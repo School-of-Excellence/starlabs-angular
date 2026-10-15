@@ -98,7 +98,7 @@
                                             {{getAppNotificationForDay(days?.date)?.length ?? 0}}
                                         </span>
                                     </div>
-                                    <button class="add-btn" *ngIf="showAddButtonInDateCell(days?.date)" (click)="onCommunicationAddClick(days?.date)" title="Add communication" aria-label="Add communication">
+                                    <button class="add-btn" *ngIf="showAddButtonInDateCell(days?.date)" (click)="onCommunicationAddClick(days?.date);$event.stopPropagation()" title="Add communication" aria-label="Add communication">
                                         <mat-icon>add</mat-icon>
                                     </button>
                                 </div>
@@ -208,7 +208,7 @@
                                         
                                             <div *ngFor="let archive of communicationwatilLog[comm?.docid] ?? []" class="wati-preview">
                                                 <div class="wati-notification-title">
-                                                    <a [attr.data-testid]="'cgp-wati-broadcast-' + archive?.broadcastname" (click)="openBroadcast(record)">{{ archive.broadcastname || 'N/A' }}</a>
+                                                    <a [attr.data-testid]="'cgp-wati-broadcast-' + archive?.broadcastname" (click)="openBroadcast(archive)">{{ archive.broadcastname || 'N/A' }}</a>
                                                     <div class="wati-profile-info">
                                                         <b>Sent By :</b> {{ mapProfile[archive?.createdby]?.name ?? '' }}
                                                     </div>

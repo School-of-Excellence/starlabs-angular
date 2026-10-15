@@ -236,7 +236,7 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.initializeProfileData();
     this.fetchCommunicationPlanner();
-    this.subscribeCommunicationToCurrentMonth();
+    // this.subscribeCommunicationToCurrentMonth();
     this.fetchEmailArchieve();
     this.fetchWatiArchieve();
     this.fetchAppNotification();
@@ -803,19 +803,30 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
   async fetchEmailArchieve() {
     this.loadingStatus.emailArchieve = true;
     const { start, end } = this.getCurrentMonthDateRange();
-    let emails = [];
+    const emailQuery = query(collection(this.firestore, 'email archive'), where('date', '>=', Timestamp.fromDate(start)), where('date', '<=', Timestamp.fromDate(end)))
+    
+    if (this.subscriptions['email archive']) {
+      this.subscriptions['email archive'].unsubscribe();
+    }
+
+    if (this.isCurrentMonth()) {
+      this.subscriptions['email archive'] = collectionData(emailQuery).subscribe((email) => {
+        this.processEmailArchieve(email);
+        this.loadingStatus.emailArchieve = false;
+      });
+    } else {
+      const emailSnap = await getDocs(emailQuery);
+      const emails = emailSnap.docs.map((doc) => doc.data());
+      this.processEmailArchieve(emails)
+      this.loadingStatus.emailArchieve = false;
+    }
+  }
+
+  processEmailArchieve(emails){
     const communicationEmailLog = {};
     const emailArchieve = {}
 
-    if (this.isCurrentMonth()) {
-      emails = [...this.currentMonthEmail];
-    } else {
-      const q = query(collection(this.firestore, 'email archive'), where('date', '>=', Timestamp.fromDate(start)), where('date', '<=', Timestamp.fromDate(end)))
-      const emailSnap = await getDocs(q);
-      emails = emailSnap.docs.map((doc) => doc.data());
-    }
-
-    emails.forEach((email) => {
+    for (const email of emails) {
       const date = email['date']?.toDate();
       const key = date?.toLocaleDateString() ?? 'Unknown';
       const communicationDocid = email['communicationplannerid'] ?? null;
@@ -830,30 +841,41 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
         communicationEmailLog[communicationDocid] = communicationEmailLog[communicationDocid] ?? [];
         communicationEmailLog[communicationDocid].push(email);
       }
+    }
 
-    });
     this.emailArchieve = emailArchieve;
     this.communicationEmailLog = communicationEmailLog;
-    this.loadingStatus.emailArchieve = false;
   }
 
   // fetch wati archieve data
   async fetchWatiArchieve() {
     this.loadingStatus.watiArchieve = true;
     const { start, end } = this.getCurrentMonthDateRange();
-    const watiArchieve = {};
-    const communicationwatilLog = {};
-    let wati = []
+    const watiQuery = query(collection(this.firestore, 'wati archive'), where('date', '>=', Timestamp.fromDate(start)), where('date', '<=', Timestamp.fromDate(end)))
 
-    if (this.isCurrentMonth()) {
-      wati = [...this.currentMonthWati];
-    } else {
-      const q = query(collection(this.firestore, 'wati archive'), where('date', '>=', Timestamp.fromDate(start)), where('date', '<=', Timestamp.fromDate(end)))
-      const watiSnap = await getDocs(q);
-      wati = watiSnap.docs.map((doc) => doc.data());
+    if (this.subscriptions['wati archive']) {
+      this.subscriptions['wati archive']?.unsubscribe();
     }
 
-    wati.forEach((wati) => {
+    if (this.isCurrentMonth()) {
+      this.subscriptions['wati archive'] = collectionData(watiQuery).subscribe((wati) => {
+        this.processWatiArchieve(wati);
+        this.loadingStatus.watiArchieve = false;
+      });
+    } else {
+      const watiSnap = await getDocs(watiQuery);
+      const wati = watiSnap.docs.map((doc) => doc.data());
+      this.processWatiArchieve(wati)
+      this.loadingStatus.watiArchieve = false;
+    }
+
+  }
+
+  processWatiArchieve(watiList){
+    const watiArchieve = {};
+    const communicationwatilLog = {};
+
+    for (const wati of watiList) {
       const date = wati['date']?.toDate();
       const key = date?.toLocaleDateString() ?? 'Unknown';
       const communicationDocid = wati['communicationplannerid'] ?? null;
@@ -868,30 +890,40 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
         communicationwatilLog[communicationDocid] = communicationwatilLog[communicationDocid] ?? [];
         communicationwatilLog[communicationDocid].push(wati);
       }
+    }
 
-    });
     this.watiArchieve = watiArchieve;
     this.communicationwatilLog = communicationwatilLog;
-    this.loadingStatus.watiArchieve = false;
   }
 
   // fetch app archive data
   async fetchAppNotification() {
     this.loadingStatus.appNotitication = true;
     const { start, end } = this.getCurrentMonthDateRange();
-    const appNotitication = {};
-    const communicationAppNotificationLog = {};
-    let appNotificationArray = [];
+    const appNotificationQuery = query(collection(this.firestore, 'notificationrecord'), where('date', '>=', Timestamp.fromDate(start)), where('date', '<=', Timestamp.fromDate(end)))
 
-    if (this.isCurrentMonth()) {
-      appNotificationArray = [...this.currentMonthAppNotification]
-    } else {
-      const q = query(collection(this.firestore, 'notificationrecord'), where('date', '>=', Timestamp.fromDate(start)), where('date', '<=', Timestamp.fromDate(end)))
-      const appNotificationSnap = await getDocs(q);
-      appNotificationArray = appNotificationSnap.docs.map((doc) => doc.data());
+    if (this.subscriptions['notificationrecord']) {
+      this.subscriptions['notificationrecord'].unsubscribe();
     }
 
-    appNotificationArray.forEach((app) => {
+    if (this.isCurrentMonth()) {
+      this.subscriptions['notificationrecord'] = collectionData(appNotificationQuery).subscribe((app) => {
+        this.processAppNotification(app);
+        this.loadingStatus.appNotitication = false;
+      });
+    } else {
+      const appNotificationSnap = await getDocs(appNotificationQuery);
+      const appNotificationArray = appNotificationSnap.docs.map((doc) => doc.data());
+      this.processAppNotification(appNotificationArray);
+      this.loadingStatus.appNotitication = false;
+    }
+  }
+
+  processAppNotification(appNotificationArray) {
+    const appNotitication = {};
+    const communicationAppNotificationLog = {};
+
+    for (const app of appNotificationArray) {
       const date = app['date']?.toDate();
       const key = date?.toLocaleDateString() ?? 'Unknown';
       const communicationDocid = app['communicationplannerid'] ?? null;
@@ -905,11 +937,10 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
         communicationAppNotificationLog[communicationDocid] = communicationAppNotificationLog[communicationDocid] ?? [];
         communicationAppNotificationLog[communicationDocid].push(app);
       }
+    }
 
-    });
     this.appNotitication = appNotitication;
     this.communicationAppNotificationLog = communicationAppNotificationLog;
-    this.loadingStatus.appNotitication = false;
   }
 
   // fetch email templates

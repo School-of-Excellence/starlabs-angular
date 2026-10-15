@@ -374,6 +374,30 @@ tbody tr:hover td {
   background: var(--sunk)
 }
 
+.cchip > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;          /* required so flex child can shrink below content width */
+  overflow: hidden;
+}
+
+/* the title text: this is what gets clipped */
+.cchip > div > span:last-child {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* keep the dot and duplicate button from shrinking */
+.cchip .sd,
+.cchip .comm-dup-btn {
+  flex-shrink: 0;
+}
+
 .more {
   font-size: 11px;
   color: var(--ink-faint);
@@ -975,7 +999,12 @@ body>input:focus-visible~.wrap label[for] {
 }
 
 .cchip {
-  cursor: default
+  cursor: default;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 200px;
+  overflow: hidden;
 }
 
 .cchip:hover {
