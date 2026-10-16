@@ -116,6 +116,28 @@
         </div>
       </section>
       
+      <!-- Specialists from the appointment (?appointmentid=) — read-only; Edit reveals the pickers below -->
+      <section class="content-section spec-card" data-testid="patc-specialists-card" *ngIf="appointmentSpecialists && !this.bigActivity()">
+        <div class="spec-head">
+          <div>
+            <h2 class="section-heading spec-title">Specialists</h2>
+            <div class="spec-sub">From the appointment roles<ng-container *ngIf="appointmentTypeName"> · {{ appointmentTypeName }}</ng-container></div>
+          </div>
+          <button data-testid="patc-specialists-edit" class="spec-edit" mat-stroked-button type="button" (click)="editSpecialists = !editSpecialists" [disabled]="assignmentInitiated">
+            {{ editSpecialists ? 'Done' : 'Edit' }}
+          </button>
+        </div>
+        <div class="spec-row" data-testid="patc-specialists-row" *ngFor="let row of appointmentSpecialists">
+          <div class="spec-label">{{ row.label }}</div>
+          <div class="spec-activity">{{ row.activity }}</div>
+          <div class="spec-people">
+            <span class="spec-chip" data-testid="patc-specialists-name" *ngFor="let path of row.profilePaths">{{ specialistName(path) }}</span>
+            <span class="spec-none" *ngIf="row.profilePaths.length == 0">Not assigned</span>
+          </div>
+        </div>
+      </section>
+
+      <ng-container *ngIf="!appointmentSpecialists || editSpecialists">
       <!-- Authors Section -->
       <section class="content-section" id="atcfield-author" *ngIf="!this.bigActivity()">
         <h2 class="section-heading">AUTHORS</h2>
@@ -245,6 +267,8 @@
         </div>
       </section>
       
+      </ng-container>
+
       <!-- Mentors Section (if mentor exists) -->
       <section class="content-section" *ngIf="mentor && mentorOption.length != 0">
         <h2 class="section-heading">MENTORS</h2>

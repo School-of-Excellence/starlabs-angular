@@ -772,3 +772,74 @@
   15%  { box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.35); background: rgba(220, 38, 38, 0.10); }
   100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.0); background: transparent; }
 }
+
+/* Specialists from the appointment (appointment mode) */
+.spec-card {
+  background-color: #fff;
+  border: 1px solid #e3e6ec;
+}
+
+.spec-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 0 1.5rem 0.75rem 0;
+  border-bottom: 1px solid #e3e6ec;
+}
+
+.spec-title {
+  background-color: transparent;
+  padding-bottom: 0.25rem;
+}
+
+.spec-sub {
+  padding: 0 1.5rem;
+  font-size: 12px;
+  color: #5f6b7a;
+}
+
+.spec-edit {
+  margin-top: 0.75rem;
+}
+
+.spec-row {
+  display: grid;
+  grid-template-columns: 120px minmax(160px, 1fr) 2fr;
+  gap: 12px;
+  align-items: center;
+  padding: 0.6rem 1.5rem;
+}
+
+.spec-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: #5f6b7a;
+}
+
+.spec-activity {
+  font-size: 14px;
+}
+
+.spec-people {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.spec-chip {
+  font-size: 13px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: #eceff1;
+}
+
+.spec-none {
+  font-size: 12px;
+  color: #9aa3ad;
+}
+
+@media (max-width: 640px) {
+  .spec-row { grid-template-columns: 1fr; gap: 4px; }
+}

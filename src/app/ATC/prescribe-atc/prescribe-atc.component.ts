@@ -35,6 +35,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { UpdateDialogComponent } from '../../DialogBox/update-dialog/update-dialog.component';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MarkdownModule } from 'ngx-markdown';
+import { appointmentSpecialistRows, AppointmentSpecialistRow } from './appointment-specialists';
 
 interface AssignmentData {
   clipurl?: string;
@@ -199,6 +200,13 @@ export class PrescribeATCComponent {
   liveassignmentid = null
   liveassignmentdata = null
   personnelReady = true   // toggled false→true after a programmatic patch to force the author/observer/mentor mat-selects to rebuild
+  // Appointment mode (?appointmentid=): specialists come from who hosted each role in that appointment.
+  // null = not in appointment mode, or a draft / live studio has since replaced the specialists.
+  appointmentId: string = null
+  appointmentTypeName = ''
+  appointmentSpecialists: AppointmentSpecialistRow[] = null
+  editSpecialists = false
+  bigActivityReady: Promise<void> = Promise.resolve()
   tokendata = null
   queueid:string = null
   stagename:string = null
@@ -298,6 +306,7 @@ export class PrescribeATCComponent {
         this.marathonId = data['marathonid']
         this.assignmentId = data['assignmentid']
         this.participantAssignmentId = data['participantassignmentid']
+        this.appointmentId = data['appointmentid'] ?? null
       }
       // this.participantProfileid = data['profileid']
       // this.marathonId = data['marathonid']
@@ -325,6 +334,10 @@ export class PrescribeATCComponent {
           }
           // this.addActivity()
           await this.setupData()
+          // Before onProfileSelect: a live-studio prefill (arena) and a draft the user opens both run later and win
+          if(this.appointmentId){
+            await this.prefillFromAppointment()
+          }
           // await the assignment check so its popup resolves before setup completes
           const profileMapData = await guardservice.getProfileMap()
           await this.getDirectiveAssignments(profileMapData.docdata)
@@ -746,8 +759,8 @@ export class PrescribeATCComponent {
         }
       })
 
-      // Big Activity
-      getDocs(query(collection(this.firestoreDefault, "bigactivity"), orderBy("activity"))).then(activityList=>{
+      // Big Activity (bigActivityReady lets the appointment prefill wait for the lists and the empty maps)
+      this.bigActivityReady = getDocs(query(collection(this.firestoreDefault, "bigactivity"), orderBy("activity"))).then(activityList=>{
         for (let i = 0; i < activityList.docs.length; i++) {
           const activityDoc = activityList.docs[i];
           var activityData = activityDoc.data()
@@ -927,6 +940,51 @@ export class PrescribeATCComponent {
     }
   }
 
+  // Appointment mode: fill the specialist pickers from the appointment instead of asking for them.
+  // appointments.hostRole says who hosted each role; AppointmentType-To-Roles.atcrolemap says which
+  // bigactivity each role fills. Read-only — nothing is saved until the user saves the ATC as usual.
+  async prefillFromAppointment(){
+    try {
+      await this.bigActivityReady
+      const apptSnap = await getDoc(doc(this.firestoreDefault, "appointments", this.appointmentId))
+      if(!apptSnap.exists()) return
+      const appt = apptSnap.data()
+      // only this participant's own appointment
+      if(this.participantProfileid && appt['bookedby']?.id && appt['bookedby'].id != this.participantProfileid) return
+      const typeRef = appt['appointment']
+      if(!typeRef) return
+      const [mappingSnap, typeSnap] = await Promise.all([
+        getDocs(query(collection(this.firestoreDefault, "AppointmentType-To-Roles"), where("assigned_appttype_ref", "==", typeRef), limit(1))),
+        getDoc(typeRef)
+      ])
+      const rows = appointmentSpecialistRows(appt, mappingSnap.docs[0]?.data() ?? null, this.bigActivityList)
+      if(rows.length == 0) return
+      // same zone + rebuild steps as the live-studio prefill, so the closed mat-selects show the names at once
+      this.ngZone.run(() => {
+        rows.forEach(row => {
+          if(row.atcproperty == "author") this.authorMap[row.activityId] = [...row.profilePaths]
+          else if(row.atcproperty == "observer") this.observerMap[row.activityId] = [...row.profilePaths]
+          else if(row.atcproperty == "mentoring") this.mentorMap[row.activityId] = [...row.profilePaths]
+          // assigned_to: preselect the "set for all procedures" picker only; Apply stays a user action
+          else if(row.atcproperty == "assigned_to") this.bulkAssignedSelection[row.activityId] = [...row.profilePaths]
+          else if(row.profilePaths.length != 0) this.additionalActivityMap.push({ activity: row.activityId, specialist: [...row.profilePaths] })
+        })
+        this.onObserverSelect()
+        this.appointmentTypeName = (typeSnap.data() as any)?.['appointmenttype'] ?? ''
+        this.appointmentSpecialists = rows
+        this.editSpecialists = false
+        this.personnelReady = false
+        setTimeout(() => this.personnelReady = true)
+      })
+    } catch (error) {
+      console.error("Could not load specialists from the appointment", error)
+    }
+  }
+
+  specialistName(path: string): string {
+    return this.specialistList.find(e => e.authorpath == path)?.authorname ?? this.mapProfile[path.split('/').pop()]?.["name"] ?? path.split('/').pop()
+  }
+
   async onProfileSelect(){
     console.log("Selected Profile", this.participantProfileid)
     this.selectedParticipantProfile = {}
@@ -1054,6 +1112,7 @@ export class PrescribeATCComponent {
               // name only appears once the dropdown is opened. Schedule the assignment on a fresh macrotask INSIDE
               // Angular's zone so a clean top-down change-detection cycle renders the selected names immediately.
               this.ngZone.run(() => {
+                this.appointmentSpecialists = null // the live studio's specialists replace the appointment's
                 this.authorMap = authorValue
                 this.observerMap = observerValue
                 this.mentorMap = mentorValue
@@ -1646,6 +1705,7 @@ export class PrescribeATCComponent {
 
   // map a draft document (server, local, or a conflict winner) onto the form fields. Reused on open AND after a resolve.
   private applyDraftValue(value: any) {
+    this.appointmentSpecialists = null // an opened draft's specialists win over the appointment's
     this.date = value['date']
     this.product = value['product']
     this.atcdirective = value['atcdirective'] ?? null
