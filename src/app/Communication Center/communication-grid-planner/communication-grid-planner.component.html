@@ -31,7 +31,7 @@
             <div>
                 <mat-form-field>
                     <mat-label>Select Participant</mat-label>
-                    <mat-select [(ngModel)]="selectedParticipant" (selectionChange)="filterCommunications()" multiple>
+                    <mat-select data-testid="cgp-filter-participant" [(ngModel)]="selectedParticipant" (selectionChange)="filterCommunications()" multiple>
                         <mat-option>
                             <ngx-mat-select-search [(ngModel)]="participantSearch" name="participant Search"
                                 [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'"
@@ -41,22 +41,20 @@
                         <mat-option *ngFor="let p of getFilteredParticipants()" [value]="p?.profileid">{{p?.name}}</mat-option>
                     </mat-select>
                 </mat-form-field>
-            </div>
-            <button (click)="refresPage()" mat-stroked-button> <mat-icon>refresh</mat-icon> Refresh </button>
+            <button data-testid="cgp-toolbar-refresh" (click)="refresPage()" mat-stroked-button> <mat-icon>refresh</mat-icon> Refresh </button>
         </div>
         <div class="header-warp">
             <div class="header">
-                <button (click)="prevMonth()" type="button">‹</button>
+                <button data-testid="cgp-cal-prev-month" (click)="prevMonth()" type="button">‹</button>
                 <span>{{ displayedMonth | date:'MMMM yyyy' }}</span>
-                <button (click)="nextMonth()" type="button">›</button>
+                <button data-testid="cgp-cal-next-month" (click)="nextMonth()" type="button">›</button>
             </div>
             
             <div class="chip-group">
-                <button class="chip" [class.is-active]="selectedEvent === event?.docid" type="button" *ngFor="let event of upcomingEvents" (click)="onEventChipClick(event?.docid)">
+                <button data-testid="cgp-eventchip" class="chip" [class.is-active]="selectedEvent === event?.docid" type="button" *ngFor="let event of upcomingEvents" (click)="onEventChipClick(event?.docid)">
                     <svg class="check" viewBox="0 0 16 16" fill="none">
                         <path d="M3 8.5L6.5 12L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                     </svg>
-                    {{event?.name}}
                 </button>
             </div>
             
@@ -80,7 +78,7 @@
                         <div class="dow">Fri</div>
                         <div class="dow">Sat</div>
                         <div class="dow">Sun</div>
-                        <div class="day" *ngFor="let days of calendarDays" [class.out]="!days.isCurrentMonth" (click)="days.isCurrentMonth && openCommunicationDaySidePanel(days?.date)">
+                        <div data-testid="cgp-cal-day" class="day" *ngFor="let days of calendarDays" [class.out]="!days.isCurrentMonth" (click)="days.isCurrentMonth && openCommunicationDaySidePanel(days?.date)">
                             <div *ngIf="days.isCurrentMonth">
                                 <div class="dhead">
                                     <span class="dn">{{days?.date?.getDate()}}</span>
@@ -98,7 +96,7 @@
                                             {{getAppNotificationForDay(days?.date)?.length ?? 0}}
                                         </span>
                                     </div>
-                                    <button class="add-btn" *ngIf="showAddButtonInDateCell(days?.date)" (click)="onCommunicationAddClick(days?.date);$event.stopPropagation()" title="Add communication" aria-label="Add communication">
+                                    <button data-testid="cgp-cal-add" class="add-btn" *ngIf="showAddButtonInDateCell(days?.date)" (click)="onCommunicationAddClick(days?.date);$event.stopPropagation()" title="Add communication" aria-label="Add communication">
                                         <mat-icon>add</mat-icon>
                                     </button>
                                 </div>
@@ -109,9 +107,9 @@
                                             <span class="sd" style="background:var(--s-draft); flex-shrink:0; width:8px; height:8px; border-radius:50%;"></span>
                                             <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; font-size: 13px;">{{comm?.title ?? ''}}</span>
                                             </div>
-                                            <button class="comm-dup-btn" (click)="onCommunicationDuplicate(comm); $event.stopPropagation()"><mat-icon>file_copy</mat-icon></button>
+                                            <button data-testid="cgp-cal-dup" class="comm-dup-btn" (click)="onCommunicationDuplicate(comm); $event.stopPropagation()"><mat-icon>file_copy</mat-icon></button>
                                         </button>
-                                        <button *ngIf="getCommunicationForDay(days?.date)?.length > 3" type="button" class="show-more-btn">
+                                        <button data-testid="cgp-cal-showmore" *ngIf="getCommunicationForDay(days?.date)?.length > 3" type="button" class="show-more-btn">
                                             <span>Show {{ getCommunicationForDay(days?.date).length - 3 }} more</span>
                                             <span class="show-more-icon">+</span>
                                         </button>
@@ -124,9 +122,9 @@
             </section>
             <section style="display:block;overflow:hidden" *ngIf="activeTab == 'library'">
                 <div class="comm-form-block">
-                    <button class="cf-btn cf-btn-ghost" (click)="openCommunicationForm()" *ngIf="!communicationFormMode"> + Add
+                    <button data-testid="cgp-lib-add-communication" class="cf-btn cf-btn-ghost" (click)="openCommunicationForm()" *ngIf="!communicationFormMode"> + Add
                         Communication </button>
-                    <button class="cf-btn cf-btn-close" (click)="onSendCommunication(selectedCommunication)"
+                    <button data-testid="cgp-lib-close-analytics" class="cf-btn cf-btn-close" (click)="onSendCommunication(selectedCommunication)"
                         *ngIf="selectedCommunication"> ✕ Close Participant Analytics </button>
                 </div>
                 <ng-container *ngIf="!isAllLoaded()">
@@ -152,7 +150,7 @@
                                     </span>
                                     <button class="comm-btn comm-send-btn"
                                         [class.comm-active]="comm?.docid == selectedCommunication?.docid"
-                                        [attr.data-testid]="'cgp-lib-send-' + comm?.docid"
+                                        data-testid="cgp-lib-send"
                                         (click)="onSendCommunication(comm); $event.stopPropagation()">
                                         {{ comm?.docid == selectedCommunication?.docid ? 'Close' : 'Send' }}
                                     </button>
@@ -178,7 +176,7 @@
                                                     </div>
                                                     <div class="email-content">
                                                         <button mat-button class="recipient-chip clickable-chip"
-                                                            [attr.data-testid]="'cgp-email-recipients-' + archive?.broadcastname"
+                                                            data-testid="cgp-email-recipients"
                                                             (click)="openParticipantsPopup(archive, 'all'); $event.stopPropagation()"
                                                             matTooltip="Click to view all participants">
                                                             <mat-icon>group</mat-icon>
@@ -276,11 +274,10 @@
 
         <!-- TOOLBAR -->
         <div class="cf-toolbar">
-            <!-- <button class="cf-btn cf-btn-ghost" (click)="openCommunicationForm()" > + Add Communication </button> -->
-            <button class="cf-btn cf-btn-close" (click)="onSendCommunication(selectedCommunication)" *ngIf="selectedCommunication"> ✕ Close Participant Analytics </button>
+            <button data-testid="cgp-form-close-analytics" class="cf-btn cf-btn-close" (click)="onSendCommunication(selectedCommunication)" *ngIf="selectedCommunication"> ✕ Close Participant Analytics </button>
             <ng-container *ngIf="communicationFormMode">
-                <button class="cf-btn cf-btn-primary" (click)="saveCommunicationFrom()"> Save Communication </button>
-                <button class="cf-btn cf-btn-ghost" (click)="clearForm()"> Cancel </button>
+                <button data-testid="cgp-form-save" class="cf-btn cf-btn-primary" (click)="saveCommunicationFrom()"> Save Communication </button>
+                <button data-testid="cgp-form-cancel" class="cf-btn cf-btn-ghost" (click)="clearForm()"> Cancel </button>
             </ng-container>
         </div>
 
@@ -292,19 +289,19 @@
                     <div class="cf-head">
                         <mat-form-field appearance="outline" class="cf-field cf-field-title">
                             <mat-label>Title</mat-label>
-                            <input matInput formControlName="title" placeholder="Untitled">
+                            <input data-testid="cgp-form-title" matInput formControlName="title" placeholder="Untitled">
                         </mat-form-field>
 
                         <mat-form-field appearance="outline" class="cf-field cf-field-date">
                             <mat-label>Choose a date</mat-label>
-                            <input matInput [matDatepicker]="picker" formControlName="date" [matDatepickerFilter]="dateFilter">
+                            <input data-testid="cgp-form-date" matInput [matDatepicker]="picker" formControlName="date" [matDatepickerFilter]="dateFilter">
                             <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
                             <mat-datepicker #picker></mat-datepicker>
                         </mat-form-field>
 
                         <mat-form-field appearance="outline" class="cf-field cf-field-event">
                             <mat-label>Select Event</mat-label>
-                            <mat-select formControlName="eventref">
+                            <mat-select data-testid="cgp-form-eventref" formControlName="eventref">
                                 <mat-option>
                                     <ngx-mat-select-search formControlName="eventsearch" name="event Search" [placeholderLabel]="'Search'"
                                         [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
@@ -316,8 +313,8 @@
                         </mat-form-field>
 
                         <div class="cf-head-actions" *ngIf="communicationFormMode == 'add'">
-                            <button mat-button class="cf-btn cf-btn-ghost" (click)="addCommunicationFrom()" *ngIf="isLast"> + Add row </button>
-                            <button mat-button class="cf-btn cf-btn-danger" (click)="removeCommunicationForm(i)"> Remove </button>
+                            <button data-testid="cgp-form-addrow" mat-button class="cf-btn cf-btn-ghost" (click)="addCommunicationFrom()" *ngIf="isLast"> + Add row </button>
+                            <button data-testid="cgp-form-remove" mat-button class="cf-btn cf-btn-danger" (click)="removeCommunicationForm(i)"> Remove </button>
                         </div>
                     </div>
 
@@ -327,7 +324,7 @@
                                 <div class="cf-email-config">
                                     <mat-form-field appearance="outline" class="cf-field cf-field-tmpl">
                                         <mat-label>Select Email Template</mat-label>
-                                        <mat-select formControlName="emailtemplate">
+                                        <mat-select data-testid="cgp-form-emailtemplate" formControlName="emailtemplate">
                                             <mat-option>
                                                 <ngx-mat-select-search formControlName="emailsearch" name="event Search" [placeholderLabel]="'Search'"
                                                     [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
@@ -335,7 +332,7 @@
                                             <mat-option *ngFor="let template of getFilteredEmailTemplates(group?.get('emailsearch')?.value)" [value]="template.docid"> {{ template?.templatename ?? 'no title' }} </mat-option>
                                         </mat-select>
                                     </mat-form-field>
-                                    <button mat-stroked-button class="cf-btn cf-btn-primary cf-btn-sm" (click)="navigateToCreateEmail()"> + </button>
+                                    <button data-testid="cgp-form-newtemplate" mat-stroked-button class="cf-btn cf-btn-primary cf-btn-sm" (click)="navigateToCreateEmail()"> + </button>
                                 </div>
                             </div>
 
@@ -343,7 +340,7 @@
                             <div>
                                 <div>
                                     <mat-form-field appearance="outline" class="full-width"><mat-label>Search templates</mat-label><mat-icon matPrefix>search</mat-icon>
-                                        <mat-select (selectionChange)="onTemplateChange($event , i)" >
+                                        <mat-select data-testid="cgp-form-wati" (selectionChange)="onTemplateChange($event , i)" >
                                             <mat-option><ngx-mat-select-search [(ngModel)]="searchTemplate"
                                                     [ngModelOptions]="{standalone: true}"
                                                     placeholderLabel="Search…" noEntriesFoundLabel="None found"
@@ -360,10 +357,10 @@
                                                             <span class="tpl-server-tag">{{t.servername}}</span><span class="tpl-cat-tag" *ngIf="t.category">{{t.category}}</span>
                                                         </div>
                                                     </div>
-                                                    <button class="fav-inline-btn" [class.fav-inline-btn-active]="isFavourite(t)" (click)="toggleFavourite($event, t)" [matTooltip]="isFavourite(t) ? 'Remove' : 'Add to favourites'"><mat-icon>{{isFavourite(t)? 'star' : 'star_border'}}</mat-icon></button>
+                                                    <button data-testid="cgp-tpl-fav" class="fav-inline-btn" [class.fav-inline-btn-active]="isFavourite(t)" (click)="toggleFavourite($event, t)" [matTooltip]="isFavourite(t) ? 'Remove' : 'Add to favourites'"><mat-icon>{{isFavourite(t)? 'star' : 'star_border'}}</mat-icon></button>
                                                 </div>
                                             </mat-option>
-                                            <mat-option disabled *ngIf="hasMoreTemplates"><button mat-stroked-button class="load-more-btn" (click)="loadMoreTemplates(); $event.stopPropagation();">Load more…</button></mat-option>
+                                            <mat-option disabled *ngIf="hasMoreTemplates"><button data-testid="cgp-form-loadmore" mat-stroked-button class="load-more-btn" (click)="loadMoreTemplates(); $event.stopPropagation();">Load more…</button></mat-option>
                                             <mat-option disable *ngIf="displayTemplates.length === 0 && !watiTemplateLoading && !iswatiSearching"><span class="empty-label">No matches</span></mat-option>
                                         </mat-select>
                                     </mat-form-field>
@@ -374,7 +371,7 @@
                             <!-- <div>
                                 <mat-form-field appearance="outline" class="full-width">
                                     <mat-label>Select App Template</mat-label>
-                                    <mat-select formControlName="apptemplate">
+                                    <mat-select data-testid="cgp-form-apptemplate" formControlName="apptemplate">
                                         <mat-option *ngFor="let template of appNotificationTemplate" [value]="template.docid"> {{ template?.title ??
                                             'no title' }} </mat-option>
                                     </mat-select>
@@ -715,10 +712,10 @@
         <aside class="drawer" aria-label="Communications for the day">
             <div class="dh">
                 <div class="r1">
-                    <button class="nav" title="Previous day" (click)="onPreSidePanelClick()" [disabled]="!showPreSidePanel()"><span>‹</span></button>
+                    <button data-testid="cgp-side-prev" class="nav" title="Previous day" (click)="onPreSidePanelClick()" [disabled]="!showPreSidePanel()"><span>‹</span></button>
                     <h3>{{expandedCommunication?.date | date}}</h3>
-                    <button class="nav" title="Next day" (click)="onNextSidePanelClick()" [disabled]="!showNextSidePanel()"><span>›</span></button>
-                    <button class="x" title="Close" (click)="closeCommunicationDaySidePanel()">×</button>
+                    <button data-testid="cgp-side-next" class="nav" title="Next day" (click)="onNextSidePanelClick()" [disabled]="!showNextSidePanel()"><span>›</span></button>
+                    <button data-testid="cgp-side-close" class="x" title="Close" (click)="closeCommunicationDaySidePanel()">×</button>
                 </div>
                 <div class="sub">{{expandedCommunication?.communications?.length}} communications</div>
                 <div class="tot">
@@ -740,7 +737,7 @@
                         </svg>App 165
                     </span> -->
                 </div>
-                <input class="inp" placeholder="Search this day" [(ngModel)]="expandedCommunication.communicationSearch">
+                <input data-testid="cgp-side-search" class="inp" placeholder="Search this day" [(ngModel)]="expandedCommunication.communicationSearch">
             </div>
             <div class="db">
                 <div class="grp" *ngFor="let event of getCommunicationsForSidePanel() | keyvalue">
@@ -748,8 +745,8 @@
                     <div class="row" style="border-left-color:#1f5bd8;background:rgba(31,91,216,0.04);" *ngFor="let comm of event?.value">
                         <div><b>{{comm?.title ?? 'Unknown'}}</b></div>
                         <div class="acts">
-                            <button title="Duplicate" (click)="onCommunicationDuplicate(comm)">⧉</button>
-                            <button title="Open" (click)="onCummunicationClick(comm);$event.stopPropagation()" >Open</button>
+                            <button data-testid="cgp-side-dup" title="Duplicate" (click)="onCommunicationDuplicate(comm)">⧉</button>
+                            <button data-testid="cgp-side-open" title="Open" (click)="onCummunicationClick(comm);$event.stopPropagation()" >Open</button>
                         </div>
                     </div>
                 </div>
