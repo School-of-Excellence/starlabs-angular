@@ -16,9 +16,10 @@ Screen: `/zoom-recording-dashboard` → `src/app/Communication Center/zoom-recor
 - **The 2 h cap** stops a repair that never ran from leaving a row "backing up" forever.
 
 ## e2e
-No new interactive elements (the sort headers are `mat-sort-header`, and the size cells are display-only).
-The gate is green and the comms ZRD-* cases still cover the screen. The Zoom/Dropbox mismatch display has
-no behavioural case yet.
+Display hooks were added: `zrd-size-zoom` / `-dropbox` / `-dropbox-unknown`, `zrd-file-bytes`,
+`zrd-file-zoomnow`, `zrd-verifyall-problem` and `zrd-verifyall-gone`. The hub's `comms/zoom-backup-verify.spec.ts`
+ZRD-11..14 cover the ✓/⚠ sizes (the verification beats the upload size), the Zoom-changed warning, the Size
+sort and the gone-from-Zoom split. Why the seed looks that way: hub `specs/journals/2026-10-16-zoom-dashboard-size-validation.md`.
 
 ## Revert
 `git checkout <commit-before> -- "src/app/Communication Center/zoom-recording-dashboard"`
