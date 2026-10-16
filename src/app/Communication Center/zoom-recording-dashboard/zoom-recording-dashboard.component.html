@@ -135,8 +135,16 @@
         @if (st.errors) { <span class="verify-bad">{{ st.errors }} error(s)</span> }
         @if (!st.running) { <span class="action-muted">{{ st.stop ? 'Stopped' : 'Done' }}</span> }
       </div>
-      @for (p of st.problems; track $index) {
-      <div class="file-error">⚠ {{ p.topic }} — {{ p.text }}</div>
+      @for (p of verifyAllActionable(st); track $index) {
+      <div class="file-error">⚠ {{ p.topic }} — {{ p.text || 'Verification failed' }}</div>
+      }
+      @if (verifyAllGone(st).length) {
+      <details class="verify-all__gone">
+        <summary>{{ verifyAllGone(st).length }} recording(s) can't be completed — no longer in Zoom, so nothing can be re-downloaded (show details)</summary>
+        @for (p of verifyAllGone(st); track $index) {
+        <div class="cell-sub">• {{ p.topic }} — {{ p.text || 'No files were ever backed up' }}</div>
+        }
+      </details>
       }
     </div>
     }
@@ -252,7 +260,7 @@
   <div class="table-card">
     <table mat-table [dataSource]="recordsBackup" matSort>
       <ng-container matColumnDef="meetingTopic">
-        <th mat-header-cell *matHeaderCellDef>Meeting</th>
+        <th mat-header-cell *matHeaderCellDef mat-sort-header start="asc" title="Sort by meeting name">Meeting</th>
         <td mat-cell *matCellDef="let el">
           <div class="cell-topic">{{ el.meetingTopic }}</div>
           <div class="cell-sub mono">#{{ el.meetingId }}</div>
@@ -318,8 +326,18 @@
       </ng-container>
 
       <ng-container matColumnDef="totalSize">
-        <th mat-header-cell *matHeaderCellDef>Size</th>
-        <td mat-cell *matCellDef="let el"><span class="mono">{{ formatBytes(el.totalSize) }}</span></td>
+        <th mat-header-cell *matHeaderCellDef mat-sort-header start="desc" title="Sort by size (Zoom)">Size</th>
+        <td mat-cell *matCellDef="let el" [title]="bytesTitle(zoomTotal(el), dropboxTotal(el))">
+          <div class="mono">{{ formatBytes(zoomTotal(el)) }} <span class="size-src">Zoom</span></div>
+          @if (dropboxTotal(el) !== null) {
+          <div class="mono" [class.size-bad]="dropboxTotal(el) !== zoomTotal(el)" [class.size-ok]="dropboxTotal(el) === zoomTotal(el)">
+            {{ formatBytes(dropboxTotal(el)) }} <span class="size-src">Dropbox</span>
+            {{ dropboxTotal(el) === zoomTotal(el) ? '✓' : '⚠' }}
+          </div>
+          } @else {
+          <div class="cell-sub">— <span class="size-src">Dropbox</span></div>
+          }
+        </td>
       </ng-container>
 
       <ng-container matColumnDef="totalFiles">
@@ -489,10 +507,24 @@
           </div>
           <span class="mono progress-text">{{ f.status === 'success' ? 100 : (f.percent || 0) }}%</span>
         </div>
-        <div class="file-bytes mono">
-          {{ formatBytes(f.status === 'success' ? f.fileSize : (f.uploadedBytes || 0)) }}
-          / {{ formatBytes(f.fileSize) }}
+        @if (f.status === 'success') {
+        <div class="file-bytes mono" [title]="bytesTitle(f.fileSize, dropboxSizeFor(activeRecord, f))">
+          Zoom {{ formatBytes(f.fileSize) }} ·
+          @if (dropboxSizeFor(activeRecord, f) !== null) {
+          <span [class.size-bad]="dropboxSizeFor(activeRecord, f) !== +f.fileSize" [class.size-ok]="dropboxSizeFor(activeRecord, f) === +f.fileSize">
+            Dropbox {{ formatBytes(dropboxSizeFor(activeRecord, f)) }} {{ dropboxSizeFor(activeRecord, f) === +f.fileSize ? '✓' : '⚠' }}</span>
+          } @else {
+          <span>Dropbox — (Verify to check)</span>
+          }
         </div>
+        } @else {
+        <div class="file-bytes mono">
+          {{ formatBytes(f.uploadedBytes || 0) }} / {{ formatBytes(f.fileSize) }} uploaded
+        </div>
+        }
+        @if (zoomNowFor(activeRecord, f); as now) {
+        <div class="file-bytes mono size-bad">⚠ Zoom now has {{ formatBytes(now) }} (changed since backup)</div>
+        }
         @if (f.status === 'failed' && f.error) {
         <div class="file-error">⚠ {{ f.error }}</div>
         }
