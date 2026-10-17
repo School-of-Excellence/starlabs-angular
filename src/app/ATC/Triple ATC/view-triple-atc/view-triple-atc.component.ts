@@ -396,7 +396,7 @@ export class ViewTripleATCComponent {
     const url = this.router.createUrlTree(['/previewtripleATC'], {
       queryParams: {
         type: 'validation',
-        atcid:tripleatc,
+        atcdocid: tripleatc, // preview-triple-atc reads `atcdocid` (was `atcid` → "No ATC ID provided")
         validation: true,
         profileid: this.profileID,
         // marathonid: activity.marathonref.id,
