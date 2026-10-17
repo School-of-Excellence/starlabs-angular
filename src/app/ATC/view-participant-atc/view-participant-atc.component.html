@@ -9,7 +9,7 @@
 <div class="participant-atc-container" *ngIf="!loading()">
   <!-- No Data -->
   @if (productGroups().length === 0) {
-    <div class="no-data">
+    <div data-testid="vpa-no-data" class="no-data">
       <mat-icon>inbox</mat-icon>
       <p>The participant does not have any previously prescribed ATC</p>
     </div>
@@ -18,28 +18,28 @@
   <!-- Product Groups — use $index in the track key so duplicate product
        names (e.g. multiple "uP!" cycles) don't trigger NG0955. -->
   @for (group of productGroups(); track groupIdx + '-' + group.product; let groupIdx = $index) {
-    <div class="product-group">
+    <div data-testid="vpa-group" class="product-group">
       <!-- Product Header -->
       <div class="product-header">
         <mat-icon>inventory_2</mat-icon>
-        <h2>{{ group.product }}</h2>
+        <h2 data-testid="vpa-product">{{ group.product }}</h2>
         <span class="atc-count">{{ group.atcItems.length }} ATC(s)</span>
       </div>
 
       <!-- ATCs under this product -->
       @for (atc of group.atcItems; track atc.id; let atcIdx = $index) {
-        <div class="atc-card">
+        <div class="atc-card" data-testid="vpa-card" [attr.data-atc]="atc.id">
           <!-- Header row: number + underlined date + status pill -->
           <div class="atc-card__head">
             <span class="atc-card__num">{{ atcIdx + 1 }}.</span>
             <span class="atc-card__date">{{ atc.data['prescription_date']?.toDate() | date:'medium' }}</span>
             @if (atc.data['status'] === 'validated') {
-              <span class="pill pill-green">
+              <span data-testid="vpa-pill-validated" class="pill pill-green">
                 <mat-icon>verified</mat-icon>
                 Validated
               </span>
             } @else if (atc.data['status'] === 'atc given') {
-              <span class="pill pill-amber">
+              <span data-testid="vpa-pill-pending" class="pill pill-amber">
                 <mat-icon>schedule</mat-icon>
                 Pending
               </span>
@@ -95,7 +95,7 @@
 
           <!-- Single CTA: View Full ATC toggle -->
           <div class="atc-card__actions">
-            <button type="button" class="vp-btn vp-btn--soft" (click)="toggleATC(atc.id)">
+            <button data-testid="vpa-toggle" type="button" class="vp-btn vp-btn--soft" (click)="toggleATC(atc.id)">
               <mat-icon>{{ isATCExpanded(atc.id) ? 'visibility_off' : 'visibility' }}</mat-icon>
               {{ isATCExpanded(atc.id) ? 'Hide Details' : 'View Full ATC' }}
             </button>
@@ -112,7 +112,7 @@
                     <div class="adjustment-block" [class.deleted]="item.adjustment.data['isdelete']">
                       <div class="adjustment-header">
                         <span class="adj-number">{{ adjIdx + 1 }}.</span>
-                        <span class="adj-name">{{ item.adjustment.data['name'] }}</span>
+                        <span data-testid="vpa-adj-name" class="adj-name">{{ item.adjustment.data['name'] }}</span>
                         @if (item.adjustment.data['newlyadded']) {
                           <span class="new-tag">New</span>
                         }
@@ -150,7 +150,7 @@
                             <div class="procedure-block" [class.deleted]="proc.data['isdelete']">
                               <div class="procedure-row">
                                 <span class="proc-number">{{ procIdx + 1 }}.</span>
-                                <span class="proc-name">{{ getProcedureName(proc.data['name']) }}</span>
+                                <span data-testid="vpa-proc-name" class="proc-name">{{ getProcedureName(proc.data['name']) }}</span>
 
                                 @if (proc.data['mandatory']) {
                                   <span class="mandatory-tag">Mandatory</span>
