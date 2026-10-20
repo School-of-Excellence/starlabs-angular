@@ -77,18 +77,29 @@ describe('appointment-specialists', () => {
 });
 
 describe('completedNewestFirst', () => {
-  const day = (d: number) => new Date(2026, 9, d, 10);
-  const a = (id: string, d: number, over: Partial<AppointmentSummary> = {}): AppointmentSummary =>
-    ({ id, start: day(d), attended: true, cancelled: false, typeId: 'T', ...over });
+  const NOW = new Date(2026, 9, 20, 15, 0);            // 20 Oct 2026, 3 pm
+  const at = (d: number, h = 10) => new Date(2026, 9, d, h);
+  const a = (id: string, start: Date | null, over: Partial<AppointmentSummary> = {}): AppointmentSummary =>
+    ({ id, start, attended: true, cancelled: false, typeId: 'T', ...over });
 
-  it('keeps attended, not-cancelled, typed, dated appointments, newest first', () => {
+  it('past days need attended; newest first', () => {
+    const list = [a('old', at(10)), a('new', at(18)), a('mid', at(14)), a('notMarked', at(19), { attended: false })];
+    expect(completedNewestFirst(list, NOW).map(x => x.id)).toEqual(['new', 'mid', 'old']);
+  });
+
+  it('today counts even before its status is updated, including later today', () => {
+    const list = [a('yesterday', at(19)), a('todayUnmarked', at(20, 9), { attended: false }), a('todayLater', at(20, 18), { attended: false })];
+    expect(completedNewestFirst(list, NOW).map(x => x.id)).toEqual(['todayLater', 'todayUnmarked', 'yesterday']);
+  });
+
+  it('never takes future days (even if marked attended), cancelled, untyped or undated appointments', () => {
     const list = [
-      a('old', 10), a('new', 18), a('mid', 14),
-      a('notyet', 19, { attended: false }),
-      a('cancelled', 17, { cancelled: true }),
-      a('untyped', 16, { typeId: null }),
-      a('nodate', 15, { start: null }),
+      a('ok', at(12)),
+      a('tomorrow', at(21), { attended: true }),
+      a('cancelledToday', at(20, 9), { cancelled: true }),
+      a('untyped', at(16), { typeId: null }),
+      a('nodate', null),
     ];
-    expect(completedNewestFirst(list).map(x => x.id)).toEqual(['new', 'mid', 'old']);
+    expect(completedNewestFirst(list, NOW).map(x => x.id)).toEqual(['ok']);
   });
 });

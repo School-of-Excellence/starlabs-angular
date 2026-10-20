@@ -72,3 +72,10 @@ role's specialist on ALL author activities.
 - Card shows property · role name · people (no activity column — the person covers the whole section).
 **Verified:** helper 8/8; tsc + build green; emulator: one author role filled BOTH author activities
 (appt_BA1 and appt_BA3), observer role filled the observer activity.
+
+## 2026-10-20 — date rule for the fallback: today counts
+**Operator:** "take if it is today date also". `completedNewestFirst(appts, now)`: not cancelled, typed, dated, and
+`starttime` before tomorrow; past days must be `attended`, **today's count even before the status is updated**
+(prescribing right after the session); future days never count, even if marked attended (hand-edited data).
+**Verified:** helper 10/10; build green; emulator — a today, not-yet-attended appointment was picked over
+yesterday's attended one (card "Test Two-Role · 20 Oct 2026", swapped hosts).
