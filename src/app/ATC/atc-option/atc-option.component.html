@@ -4,7 +4,7 @@
       <ul>
         <li *ngFor="let atc of initiatedATC; let i = index">
           Initiated By - {{mapProfile[atc.data()["initiatedby"].path].name}}
-          <button mat-icon-button class="selectbtn" (click)="selecteATC('initiated', atc)">
+          <button [attr.data-testid]="'atco-initiated-select-' + i" mat-icon-button class="selectbtn" (click)="selecteATC('initiated', atc)">
             <mat-icon class="icon">check</mat-icon>
           </button>
         </li>
@@ -24,10 +24,10 @@
           <span *ngIf="atc.data()['aiedited']" class="aiatc-badge">
             <mat-icon class="icon">auto_awesome</mat-icon> AI ATC draft
           </span>
-          <button mat-icon-button class="selectbtn" (click)="selecteATC('draft', atc)">
+          <button [attr.data-testid]="'atco-draft-select-' + i" mat-icon-button class="selectbtn" (click)="selecteATC('draft', atc)">
             <mat-icon class="icon">check</mat-icon>
           </button>
-          <button mat-icon-button class="deletebtn" (click)="deleteDraft(atc, i)">
+          <button [attr.data-testid]="'atco-draft-delete-' + i" mat-icon-button class="deletebtn" (click)="deleteDraft(atc, i)">
             <mat-icon class="icon">delete_outline</mat-icon>
           </button>
         </li>
@@ -38,13 +38,13 @@
       <ul>
         <li *ngFor="let item of assignments;let i = index;">
           {{mapProfile[item.data()['profileid']]['name']}} - <b>{{item.data()['directive']}}</b> given by <span *ngFor="let eis of item.data()['author'];let j = index"><b>{{mapProfile[eis]['name']}}, </b></span> on {{item.data()['created'].toDate() | date : 'medium'}}
-          <button mat-icon-button class="selectbtn" (click)="selecteATC('assignment', item)">
+          <button [attr.data-testid]="'atco-assignment-select-' + i" mat-icon-button class="selectbtn" (click)="selecteATC('assignment', item)">
             <mat-icon class="icon">check</mat-icon>
           </button>
         </li>
       </ul>
     </div>
     <div class="actionbox">
-      <button class="closebtn" mat-stroked-button (click)="close()">Close</button>
+      <button data-testid="atco-close" class="closebtn" mat-stroked-button (click)="close()">Close</button>
     </div>
   </div>

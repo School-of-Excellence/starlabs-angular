@@ -3463,3 +3463,13 @@ button {
     gap: 12px;
   }
 }
+
+/* Duplicate cohorts — target marathon picker (#duplicateConfig) */
+.dup-marathon-field {
+  width: 100%;
+}
+
+.dup-actions {
+  display: flex;
+  justify-content: flex-end;
+}

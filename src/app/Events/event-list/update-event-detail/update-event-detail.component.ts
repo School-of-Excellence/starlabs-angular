@@ -22,6 +22,7 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { ref, uploadBytes, getDownloadURL, deleteObject, Storage } from '@angular/fire/storage';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 
 @Component({
   selector: 'app-update-event-detail',
@@ -44,7 +45,8 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
     MatAutocompleteModule,
     AutoCompleteWithChipComponent,
     MatSlideToggleModule,
-    MatCheckboxModule
+    NgxMatSelectSearchModule,
+    MatCheckboxModule,
   ],
   providers:[provideNativeDateAdapter()],
   templateUrl: './update-event-detail.component.html',
@@ -84,6 +86,13 @@ export class UpdateEventDetailComponent {
     previewurl:null,
     url:null
   };
+
+  journeyList : any = [];
+  cohortsList : any = [];
+
+  // filter search 
+  filterJourney = '';
+  filterCohort = '';
 
   private destroy$ = new Subject<void>()
   private firestore = inject(Firestore)
@@ -132,6 +141,10 @@ export class UpdateEventDetailComponent {
     return this.eventform.get("products") as FormArray
   }
 
+  getProductConsumption(productIndex){
+    return this.productsArray.controls[productIndex]?.get('eligibility.productconsumption') as FormArray
+  }
+
   get loadingref (){
     return this.dialogData.open(LoadingProgressComponent,{
       data:{
@@ -146,6 +159,25 @@ export class UpdateEventDetailComponent {
     this.destroy$.complete()
   }
 
+  // addproductsArray(){
+  //   const newIndex = this.productsArray.length;
+  //   this.productImages[newIndex] = { file: null, previewurl: null, url: null };
+  //   return this.productsArray.push(
+  //     this.formbuilder.group({
+  //       heroevent: [false, {validators: [Validators.required], update:"change"}],
+  //       title: [, {validators: [Validators.required], update:"change"}],
+  //       productref : [, {validators: [Validators.required], update:"change"}],
+  //       startdate : [, {validators: [Validators.required], update:"change"}],
+  //       enddate : [, {validators: [Validators.required], update:"change"}],
+  //       deliveryref:[null,],
+  //       delete:[false,],
+  //       docid:[doc(collection(this.firestore,"arena events")).id,],
+  //       image:[null,],
+  //     })
+  //   )
+  // }
+
+  // surya
   addproductsArray(){
     const newIndex = this.productsArray.length;
     this.productImages[newIndex] = { file: null, previewurl: null, url: null };
@@ -160,8 +192,28 @@ export class UpdateEventDetailComponent {
         delete:[false,],
         docid:[doc(collection(this.firestore,"arena events")).id,],
         image:[null,],
+        eligibility: this.formbuilder.group({
+          journeyid: [[], { validators: [Validators.required], update: "change" }],
+          cohortid: [[]],
+          customerstatus: [['active'], { validators: [Validators.required], update: "change" }],
+          productconsumption: this.formbuilder.array([]),
+        })
       })
     )
+  }
+
+  onCustomerStatsChange(option, index: number, checked: boolean) {
+    console.log(index)
+    const control = this.productsArray.controls[index].get('eligibility.customerstatus');
+    const currentValue: string[] = control?.value || [];
+
+    if (checked) {
+      control?.setValue([...currentValue, option]);
+    } else {
+      control?.setValue(
+        currentValue.filter(value => value !== option)
+      );
+    }
   }
 
   removeproductsArray(index:number){
@@ -176,6 +228,31 @@ export class UpdateEventDetailComponent {
       // }
     }else{
       this.productsArray.removeAt(index)
+    }
+  }
+
+
+  // function to add product consumption ( surya )
+  addProductConsumption(productIndex){
+    const product = this.getProductConsumption(productIndex);
+    if (!product) {
+      console.log('Invalid index');
+      return
+    }
+    return product.push(
+      this.formbuilder.group({
+        productid: [null, {validators: [Validators.required], update:"change"}],
+        operator: [null, {validators: [Validators.required], update:"change"}],
+        count : [null, {validators: [Validators.required], update:"change"}],
+      })
+    )
+  }
+
+  // function to add product consumption ( surya )
+  removeProductConsumption(productIndex , productConsumpIndex){
+    const product = this.getProductConsumption(productIndex);
+    if (product) {
+      product.removeAt(productConsumpIndex);
     }
   }
 
@@ -218,6 +295,7 @@ export class UpdateEventDetailComponent {
         otherEventData.sort((a, b) => a["delete"] - b["delete"])
         for (let i = 0; i < otherEventData.length; i++) {
           const element = otherEventData[i];
+          const productConsumption = element['eligibility']?.['productconsumption'] ?? [];
           this.productsArray.push(
             this.formbuilder.group({
               heroevent: [element['heroevent'] ?? false, {validators: [Validators.required], update:"change"}],
@@ -229,8 +307,29 @@ export class UpdateEventDetailComponent {
               docid:[element['docid'],],
               delete:[element['delete'],],
               image:[element['image'] ?? null,],
+              eligibility: this.formbuilder.group({
+                journeyid: [element['eligibility']?.['journeyid'] ?? [], { validators: [Validators.required], update: "change" }],
+                cohortid: [element['eligibility']?.['cohortid'] ?? []],
+                customerstatus: [element['eligibility']?.['customerstatus'] ?? ['active'], { validators: [Validators.required], update: "change" }],
+                productconsumption: this.formbuilder.array([])
+              })
             })
-          )
+          );
+
+          // block to patch product consumption
+          if (productConsumption.length > 0) {
+            const productConsumptionArray = this.getProductConsumption(i);
+            console.log('product consum')
+            productConsumption.forEach((productConsump)=>{
+              productConsumptionArray.push(
+                this.formbuilder.group({
+                  productid: [productConsump['productid'] ?? null, { validators: [Validators.required], update: "change" }],
+                  operator: [productConsump['operator'] ?? null, { validators: [Validators.required], update: "change" }],
+                  count: [productConsump['count'] ?? null, { validators: [Validators.required], update: "change" }],
+                }))
+            })
+          }
+
           this.productsArray.controls[i].get("productref").disable()
           this.productImages[i] = { file: null, previewurl: null, url: element['image'] ?? null };
         }
@@ -311,6 +410,20 @@ export class UpdateEventDetailComponent {
       }
     })
 
+    // fetch journey ( surya )
+    const journeyList = [];
+    getDocs(collection(this.firestore , 'journey')).then((journeySnap)=>{
+      journeySnap.docs.forEach((journeyRef)=>{
+        const journey = journeyRef.data();
+        journeyList.push({
+          ...journey,
+          docid : journeyRef.id
+        })
+      });
+
+      this.journeyList = journeyList;
+    }).catch((error)=>console.log('error in fetching journey ' , error));
+
     //get delivery events forms queue
     const delEventsCollRef = collection(this.firestore,"delivery events")
     getDocs(delEventsCollRef).then((snap) => {
@@ -364,7 +477,24 @@ export class UpdateEventDetailComponent {
         return element;
       })
     })
+
+    // fetch cohorts ( surya )
+    this.fetchCohorts();
     this.loading = false;
+  }
+
+  // function to fetch cohorts
+  async fetchCohorts(){
+    const marathonref = collection(this.firestore , 'big marathon');
+    const cohortsref = collection(this.firestore , 'big cohorts');
+    try{
+      const currentMarathon = (await getDocs(query(marathonref , where('status' , '==' , 'live')))).docs.map((d)=>d.ref);
+      const cohortsQuery = query(cohortsref , where('marathonref' , 'in' , currentMarathon));
+      const cohorts = await getDocs(cohortsQuery);
+      this.cohortsList = cohorts.docs.map((docref)=>docref.data());
+    }catch(error){
+      console.log('error fetching cohorts' , error)
+    }
   }
 
   compareFn(c1:any, c2:any): boolean {
@@ -381,7 +511,7 @@ export class UpdateEventDetailComponent {
 
   async saveEventDetail(value){
     console.log( this.eventimage.url);
-    
+
     if(this.eventform.valid){
       console.log(value)
       if(!this.validationFn()){
@@ -454,6 +584,12 @@ export class UpdateEventDetailComponent {
                   eventname:value.eventname,
                   bigmarathonref:value.bigmarathonref || null,
                   image: value.products[i]['image'] ?? null,
+                  eligibility: {
+                    journeyid: value?.products[i]?.eligibility['journeyid'] ?? [],
+                    cohortid: value?.products[i]?.eligibility['cohortid'] ?? [],
+                    customerstatus: value?.products[i]?.eligibility['customerstatus'] ?? [],
+                    productconsumption: value?.products[i]?.eligibility['productconsumption'] ?? []
+                  }
                 }
                 batch.set(arenaEventRef, arenaEventData, {merge:true})
               }
@@ -493,6 +629,12 @@ export class UpdateEventDetailComponent {
               eventname:value.eventname,
               bigmarathonref:value.bigmarathonref || null,
               image: value.products[i]['image'] ?? null,
+              eligibility: {
+                journeyid: value?.products[i]?.eligibility['journeyid'] ?? [],
+                cohortid: value?.products[i]?.eligibility['cohortid'] ?? [],
+                customerstatus: value?.products[i]?.eligibility['customerstatus'] ?? [],
+                productconsumption: value?.products[i]?.eligibility['productconsumption'] ?? []
+              }
             }
             batch.update(arenaEventRef, arenaEventData, {merge:true})
           }
@@ -696,8 +838,18 @@ export class UpdateEventDetailComponent {
           if (pathMatch && pathMatch[1]) {
             const filePath = pathMatch[1];
             const storageRef = ref(this.storage, filePath);
-            await deleteObject(storageRef);
-
+            
+            try {
+              await deleteObject(storageRef);
+              console.log("Product image deleted successfully from storage");
+            } catch (storageError: any) {
+              if (storageError?.code === "storage/object-not-found") {
+                console.warn( "Image does not exist in Firebase Storage. Clearing image reference anyway:",filePath);
+              } else {
+                throw storageError;
+              }
+            }
+            
             this.productImages[index].url = null;
             this.productImages[index].previewurl = null;
             this.productImages[index].file = null;
@@ -854,4 +1006,19 @@ export class UpdateEventDetailComponent {
   }
   */
 
+  onJourneySearch(){
+    if (this.journeyList != null) {
+      const filterValue = (this.filterJourney != null && this.filterJourney != '') ? this.filterJourney.trim().toLowerCase() : ''
+      return this.journeyList.filter(e => e?.journey?.trim().toLowerCase().includes(filterValue))
+    }
+    return []
+  }
+
+   onCohortSearch(){
+    if (this.cohortsList != null) {
+      const filterValue = (this.filterCohort != null && this.filterCohort != '') ? this.filterCohort.trim().toLowerCase() : ''
+      return this.cohortsList.filter(e => e?.name?.trim().toLowerCase().includes(filterValue))
+    }
+    return []
+  }
 }

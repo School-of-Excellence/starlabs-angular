@@ -10,7 +10,15 @@
   <!-- Form Content -->
   <div class="dialog-content">
     <form [formGroup]="cohortsForm" class="cohort-form">
-      
+
+      <!-- Duplicate target (duplicate mode only) -->
+      <div data-testid="mcoh-duplicate-target-35" class="invitation-info" *ngIf="isDuplicateMode()">
+        <div class="invitation-count">
+          <mat-icon class="success-icon">content_copy</mat-icon>
+          <span>Copy of <strong>{{data.doc?.name}}</strong> into <strong>{{getTargetMarathonName()}}</strong>. The event is not carried over.</span>
+        </div>
+      </div>
+
       <!-- Cohort Name -->
       <div class="form-group">
         <label class="form-label">Cohort Name <span class="required">*</span></label>

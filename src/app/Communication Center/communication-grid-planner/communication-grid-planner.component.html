@@ -6,32 +6,60 @@
                 <label for="v-lib" [class.active-tab]="activeTab == 'library'" (click)="onActiveTabChange('library')" data-testid="cgp-view-library">Library</label>
             </div>
         </div>
-        <div class="bar bar2"><span class="rowlab">Status</span>
-            <mat-form-field>
-                <mat-label>Select Event</mat-label>
-                <mat-select [(ngModel)]="selectedEvent" (selectionChange)="filterCommunications()" data-testid="cgp-filter-event">
-                    <mat-option [value]="null">None</mat-option>
-                    <mat-option *ngFor="let event of eventList" [value]="event.docid">{{event?.name ?? 'no title'}}</mat-option>
-                </mat-select>
-            </mat-form-field>
-            <button (click)="refresPage()" data-testid="cgp-toolbar-refresh" mat-stroked-button> <mat-icon>refresh</mat-icon> Refresh </button>
+        <div class="bar bar2">
+            <div class="event-select">
+                <!-- <span class="rowlab">Select Event</span> -->
+                <mat-form-field>
+                    <mat-label>Select Event</mat-label>
+                    <mat-select data-testid="cgp-filter-event" [(ngModel)]="selectedEvent" (selectionChange)="filterCommunications()">
+                        <mat-option>
+                            <ngx-mat-select-search [(ngModel)]="eventSearch" name="event Search"
+                                [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'"
+                                ngDefaultControl></ngx-mat-select-search>
+                        </mat-option>
+                        <mat-option [value]="null">None</mat-option>
+                        <mat-option data-testid="cgp-filter-event-option" *ngFor="let event of getFilteredEvents(this.eventSearch)" [value]="event.docid">{{event?.name ?? 'no title'}}</mat-option>
+                    </mat-select>
+                </mat-form-field>
+            </div>
+            <div>
+                <mat-form-field>
+                    <mat-label>Search Communication</mat-label>
+                    <input data-testid="cgp-filter-search" matInput [(ngModel)]="communicationSearch" (input)="filterCommunications()">
+                </mat-form-field>
+            </div>
+            <div>
+                <mat-form-field>
+                    <mat-label>Select Participant</mat-label>
+                    <mat-select data-testid="cgp-filter-participant" [(ngModel)]="selectedParticipant" (selectionChange)="filterCommunications()" multiple>
+                        <mat-option>
+                            <ngx-mat-select-search [(ngModel)]="participantSearch" name="participant Search"
+                                [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'"
+                                ngDefaultControl></ngx-mat-select-search>
+                        </mat-option>
+                        <mat-option [value]="null">None</mat-option>
+                        <mat-option data-testid="cgp-filter-participant-option" *ngFor="let p of getFilteredParticipants()" [value]="p?.profileid">{{p?.name}}</mat-option>
+                    </mat-select>
+                </mat-form-field>
+            </div>
+            <button data-testid="cgp-toolbar-refresh" (click)="refresPage()" mat-stroked-button> <mat-icon>refresh</mat-icon> Refresh </button>
         </div>
         <div class="header-warp">
             <div class="header">
-                <button (click)="prevMonth()" data-testid="cgp-cal-prev-month">‹</button>
+                <button data-testid="cgp-cal-prev-month" (click)="prevMonth()" type="button">‹</button>
                 <span>{{ displayedMonth | date:'MMMM yyyy' }}</span>
-                <button (click)="nextMonth()" data-testid="cgp-cal-next-month">›</button>
+                <button data-testid="cgp-cal-next-month" (click)="nextMonth()" type="button">›</button>
             </div>
-            <div>
-                <div class="chip-group">
-                    <button class="chip" [class.is-active]="selectedEvent === event?.docid" type="button" *ngFor="let event of upcomingEvents" [attr.data-testid]="'cgp-eventchip-' + event?.docid" (click)="onEventChipClick(event?.docid)">
-                        <svg class="check" viewBox="0 0 16 16" fill="none">
-                            <path d="M3 8.5L6.5 12L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                        {{event?.name}}
-                    </button>
-                </div>
+            
+            <div class="chip-group">
+                <button data-testid="cgp-eventchip" class="chip" [class.is-active]="selectedEvent === event?.docid" type="button" *ngFor="let event of upcomingEvents" (click)="onEventChipClick(event?.docid)">
+                    <svg class="check" viewBox="0 0 16 16" fill="none">
+                        <path d="M3 8.5L6.5 12L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    {{event?.name}}
+                </button>
             </div>
+            
         </div>
         <main>
             <section style="display:block;" *ngIf="activeTab == 'calendar'">
@@ -52,7 +80,7 @@
                         <div class="dow">Fri</div>
                         <div class="dow">Sat</div>
                         <div class="dow">Sun</div>
-                        <div class="day" *ngFor="let days of calendarDays" [class.out]="!days.isCurrentMonth">
+                        <div data-testid="cgp-cal-day" class="day" *ngFor="let days of calendarDays" [class.out]="!days.isCurrentMonth" (click)="days.isCurrentMonth && openCommunicationDaySidePanel(days?.date)">
                             <div *ngIf="days.isCurrentMonth">
                                 <div class="dhead">
                                     <span class="dn">{{days?.date?.getDate()}}</span>
@@ -70,15 +98,22 @@
                                             {{getAppNotificationForDay(days?.date)?.length ?? 0}}
                                         </span>
                                     </div>
-                                    <button class="add-btn" [attr.data-testid]="'cgp-cal-add-' + days?.date?.getTime()" (click)="onCommunicationAddClick(days?.date)" title="Add communication" aria-label="Add communication">
+                                    <button data-testid="cgp-cal-add" class="add-btn" *ngIf="showAddButtonInDateCell(days?.date)" (click)="onCommunicationAddClick(days?.date);$event.stopPropagation()" title="Add communication" aria-label="Add communication">
                                         <mat-icon>add</mat-icon>
                                     </button>
                                 </div>
                                 <div class="cell-com-wrap">
                                     <div class="cell-com">
-                                        <button class="cchip" [title]="comm?.title ?? ''" style="display:inline-flex; align-items:center; gap:6px; max-width:200px; overflow:hidden;" *ngFor="let comm of getCommunicationForDay(days?.date)" [attr.data-testid]="'cgp-cal-comm-' + comm?.docid" (click)="onCummunicationClick(comm)">
+                                        <button class="cchip" [title]="comm?.title ?? ''" style="display:inline-flex; align-items:center; gap:6px; max-width:200px; overflow:hidden;" *ngFor="let comm of getCommunicationForDay(days?.date)?.slice(0,3)" [attr.data-testid]="'cgp-cal-comm-' + comm?.docid" (click)="onCummunicationClick(comm);$event.stopPropagation()">
+                                            <div>
                                             <span class="sd" style="background:var(--s-draft); flex-shrink:0; width:8px; height:8px; border-radius:50%;"></span>
                                             <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; font-size: 13px;">{{comm?.title ?? ''}}</span>
+                                            </div>
+                                            <button data-testid="cgp-cal-dup" class="comm-dup-btn" (click)="onCommunicationDuplicate(comm); $event.stopPropagation()"><mat-icon>file_copy</mat-icon></button>
+                                        </button>
+                                        <button data-testid="cgp-cal-showmore" *ngIf="getCommunicationForDay(days?.date)?.length > 3" type="button" class="show-more-btn">
+                                            <span>Show {{ getCommunicationForDay(days?.date).length - 3 }} more</span>
+                                            <span class="show-more-icon">+</span>
                                         </button>
                                     </div>
                                 </div>
@@ -89,137 +124,10 @@
             </section>
             <section style="display:block;overflow:hidden" *ngIf="activeTab == 'library'">
                 <div class="comm-form-block">
-                    <div class="cf-toolbar">
-                        <button class="cf-btn cf-btn-ghost" (click)="openCommunicationForm()" *ngIf="!communicationFormMode" data-testid="cgp-lib-add-communication"> + Add Communication </button>
-                        <button class="cf-btn cf-btn-close" (click)="onSendCommunication(selectedCommunication)" *ngIf="selectedCommunication" data-testid="cgp-lib-close-analytics"> ✕ Close Participant Analytics </button>
-                        <ng-container *ngIf="communicationFormMode">
-                            <button class="cf-btn cf-btn-primary" (click)="saveCommunicationFrom()" data-testid="cgp-form-save"> Save Communication </button>
-                            <button class="cf-btn cf-btn-ghost" (click)="clearForm()" data-testid="cgp-form-cancel"> Cancel </button>
-                        </ng-container>
-                    </div>
-                    
-                    <div *ngIf="communicationFormMode">
-                        <div class="mrow" *ngFor="let group of communicationForm?.controls ?? []; let i = index; let isLast = last;" [formGroup]="group">
-                            <div class="cf-head">
-                                <mat-form-field appearance="outline" class="cf-field cf-field-title">
-                                    <mat-label>Title</mat-label>
-                                    <input matInput formControlName="title" placeholder="Untitled" [attr.data-testid]="'cgp-form-title-' + i">
-                                </mat-form-field>
-
-                                <mat-form-field appearance="outline" class="cf-field cf-field-date">
-                                    <mat-label>Choose a date</mat-label>
-                                    <input matInput [matDatepicker]="picker" formControlName="date" [attr.data-testid]="'cgp-form-date-' + i">
-                                    <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
-                                    <mat-datepicker #picker></mat-datepicker>
-                                </mat-form-field>
-
-                                <mat-form-field appearance="outline" class="cf-field cf-field-event">
-                                    <mat-label>Select Event</mat-label>
-                                    <mat-select formControlName="eventref" [attr.data-testid]="'cgp-form-eventref-' + i">
-                                        <mat-option *ngFor="let event of eventList" [value]="event.docid">
-                                            {{ event?.name ?? 'no title' }}
-                                        </mat-option>
-                                    </mat-select>
-                                </mat-form-field>
-
-                                <div class="cf-head-actions" *ngIf="communicationFormMode == 'add'">
-                                    <button mat-button class="cf-btn cf-btn-ghost" (click)="addCommunicationFrom()" *ngIf="isLast" [attr.data-testid]="'cgp-form-addrow-' + i"> + Add row </button>
-                                    <button mat-button class="cf-btn cf-btn-danger" (click)="removeCommunicationForm(i)" [attr.data-testid]="'cgp-form-remove-' + i"> Remove </button>
-                                </div>
-                            </div>
-
-                            <div class="mopen">
-                                <div class="mcols">
-                                    <div style="display:flex; flex-direction : column; gap: 5px">
-                                        <div class="cf-email-config">
-                                            <mat-form-field appearance="outline" class="cf-field cf-field-tmpl">
-                                                <mat-label>Select Email Template</mat-label>
-                                                <mat-select formControlName="emailtemplate" [attr.data-testid]="'cgp-form-emailtemplate-' + i">
-                                                    <mat-option *ngFor="let template of emailTemplates" [value]="template.docid"> {{ template?.templatename ?? 'no title' }} </mat-option>
-                                                </mat-select>
-                                            </mat-form-field>
-                                            <button mat-stroked-button class="cf-btn cf-btn-primary cf-btn-sm" (click)="navigateToCreateEmail()" [attr.data-testid]="'cgp-form-newtemplate-' + i"> + New template </button>
-                                        </div>
-                                        <div class="cell">
-                                            <div class="cellh"><span>Email</span></div>
-                                            <div class="pv-mail">
-                                                <ng-container *ngIf="group.get('emailtemplate')?.value as tplId; else noEmailTpl">
-                                                    <div class="subj">
-                                                        <span class="ptxt">{{ getSelectedEmail(tplId)?.subject || 'no subject line' }}</span>
-                                                    </div>
-                                                    <div class="ptxt" [innerHtml]="getSelectedEmail(tplId)?.htmlbody"></div>
-                                                </ng-container>
-                                                <ng-template #noEmailTpl>
-                                                    <div class="subj"><span class="mt">no subject line</span></div>
-                                                    <div class="ptxt"><span class="mt">no template selected</span></div>
-                                                </ng-template>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- WHATSAPP -->
-
-                                    <div>
-                                        <div>
-                                            <mat-form-field appearance="outline" class="full-width"><mat-label>Search templates</mat-label><mat-icon matPrefix>search</mat-icon>
-                                                <mat-select (selectionChange)="onTemplateChange($event , i)" [attr.data-testid]="'cgp-form-watisearch-' + i" >
-                                                    <mat-option><ngx-mat-select-search [(ngModel)]="searchTemplate"
-                                                            [ngModelOptions]="{standalone: true}"
-                                                            placeholderLabel="Search…" noEntriesFoundLabel="None found"
-                                                            (ngModelChange)="onSearchTemplate()"
-                                                            ngDefaultControl></ngx-mat-select-search></mat-option>
-                                                    <mat-option disabled *ngIf="displayTemplates.length > 0"> <small class="count-label">{{getTemplatesCountInfo()}}</small></mat-option>
-                                                    <mat-option *ngFor="let t of displayTemplates" [value]="t">
-                                                        <div class="tpl-option-top-favourites">
-                                                            <div class="tpl-option">
-                                                                <div class="tpl-option-top">
-                                                                    <div class="tpl-name">{{t.elementName}}</div>
-                                                                </div>
-                                                                <div class="tpl-meta">
-                                                                    <span class="tpl-server-tag">{{t.servername}}</span><span class="tpl-cat-tag" *ngIf="t.category">{{t.category}}</span>
-                                                                </div>
-                                                            </div>
-                                                            <button class="fav-inline-btn" [class.fav-inline-btn-active]="isFavourite(t)" [attr.data-testid]="'cgp-tpl-fav-' + t?.elementName" (click)="toggleFavourite($event, t)" [matTooltip]="isFavourite(t) ? 'Remove' : 'Add to favourites'"><mat-icon>{{isFavourite(t)? 'star' : 'star_border'}}</mat-icon></button>
-                                                        </div>
-                                                    </mat-option>
-                                                    <mat-option disabled *ngIf="hasMoreTemplates"><button mat-stroked-button class="load-more-btn" [attr.data-testid]="'cgp-form-loadmore-' + i" (click)="loadMoreTemplates(); $event.stopPropagation();">Load more…</button></mat-option>
-                                                    <mat-option disable *ngIf="displayTemplates.length === 0 && !watiTemplateLoading && !iswatiSearching"><span class="empty-label">No matches</span></mat-option>
-                                                </mat-select>
-                                            </mat-form-field>
-                                        </div>
-                                        <div class="cell">
-                                            <div class="cellh"><span>WhatsApp</span></div>
-                                            <div class="pv-chat">
-                                                <div class="chat-msg-row">
-                                                    <div class="chat-bubble">
-                                                        <div class="bubble-content" [innerHTML]="getFormattedPreviewHtml(watiTemplateMap[group?.get('watitemplate').value?.templateid])"> </div>
-                                                        <div class="ptxt" *ngIf="!group?.get('watitemplate').value?.templateid"><span class="mt">not written yet</span></div>
-                                                        <div class="bubble-meta">
-                                                            <mat-icon class="bubble-tick">done_all</mat-icon>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- APP NOTIFICATION -->
-                                    <!-- <div class="cell">
-                                        <div class="cellh"><span>App notification</span></div>
-                                        <div class="pv-note" style="--evc:var(--ev-1)">
-                                            <span class="appicon">SL</span>
-                                            <div class="notebody">
-                                                <div class="noteapp">SLD CI</div>
-                                                <div class="ntitle"><span class="mt">no title</span></div>
-                                                <div class="ptxt"><span class="mt">not written yet</span></div>
-                                            </div>
-                                        </div>
-                                    </div> -->
-
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <button data-testid="cgp-lib-add-communication" class="cf-btn cf-btn-ghost" (click)="openCommunicationForm()" *ngIf="!communicationFormMode"> + Add
+                        Communication </button>
+                    <button data-testid="cgp-lib-close-analytics" class="cf-btn cf-btn-close" (click)="onSendCommunication(selectedCommunication)"
+                        *ngIf="selectedCommunication"> ✕ Close Participant Analytics </button>
                 </div>
                 <ng-container *ngIf="!isAllLoaded()">
                     <section class="libg" style="--evc:var(--ev-1)" *ngFor="let eventId of getEventGroupKeys()">
@@ -244,7 +152,7 @@
                                     </span>
                                     <button class="comm-btn comm-send-btn"
                                         [class.comm-active]="comm?.docid == selectedCommunication?.docid"
-                                        [attr.data-testid]="'cgp-lib-send-' + comm?.docid"
+                                        data-testid="cgp-lib-send"
                                         (click)="onSendCommunication(comm); $event.stopPropagation()">
                                         {{ comm?.docid == selectedCommunication?.docid ? 'Close' : 'Send' }}
                                     </button>
@@ -268,9 +176,9 @@
                                                         <span class="email-broadcast-name">{{ archive.broadcastname }} </span>
                                                         <span class="email-archive-status" [attr.data-status]="archive?.status"> {{ archive?.status }} </span>
                                                     </div>
-                                                    <div class="email-content" *ngIf="archive?.status === 'send'">
+                                                    <div class="email-content">
                                                         <button mat-button class="recipient-chip clickable-chip"
-                                                            [attr.data-testid]="'cgp-email-recipients-' + archive?.broadcastname"
+                                                            data-testid="cgp-email-recipients"
                                                             (click)="openParticipantsPopup(archive, 'all'); $event.stopPropagation()"
                                                             matTooltip="Click to view all participants">
                                                             <mat-icon>group</mat-icon>
@@ -281,23 +189,26 @@
                                                 </div>
                                             </div>
                                         </div>
-                                        <div>
+                                        <div class="pv-chat-wrap">
                                             <div class="cell">
-                                                <div class="cellh" style="color:black;"><span>WhatsApp<span *ngIf="comm?.watitemplate?.templateid">: ( {{watiTemplateMap[comm?.watitemplate?.templateid]?.templatename}} )</span></span></div>
+                                                <div class="cellh" style="color:black;"><span>WhatsApp<span *ngIf="comm?.watitemplate?.templateid">: (
+                                                            {{watiTemplateMap[comm?.watitemplate?.templateid]?.templatename}} )</span></span></div>
                                                 <div class="pv-chat">
                                                     <div class="chat-msg-row">
                                                         <div class="chat-bubble">
-                                                            <div class="bubble-content" [innerHTML]="getFormattedPreviewHtml(watiTemplateMap[comm?.watitemplate?.templateid] )"> </div>
-                                                            <div class="ptxt" *ngIf="!comm?.watitemplate?.templateid"><span class="mt">not written yet</span></div>
+                                                            <div class="bubble-content"
+                                                                [innerHTML]="getFormattedPreviewHtml(watiTemplateMap[comm?.watitemplate?.templateid] )"> </div>
+                                                            <div class="ptxt" *ngIf="!comm?.watitemplate?.templateid"><span class="mt">not written yet</span>
+                                                            </div>
                                                             <div class="bubble-meta"> <mat-icon class="bubble-tick">done_all</mat-icon> </div>
                                                         </div>
                                                     </div>
                                                 </div>
                                             </div>
-                
+                                        
                                             <div *ngFor="let archive of communicationwatilLog[comm?.docid] ?? []" class="wati-preview">
                                                 <div class="wati-notification-title">
-                                                    <a [attr.data-testid]="'cgp-wati-broadcast-' + archive?.broadcastname" (click)="openBroadcast(record)">{{ archive.broadcastname || 'N/A' }}</a>
+                                                    <a [attr.data-testid]="'cgp-wati-broadcast-' + archive?.broadcastname" (click)="openBroadcast(archive)">{{ archive.broadcastname || 'N/A' }}</a>
                                                     <div class="wati-profile-info">
                                                         <b>Sent By :</b> {{ mapProfile[archive?.createdby]?.name ?? '' }}
                                                     </div>
@@ -319,15 +230,24 @@
                                                 </button>
                                             </div>
                                         </div>
-                                    <!-- <div class="cell">
+                                        <!-- <div class="cell">
                                             <div class="cellh"><span>App notification</span></div>
-                                                <div class="pv-note" style="--evc:var(--ev-1)"><span class="appicon">SL</span>
-                                                    <div class="notebody">
-                                                        <div class="noteapp">SLD CI</div>
+                                            <div class="pv-note">
+                                                <div class="notebody">
+                                                    <ng-container *ngIf="comm.apptemplate?.docid as tplId; else noAppTpl">
+                                                        <div class="subj">
+                                                            <span class="ptxt">{{ appNotificationTemplateMap[tplId]?.title || 'no title' }}</span>
+                                                        </div>
+                                                        <div class="ptxt">{{appNotificationTemplateMap[tplId]?.message}}</div>
+                                                    </ng-container>
+                                                    <ng-template #noAppTpl>
                                                         <div class="ntitle"><span class="mt">no title</span></div>
                                                         <div class="ptxt"><span class="mt">not written yet</span></div>
-                                                    </div>
+                                                    </ng-template>
+                                                    <div class="ntitle"><span class="mt">no title</span></div>
+                                                    <div class="ptxt"><span class="mt">not written yet</span></div>
                                                 </div>
+                                            </div>
                                         </div> -->
                                     </div>
                                 </div>
@@ -340,6 +260,184 @@
     </div>
     <app-participants-analytics *ngIf="activeTab === 'library' && selectedCommunication" [communication]="selectedCommunication"></app-participants-analytics>
 </div>
+
+
+<!-- communication form -->
+<ng-template #communicationDialog>
+    <div class="comm-dialog">
+
+        <!-- HEADER -->
+        <div class="comm-dialog__header">
+            <div class="comm-dialog__heading">
+                <span class="comm-dialog__title">Communications</span>
+                <span class="comm-dialog__subtitle">Schedule what gets sent for each event</span>
+            </div>
+        </div>
+
+        <!-- TOOLBAR -->
+        <div class="cf-toolbar">
+            <button data-testid="cgp-form-close-analytics" class="cf-btn cf-btn-close" (click)="onSendCommunication(selectedCommunication)" *ngIf="selectedCommunication"> ✕ Close Participant Analytics </button>
+            <ng-container *ngIf="communicationFormMode">
+                <button data-testid="cgp-form-save" class="cf-btn cf-btn-primary" (click)="saveCommunicationFrom()"> Save Communication </button>
+                <button data-testid="cgp-form-cancel" class="cf-btn cf-btn-ghost" (click)="clearForm()"> Cancel </button>
+            </ng-container>
+        </div>
+
+        <!-- BODY -->
+        <div class="comm-dialog__body">
+            <div>
+                <div class="mrow" *ngFor="let group of communicationForm?.controls ?? []; let i = index; let isLast = last;" [formGroup]="group">
+
+                    <div class="cf-head">
+                        <mat-form-field appearance="outline" class="cf-field cf-field-title">
+                            <mat-label>Title</mat-label>
+                            <input data-testid="cgp-form-title" matInput formControlName="title" placeholder="Untitled">
+                        </mat-form-field>
+
+                        <mat-form-field appearance="outline" class="cf-field cf-field-date">
+                            <mat-label>Choose a date</mat-label>
+                            <input data-testid="cgp-form-date" matInput [matDatepicker]="picker" formControlName="date" [matDatepickerFilter]="dateFilter">
+                            <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+                            <mat-datepicker #picker></mat-datepicker>
+                        </mat-form-field>
+
+                        <mat-form-field appearance="outline" class="cf-field cf-field-event">
+                            <mat-label>Select Event</mat-label>
+                            <mat-select data-testid="cgp-form-eventref" formControlName="eventref">
+                                <mat-option>
+                                    <ngx-mat-select-search formControlName="eventsearch" name="event Search" [placeholderLabel]="'Search'"
+                                        [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+                                </mat-option>
+                                <mat-option *ngFor="let event of getFilteredEvents(group?.get('eventsearch')?.value)" [value]="event.docid">
+                                    {{ event?.name ?? 'no title' }}
+                                </mat-option>
+                            </mat-select>
+                        </mat-form-field>
+
+                        <div class="cf-head-actions" *ngIf="communicationFormMode == 'add'">
+                            <button data-testid="cgp-form-addrow" mat-button class="cf-btn cf-btn-ghost" (click)="addCommunicationFrom()" *ngIf="isLast"> + Add row </button>
+                            <button data-testid="cgp-form-remove" mat-button class="cf-btn cf-btn-danger" (click)="removeCommunicationForm(i)"> Remove </button>
+                        </div>
+                    </div>
+
+                    <div class="mopen">
+                        <div class="mcols">
+                            <div style="display:flex; flex-direction : column; gap: 5px">
+                                <div class="cf-email-config">
+                                    <mat-form-field appearance="outline" class="cf-field cf-field-tmpl">
+                                        <mat-label>Select Email Template</mat-label>
+                                        <mat-select data-testid="cgp-form-emailtemplate" formControlName="emailtemplate">
+                                            <mat-option>
+                                                <ngx-mat-select-search formControlName="emailsearch" name="event Search" [placeholderLabel]="'Search'"
+                                                    [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+                                            </mat-option>
+                                            <mat-option *ngFor="let template of getFilteredEmailTemplates(group?.get('emailsearch')?.value)" [value]="template.docid"> {{ template?.templatename ?? 'no title' }} </mat-option>
+                                        </mat-select>
+                                    </mat-form-field>
+                                    <button data-testid="cgp-form-newtemplate" mat-stroked-button class="cf-btn cf-btn-primary cf-btn-sm" (click)="navigateToCreateEmail()"> + </button>
+                                </div>
+                            </div>
+
+                            <!-- WHATSAPP -->
+                            <div>
+                                <div>
+                                    <mat-form-field appearance="outline" class="full-width"><mat-label>Search templates</mat-label><mat-icon matPrefix>search</mat-icon>
+                                        <mat-select data-testid="cgp-form-wati" (selectionChange)="onTemplateChange($event , i)" >
+                                            <mat-option><ngx-mat-select-search [(ngModel)]="searchTemplate"
+                                                    [ngModelOptions]="{standalone: true}"
+                                                    placeholderLabel="Search…" noEntriesFoundLabel="None found"
+                                                    (ngModelChange)="onSearchTemplate()"
+                                                    ngDefaultControl></ngx-mat-select-search></mat-option>
+                                            <mat-option disabled *ngIf="displayTemplates.length > 0"> <small class="count-label">{{getTemplatesCountInfo()}}</small></mat-option>
+                                            <mat-option *ngFor="let t of displayTemplates" [value]="t">
+                                                <div class="tpl-option-top-favourites">
+                                                    <div class="tpl-option">
+                                                        <div class="tpl-option-top">
+                                                            <div class="tpl-name">{{t.elementName}}</div>
+                                                        </div>
+                                                        <div class="tpl-meta">
+                                                            <span class="tpl-server-tag">{{t.servername}}</span><span class="tpl-cat-tag" *ngIf="t.category">{{t.category}}</span>
+                                                        </div>
+                                                    </div>
+                                                    <button data-testid="cgp-tpl-fav" class="fav-inline-btn" [class.fav-inline-btn-active]="isFavourite(t)" (click)="toggleFavourite($event, t)" [matTooltip]="isFavourite(t) ? 'Remove' : 'Add to favourites'"><mat-icon>{{isFavourite(t)? 'star' : 'star_border'}}</mat-icon></button>
+                                                </div>
+                                            </mat-option>
+                                            <mat-option disabled *ngIf="hasMoreTemplates"><button data-testid="cgp-form-loadmore" mat-stroked-button class="load-more-btn" (click)="loadMoreTemplates(); $event.stopPropagation();">Load more…</button></mat-option>
+                                            <mat-option disable *ngIf="displayTemplates.length === 0 && !watiTemplateLoading && !iswatiSearching"><span class="empty-label">No matches</span></mat-option>
+                                        </mat-select>
+                                    </mat-form-field>
+                                </div>
+                            </div>
+
+                            <!-- APP NOTIFICATION -->
+                            <!-- <div>
+                                <mat-form-field appearance="outline" class="full-width">
+                                    <mat-label>Select App Template</mat-label>
+                                    <mat-select data-testid="cgp-form-apptemplate" formControlName="apptemplate">
+                                        <mat-option *ngFor="let template of appNotificationTemplate" [value]="template.docid"> {{ template?.title ??
+                                            'no title' }} </mat-option>
+                                    </mat-select>
+                                </mat-form-field>
+                            </div> -->
+
+                        </div>
+
+                        <div class="mcols">
+                            <div class="cell">
+                                <div class="cellh"><span>Email</span></div>
+                                <div class="pv-mail">
+                                    <ng-container *ngIf="group.get('emailtemplate')?.value as tplId; else noEmailTpl">
+                                        <div class="subj">
+                                            <span class="ptxt">{{ getSelectedEmail(tplId)?.subject || 'no subject line' }}</span>
+                                        </div>
+                                        <div class="ptxt" [innerHtml]="getSelectedEmail(tplId)?.htmlbody"></div>
+                                    </ng-container>
+                                    <ng-template #noEmailTpl>
+                                        <div class="subj"><span class="mt">no subject line</span></div>
+                                        <div class="ptxt"><span class="mt">no template selected</span></div>
+                                    </ng-template>
+                                </div>
+                            </div>
+                            <div class="cell">
+                                <div class="cellh"><span>WhatsApp</span></div>
+                                <div class="pv-chat">
+                                    <div class="chat-msg-row">
+                                        <div class="chat-bubble">
+                                            <div class="bubble-content" [innerHTML]="getFormattedPreviewHtml(watiTemplateMap[group?.get('watitemplate').value?.templateid])">
+                                            </div>
+                                            <div class="ptxt" *ngIf="!group?.get('watitemplate').value?.templateid"><span class="mt">not written yet</span></div>
+                                            <div class="bubble-meta">
+                                                <mat-icon class="bubble-tick">done_all</mat-icon>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- <div class="cell">
+                                <div class="cellh"><span>App notification</span></div>
+                                <div class="pv-note">
+                                    <div class="notebody">
+                                        <ng-container *ngIf="group.get('apptemplate')?.value as tplId; else noAppTpl">
+                                            <div class="subj">
+                                                <span class="ptxt">{{ appNotificationTemplateMap[tplId]?.title || 'no title' }}</span>
+                                            </div>
+                                            <div class="ptxt">{{appNotificationTemplateMap[tplId]?.message}}</div>
+                                        </ng-container>
+                                        <ng-template #noAppTpl>
+                                            <div class="ntitle"><span class="mt">no title</span></div>
+                                            <div class="ptxt"><span class="mt">not written yet</span></div>
+                                        </ng-template>
+                                    </div>
+                                </div>
+                            </div> -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</ng-template>
 
 
 <!-- ==================== UNIFIED PARTICIPANTS POPUP ==================== -->
@@ -608,5 +706,53 @@
                 </ng-container>
             </div>
         </div>
+    </div>
+</div>
+
+<div class="csp-wrap" *ngIf="expandedCommunication">
+    <div class="csp">
+        <aside class="drawer" aria-label="Communications for the day">
+            <div class="dh">
+                <div class="r1">
+                    <button data-testid="cgp-side-prev" class="nav" title="Previous day" (click)="onPreSidePanelClick()" [disabled]="!showPreSidePanel()"><span>‹</span></button>
+                    <h3>{{expandedCommunication?.date | date}}</h3>
+                    <button data-testid="cgp-side-next" class="nav" title="Next day" (click)="onNextSidePanelClick()" [disabled]="!showNextSidePanel()"><span>›</span></button>
+                    <button data-testid="cgp-side-close" class="x" title="Close" (click)="closeCommunicationDaySidePanel()">×</button>
+                </div>
+                <div class="sub">{{expandedCommunication?.communications?.length}} communications</div>
+                <div class="tot">
+                    <span class="email " title="Show / hide Email">
+                        <svg viewBox="0 0 24 24"
+                            fill="currentColor">
+                            <path d="M3 5h18v14H3z" opacity=".25"></path>
+                            <path d="M3 5h18v2l-9 6-9-6z"></path>
+                        </svg>Email {{expandedCommunication?.email}}
+                    </span>
+                    <span class="whatsapp " title="Show / hide WhatsApp">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M4 4h16v12H8l-4 4z"></path>
+                        </svg>WhatsApp {{expandedCommunication?.wati}}
+                    </span>
+                    <!-- <span class="app " title="Show / hide App">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 3a6 6 0 0 0-6 6v4l-2 3h16l-2-3V9a6 6 0 0 0-6-6zm-2 15a2 2 0 0 0 4 0z"></path>
+                        </svg>App 165
+                    </span> -->
+                </div>
+                <input data-testid="cgp-side-search" class="inp" placeholder="Search this day" [(ngModel)]="expandedCommunication.communicationSearch">
+            </div>
+            <div class="db">
+                <div class="grp" *ngFor="let event of getCommunicationsForSidePanel() | keyvalue">
+                    <div class="gh"><i style="background:#1f5bd8"></i>{{eventMap[event?.key]?.name ?? event?.key}} <small>{{event?.value?.length}}</small></div>
+                    <div class="row" style="border-left-color:#1f5bd8;background:rgba(31,91,216,0.04);" *ngFor="let comm of event?.value">
+                        <div><b>{{comm?.title ?? 'Unknown'}}</b></div>
+                        <div class="acts">
+                            <button data-testid="cgp-side-dup" title="Duplicate" (click)="onCommunicationDuplicate(comm)">⧉</button>
+                            <button data-testid="cgp-side-open" title="Open" (click)="onCummunicationClick(comm);$event.stopPropagation()" >Open</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
     </div>
 </div>

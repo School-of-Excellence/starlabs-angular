@@ -55,6 +55,22 @@
     <div class="filter-divider"></div>
 
     <div class="filter-group">
+      <label class="filter-label">Type</label>
+      <div class="filter-chips">
+        <button data-testid="wor-type-filter-all" class="chip" [class.chip-active]="typeFilter === 'all'"
+          (click)="typeFilter = 'all'">All</button>
+        <button data-testid="wor-type-filter-cp" class="chip" [class.chip-active]="typeFilter === 'CP Workshop'"
+          (click)="typeFilter = 'CP Workshop'">CP Workshop</button>
+        <button data-testid="wor-type-filter-live" class="chip" [class.chip-active]="typeFilter === 'Workshop'"
+          (click)="typeFilter = 'Workshop'">Workshop</button>
+        <button data-testid="wor-type-filter-evergreen" class="chip" [class.chip-active]="typeFilter === 'Evergreen Workshop'"
+          (click)="typeFilter = 'Evergreen Workshop'">Evergreen Workshop</button>
+      </div>
+    </div>
+
+    <div class="filter-divider"></div>
+
+    <div class="filter-group">
       <label class="filter-label">Sort By</label>
       <div class="filter-chips">
         <button data-testid="wor-set-sort-field-11" class="chip" [class.chip-active]="sortField === 'created'" (click)="setSortField('created')">
@@ -89,35 +105,54 @@
       <div class="table-wrapper" *ngIf="filtered.length > 0; else empty">
         <table mat-table [dataSource]="filtered" class="workshops-table">
 
+          <!-- Active column hidden for now (operator 2026-10-15). Kept, not removed: to restore it, uncomment
+               this block and put 'active' back in displayedColumns.
+               Breakthroughs App, Web and EiFlix Mobile switches side by side; a completed workshop shows one label.
           <ng-container matColumnDef="active">
             <th mat-header-cell *matHeaderCellDef class="col-center col-active">Active</th>
             <td mat-cell *matCellDef="let workshop" class="col-center col-active">
-              <mat-slide-toggle data-testid="wor-change-on-workshop-status-change-14"
-                [checked]="workshop.active"
-                [disabled]="!canEdit"
-                (change)="onWorkshopStatusChange(workshop, $event)"
-                color="primary">
-              </mat-slide-toggle>
+              <span data-testid="wor-completed-pill" class="completed-pill" *ngIf="workshop.workshopcompleted; else liveToggles">Completed</span>
+              <ng-template #liveToggles>
+                <div class="live-toggles">
+                  <div class="live-toggle">
+                    <span class="live-toggle-name">Breakthroughs App</span>
+                    <mat-slide-toggle data-testid="wor-change-on-workshop-status-change-14"
+                      [checked]="workshop.active"
+                      [disabled]="!canEdit"
+                      (change)="onWorkshopStatusChange(workshop, $event)"
+                      color="primary">
+                    </mat-slide-toggle>
+                  </div>
+                  <div class="live-toggle">
+                    <span class="live-toggle-name">Web</span>
+                    <mat-slide-toggle data-testid="wor-change-on-workshop-web-status-change-15"
+                      [checked]="workshop.webactive"
+                      [disabled]="!canEdit"
+                      (change)="onWorkshopWebStatusChange(workshop, $event)"
+                      color="primary">
+                    </mat-slide-toggle>
+                  </div>
+                  <div class="live-toggle">
+                    <span class="live-toggle-name">EiFlix Mobile</span>
+                    <mat-slide-toggle data-testid="wor-change-on-workshop-mobile-status-change"
+                      [checked]="workshop.eiflixmobileactive"
+                      [disabled]="!canEdit"
+                      (change)="onWorkshopMobileStatusChange(workshop, $event)"
+                      color="primary">
+                    </mat-slide-toggle>
+                  </div>
+                </div>
+              </ng-template>
             </td>
           </ng-container>
-
-          <ng-container matColumnDef="webactive">
-            <th mat-header-cell *matHeaderCellDef class="col-center col-active">Web Active</th>
-            <td mat-cell *matCellDef="let workshop" class="col-center col-active">
-              <mat-slide-toggle data-testid="wor-change-on-workshop-web-status-change-15"
-                [checked]="workshop.webactive"
-                [disabled]="!canEdit"
-                (change)="onWorkshopWebStatusChange(workshop, $event)"
-                color="primary">
-              </mat-slide-toggle>
-            </td>
-          </ng-container>
+          -->
 
           <ng-container matColumnDef="title">
             <th mat-header-cell *matHeaderCellDef>Workshop</th>
             <td mat-cell *matCellDef="let workshop">
               <div class="workshop-title-cell">
                 <div class="workshop-name">{{ workshop?.detailpage?.title || '—' }}</div>
+                <span data-testid="wor-active-chip" class="active-chip" *ngIf="isActive(workshop)">Active</span>
                 <!-- <div class="workshop-id">{{ workshop?.id }}</div> -->
               </div>
             </td>
@@ -202,7 +237,7 @@
 
           <tr mat-header-row *matHeaderRowDef="displayedColumns" class="table-header-row"></tr>
           <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="table-row"
-            [class.row-active]="row.active"
+            [class.row-active]="isActive(row)"
             [class.row-completed]="row.workshopcompleted">
           </tr>
         </table>

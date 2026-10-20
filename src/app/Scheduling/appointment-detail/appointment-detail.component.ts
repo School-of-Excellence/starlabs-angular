@@ -20,7 +20,8 @@ export class AppointmentDetailComponent {
 
   constructor(public dialog: MatDialog, public dialogRef:MatDialogRef<any>,  @Inject(MAT_DIALOG_DATA) public data:any) {
     this.metaData = data
-    if(!this.metaData['cancelled'] && new Date() < this.metaData['starttime'].toDate()){ // this.metaData['type'] == 'appointment' && 
+    // disableCancel: set by the specialist appointment studio for CW / mentor views (only A&H cancels there)
+    if(!this.metaData['disableCancel'] && !this.metaData['cancelled'] && new Date() < this.metaData['starttime'].toDate()){ // this.metaData['type'] == 'appointment' && 
       this.enableCancel = true
     }
     if(!this.metaData['cancelled'] && !this.metaData['attended'] && this.metaData['starttime'].toDate() < new Date()){ // this.metaData['type'] == 'slot' && 

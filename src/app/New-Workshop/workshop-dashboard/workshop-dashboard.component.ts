@@ -23,6 +23,7 @@ import {
   arrayUnion,
 } from '@angular/fire/firestore';
 import { MatDatepickerModule } from '@angular/material/datepicker';
+import { watsonFirestore, saleWindow, purchaseLabels, formatRupees, buildSaleBuyers, sortSaleBuyers, saleExportRows } from '../watson-purchases';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { AuthguardService } from '../../authguard.service';
 import { MatDialog } from '@angular/material/dialog';
@@ -52,7 +53,8 @@ import {
   evergreenWorkshopDays, filterTableParticipants, filteredProgressListForChallenge, formatDate, formatDateTime,
   groupProgressStat, hasAccessToChallenge, headlineMetrics, isChallengeVisibleForCategory,
   moveButtonText, moveButtonTooltip, neverStartedIds, normalizeSubChallengeStatus, oldResultTooltip,
-  overallProgressLabel, participantTypeClass, participantTypeLabel
+  overallProgressLabel, participantTypeClass, participantTypeLabel,
+  filterParticipantsByName,
 } from './workshop-dashboard.engine';
 
 @Component({
@@ -185,9 +187,14 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   challengeStatistics: any[] = [];
   objectKeys = Object.keys;
   dataSource = new MatTableDataSource<any>([]);
+  // Total, Status and Assignment are parked, not dropped: their cell definitions are still in
+  // the template (commented out beside their column ids) because they are wanted again later.
+  // To bring one back, uncomment it here AND uncomment its <ng-container matColumnDef> block —
+  // mat-table throws if a displayed id has no cell definition.
   displayedColumns: string[] = [
-    'participantId', 'type', 'currentChallenge', 'progress', 'completed',
-    'total', 'status', 'action', 'assignment'
+    'participantId', 'email', 'type', 'currentChallenge', 'progress', 'completed',
+    'action'
+    // 'total', 'status', 'assignment'
   ];
 
   selectedJourneyFilters: string[] = [];
@@ -205,6 +212,8 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     ['completedParticipants', []],
   ]);
   filterOption: 'all' | 'new' | 'old' = 'all';
+  /** Side-panel name search. Narrows the list in the panel only — never the progress table. */
+  sideSearch = '';
   cohortTypeFilter: 'all' | 'facilitator' | 'cohort' = 'all';
   filteredParticipants: any[] = [];
   loggedinProfile: string = null;
@@ -265,6 +274,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     ['existUsersEnrolled', 'Exist Users Enrolled'],
     ['platform', 'Enrolled via'],
     ['notInChatGroup', 'Not in Chat Group'],
+    ['saleAchieved', 'Sale Achieved'],
     ['completed', 'Completed'], ['inreview', 'In Review'], ['rework', 'Rework Required'],
     ['readyformobile', 'Ready for Mobile'], ['inprogress', 'In Progress'], ['notstarted', 'Not Started'],
     ['enrolled', 'All Enrolled'], ['activeParticipants', 'Active Participants'],
@@ -508,15 +518,26 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   }
 
   private setupFilterPredicate() {
+    // Every searchable term goes through this: a missing or non-string field must become an empty
+    // haystack, never an exception. See the note on the sub-challenge name below for why a throw in
+    // here is worse than it looks.
+    const str = (v: any): string => (v === null || v === undefined) ? '' : String(v).toLowerCase();
+
     this.dataSource.filterPredicate = (data: any, filter: string) => {
       const searchStr = filter.toLowerCase();
-      const participantName = (this.mapProfile[data.profileid]?.['name'] || '').toLowerCase();
+      const participantName = str(this.mapProfile[data.profileid]?.['name']);
+      // Email is a table column, so it is searchable too — people look up a row by address.
+      const participantEmail = str(this.mapProfile[data.profileid]?.['email']);
 
       let currentChallengeName = '';
       if (this.workshopData?.challenges[data.currentChallengeIndex]) {
         const challenge = this.workshopData.challenges[data.currentChallengeIndex];
         if (challenge.type === 'challenge' && challenge.challenges?.[data.currentSubChallengeIndex]) {
-          currentChallengeName = challenge.challenges[data.currentSubChallengeIndex].name.toLowerCase();
+          // A sub-challenge is not guaranteed to carry `name` — some are stored with `heading`
+          // instead. Dereferencing it bare threw inside the predicate, and a throw here does not
+          // just lose one field: MatTableDataSource aborts the whole filter pass, so the table
+          // silently stops responding to the search box. Hence str() on every term below.
+          currentChallengeName = str(challenge.challenges[data.currentSubChallengeIndex].name);
         } else if (challenge.type === 'zoomcall') {
           currentChallengeName = `${challenge.heading}: ${challenge.subheading}`.toLowerCase();
         }
@@ -527,16 +548,18 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       const statusStr = status.toLowerCase();
 
       return participantName.includes(searchStr) ||
+        participantEmail.includes(searchStr) ||
         currentChallengeName.includes(searchStr) ||
         statusStr.includes(searchStr) ||
-        data.profileid.toLowerCase().includes(searchStr) ||
-        data.completedChallenges.toString().includes(searchStr) ||
-        data.totalChallenges.toString().includes(searchStr) ||
-        data.progressPercentage.toString().includes(searchStr);
+        str(data.profileid).includes(searchStr) ||
+        str(data.completedChallenges).includes(searchStr) ||
+        str(data.totalChallenges).includes(searchStr) ||
+        str(data.progressPercentage).includes(searchStr);
     };
   }
 
   ngOnDestroy() {
+    if (this.saleTipTimer) clearTimeout(this.saleTipTimer);
     if (this.supportChatUnsub) { this.supportChatUnsub(); this.supportChatUnsub = null; }
     this.destroyed = true;
     this.clearSelectedParticipant();
@@ -891,7 +914,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
           name: param.name,
           value: param.value.replace(/\{\{name\}\}/g, name)
         }));
-        return { phonenumber, name, customParams: processedParams };
+        return { profileid: participant['profileid'], phonenumber, name, customParams: processedParams };
       });
 
     if (participants.length === 0) {
@@ -1039,7 +1062,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
           })
           .map(participant => {
             const metadata = participant['metadata'];
-            return { email: metadata['email'], name: metadata['name'] };
+            return { profileid: participant['profileid'], email: metadata['email'], name: metadata['name'] };
           });
 
         if (recipients.length === 0) {
@@ -1091,7 +1114,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
               name: param.name,
               value: param.value.replace(/\{\{name\}\}/g, name)
             }));
-            return { phonenumber: fullPhoneNumber, name, customParams: processedParams };
+            return { profileid: participant['profileid'], phonenumber: fullPhoneNumber, name, customParams: processedParams };
           });
 
         if (participants.length === 0) {
@@ -1188,7 +1211,10 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     this.workshopEndDateFormatted = this.formatDate(this.workshopData.detailpage?.workshopEndDate);
     if (this.workshopData.categorybased === true) {
       if (!this.displayedColumns.includes('type')) {
-        const idx = this.displayedColumns.indexOf('participantId');
+        // Email belongs immediately after the name, so Type goes in after Email rather than
+        // after Participant. Falls back to Participant if Email is ever taken out.
+        const anchor = this.displayedColumns.indexOf('email') > -1 ? 'email' : 'participantId';
+        const idx = this.displayedColumns.indexOf(anchor);
         this.displayedColumns.splice(idx + 1, 0, 'type');
       }
     } else {
@@ -1328,6 +1354,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       // `participant metadata` (which carries activejourney / customerstatus).
       this.mapProfile = { ...participantData.docdata, ...this.newUserOverlay() };
       this.recomputeNotInChat();
+      void this.loadSaleAchieved();
       // Participant progress lives in its own snapshot (setupParticipantWorkshopSnapshot);
       // here we just re-derive from the current (live) participantWorkshopMap.
       this.recomputeDerivedState();
@@ -1672,6 +1699,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     };
     this.showParticipantPanel = true;
     this.filterOption = 'all';
+    this.sideSearch = '';
     this.applyFilterSide();
   }
 
@@ -1836,12 +1864,29 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       };
       this.showParticipantPanel = true;
       this.filterOption = 'all';
+      this.sideSearch = '';
       this.selectedJourneyFilters = [];
       this.selectedCustomerStatusFilters = [];
       this.selectedEnrollmentStatusFilters = [];
       this.selectedTierFilters = [];
       this.selectedCategoryFilters = [];
       this.selectedNotStartedTypeFilters = [];
+      this.applyFilterSide();
+
+    } else if (metricType === 'saleAchieved') {
+      const list = this.saleAchievedParticipants;
+      this.selectedParticipants = list;
+      this.selectedStatusInfo = {
+        status: 'saleAchieved',
+        challengeName: 'Sale Achieved',
+        subChallengeName: this.saleWindowLabel,
+        count: list.length
+      };
+      this.showParticipantPanel = true;
+      this.filterOption = 'all';
+      this.sideSearch = '';
+      this.selectedJourneyFilters = [];
+      this.selectedCustomerStatusFilters = [];
       this.applyFilterSide();
 
     } else if (metricType === 'notInChatGroup') {
@@ -1855,6 +1900,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       };
       this.showParticipantPanel = true;
       this.filterOption = 'all';
+      this.sideSearch = '';
       this.selectedJourneyFilters = [];
       this.selectedCustomerStatusFilters = [];
       this.selectedEnrollmentStatusFilters = [];
@@ -1883,6 +1929,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       this.selectedSubscriberCode = [];
       this.showReferredOnly = false;
       this.filterOption = 'all';
+      this.sideSearch = '';
       this.applyFilterSide();
 
     } else if (metricType === 'totalNewUsersNotEnrolled') {
@@ -1906,6 +1953,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       this.selectedSubscriberCode = [];
       this.showReferredOnly = false;
       this.filterOption = 'all';
+      this.sideSearch = '';
       this.applyFilterSide();
 
     } else if (metricType === 'shareClicked' || metricType === 'shareClaimed') {
@@ -1945,6 +1993,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       };
       this.showParticipantPanel = true;
       this.filterOption = 'all';
+      this.sideSearch = '';
       this.applyFilterSide();
 
     } else if (metricType === 'purchase') {
@@ -1961,6 +2010,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       };
       this.showParticipantPanel = true;
       this.filterOption = 'all';
+      this.sideSearch = '';
       this.applyFilterSide();
     } else {
       const participantIds = this.metrics.get(metricType);
@@ -1972,6 +2022,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       };
       this.showParticipantPanel = true;
       this.filterOption = 'all';
+      this.sideSearch = '';
       this.selectedJourneyFilters = [];
       this.selectedEnrollmentStatusFilters = [];
       this.selectedTierFilters = [];
@@ -2000,6 +2051,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     this.extendDate = null;
     this.showParticipantPanel = true;
     this.filterOption = 'all';
+    this.sideSearch = '';
     this.selectedJourneyFilters = [];
     this.selectedEnrollmentStatusFilters = [];
     this.selectedTierFilters = [];
@@ -2118,10 +2170,12 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     this.selectedStatusInfo = statusInfo;
     this.showParticipantPanel = true;
     this.filterOption = 'all';
+    this.sideSearch = '';
     this.applyFilterSide();
   }
 
   closeParticipantPanel() {
+    this.saleTipRow = null;
     this.showParticipantPanel = false;
     this.selectedParticipants = [];
     this.selectedStatusInfo = null;
@@ -2670,7 +2724,20 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
           metadata: p
         }));
     }
-    this.filteredParticipants = base;
+    // Applied last, over whatever the other side filters left.
+    this.filteredParticipants = filterParticipantsByName(base, this.sideSearch, p => this.sideNameFor(p));
+    // Sale Achieved sorts instead of filtering (operator 2026-10-14).
+    if (this.selectedStatusInfo?.status === 'saleAchieved') {
+      this.filteredParticipants = sortSaleBuyers(this.filteredParticipants, this.saleSort);
+    }
+  }
+
+  /** The name a side-panel row shows: its own, else whichever directory knows the profile. */
+  private sideNameFor(p: any): string {
+    return p?.name
+      || this.mapProfile[p?.profileid]?.['name']
+      || this.mapProfileNew[p?.profileid]?.['name']
+      || '';
   }
 
   toggleJourneyFilter(journey: string) {
@@ -2765,6 +2832,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     };
     this.showParticipantPanel = true;
     this.filterOption = 'all';
+    this.sideSearch = '';
     this.cohortTypeFilter = 'all';
     this.applyFilterSide();
   }
@@ -2779,6 +2847,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     };
     this.showParticipantPanel = true;
     this.filterOption = 'all';
+    this.sideSearch = '';
     this.applyFilterSide();
   }
 
@@ -2896,6 +2965,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     this.selectedStatusInfo = { status: type, challengeName: label, subChallengeName: label, count: profileIds.length };
     this.showParticipantPanel = true;
     this.filterOption = 'all';
+    this.sideSearch = '';
     this.selectedCategoryFilters = [];
     this.selectedNotStartedTypeFilters = [];
     this.applyFilterSide();
@@ -2930,6 +3000,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     };
     this.showParticipantPanel = true;
     this.filterOption = 'all';
+    this.sideSearch = '';
     this.applyFilterSide();
   }
 
@@ -2993,6 +3064,134 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   supportChatMembers: Set<string> | null = null;
   private supportChatUnsub: Unsubscribe | null = null;
   notInChatParticipants: any[] = [];
+
+  // ==================== Sale Achieved (liveworkshop only, operator 2026-10-14) ====================
+  // Enrolled people who bought anything in Watson `ParticipantPurchases` between the registration start
+  // and ONE MONTH after the workshop end. Watson is READ-ONLY here — reads only, never a write.
+  saleAchievedParticipants: any[] = [];
+  /** 'unavailable' = this build has no Watson config (the emulator build, deliberately). */
+  saleStatus: 'idle' | 'loading' | 'ready' | 'unavailable' = 'idle';
+  saleTotalLabel = '';
+  saleWindowLabel = '';
+  private saleToken = 0;
+  /** Inputs of the last started lookup — a re-fire of the live enrolled listener with the same people and
+   *  dates must NOT restart it (it used to, and the card sat on '…' while each run was thrown away). */
+  private saleKey = '';
+  /** The panel row whose purchases are showing in the hover card. */
+  saleTipRow: any = null;
+  saleTipStyle: Record<string, string> = {};
+  private saleTipTimer: any = null;
+  /** The Sale Achieved panel sorts (no All/New/Old filter): biggest total, or latest purchase first. */
+  saleSort: 'amount' | 'recent' = 'amount';
+
+  setSaleSort(by: 'amount' | 'recent'): void {
+    this.saleSort = by;
+    this.applyFilterSide();
+  }
+
+  get isLiveWorkshop(): boolean { return this.workshopData?.workshoptype === 'liveworkshop'; }
+  /** The card's highlighted figure: the rupee total. '…' while loading, '—' without Watson. */
+  get saleAmountValue(): string {
+    if (this.saleStatus === 'loading' || this.saleStatus === 'idle') return '…';
+    if (this.saleStatus === 'unavailable') return '—';
+    return this.saleTotalLabel || formatRupees(0);
+  }
+  /** The smaller line under it: how many enrolled people bought (only once the lookup has answered). */
+  get saleCountLabel(): string {
+    if (this.saleStatus !== 'ready') return '';
+    const n = this.saleAchievedParticipants.length;
+    return `${n} ${n === 1 ? 'user' : 'users'}`;
+  }
+
+  async loadSaleAchieved(): Promise<void> {
+    if (!this.isLiveWorkshop) { ++this.saleToken; this.saleKey = ''; this.saleStatus = 'idle'; this.saleAchievedParticipants = []; return; }
+    const dp = this.workshopData?.detailpage || {};
+    const win = saleWindow(dp['registrationStartDate'], dp['workshopEndDate']);
+    this.saleWindowLabel = win
+      ? `Bought ${formatDate(win.start)} – ${formatDate(win.end)}`
+      : 'Registration start or workshop end date is not set';
+    const db = watsonFirestore();
+    if (!db) { ++this.saleToken; this.saleStatus = 'unavailable'; this.saleAchievedParticipants = []; this.saleTotalLabel = ''; return; }
+    if (!win) { ++this.saleToken; this.saleStatus = 'ready'; this.saleAchievedParticipants = []; this.saleTotalLabel = ''; return; }
+
+    // Enrolled people with an email. Watson stores emails lower-cased; ask for the stored spelling too.
+    const ids = [...new Set(this.enrolledParticipants.map(p => p.profileid).filter(Boolean))];
+    const emailOf = new Map<string, string>();
+    ids.forEach(id => { const e = String(this.mapProfile[id]?.email ?? '').trim(); if (e) emailOf.set(id, e); });
+    const asked = [...new Set([...emailOf.values()].flatMap(e => [e, e.toLowerCase()]))];
+    // Same people + same window as the run already started (or finished)? Keep it — don't restart.
+    const key = [...asked].sort().join('|') + '#' + win.start.getTime() + '-' + win.end.getTime();
+    if (key === this.saleKey && (this.saleStatus === 'loading' || this.saleStatus === 'ready')) return;
+    this.saleKey = key;
+    const token = ++this.saleToken;
+    this.saleStatus = 'loading';
+    const chunks = <T>(a: T[]) => Array.from({ length: Math.ceil(a.length / 30) }, (_, i) => a.slice(i * 30, i * 30 + 30));
+    try {
+      // 1) Participants by email (READ) — every batch of 30 at once, not one after another.
+      const participantDocs: { id: string; data: any }[] = [];
+      const pSnaps = await Promise.all(chunks(asked).map(part =>
+        getDocs(query(collection(db, 'Participants'), where('email', 'in', part)))));
+      pSnaps.forEach(snap => snap.forEach((d: any) => participantDocs.push({ id: d.id, data: d.data() || {} })));
+      if (token !== this.saleToken || this.destroyed) return;
+      // 2) ParticipantPurchases for those participant ids (READ) — also all batches at once.
+      const allPids = [...new Set(participantDocs.map(d => String(d.data['id'] ?? d.id)))];
+      const purchaseDocs: any[] = [];
+      const bSnaps = await Promise.all(chunks(allPids).map(part =>
+        getDocs(query(collection(db, 'ParticipantPurchases'), where('participantid', 'in', part)))));
+      bSnaps.forEach(snap => snap.forEach((d: any) => purchaseDocs.push(d.data() || {})));
+      if (token !== this.saleToken || this.destroyed) return;
+      // 3) Match and window (pure — see buildSaleBuyers).
+      const matched = buildSaleBuyers(emailOf, participantDocs, purchaseDocs, win);
+      const grand = matched.reduce((a, m) => a + m.total, 0);
+      const buyers = matched.map(m => ({
+        ...this.buildParticipantEntry(m.profileid),
+        salePurchases: m.rows.map(purchaseLabels),
+        saleTotal: m.total,
+        saleTotalLabel: formatRupees(m.total),
+        // Latest purchase in the window — the "Recent purchase" sort key.
+        saleLastDate: Math.max(...m.rows.map(r => r.date ? r.date.getTime() : 0))
+      }));
+      this.saleAchievedParticipants = buyers;
+      this.saleTotalLabel = buyers.length ? formatRupees(grand) : '';
+      this.saleStatus = 'ready';
+    } catch (err) {
+      console.error('Sale Achieved: Watson lookup failed', err);
+      if (token !== this.saleToken || this.destroyed) return;
+      this.saleKey = '';   // let the next trigger retry
+      this.saleAchievedParticipants = [];
+      this.saleTotalLabel = '';
+      this.saleStatus = 'ready';
+    }
+    // Keep an open Sale Achieved panel in step.
+    if (this.selectedStatusInfo?.status === 'saleAchieved') this.onMetricClick('saleAchieved');
+  }
+
+  /**
+   * Purchases hover card on a Sale Achieved panel row — same card as the EiFlix dashboard's. The side
+   * panel is fixed at z-index 1000, so the card is fixed at 1002, placed beside the panel level with the
+   * row; with no room beside it (phones) it drops below the row.
+   */
+  showSaleTip(row: any, el: HTMLElement): void {
+    this.keepSaleTip();
+    if (this.selectedStatusInfo?.status !== 'saleAchieved' || !row?.salePurchases?.length || !el) { this.saleTipRow = null; return; }
+    const r = el.getBoundingClientRect();
+    const panel = (el.closest('.participant-panel') as HTMLElement | null)?.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const tipMax = 360;
+    const roomLeft = panel ? panel.left : r.left;
+    this.saleTipStyle = roomLeft >= 320
+      ? { top: Math.max(8, Math.min(r.top, vh - tipMax - 8)) + 'px', right: (vw - roomLeft + 10) + 'px' }
+      : { top: Math.max(8, Math.min(r.bottom + 6, vh - tipMax - 8)) + 'px', left: '12px', right: '12px' };
+    this.saleTipRow = row;
+  }
+  keepSaleTip(): void {
+    if (this.saleTipTimer) { clearTimeout(this.saleTipTimer); this.saleTipTimer = null; }
+  }
+  hideSaleTip(): void {
+    this.keepSaleTip();
+    this.saleTipTimer = setTimeout(() => { this.saleTipRow = null; this.saleTipTimer = null; }, 140);
+  }
   chatAddBusy = new Set<string>();
   chatAddAllBusy = false;
 
@@ -3157,6 +3356,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     this.selectedStatusInfo = { status: 'platform', challengeName: 'Enrolled via', subChallengeName: label, count: list.length };
     this.showParticipantPanel = true;
     this.filterOption = 'all';
+    this.sideSearch = '';
     this.selectedJourneyFilters = [];
     this.selectedCustomerStatusFilters = [];
     this.selectedEnrollmentStatusFilters = [];
@@ -3371,6 +3571,13 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     }
     const confirmDownload = window.confirm("Are you sure you want to export participants as CSV?");
     if (!confirmDownload) return;
+    // Sale Achieved: one row per purchase — date, product, amount — in the panel's current order.
+    if (this.selectedStatusInfo?.status === 'saleAchieved') {
+      const rows = saleExportRows(this.filteredParticipants);
+      const name = `workshop-sale-achieved-${this.workshopData?.detailpage?.title || 'workshop'}-${new Date().toISOString().split('T')[0]}.csv`;
+      this.downloadCSV(this.createCSVContent(rows), name);
+      return;
+    }
     const csvData = this.filteredParticipants.map((p: any) => ({
       'Participant Name': p.name || 'N/A',
       'Email': p['metadata']['email'] || '',

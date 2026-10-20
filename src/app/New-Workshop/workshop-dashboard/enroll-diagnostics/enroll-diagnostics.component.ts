@@ -187,7 +187,7 @@ export class EnrollDiagnosticsComponent {
     try {
       const workshopRef = doc(this.db, 'workshopconfiguration', this.workshopId) as DocumentReference;
 
-      // ── all reads, scoped to this profile and this workshop ──
+      // ── all reads, scoped to this profile and this workshops ──
       const [wsDoc, meta, profileData, newUserData, enrolled, progress, payments, referrals, tierSnap, journeySnap] =
         await Promise.all([
           this.byId('workshopconfiguration', this.workshopId),

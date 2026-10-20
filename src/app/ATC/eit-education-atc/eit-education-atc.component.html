@@ -1,12 +1,12 @@
 <main>
   <header class="d-flex justify-content-center m-3"><h4>ATC Education - {{![null,undefined].includes(ongoingQueue) ? ongoingQueue['queuename']: '' }}</h4></header>
-  <button *ngIf="onViewSelectedParticipantATC" style="height:50px;float: right;margin-right: 10px;margin-bottom:10px;" mat-stroked-button  type="button" (click)="showParticipants()">Back to Participant List</button>
+  <button data-testid="ate-back" *ngIf="onViewSelectedParticipantATC" style="height:50px;float: right;margin-right: 10px;margin-bottom:10px;" mat-stroked-button  type="button" (click)="showParticipants()">Back to Participant List</button>
   <!-- event select -->
   <section *ngIf="!onViewSelectedParticipantATC">
     <section class="d-flex flex-row justify-content-start">
       &nbsp;&nbsp;&nbsp;
       <mat-form-field class="w-50" appearance="outline">
-        <mat-select [compareWith]="compareFn" [(ngModel)]="this.ongoingQueue" (selectionChange)="getSpecialist();getParticipantListBySelectedQueue()">
+        <mat-select data-testid="ate-queue" [compareWith]="compareFn" [(ngModel)]="this.ongoingQueue" (selectionChange)="getSpecialist();getParticipantListBySelectedQueue()">
           <mat-option *ngFor="let list of queueList" [value]="list">{{list['queuename']}}</mat-option>
         </mat-select>
       </mat-form-field>&nbsp;&nbsp;&nbsp;
@@ -26,9 +26,9 @@
     </section>
     <!-- show participant list -->
     <section *ngIf="onViewParticipantList" style="margin-left:25%;margin-right:25%;height:100vh;overflow: auto;margin-bottom: 300px;">
-      <div class="card" *ngFor="let list of filteredParticipants">
+      <div class="card" data-testid="ate-participant-card" [attr.data-pid]="list.profileid" *ngFor="let list of filteredParticipants">
         <div class="card-body">
-          Participant : <span style="cursor: pointer;" (click)="getTheirATC(list.profileid)"><b>{{mapProfile[list.profileid]}}</b></span>&nbsp;&nbsp;&nbsp;<span style="float:right;" [ngClass]="list.atcref.path.indexOf('atc_alpha') === 0 ? 'green' :'yellow'">{{list.status | titlecase}}</span><br>
+          Participant : <span data-testid="ate-participant-name" style="cursor: pointer;" (click)="getTheirATC(list.profileid)"><b>{{mapProfile[list.profileid]}}</b></span>&nbsp;&nbsp;&nbsp;<span style="float:right;" [ngClass]="list.atcref.path.indexOf('atc_alpha') === 0 ? 'green' :'yellow'">{{list.status | titlecase}}</span><br>
           Stage : <span>{{list.stagename}}</span><br>
           Prescribed Author(s): <span *ngFor="let eis of list['author']">{{mapProfile[eis.id]}} , </span><br>
           Validators(s): <span *ngFor="let eis of list['validator'] || []">{{mapProfile[eis.id]}} , </span><br>
@@ -44,17 +44,17 @@
       <div class="container-fluid py-2">
         <h4 class="title">{{mapProfile[chosenParticipant]}}-Accelerated Time Compression-Final View.</h4>
         <div class="d-flex flex-row flex-nowrap" style="width:100vw;overflow-x: auto;overflow-y: hidden;">
-          <div style="height:100vh;overflow-y: auto;overflow-x: hidden;min-width:40vw" class="border d-flex flex-column ml-1" *ngFor="let atc of mapATCByProfile[chosenParticipant]">
+          <div style="height:100vh;overflow-y: auto;overflow-x: hidden;min-width:40vw" class="border d-flex flex-column ml-1" data-testid="ate-atc" [attr.data-atc]="atc.atcid" *ngFor="let atc of mapATCByProfile[chosenParticipant]">
             <section *ngIf="![null,undefined].includes(mapATC[atc.atcref.path])" class="mb-2">
               <div class="atcdetail">
                 <label class="highlight">Stage:</label>
                 <label>{{atc['stagename']}}</label>&nbsp;&nbsp;&nbsp;&nbsp;
                 <span style="float:right;">
-                  <button style="color:black;" mat-stroked-button type="button" (click)="onEditATC(atc)">Edit</button>&nbsp;&nbsp;
-                  <button style="color:black" mat-stroked-button type="button" (click)="onCancelATC(atc)">Cancel</button>&nbsp;&nbsp;
-                  <button *ngIf="atc.atcref.path.indexOf('atc_to_validate') === 0" style="color:black;" mat-stroked-button type="button" (click)="onValidateATC(atc,'validated')">Validate</button>&nbsp;&nbsp;
-                  <button *ngIf="atc.atcref.path.indexOf('atc_alpha') === 0" style="color:black;" mat-stroked-button type="button" (click)="onInvalidateATC(atc,'unvalidated')">Unvalidate</button>&nbsp;&nbsp;
-                  <label style="color:black;font-size: 1.25rem;">{{atc.status === 'atc given' ? 'Yet to validate' : (atc.status | titlecase)}}</label>
+                  <button data-testid="ate-edit" style="color:black;" mat-stroked-button type="button" (click)="onEditATC(atc)">Edit</button>&nbsp;&nbsp;
+                  <button data-testid="ate-cancel" style="color:black" mat-stroked-button type="button" (click)="onCancelATC(atc)">Cancel</button>&nbsp;&nbsp;
+                  <button data-testid="ate-validate" *ngIf="atc.atcref.path.indexOf('atc_to_validate') === 0" style="color:black;" mat-stroked-button type="button" (click)="onValidateATC(atc,'validated')">Validate</button>&nbsp;&nbsp;
+                  <button data-testid="ate-unvalidate" *ngIf="atc.atcref.path.indexOf('atc_alpha') === 0" style="color:black;" mat-stroked-button type="button" (click)="onInvalidateATC(atc,'unvalidated')">Unvalidate</button>&nbsp;&nbsp;
+                  <label data-testid="ate-status" style="color:black;font-size: 1.25rem;">{{atc.status === 'atc given' ? 'Yet to validate' : (atc.status | titlecase)}}</label>
                 </span>
                 <br>
                 <label class="highlight">Prescribed Author(s):</label>
@@ -151,7 +151,7 @@
       <div class="container-fluid py-2">
         <h4 class="title">Consolidate View.</h4>
         <div class="d-flex flex-row flex-nowrap" style="width:100vw;overflow-x: auto;overflow-y: hidden;">
-          <div style="height:100vh;overflow-y: auto;overflow-x: hidden;min-width:40vw" class="border d-flex flex-column ml-1" *ngFor="let atc of filterAlphaAtc(mapATCByProfile[chosenParticipant])">
+          <div style="height:100vh;overflow-y: auto;overflow-x: hidden;min-width:40vw" class="border d-flex flex-column ml-1" data-testid="ate-consolidated" [attr.data-atc]="atc.atcid" *ngFor="let atc of filterAlphaAtc(mapATCByProfile[chosenParticipant])">
             <section *ngIf="![null,undefined].includes(mapATC[atc.atcref.path])" class="mb-2">
               <div class="atcdetail">
                 <label class="highlight">Stage:</label>

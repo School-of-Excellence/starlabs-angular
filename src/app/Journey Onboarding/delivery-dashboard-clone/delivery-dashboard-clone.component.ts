@@ -369,6 +369,7 @@ export class DeliveryDashboardCloneComponent {
     journeyMonthPicker = new FormControl<Date>(new Date());
 
     originalData = {
+        allParticipants: { data: [], count: 0 },
         awaitingInitiation: { data: [], count: 0 },
         readyForInitiation: { data: [], count: 0 },
         paymentNotCleared: { data: [], count: 0 },
@@ -631,6 +632,10 @@ export class DeliveryDashboardCloneComponent {
     selectedEvent: any = null;
     productTableFilterControl = new FormControl<string[]>([]); 
     stageAppointmentTypeMap: { [key: string]: string } = {};
+    customerStatusFilterControl = new FormControl<string[]>([]);
+    financialStatusFilterControl = new FormControl<string[]>([]);
+    parallelFilterControl = new FormControl<string>('all'); 
+    filtersApplied = false;
     
     private readonly stagePopulationSource: { [product: string]: { [stageKey: string]: string } } = {
         eiStarterPack: {
@@ -1411,7 +1416,8 @@ export class DeliveryDashboardCloneComponent {
                 }
 
                 if (isEligible) {
-                    if (!status) {
+                    const isYetToStart = !status && this.isReadyToStart(item);
+                    if (isYetToStart) {
                         funnelData[productId].awaiting.push({ ...item, cycle });
                     } else if (status === 'initiated') {
                         const d = this.getDateFromFieldPublic(statusdate['initiated']);
@@ -3331,27 +3337,26 @@ export class DeliveryDashboardCloneComponent {
     navToAttention(target: 'stuck' | 'awaiting' | 'ready' | 'idle') {
         this.outerTabIndex = 2;
         switch (target) {
-            case 'stuck':
-                this.currentTabIndex = 2;
-                this.activeFilter = 'none';
+            case 'stuck':    
+                this.currentTabIndex = 3; 
+                this.activeFilter = 'none'; 
                 break;
             case 'awaiting':
-                this.currentTabIndex = 0;
-                this.activeFilter = 'none';
+                this.currentTabIndex = 1; 
+                this.activeFilter = 'none'; 
                 break;
-            case 'ready':
-                this.currentTabIndex = 0;
-                this.activeFilter = 'readyForInitiation';
+            case 'ready':    
+                this.currentTabIndex = 1; 
+                this.activeFilter = 'readyForInitiation'; 
                 break;
-            case 'idle':
-                this.currentTabIndex = 1;
-                this.activeFilter = 'none';
+            case 'idle':     
+                this.currentTabIndex = 2; 
+                this.activeFilter = 'none'; 
                 break;
         }
         if (this.tabGroup) this.tabGroup.selectedIndex = this.currentTabIndex;
         this.populateActionableCohorts(this.currentSelectedLabels);
-        // Re-trigger paginated data for the newly active sub-tab
-        try { this.filterTableData?.(); } catch { /* ignore if not ready */ }
+        try { this.filterTableData?.(); } catch { }
     }
 
     // Human-readable active sub-tab name for the Export button label
@@ -3365,22 +3370,22 @@ export class DeliveryDashboardCloneComponent {
     }
 
     // Bulk Initiate Ready — confirmation gate (Batch B)
-    bulkInitiateReady() {
-        const readyCount = this.kpiReadyToInitiate;
-        if (readyCount === 0) {
-            alert('No participants are currently in the Ready state to initiate.');
-            return;
-        }
-        const ok = confirm(
-            `Bulk-initiate ${readyCount} participant${readyCount === 1 ? '' : 's'}?\n\n` +
-            `This will trigger the initiation flow for everyone currently in the Ready state. ` +
-            `This action cannot be undone in one click.`
-        );
-        if (!ok) return;
-        // Surface intent — actual bulk logic is not yet implemented in the backend.
-        alert(`Bulk-initiate triggered for ${readyCount} participant${readyCount === 1 ? '' : 's'}. ` +
-            `Backend wiring is pending — this is a UX-confirmed stub.`);
-    }
+    // bulkInitiateReady() {
+    //     const readyCount = this.kpiReadyToInitiate;
+    //     if (readyCount === 0) {
+    //         alert('No participants are currently in the Ready state to initiate.');
+    //         return;
+    //     }
+    //     const ok = confirm(
+    //         `Bulk-initiate ${readyCount} participant${readyCount === 1 ? '' : 's'}?\n\n` +
+    //         `This will trigger the initiation flow for everyone currently in the Ready state. ` +
+    //         `This action cannot be undone in one click.`
+    //     );
+    //     if (!ok) return;
+    //     // Surface intent — actual bulk logic is not yet implemented in the backend.
+    //     alert(`Bulk-initiate triggered for ${readyCount} participant${readyCount === 1 ? '' : 's'}. ` +
+    //         `Backend wiring is pending — this is a UX-confirmed stub.`);
+    // }
 
     // First-letter monogram for a product (replaces emoji icons in Completion History).
     // 1 word → first 2 letters; 2 words → 2 initials; 3+ words → 3 initials.
@@ -4218,16 +4223,33 @@ export class DeliveryDashboardCloneComponent {
     }
 
     tabTableConfigs: { [key: string]: TabTableConfig } = {
+        allParticipants: {
+            headers: [
+                { key: 'priority', label: 'PRIORITY', width: '5%' },
+                { key: 'profileid', label: 'NAME', width: '12%', type: 'mapped', mapData: this.mapMetaData, mapValue: 'name' },
+                { key: 'profileid', label: 'MOBILE', width: '8%', type: 'mapped', mapData: this.mapMetaData, mapValue: 'phonenumber' },
+                { key: 'status', label: 'STATUS', width: '14%', type: 'text' },
+                { key: 'journey', label: 'JOURNEY', width: '10%', type: 'text' },
+                { key: 'product', label: 'PRODUCT', width: '12%', type: 'text' },
+                { key: 'parallelproduct', label: 'PARALLEL PRODUCT', width: '12%', type: 'text' },
+                { key: 'subscriptionstart', label: 'SUBSCRIPTION START', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
+                { key: 'subscriptionend', label: 'SUBSCRIPTION END', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
+            ],
+            dataKey: 'allParticipants'
+        },
         awaitingInitiation: {
             headers: [
                 { key: 'priority', label: 'PRIORITY', width: '5%' },
                 { key: 'profileid', label: 'NAME', width: '10%', type: 'mapped', mapData: this.mapMetaData, mapValue: 'name' },
                 { key: 'profileid', label: 'MOBILE', width: '5%', type: 'mapped', mapData: this.mapMetaData, mapValue: 'phonenumber' },
                 { key: 'journey', label: 'JOURNEY', width: '10%', type: 'text' },
+                { key: 'parallelproduct', label: 'PARALLEL PRODUCT', width: '10%', type: 'text' },
                 { key: 'onboardedtime', label: 'ONBOARDED', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
                 { key: 'waitingperiod', label: 'DAYS WAITING', width: '10%', type: 'number' },
                 { key: 'financialdata', label: 'PAYMENT STATUS', width: '10%' },
                 { key: 'lastpaymentdate', label: 'LASTPAYMENT', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
+                { key: 'subscriptionstart', label: 'SUBSCRIPTION START', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
+                { key: 'subscriptionend', label: 'SUBSCRIPTION END', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
                 { key: 'bottleneck', label: 'BOTTLENECK', width: '10%' },
             ],
             dataKey: 'awaitingInitiation'
@@ -4237,10 +4259,13 @@ export class DeliveryDashboardCloneComponent {
                 { key: 'priority', label: 'STATUS', width: '15%' },
                 { key: 'profileid', label: 'NAME', width: '15%', type: 'mapped', mapData: this.mapMetaData, mapValue: 'name' },
                 { key: 'journey', label: 'JOURNEY', width: '12%', type: 'text' },
+                { key: 'parallelproduct', label: 'PARALLEL PRODUCT', width: '10%', type: 'text' },
                 { key: 'product', label: 'PRODUCT', width: '12%', type: 'text' },
                 { key: 'profileid', label: 'MOBILE', width: '15%', type: 'mapped', mapData: this.mapMetaData, mapValue: 'phonenumber' },
                 { key: 'initiatedtime', label: 'INITIATED DATE', width: '15%', type: 'date', format: 'MMM dd, yyyy' },
                 { key: 'waitingperiod', label: 'DAYS WAITING', width: '10%', type: 'number' },
+                { key: 'subscriptionstart', label: 'SUBSCRIPTION START', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
+                { key: 'subscriptionend', label: 'SUBSCRIPTION END', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
                 { key: 'generalnotes', label: 'NOTES', width: '10%' },
                 { key: 'addnotes', label: '+', width: '5%', substringStart: 0, substringEnd: 50 }
             ],
@@ -4251,6 +4276,7 @@ export class DeliveryDashboardCloneComponent {
                 { key: 'escalationlevel', label: 'ESCALATION LEVEL', width: '10%', type: 'text' },
                 { key: 'profileid', label: 'NAME', width: '10%', type: 'mapped', mapData: this.mapMetaData, mapValue: 'name' },
                 { key: 'activejourney', label: 'JOURNEY', width: '12%', type: 'text' },
+                { key: 'parallelproduct', label: 'PARALLEL PRODUCT', width: '10%', type: 'text' },
                 { key: 'product', label: 'PRODUCT', width: '12%', type: 'text' },
                 { key: 'appointment', label: 'APPOINTMENT', width: '12%', type: 'text' },
                 { key: 'appointmentstatus', label: 'APPOINTMENT STATUS', type: 'text', width: '130px' },
@@ -4259,6 +4285,8 @@ export class DeliveryDashboardCloneComponent {
                 { key: 'waitingperiod', label: 'DAYS STUCK', width: '10%', type: 'number' },
                 { key: 'recentappointmentdate', label: 'LAST APPOINTMENT DATE', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
                 { key: 'actualstuckdays', label: 'DAYS', width: '10%', type: 'number' },
+                { key: 'subscriptionstart', label: 'SUBSCRIPTION START', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
+                { key: 'subscriptionend', label: 'SUBSCRIPTION END', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
                 { key: 'lastaction', label: 'LAST ACTION', width: '10%', type: 'text' },
                 { key: 'assignedto', label: 'ASSIGNED TO', width: '13%', type: 'text' },
                 { key: 'generalnotes', label: 'RESOLUTION', width: '10%' },
@@ -4272,10 +4300,13 @@ export class DeliveryDashboardCloneComponent {
                 { key: 'profileid', label: 'NAME', width: '10%', type: 'mapped', mapData: this.mapMetaData, mapValue: 'name' },
                 { key: 'profileid', label: 'MOBILE', width: '5%', type: 'mapped', mapData: this.mapMetaData, mapValue: 'phonenumber' },
                 { key: 'journey', label: 'JOURNEY', width: '10%', type: 'text' },
+                { key: 'parallelproduct', label: 'PARALLEL PRODUCT', width: '10%', type: 'text' },
                 { key: 'onboardedtime', label: 'ONBOARDED', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
                 { key: 'waitingperiod', label: 'DAYS WAITING', width: '10%', type: 'number' },
                 { key: 'financialdata', label: 'PAYMENT STATUS', width: '10%' },
                 { key: 'lastpaymentdate', label: 'LASTPAYMENT', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
+                { key: 'subscriptionstart', label: 'SUBSCRIPTION START', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
+                { key: 'subscriptionend', label: 'SUBSCRIPTION END', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
                 { key: 'bottleneck', label: 'BOTTLENECK', width: '10%' },
                 { key: 'action', label: 'ACTION REQUIRED', width: '20%' }
             ],
@@ -4987,13 +5018,13 @@ export class DeliveryDashboardCloneComponent {
         if (this.activeFilter === 'thisMonthActivity') {
             return this.tabTableConfigs['thisMonthActivityHeaders']?.headers || [];
         }
-        const tabKeys = ['awaitingInitiation', 'initiatedPending', 'stuckCases'];
+        const tabKeys = ['allParticipants','awaitingInitiation', 'initiatedPending', 'stuckCases'];
         const currentTabKey = tabKeys[this.currentTabIndex || 0];
         return this.tabTableConfigs[currentTabKey]?.headers || [];
     }
 
     getCurrentTabData(): any[] {
-        const tabKeys = ['awaitingInitiation', 'initiatedPending', 'stuckCases'];
+        const tabKeys = ['allParticipants','awaitingInitiation', 'initiatedPending', 'stuckCases'];
         const currentTabKey = tabKeys[this.currentTabIndex || 0];
         const dataKey = this.tabTableConfigs[currentTabKey]?.dataKey;
 
@@ -5049,8 +5080,8 @@ export class DeliveryDashboardCloneComponent {
     }
 
     updatePaginatedData(): void {
-        if (this.filterForm.value.search || this.filterForm.value.journey?.length > 0 || this.productTableFilterControl.value?.length > 0) {
-        this.updatePaginatedDataWithSearch();
+        if (this.filtersApplied) { 
+            this.updatePaginatedDataWithSearch(); 
         } else {
             const allData = this.getCurrentTabData();
             this.totalPages = Math.ceil(allData.length / this.itemsPerPage);
@@ -5067,36 +5098,43 @@ export class DeliveryDashboardCloneComponent {
 
     filterTableData(): void {
         const allData = this.getCurrentTabDataBeforeFilter();
-        const formValue = this.filterForm.value;
-        const searchTerm = formValue.search?.toLowerCase().trim() || '';
-        const selectedJourneys = formValue.journey || [];
+        const searchTerm = this.filterForm.value.search?.toLowerCase().trim() || '';
+        const selectedJourneys = this.filterForm.value.journey || [];
         const selectedProducts = this.productTableFilterControl.value || [];
+        const selectedCustomerStatus = this.customerStatusFilterControl.value || [];
+        const selectedFinancial = this.financialStatusFilterControl.value || [];
+        const parallelMode = this.parallelFilterControl.value;
 
-        if (!searchTerm && selectedJourneys.length === 0 && selectedProducts.length === 0) {
+        this.filtersApplied = !!searchTerm || selectedJourneys.length > 0 || selectedProducts.length > 0 || selectedCustomerStatus.length > 0 || selectedFinancial.length > 0 || parallelMode !== 'all';
+
+        if (!this.filtersApplied) {
             this.filteredData = allData;
         } else {
             this.filteredData = allData.filter(participant => {
-                let matchesSearch = true;
-                let matchesJourney = true;
-                let matchesProduct = true;
+                const meta = this.mapMetaData[participant['profileid']] || {};
 
-                if (searchTerm) {
-                    const name = this.mapMetaData[participant['profileid']]?.['name'] || '';
-                    matchesSearch = name.toLowerCase().includes(searchTerm);
-                }
+                if (searchTerm && !(meta['name'] || '').toLowerCase().includes(searchTerm)) return false;
 
                 if (selectedJourneys.length > 0) {
-                    const journeyId = this.mapMetaData[participant['profileid']]?.['activejourney'];
-                    const journeyname = this.mapjourneyname[journeyId] || participant['journey'] || participant['activejourney'] || '';
-                    matchesJourney = selectedJourneys.includes(journeyname);
+                    const journeyname = this.mapjourneyname[meta['activejourney']] || participant['journey'] || participant['activejourney'] || '';
+                    if (!selectedJourneys.includes(journeyname)) return false;
                 }
 
                 if (selectedProducts.length > 0) {
                     const productName = participant['product'] || '';
-                    matchesProduct = selectedProducts.some(prod => productName.includes(prod));
+                    if (!selectedProducts.some(prod => productName.includes(prod))) return false;
                 }
 
-                return matchesSearch && matchesJourney && matchesProduct;
+                if (selectedCustomerStatus.length > 0 && !selectedCustomerStatus.includes((meta['customerstatus'] || '').toString().toLowerCase().trim())) 
+                    return false;
+
+                if (selectedFinancial.length > 0 && !selectedFinancial.includes((meta['financialstatus'] || '').toString().toLowerCase().trim())) 
+                    return false;
+
+                if (parallelMode === 'has' && !participant['parallelproduct']) return false;
+                if (parallelMode === 'none' && participant['parallelproduct']) return false;
+
+                return true;
             });
         }
 
@@ -5106,7 +5144,7 @@ export class DeliveryDashboardCloneComponent {
     }
 
     getCurrentTabDataBeforeFilter(): any[] {
-        const tabKeys = ['awaitingInitiation', 'initiatedPending', 'stuckCases'];
+        const tabKeys = ['allParticipants', 'awaitingInitiation', 'initiatedPending', 'stuckCases'];
         const currentTabKey = tabKeys[this.currentTabIndex || 0];
         const dataKey = this.tabTableConfigs[currentTabKey]?.dataKey;
 
@@ -5159,6 +5197,11 @@ export class DeliveryDashboardCloneComponent {
         this.filteredData = [];
         this.currentPage = 1;
         this.productTableFilterControl.setValue([]); 
+        // reset all filters
+        this.customerStatusFilterControl.setValue([]);
+        this.financialStatusFilterControl.setValue([]);
+        this.parallelFilterControl.setValue('all');
+        this.filtersApplied = false;
 
         // restore product selection
         this.currentSelectedLabels = savedProductLabels;
@@ -5166,7 +5209,7 @@ export class DeliveryDashboardCloneComponent {
     }
 
     updatePaginatedDataWithSearch(): void {
-        const dataToDisplay = (this.filterForm.value.search || this.filterForm.value.journey?.length > 0 || this.productTableFilterControl.value?.length > 0) ? this.filteredData : this.getCurrentTabData();
+        const dataToDisplay = this.filtersApplied ? this.filteredData : this.getCurrentTabData();
         this.totalPages = Math.ceil(dataToDisplay.length / this.itemsPerPage);
 
         const startIndex = (this.currentPage - 1) * this.itemsPerPage;
@@ -5331,7 +5374,7 @@ export class DeliveryDashboardCloneComponent {
     }
 
     exportTableData() {
-        const tabKeys = ['awaitingInitiation', 'initiatedPending', 'stuckCases'];
+        const tabKeys = ['allParticipants', 'awaitingInitiation', 'initiatedPending', 'stuckCases'];
         const currentTabKey = tabKeys[this.currentTabIndex || 0];
         const currentConfig = this.tabTableConfigs[currentTabKey];
 
@@ -5339,7 +5382,7 @@ export class DeliveryDashboardCloneComponent {
             console.error('No configuration found for current tab');
             return;
         }
-        const dataToExport = this.getCurrentTabData();
+        const dataToExport = this.filtersApplied ? this.filteredData : this.getCurrentTabData();
         const columns = currentConfig.headers;
         const exportColumns = columns.filter(col =>
             col.key !== 'checkbox' &&
@@ -5383,7 +5426,7 @@ export class DeliveryDashboardCloneComponent {
             };
         }
 
-        const tabNames = ['Awaiting_Initiation', 'Initiated_Pending', 'Stuck_Cases'];
+        const tabNames = ['All_Participants', 'Awaiting_Initiation', 'Initiated_Pending', 'Stuck_Cases'];
         const sheetName = tabNames[this.currentTabIndex || 0];
         XLSX.utils.book_append_sheet(wb, ws, sheetName);
 
@@ -5391,6 +5434,26 @@ export class DeliveryDashboardCloneComponent {
         const fileName = `${sheetName}${filterSuffix}_${new Date().toISOString().split('T')[0]}.xlsx`;
 
         XLSX.writeFile(wb, fileName);
+    }
+
+    // Get the names of other active products for a participant, excluding the current product
+    private getParallelProduct(profileId: string, productId: string): string {
+        const meta = this.mapMetaData[profileId] || {};
+        return Array.from(new Set<string>(meta['activeproduct'] || []))
+            .filter(id => id !== productId)
+            .map(id => this.mapProductName[id])
+            .filter(Boolean)
+            .join(', ');
+    }
+
+    // Check if the participant is ready to start based on their status,other ongoing products and financial eligibility
+    private isReadyToStart(item: any): boolean {
+        const meta = this.mapMetaData[item.profileid] || {};
+        const isActive = (meta['customerstatus'] || '').toString().toLowerCase().trim() === 'active';
+        const financialStatus = (meta['financialstatus'] || '').toString().toLowerCase().trim();
+        const isFinanceEligible = ['regular', 'fully paid'].includes(financialStatus);
+        const hasParallelProduct = this.getParallelProduct(item.profileid, item.productref?.id);
+        return isActive && isFinanceEligible && !hasParallelProduct;
     }
 
     private formatCellValueForExport(participant: any, header: TableHeader): any {
@@ -5441,8 +5504,8 @@ export class DeliveryDashboardCloneComponent {
     }
 
     getCurrentTabDataLength(): number {
-        if (this.filterForm.value.search || this.filterForm.value.journey?.length > 0 || this.productTableFilterControl.value?.length > 0) {
-            return this.filteredData.length;
+        if (this.filtersApplied) { 
+            return this.filteredData.length; 
         }
         return this.getCurrentTabData().length;
     }
@@ -5498,48 +5561,20 @@ export class DeliveryDashboardCloneComponent {
         this.currentTabIndex = event.index;
         this.currentPage = 1;
         this.itemsPerPage = 10;
-        this.productTableFilterControl.setValue([]);
-
-        // save product selection before reset
         const savedProductLabels = this.productFilterControl.value as string[] || [];
 
-        // reset only search and journey, NOT product
-        this.filterForm.patchValue({
-            search: '',
-            journey: [],
-        });
+        this.filterForm.patchValue({ search: '', journey: [] });
+        this.productTableFilterControl.setValue([]);
+        this.customerStatusFilterControl.setValue([]);
+        this.financialStatusFilterControl.setValue([]);
+        this.parallelFilterControl.setValue('all');
+        this.filtersApplied = false;
         this.searchText = '';
         this.filteredData = [];
 
-        if (!this.isFilterButtonClick) {
-            this.activeFilter = 'none';
-        } else {
-            if (this.activeFilter === 'todayActivity') {
-                this.activeFilter = 'none';
-            }
-            if (this.currentTabIndex === 0 && this.activeFilter === 'initiatedToday') {
-                this.activeFilter = 'none';
-            }
-            if (this.currentTabIndex === 1 && ['readyForInitiation', 'clearedMoreThan7Days', 'clearedMoreThan30Days'].includes(this.activeFilter)) {
-                this.activeFilter = 'none';
-            }
-            if (this.currentTabIndex === 2) {
-                const appointmentFilters = ['welcomeCall', 'clarityCall', 'diagnostics', 'implementation', 'midReviewDiagnostics', 'finalReview', 'implementationPhase2', 'completed'];
-                if (!appointmentFilters.includes(this.activeFilter)) {
-                    this.activeFilter = 'none';
-                }
-            }
-            if (this.currentTabIndex !== 2) {
-                const appointmentFilters = ['welcomeCall', 'clarityCall', 'diagnostics', 'implementation', 'midReviewDiagnostics', 'finalReview', 'implementationPhase2', 'completed'];
-                if (appointmentFilters.includes(this.activeFilter)) {
-                    this.activeFilter = 'none';
-                }
-            }
-        }
-
+        if (!this.isFilterButtonClick) this.activeFilter = 'none';
         this.isFilterButtonClick = false;
 
-        // use saved labels to ensure product filter is preserved
         this.currentSelectedLabels = savedProductLabels;
         this.populateActionableCohorts(this.currentSelectedLabels);
     }
@@ -6934,6 +6969,8 @@ export class DeliveryDashboardCloneComponent {
 
     private readonly IDLE_DAYS = 7;
     private readonly STUCK_DAYS = 15;
+    private stuckCasesCache: any[] = [];
+    private stuckKey = '';
 
     private daysSinceTs(ts: any): number {
         return daysSince(ts);
@@ -6943,7 +6980,6 @@ export class DeliveryDashboardCloneComponent {
         const awaiting: any[] = [];
         const idle: any[] = [];
         const stuck: any[] = [];
-        const clearedPayment: any[] = [];
 
         for (const item of this.allMatchedProductsRaw || []) {
 
@@ -6958,6 +6994,7 @@ export class DeliveryDashboardCloneComponent {
             const profileId = item?.profileid;
             if (!profileId) continue;
             const meta = this.mapMetaData?.[profileId] || {};
+            const parallelProduct = this.getParallelProduct(item.profileid, item.productref?.id);
             const status = (item?.status || '').toString().toLowerCase().trim();
 
             const mode = (meta['participantmode'] || '').toString().toLowerCase().trim();
@@ -6984,30 +7021,20 @@ export class DeliveryDashboardCloneComponent {
             const daysSinceInitiated = this.daysSinceTs(initiated);
             const daysSinceActivity = this.daysSinceTs(lastActivity);
 
-            // payment confirmed — not yet initiated
-            if (!status && isClearedPayment) {
-                clearedPayment.push({
-                    profileid: profileId,
-                    journey: journeyName,
-                    onboardedtime: onboarded,
-                    waitingperiod: daysSinceOnboarded,
-                    financialdata,
-                    lastpaymentdate: lastPayment,
-                    bottleneck: 'Ready for Initiation',
-                });
-                continue;
-            }
-
             // payment not confirmed — not yet initiated
             if (!status && isEligible) {
                 awaiting.push({
                     profileid: profileId,
                     journey: journeyName,
+                    parallelproduct: parallelProduct, 
+                    product: productName || 'N/A', 
                     onboardedtime: onboarded,
                     waitingperiod: daysSinceOnboarded,
                     financialdata,
                     lastpaymentdate: lastPayment,
                     bottleneck: 'Awaiting for Initiation',
+                    subscriptionstart: item?.subscriptionstart || null,   
+                    subscriptionend: item?.subscriptionend || null,  
                 });
                 continue;
             }
@@ -7016,22 +7043,26 @@ export class DeliveryDashboardCloneComponent {
                 idle.push({
                     profileid: profileId,
                     journey: journeyName,
+                    parallelproduct: parallelProduct, 
                     product: productName || 'N/A',
                     initiatedtime: initiated,
                     waitingperiod: daysSinceInitiated,
                     generalnotes: [],
+                    subscriptionstart: item?.subscriptionstart || null,   
+                    subscriptionend: item?.subscriptionend || null,  
                 });
             }
 
             // Development's cohort split (readyForInitiation vs awaiting) supersedes the engine's
             // classifyCohorts, so the stuck predicate is inlined here to match. escalationLevel() and
             // stuckIssueType() below still delegate — those two rules are unchanged on both sides.
-            if ((status === 'initiated' || status === 'ongoing') && daysSinceActivity >= this.STUCK_DAYS) {
+            if (status === 'initiated' || status === 'ongoing') { 
                 const days = daysSinceActivity;
                 const escalation = escalationLevel(days);
                 stuck.push({
                     profileid: profileId,
                     activejourney: journeyName,
+                    parallelproduct: parallelProduct, 
                     product: productName || 'N/A',
                     appointment: 'N/A',
                     appointmentstatus: 'N/A',
@@ -7045,20 +7076,60 @@ export class DeliveryDashboardCloneComponent {
                     participantproductid: item?.docid || null,
                     recentappointmentdate: null,
                     actualstuckdays: null,
+                    subscriptionstart: item?.subscriptionstart || null,   
+                    subscriptionend: item?.subscriptionend || null, 
                 });
             }
         }
 
+        const yetToStart: any[] = [];
+        for (const cardId of this.visibleCardIds) {
+            yetToStart.push(...this.getCardFunnel(cardId).awaiting);   
+        }
+
+        const readyToStart = yetToStart.map(item => {
+        const meta = this.mapMetaData[item.profileid] || {};
+        const onboarded = item.productonboardingscheduled || meta['onboardedtime'] || null;
+        return {
+            profileid: item.profileid,
+            journey: this.mapjourneyname[item.journeyref?.id || meta['activejourney']] || 'N/A',
+            product: this.shortenProductName(this.mapProductName[item.productref?.id] || '') || 'N/A',
+            parallelproduct: '',
+            onboardedtime: onboarded,
+            waitingperiod: this.daysSinceTs(onboarded),
+            financialdata: 'Cleared',
+            lastpaymentdate: meta['lastpaymentdate'] || null,
+            bottleneck: 'Ready for Initiation',
+            participantproductid: item.docid || null,
+            subscriptionstart: item?.subscriptionstart || null,
+            subscriptionend: item?.subscriptionend || null,
+        };
+    });
+
         this.originalData['awaitingInitiation'].data = awaiting;
         this.originalData['awaitingInitiation'].count = awaiting.length;
-        this.originalData['readyForInitiation'].data = clearedPayment;
-        this.originalData['readyForInitiation'].count = clearedPayment.length;
+        this.originalData['readyForInitiation'].data = readyToStart;
+        this.originalData['readyForInitiation'].count = readyToStart.length;
         this.originalData['currentJourneyInitiated'].data = idle;
         this.originalData['currentJourneyInitiated'].count = idle.length;
-        this.originalData['stuckCases'].data = stuck;
-        this.originalData['stuckCases'].count = stuck.length;
-        this.getRecentAppointmentDetails(stuck);
+        const participantChangeKey = stuck.map(item => item.participantproductid).sort().join(',');
+        const stuckUnchanged = participantChangeKey === this.stuckKey;
 
+        if (stuckUnchanged) {
+            this.originalData['stuckCases'].data = this.stuckCasesCache;
+            this.originalData['stuckCases'].count = this.stuckCasesCache.length;
+        } else {
+            this.stuckKey = participantChangeKey;
+            this.getRecentAppointmentDetails(stuck);
+        }
+
+        const awaitingRows = this.originalData['awaitingInitiation'].data.map(p => ({ ...p, status: 'Awaiting Initiation' }));
+        const idleRows = this.originalData['currentJourneyInitiated'].data.map(p => ({ ...p, status: 'Initiated – Not Consuming' }));
+        const stuckRows = this.originalData['stuckCases'].data.map(p => ({ ...p, journey: p.activejourney, status: 'Stuck' }));
+        const allRows = [...awaitingRows, ...idleRows, ...stuckRows];
+
+        this.originalData['allParticipants'].data = allRows;
+        this.originalData['allParticipants'].count = allRows.length;
         this.currentPage = 1;
         this.calculatePagination();
     }
@@ -7067,7 +7138,13 @@ export class DeliveryDashboardCloneComponent {
         const requestId = ++this.uniqueTicketId;
 
         const participantProductIds = Array.from(new Set(stuckItems.map(item => item.participantproductid).filter(Boolean)));
-        if (participantProductIds.length === 0) return;
+        if (participantProductIds.length === 0) {
+            this.stuckCasesCache = [];
+            this.originalData['stuckCases'].data = [];
+            this.originalData['stuckCases'].count = 0;
+            this.populateActionableCohorts(this.currentSelectedLabels);  
+            return;
+        }
 
         const recentAppointmentMap = new Map<string, any>();
         const chunkSize = 30;
@@ -7107,7 +7184,11 @@ export class DeliveryDashboardCloneComponent {
             item.actualstuckdays = daysSince(recentAppointment['endtime']);
         }
 
-        this.calculatePagination();
+        this.stuckCasesCache = stuckItems.filter(item => item.actualstuckdays >= this.STUCK_DAYS);
+        this.originalData['stuckCases'].data = this.stuckCasesCache;
+        this.originalData['stuckCases'].count = this.stuckCasesCache.length;
+
+        this.populateActionableCohorts(this.currentSelectedLabels); 
         this.cdr.detectChanges();
     }
 

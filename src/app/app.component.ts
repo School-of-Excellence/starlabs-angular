@@ -678,7 +678,7 @@ export class AppComponent implements OnInit, OnDestroy {
     return !url.includes('/openmeeting')
         && !url.includes('arenadesigninsights')
         && !url.includes('/arena/')
-        && !url.includes('group-chat-screen');
+        && !url.includes('group-chat');
   }
 
   toggleLeftDrawer(): void {

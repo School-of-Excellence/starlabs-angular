@@ -287,6 +287,8 @@ export class ParticipantsAnalyticsComponent {
 
   isCheckListActive = false;
 
+  controller = new AbortController();
+  
   //import 
   isExcelFile: boolean;
   @ViewChild('inputFile') inputFile: ElementRef;
@@ -712,6 +714,7 @@ export class ParticipantsAnalyticsComponent {
       this.destroy$.complete();
     }
     this.clearTimers();
+    this.controller.abort();
   }
 
 
@@ -804,7 +807,7 @@ export class ParticipantsAnalyticsComponent {
     events.forEach(event => {
       document.addEventListener(event, () => {
         this.resetTimer();
-      }, true);
+      }, {signal : this.controller.signal});
     });
   }
 
@@ -1031,7 +1034,8 @@ export class ParticipantsAnalyticsComponent {
     this.filtereddashboarddata = this.cloneddashboarddata.filter(e => {
       let booleanarray = []
       for (const key in data) {
-        if (!['docid', 'profileid', 'label', 'createdby', 'productcount', 'operator', 'products', 'subscriptionend' , 'subscriptionstart'].includes(key)) {
+        // pifilter holds what only Participant Intelligence filters on; it isn't a criterion here
+        if (!['docid', 'profileid', 'label', 'createdby', 'productcount', 'operator', 'products', 'subscriptionend' , 'subscriptionstart', 'pifilter'].includes(key)) {
           if (this.arraystring.includes(key)) { [null, undefined].includes(e[key]) ? e[key] = 'none' : null }
 
           if (['atccount'].includes(key) || (e[key] != undefined && e[key] != null)) {
@@ -1441,6 +1445,11 @@ export class ParticipantsAnalyticsComponent {
             this.openSnackBar("Error Sending Email", "OK");
           });
         } else if (result['status'] == 'validated') {
+          result['status'] = 'send'
+          await setDoc(docRef, result, { merge: true }).catch(err => {
+            console.log(err);
+            this.openSnackBar("Error Sending Email", "OK");
+          });
           let url: string;
           if (environment.firebase.projectId == 'starlabs-test') {
             url = "https://us-central1-starlabs-test.cloudfunctions.net/sendBatchEmail";
@@ -1456,6 +1465,7 @@ export class ParticipantsAnalyticsComponent {
           }).subscribe({
             next: (response) => {
               console.log('response', response);
+              this.openSnackBar("Email Sent Successfully", "OK");
             },
             error: (err) => {
               console.log(err);
@@ -2606,7 +2616,13 @@ export class ParticipantsAnalyticsComponent {
   // Function to add products to participant Journey 
   bulkAddProducts() {
     this.dialog.open(BulkAddProductsComponent, {
-      data: this.selection.selected
+      panelClass: 'bap-overlay',
+      maxHeight: '92vh',
+      width: '640px',
+      data: {
+        participants: this.selection.selected,
+        loggedInProfileId: this.loggedInProfileId
+      }
     })
   }
 
@@ -2735,6 +2751,7 @@ export class ParticipantsAnalyticsComponent {
         }));
 
         return {
+          profileid: metadata['profileid'],
           phonenumber,
           name,
           customParams: processedParams
@@ -2910,6 +2927,7 @@ export class ParticipantsAnalyticsComponent {
               phonenumber, "conslingggg fullnum"
             );
             return {
+              profileid: metadata['profileid'],
               phonenumber,
               name,
               customParams: processedParams

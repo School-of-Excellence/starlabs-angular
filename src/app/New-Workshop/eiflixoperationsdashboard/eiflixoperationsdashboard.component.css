@@ -516,6 +516,50 @@ section.eod-section:focus { outline: none; }
 }
 .eod-retry:hover { background: rgba(161, 60, 49, 0.08); }
 
+/* The highlighted total in words, under the amount (Indian system). */
+.eod-card-amount-words {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--eod-emerald, #0c8a5f);
+  opacity: 0.85;
+  margin: -2px 0 2px;
+}
+.eod-card-amount-label {
+  margin-left: 8px;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+/* Emphasised figure on a stat card (Master Class Purchase total). */
+.eod-card-amount {
+  align-self: flex-start;
+  font-family: 'Geist Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--eod-emerald, #0c8a5f);
+  background: var(--eod-emerald-tint, rgba(12, 138, 95, 0.10));
+  border: 1px solid rgba(12, 138, 95, 0.24);
+  border-radius: 8px;
+  padding: 3px 10px;
+  margin: 2px 0 2px;
+}
+.eod-tag.eod-tag-workshop {
+  /* Its own line in the row's column: hug the text, but wrap long titles
+     within the column instead of overflowing into the side column. */
+  align-self: flex-start;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+  border-radius: 7px;   /* a 999px pill turns into a stadium once it wraps */
+  color: var(--eod-amber, #a35d04);
+  background: var(--eod-amber-tint, rgba(163, 93, 4, 0.09));
+  border-color: rgba(163, 93, 4, 0.24);
+}
 .eod-tag.eod-tag-journey {
   color: var(--eod-violet, #6d28d9);
   background: var(--eod-violet-tint, rgba(109, 40, 217, 0.09));
@@ -1206,6 +1250,9 @@ section.eod-section:focus { outline: none; }
   font-weight: 600;
   color: var(--eod-rose, #c2233c);
 }
+/* Purchase amount: same mono figure as hours, but neutral — red reads as a refund or loss. */
+/* Every ₹ amount is green (operator 2026-10-14); hours keep their own colour. */
+.eod-row-hours.eod-row-amount { color: var(--eod-emerald, #0c8a5f); }
 .eod-row-chevron {
   flex: none;
   font-size: 20px;
@@ -1339,6 +1386,8 @@ section.eod-section:focus { outline: none; }
 .eod-log-search input::placeholder { color: var(--eod-ink-3); }
 .eod-log-select { width: 220px; }
 .eod-log-select-sm { width: 150px; }
+/* "Existing users" is the longest option on this row — 150px clips it. */
+.eod-log-select-md { width: 172px; }
 .eod-log-select .mat-mdc-text-field-wrapper { height: 38px; }
 .eod-log-clear { display: inline-flex; align-items: center; gap: 4px; height: 34px; padding: 0 10px 0 6px; border: 0; border-radius: 9px; background: transparent; color: #b3452e; font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
 .eod-log-clear mat-icon { font-size: 17px; width: 17px; height: 17px; }
@@ -1372,5 +1421,188 @@ section.eod-section:focus { outline: none; }
 .eod-log-pgbtn mat-icon { font-size: 18px; width: 18px; height: 18px; }
 .eod-log-pgbtn:hover:not([disabled]) { border-color: var(--eod-indigo); color: var(--eod-indigo); }
 .eod-log-pgbtn[disabled] { opacity: .4; cursor: not-allowed; }
-@media (max-width: 720px) { .eod-log-select, .eod-log-select-sm { width: 100%; } .eod-log-count { margin-left: 0; } }
+@media (max-width: 720px) { .eod-log-select, .eod-log-select-sm, .eod-log-select-md { width: 100%; } .eod-log-count { margin-left: 0; } }
 .eod-log-dot { margin: 0 6px; color: var(--eod-ink-3); }
+
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   EiFlix Report — redesigned 2026-10-09.
+   Restrained, editorial: one accent, hairline rules, weight and scale doing the
+   work instead of boxes inside boxes. Replaces the previous card-in-card layout
+   and its paragraph-length footnotes (now hover notes on the figures themselves).
+   ═════════════════════════════════════════════════════════════════════════════ */
+.eir {
+  --eir-ink: #15151a;
+  --eir-ink-2: #5a5a66;
+  --eir-ink-3: #8e8e9c;
+  --eir-line: #e7e7ee;
+  --eir-accent: #5b3fd6;
+  --eir-accent-soft: #f3f0ff;
+  --eir-surface: #fff;
+  margin: 28px 0 24px;
+}
+
+/* ---- header ---- */
+.eir-top {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap;
+  padding-bottom: 14px; margin-bottom: 18px;
+  border-bottom: 1px solid var(--eir-line);
+}
+.eir-id { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.eir-eyebrow {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase;
+  color: var(--eir-accent);
+}
+.eir-title { margin: 0; font-size: 25px; font-weight: 600; letter-spacing: -0.3px; color: var(--eir-ink); }
+.eir-period {
+  font-size: 12.5px; color: var(--eir-ink-3);
+  padding-left: 10px; border-left: 1px solid var(--eir-line);
+}
+.eir-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+.eir-export {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 34px; padding: 0 14px 0 11px;
+  border: 1px solid var(--eir-accent); border-radius: 9px;
+  background: var(--eir-accent); color: #fff;
+  font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: background .15s ease, box-shadow .15s ease;
+}
+.eir-export:hover:not(:disabled) { background: #4c33bb; box-shadow: 0 2px 10px rgba(91, 63, 214, .25); }
+.eir-export:disabled { opacity: .6; cursor: default; }
+.eir-export mat-icon { font-size: 17px; width: 17px; height: 17px; }
+
+/* ---- layout ---- */
+.eir-body { display: flex; flex-direction: column; gap: 16px; }
+.eir-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+
+.eir-card {
+  display: flex; flex-direction: column;
+  padding: 18px 20px 20px;
+  border: 1px solid var(--eir-line); border-radius: 14px;
+  background: var(--eir-surface);
+}
+.eir-card-top { margin-bottom: 14px; }
+.eir-card-title {
+  margin: 0; font-size: 13px; font-weight: 700;
+  letter-spacing: .7px; text-transform: uppercase; color: var(--eir-ink-2);
+}
+
+/* ---- figures ---- */
+.eir-figs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px 18px; }
+.eir-figs--one { grid-template-columns: minmax(0, 1fr); }
+/* Dim rather than blank while a wider range loads — the shape of the page holds still. */
+.eir-dim { opacity: .4; transition: opacity .15s ease; }
+
+.eir-fig { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 2px 0; }
+/* The lead figure is marked by a rule and the accent, not by a filled box. */
+.eir-fig--lead { padding-left: 14px; border-left: 2px solid var(--eir-accent); }
+.eir-fig-k {
+  display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
+  font-size: 11px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase;
+  color: var(--eir-ink-3);
+}
+.eir-fig--lead .eir-fig-k { color: var(--eir-accent); }
+/* The long explanatory sentences became these: a quiet marker with the sentence on hover. */
+.eir-fig-n {
+  font-size: 32px; font-weight: 600; line-height: 1.08; letter-spacing: -0.8px;
+  color: var(--eir-ink); font-variant-numeric: tabular-nums;
+}
+.eir-fig-s { font-size: 11.5px; color: var(--eir-ink-3); font-variant-numeric: tabular-nums; }
+.eir-fig-s b { color: var(--eir-ink-2); font-weight: 600; }
+.eir-fig-s i { font-style: normal; margin: 0 5px; color: var(--eir-line); }
+
+/* ---- consumption ---- */
+.eir-cons { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--eir-line); }
+.eir-cons-h {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .9px; text-transform: uppercase;
+  color: var(--eir-ink-3);
+}
+.eir-cons-err { text-transform: none; letter-spacing: 0; font-weight: 500; color: #b3452e; }
+
+.eir-cons-l { margin: 0; }
+.eir-cons-l > div {
+  display: flex; align-items: baseline; gap: 12px;
+  padding: 5px 0; border-bottom: 1px dotted var(--eir-line);
+}
+.eir-cons-l > div:last-child { border-bottom: 0; }
+.eir-cons-l dt { flex: 1 1 auto; min-width: 0; margin: 0; font-size: 12.5px; color: var(--eir-ink-2); }
+/* tabular-nums + right alignment so the five durations read as a column, not a list. */
+.eir-cons-l dd {
+  flex: 0 0 auto; margin: 0; font-size: 12.5px; color: var(--eir-ink);
+  font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap;
+}
+.eir-cons-l .is-total { border-bottom: 1px solid var(--eir-line); }
+.eir-cons-l .is-total dt, .eir-cons-l .is-total dd { font-weight: 700; color: var(--eir-ink); }
+.eir-cons-l .is-sub dt { padding-left: 12px; color: var(--eir-ink-3); }
+.eir-cons-l .is-sub dd { color: var(--eir-ink-2); }
+
+@media (max-width: 1040px) { .eir-pair { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 640px) {
+  .eir-figs { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .eir-fig--lead { padding-left: 0; border-left: 0; border-top: 2px solid var(--eir-accent); padding-top: 10px; }
+  .eir-cons-l dd { font-size: 12px; }
+}
+.eir-export-err { font-size: 12px; font-weight: 600; color: #b3452e; }
+
+/* ---- Payment-schedule hover card (New Users to Paid panel) ----
+   Fixed and above the side panel (.eod-panel is z-index 1001). Height-capped;
+   the list scrolls, and the pointer may move onto the card to scroll it. */
+.eod-plan-tip {
+  position: fixed;
+  z-index: 1002;
+  width: 300px;
+  max-width: calc(100vw - 24px);
+  background: #ffffff;
+  border: 1px solid rgba(23, 24, 28, 0.10);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(23, 24, 28, 0.16);
+  font-size: 12.5px;
+  color: var(--eod-ink, #17181c);
+  overflow: hidden;
+}
+.eod-plan-tip-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px 8px;
+  border-bottom: 1px solid rgba(23, 24, 28, 0.08);
+}
+.eod-plan-tip-name { font-weight: 600; font-size: 13px; }
+.eod-plan-tip-sub {
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+.eod-plan-tip-list {
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+.eod-plan-tip-row,
+.eod-plan-tip-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 14px;
+}
+.eod-plan-tip-row:nth-child(even) { background: rgba(23, 24, 28, 0.03); }
+.eod-plan-tip-row { align-items: flex-start; }
+.eod-plan-tip-when { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.eod-plan-tip-date { opacity: 0.75; font-size: 11.5px; }
+.eod-plan-tip-product { font-weight: 500; overflow-wrap: anywhere; }
+.eod-plan-tip-amt {
+  font-family: 'Geist Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--eod-emerald, #0c8a5f);
+}
+.eod-plan-tip-foot {
+  padding: 8px 14px 10px;
+  border-top: 1px solid rgba(23, 24, 28, 0.08);
+  font-weight: 600;
+}
+

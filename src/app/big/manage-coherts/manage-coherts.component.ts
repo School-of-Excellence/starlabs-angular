@@ -231,6 +231,40 @@ export class ManageCohertsComponent {
         this.selectedMentors = this.data.doc['mentors'] || [];
         this.selectedTeam = this.data.doc['team'] || [];
       }
+      if (this.data.type == "duplicate") {
+        // Copy of data.doc into data.selectedMarathon — new docid, event cleared, everything else carried over.
+        // Arrays are copied so edits here never mutate the source cohort object held by the list screen.
+        const source = this.data.doc;
+        const newDocId = doc(collection(this.firestore, "big cohorts")).id;
+        this.selectedParticipants = [...(source['participantidlist'] || [])];
+
+        this.cohortsForm.patchValue({
+          name: source['name'],
+          cohortCategory: source['cohortCategory'] || 'studio',
+          cohortType: source['cohortType'] || 'general',
+          participantidlist: [...this.selectedParticipants],
+          docid: newDocId,
+          createddate: new Date(),
+          udpateddate: new Date(),
+          marathonref: doc(collection(this.firestore, "big marathon"), this.data.selectedMarathon?.docid),
+          eventref: null,
+          status: source['status'] || 'active',
+          isTemporary: source['isTemporary'] || false,
+          startDate: source['startDate']?.toDate ? source['startDate'].toDate() : source['startDate'] || null,
+          endDate: source['endDate']?.toDate ? source['endDate'].toDate() : source['endDate'] || null,
+          level: source['level'] || 'level1',
+          enableGroupChat: source['enableGroupChat'] === true,
+          tags: [...(source['tags'] || [])],
+          mentors: [...(source['mentors'] || [])],
+          team: [...(source['team'] || [])],
+          bigactivity: source['bigactivity'] || null,
+          description: source['description'] || '',
+        });
+
+        this.selectedTags = [...(source['tags'] || [])];
+        this.selectedMentors = [...(source['mentors'] || [])];
+        this.selectedTeam = [...(source['team'] || [])];
+      }
       // Show all participants by default (when no event is selected)
       this.filteredParticipants = this.data.totalParticipants || [];
       this.filteredParticipantsList = [...this.filteredParticipants];
@@ -1474,8 +1508,8 @@ export class ManageCohertsComponent {
         // Save cohort document
         await setDoc(doc(this.firestore, "big cohorts", formValue['docid']), formValue, { merge: true });
         
-        if (this.data.type === 'new') {
-          // Create logs for all participants when cohort is NEW
+        if (this.data.type === 'new' || this.data.type === 'duplicate') {
+          // Create logs for all participants when cohort is NEW (a duplicate is a new cohort doc)
           await this.createCohortLogs(formValue, 'added');
         } else if (this.data.type === 'edit') {
           // For edit mode: only create logs for changed participants
@@ -1512,7 +1546,8 @@ export class ManageCohertsComponent {
         }
       }
       
-      this.dialogref.close(formValue);
+      // null when the confirm was declined, so callers don't treat an unsaved form as created
+      this.dialogref.close(check ? formValue : null);
     } catch (error) {
       console.error('Error saving cohort:', error);
       alert('Error saving cohort. Please try again.');
@@ -1523,12 +1558,25 @@ export class ManageCohertsComponent {
     return this.data?.type === 'edit';
   }
 
+  isDuplicateMode(): boolean {
+    return this.data?.type === 'duplicate';
+  }
+
   getDialogTitle(): string {
+    if (this.isDuplicateMode()) {
+      const total = this.data?.duplicateTotal || 1;
+      return total > 1 ? `Duplicate Cohort (${this.data.duplicateIndex} of ${total})` : 'Duplicate Cohort';
+    }
     return this.isEditMode() ? 'Edit Cohort' : 'Create New Cohort';
   }
 
   getSubmitButtonText(): string {
+    if (this.isDuplicateMode()) return 'Create Duplicate';
     return this.isEditMode() ? 'Update Cohort' : 'Create Cohort';
+  }
+
+  getTargetMarathonName(): string {
+    return this.data?.selectedMarathon?.title || this.data?.selectedMarathon?.name || 'selected marathon';
   }
 
   isEventType(): boolean {

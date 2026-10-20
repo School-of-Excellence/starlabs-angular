@@ -1494,11 +1494,44 @@
   gap: 8px;
 }
 
+/* "New" used to be an image (assets/new.png). A text pill reads at any zoom, scales with the
+   row, needs no network round-trip and stays legible next to a long name. */
 .new-badge {
-  width: 40px;
-  height: auto;
+  display: inline-block;
+  flex: 0 0 auto;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: #ede7ff;
+  border: 1px solid #b39ddb;
+  color: #5e35b1;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  white-space: nowrap;
   vertical-align: middle;
-  margin-left: 4px;
+}
+
+/* Email column.
+   mat-table sizes columns by content, so a long address either stretches the row or — when the
+   other columns win the fight — gets squeezed into a one-character-wide vertical strip. Breaking
+   mid-word is what causes that, so the address stays on ONE line and ellipsises instead; the cell
+   carries a title attribute with the full value. The floor on the column keeps the header legible
+   even when every address in view is short. */
+.progress-table .mat-column-email {
+  min-width: 13em;
+}
+
+.participant-email {
+  display: block;
+  max-width: 24em;
+  font-size: 13px;
+  color: #555;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .filter-header {
   display: flex;
@@ -2995,3 +3028,93 @@
 .wd-no-access mat-icon { font-size: 40px; width: 40px; height: 40px; color: #9aa4b2; }
 .wd-no-access h3 { margin: 14px 0 8px; font-size: 18px; font-weight: 700; color: #1a2535; }
 .wd-no-access p { margin: 0; font-size: 13.5px; color: #6b7280; line-height: 1.6; }
+
+/* ───────── side-panel name search (2026-10-08) ───────── */
+.wd-side-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 0 8px 0 10px;
+  height: 36px;
+  border: 1px solid #e0e0e6;
+  border-radius: 10px;
+  background: #fff;
+}
+.wd-side-search:focus-within { border-color: #7c4dff; box-shadow: 0 0 0 3px rgba(124, 77, 255, 0.12); }
+.wd-side-search > mat-icon { flex: 0 0 auto; font-size: 18px; width: 18px; height: 18px; color: #8a8a94; }
+/* min-width:0 or a long placeholder stops the input shrinking inside the flex row. */
+.wd-side-search input { flex: 1 1 auto; min-width: 0; border: 0; outline: 0; background: transparent; font: inherit; font-size: 13px; color: #26262c; }
+.wd-side-search input::placeholder { color: #9a9aa4; }
+/* The native search-field clear affordance would sit beside our own button. */
+.wd-side-search input::-webkit-search-cancel-button { display: none; }
+.wd-side-search-x { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: #8a8a94; cursor: pointer; }
+.wd-side-search-x:hover { background: rgba(0, 0, 0, 0.06); color: #26262c; }
+.wd-side-search-x mat-icon { font-size: 16px; width: 16px; height: 16px; }
+
+/* ---- Sale Achieved (live workshops) ---- */
+/* The amount is the card's headline — highlighted. */
+/* Every ₹ amount is green (operator 2026-10-14) — same green as the EiFlix dashboard. */
+.metric-value.sale-highlight {
+  color: #0c8a5f;
+  font-variant-numeric: tabular-nums;
+}
+.metric-sale-count {
+  margin: 2px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.7;
+}
+.sale-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 0 40px;
+  font-size: 12.5px;
+}
+.sale-row-amt { font-weight: 700; font-variant-numeric: tabular-nums; color: #0c8a5f; }
+.sale-row-count {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(163, 93, 4, 0.10);
+  color: #a35d04;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* Purchases hover card — fixed above the side panel (.participant-panel is z-index 1000). */
+.sale-tip {
+  position: fixed;
+  z-index: 1002;
+  width: 300px;
+  max-width: calc(100vw - 24px);
+  background: #ffffff;
+  border: 1px solid rgba(23, 24, 28, 0.10);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(23, 24, 28, 0.16);
+  font-size: 12.5px;
+  color: #17181c;
+  overflow: hidden;
+}
+.sale-tip-head { display: flex; flex-direction: column; gap: 2px; padding: 10px 14px 8px; border-bottom: 1px solid rgba(23, 24, 28, 0.08); }
+.sale-tip-name { font-weight: 600; font-size: 13px; }
+.sale-tip-sub { font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.6; }
+.sale-tip-list { max-height: 280px; overflow-y: auto; padding: 4px 0; }
+.sale-tip-row, .sale-tip-foot { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 4px 14px; }
+.sale-tip-when { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.sale-tip-product { font-weight: 500; overflow-wrap: anywhere; }
+.sale-tip-row:nth-child(even) { background: rgba(23, 24, 28, 0.03); }
+.sale-tip-date { opacity: 0.75; font-size: 11.5px; }
+.sale-tip-amt { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; color: #0c8a5f; }
+.sale-tip-foot { padding: 8px 14px 10px; border-top: 1px solid rgba(23, 24, 28, 0.08); font-weight: 600; }
+
+/* Sale Achieved panel: sort toggle in place of the All / New / Old filter. */
+.sale-sort { display: inline-flex; border: 1px solid rgba(23, 24, 28, 0.14); border-radius: 999px; padding: 2px; gap: 2px; }
+.sale-sort button {
+  border: 0; background: transparent; border-radius: 999px; padding: 4px 10px;
+  font-size: 12px; font-weight: 600; color: inherit; opacity: 0.7; cursor: pointer;
+}
+.sale-sort button.on { background: rgba(12, 138, 95, 0.12); color: #0c8a5f; opacity: 1; }
+

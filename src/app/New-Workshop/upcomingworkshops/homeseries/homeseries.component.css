@@ -152,3 +152,44 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Series-level presentation fields — two per row on wide screens, one on mobile,
+   matching the episode cards below them. */
+.series-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 14px;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  border: 1px solid #e2e6ee;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.toggle-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.toggle-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.toggle-desc {
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+
+@media (max-width: 760px) {
+  .series-grid { grid-template-columns: minmax(0, 1fr); }
+}
