@@ -117,28 +117,37 @@
       </section>
       
       <!-- Ask · area of focus — EI Solution ATCs only; saved as asks: [{ <askedby>: <askedfor> }] -->
-      <section class="content-section ask-card" id="atcfield-asks" data-testid="patc-asks-card" *ngIf="isEISolution">
-        <div class="ask-head">
-          <div>
-            <h2 class="section-heading ask-title">Ask · area of focus</h2>
-            <div class="ask-sub">Ask widget. Who asked and what they asked for. At least one complete ask.</div>
+      <section class="content-section" id="atcfield-asks" data-testid="patc-asks-card" *ngIf="isEISolution">
+        <h2 class="section-heading">ASK · AREA OF FOCUS*</h2>
+        <div class="personnel-container">
+          <div class="field-grid field-header">
+            <div class="field-activity">Asked By</div>
+            <div class="field-person">Asked For</div>
           </div>
-          <span class="ask-count" data-testid="patc-asks-count">{{ completeAsks.length }} complete</span>
+          <div class="field-grid" data-testid="patc-ask-row" *ngFor="let row of askRows; let i = index">
+            <div class="field-activity">
+              <mat-form-field appearance="outline" class="flat-field">
+                <mat-select data-testid="patc-ask-by" placeholder="Choose" [(ngModel)]="row.askedby" (selectionChange)="autoSave()" [disabled]="assignmentInitiated">
+                  <mat-option *ngFor="let o of askedByOptions" [value]="o.value">{{ o.label }}</mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+            <div class="field-person">
+              <mat-form-field appearance="outline" class="flat-field">
+                <input matInput data-testid="patc-ask-for" placeholder="What they asked for" [(ngModel)]="row.askedfor" (focusout)="autoSave()" [disabled]="assignmentInitiated">
+              </mat-form-field>
+            </div>
+            <div class="field-actions">
+              <button class="action-button remove-button" data-testid="patc-ask-remove" mat-icon-button type="button" (click)="removeAsk(i)" [disabled]="assignmentInitiated">
+                <mat-icon>remove</mat-icon>
+              </button>
+            </div>
+          </div>
+          <mat-error class="ask-error" *ngIf="submitAttempted && completeAsks.length == 0">At least one complete ask (asked by and asked for) is required</mat-error>
+          <div class="empty-activities">
+            <button class="primary-button" data-testid="patc-ask-add" mat-button type="button" (click)="addAsk()" [disabled]="assignmentInitiated">Add New Ask</button>
+          </div>
         </div>
-        <div class="ask-grid ask-colhead">
-          <span></span><span>ASKED BY</span><span>ASKED FOR</span><span></span>
-        </div>
-        <div class="ask-grid ask-row" data-testid="patc-ask-row" *ngFor="let row of askRows; let i = index">
-          <span class="ask-num">{{ (i + 1) < 10 ? '0' + (i + 1) : (i + 1) }}</span>
-          <select class="ask-select" data-testid="patc-ask-by" [(ngModel)]="row.askedby" (change)="autoSave()" [disabled]="assignmentInitiated">
-            <option [ngValue]="null">Choose</option>
-            <option *ngFor="let o of askedByOptions" [ngValue]="o.value">{{ o.label }}</option>
-          </select>
-          <input class="ask-input" data-testid="patc-ask-for" type="text" placeholder="What they asked for" [(ngModel)]="row.askedfor" (focusout)="autoSave()" [disabled]="assignmentInitiated">
-          <button class="ask-remove" data-testid="patc-ask-remove" type="button" aria-label="Remove ask" (click)="removeAsk(i)" [disabled]="assignmentInitiated">×</button>
-        </div>
-        <button class="ask-add" data-testid="patc-ask-add" type="button" (click)="addAsk()" [disabled]="assignmentInitiated">+ Add ask</button>
-        <div class="ask-error" *ngIf="submitAttempted && completeAsks.length == 0">At least one complete ask is required.</div>
       </section>
 
       <!-- Specialists from the appointment (?appointmentid=) — read-only; Edit reveals the pickers below -->

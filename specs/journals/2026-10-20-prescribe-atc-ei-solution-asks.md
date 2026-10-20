@@ -8,7 +8,9 @@
 - **One-key maps `{askedby: askedfor}`** — operator's explicit shape. Lowercase keys so data is stable regardless
   of display labels.
 - **Only complete rows are saved**, so a half-filled row never reaches Firestore; the UI keeps at least one row.
-- **Native `<select>`/`<input>`** to match the operator's mock; autosave mirrors the page's existing triggers
+- **Styled like the existing sections** (operator, 2026-10-20: "like the existing screen, not the screenshot"):
+  `content-section` + `section-heading` + `field-grid` header, outline `mat-select` / `matInput`, the remove
+  icon button and `primary-button` from ADDITIONAL ACTIVITIES; autosave mirrors the page's existing triggers
   (`change` / `focusout`).
 - **`asks` only on EI Solution final docs** (spread), so other ATCs' documents are byte-for-byte unchanged.
 - **Validation after the directive check**, using the existing `focusMissingField('atcfield-asks', …)` pattern.

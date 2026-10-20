@@ -844,24 +844,6 @@
   .spec-row { grid-template-columns: 1fr; gap: 4px; }
 }
 
-/* Ask · area of focus (EI Solution) */
-.ask-card { background-color: #fff; border: 1px solid #e3e6ec; padding-bottom: 0.75rem; }
-.ask-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding-right: 1.5rem; border-bottom: 1px solid #e3e6ec; padding-bottom: 0.75rem; }
-.ask-title { background-color: transparent; padding-bottom: 0.25rem; }
-.ask-sub { padding: 0 1.5rem; font-size: 12px; color: #5f6b7a; }
-.ask-count { margin-top: 1rem; font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: #5f6b7a; white-space: nowrap; }
-.ask-grid { display: grid; grid-template-columns: 40px 200px 1fr 32px; gap: 12px; align-items: center; padding: 0 1.5rem; }
-.ask-colhead { padding-top: 0.9rem; padding-bottom: 0.4rem; font-size: 11px; font-weight: 600; letter-spacing: 0.05em; color: #5f6b7a; }
-.ask-row { padding-top: 0.35rem; padding-bottom: 0.35rem; }
-.ask-num { font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: #5f6b7a; }
-.ask-select, .ask-input { height: 38px; border: 1px solid #d5dae1; border-radius: 8px; padding: 0 12px; font-size: 14px; background: #fff; width: 100%; box-sizing: border-box; }
-.ask-select:focus, .ask-input:focus { outline: none; border-color: #1e88e5; box-shadow: 0 0 0 2px rgba(30,136,229,0.15); }
-.ask-remove { border: none; background: transparent; font-size: 18px; color: #5f6b7a; cursor: pointer; }
-.ask-remove:hover { color: #c62828; }
-.ask-add { margin: 0.5rem 1.5rem 0 calc(1.5rem + 52px); border: none; background: transparent; color: #1e88e5; font-size: 13px; cursor: pointer; padding: 0; }
-.ask-error { padding: 0.4rem 1.5rem 0; font-size: 12px; color: #c62828; }
-@media (max-width: 640px) {
-  .ask-grid { grid-template-columns: 28px 1fr 28px; }
-  .ask-grid .ask-input { grid-column: 2 / 3; }
-  .ask-colhead { display: none; }
-}
+
+/* Ask · area of focus (EI Solution): reuses the section/field-grid styles above */
+.ask-error { display: block; padding: 0 0 0.5rem 0.25rem; }
