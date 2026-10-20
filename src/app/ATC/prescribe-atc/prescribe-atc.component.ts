@@ -35,7 +35,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { UpdateDialogComponent } from '../../DialogBox/update-dialog/update-dialog.component';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MarkdownModule } from 'ngx-markdown';
-import { appointmentSpecialistRows, AppointmentSpecialistRow, latestAtcAppointment } from './appointment-specialists';
+import { appointmentSpecialistRows, AppointmentSpecialistRow, latestAtcAppointment, appointmentRoleIds } from './appointment-specialists';
 
 interface AssignmentData {
   clipurl?: string;
@@ -236,6 +236,7 @@ export class PrescribeATCComponent {
   appointmentId: string = null
   appointmentTypeName = ''
   appointmentDate: Date = null
+  appointmentRoleNames: Record<string, string> = {}  // eisroles id → role name, for the Specialists card
   appointmentSpecialists: AppointmentSpecialistRow[] = null
   editSpecialists = false
   bigActivityReady: Promise<void> = Promise.resolve()
@@ -994,6 +995,11 @@ export class PrescribeATCComponent {
       ])
       const rows = appointmentSpecialistRows(appt, mappingSnap.docs[0]?.data() ?? null, this.bigActivityList)
       if(rows.length == 0) return skip("type has no ATC role map (atcrequired / atcrolemap) or its activities are unknown")
+      // Role names for the card: appointment.appointmentrole → eisroles/{id}.role
+      const roleIds = Array.from(new Set([...(appointmentRoleIds(appt) ?? []), ...rows.flatMap(r => r.roleIds)]))
+      const roleSnaps = await Promise.all(roleIds.map(id => getDoc(doc(this.firestoreDefault, "eisroles", id)).catch(() => null)))
+      const roleNames: Record<string, string> = {}
+      roleSnaps.forEach((snap, i) => roleNames[roleIds[i]] = (snap?.data() as any)?.['role'] ?? roleIds[i])
       // same zone + rebuild steps as the live-studio prefill, so the closed mat-selects show the names at once
       this.ngZone.run(() => {
         rows.forEach(row => {
@@ -1007,6 +1013,7 @@ export class PrescribeATCComponent {
         this.onObserverSelect()
         this.appointmentTypeName = (typeSnap.data() as any)?.['appointmenttype'] ?? ''
         this.appointmentDate = appt['starttime']?.toDate?.() ?? null
+        this.appointmentRoleNames = roleNames
         this.appointmentSpecialists = rows
         this.editSpecialists = false
         this.personnelReady = false
@@ -1040,6 +1047,10 @@ export class PrescribeATCComponent {
     } catch (error) {
       console.error("Could not find the participant's latest ATC appointment", error)
     }
+  }
+
+  roleNamesOf(row: AppointmentSpecialistRow): string {
+    return row.roleIds.map(id => this.appointmentRoleNames[id] ?? id).join(', ')
   }
 
   specialistName(path: string): string {

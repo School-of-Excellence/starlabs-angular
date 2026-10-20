@@ -1,4 +1,4 @@
-import { appointmentSpecialistRows, propertyLabel, AtcActivity, latestAtcAppointment, AppointmentSummary } from './appointment-specialists';
+import { appointmentSpecialistRows, propertyLabel, AtcActivity, latestAtcAppointment, AppointmentSummary, appointmentRoleIds } from './appointment-specialists';
 
 const ACTS: AtcActivity[] = [
   { docid: 'A_SOLO', activity: 'Diagnostics Solo', atcproperty: 'author' },
@@ -16,8 +16,8 @@ describe('appointment-specialists', () => {
       ACTS,
     );
     expect(rows).toEqual([
-      { activityId: 'A_SOLO', activity: 'Diagnostics Solo', atcproperty: 'author', label: 'AUTHOR', profilePaths: ['profile_data/disha'] },
-      { activityId: 'A_SHADOW', activity: 'Diagnostics Shadow', atcproperty: 'observer', label: 'OBSERVER', profilePaths: ['profile_data/ishara'] },
+      { activityId: 'A_SOLO', activity: 'Diagnostics Solo', atcproperty: 'author', label: 'AUTHOR', roleIds: ['R_DIAG'], profilePaths: ['profile_data/disha'] },
+      { activityId: 'A_SHADOW', activity: 'Diagnostics Shadow', atcproperty: 'observer', label: 'OBSERVER', roleIds: ['R_SHADOW'], profilePaths: ['profile_data/ishara'] },
     ]);
   });
 
@@ -42,6 +42,7 @@ describe('appointment-specialists', () => {
     );
     expect(rows.length).toBe(1);
     expect(rows[0].profilePaths).toEqual(['profile_data/a', 'profile_data/b']);
+    expect(rows[0].roleIds).toEqual(['R1', 'R2']);
   });
 
   it('returns nothing when ATC is not required, the mapping is missing, or the activity is unknown', () => {
@@ -50,6 +51,20 @@ describe('appointment-specialists', () => {
     expect(appointmentSpecialistRows(appt, null, ACTS)).toEqual([]);
     expect(appointmentSpecialistRows(null, { atcrequired: true, atcrolemap: { R1: 'A_SOLO' } }, ACTS)).toEqual([]);
     expect(appointmentSpecialistRows(appt, { atcrequired: true, atcrolemap: { R1: 'GONE' } }, ACTS)).toEqual([]);
+  });
+
+  it('keeps only roles listed in appointmentrole, when the appointment has it', () => {
+    const appt = {
+      appointmentrole: [ref('eisroles/R_DIAG')],
+      hostRole: { 'eisroles/R_DIAG': [ref('profile_data/disha')], 'eisroles/R_SHADOW': [ref('profile_data/ishara')] },
+    };
+    const rows = appointmentSpecialistRows(appt, { atcrequired: true, atcrolemap: { R_DIAG: 'A_SOLO', R_SHADOW: 'A_SHADOW' } }, ACTS);
+    expect(rows.map(r => r.activityId)).toEqual(['A_SOLO']);
+  });
+
+  it('reads appointmentrole ids from refs or path strings', () => {
+    expect(appointmentRoleIds({ appointmentrole: [ref('eisroles/R1'), 'eisroles/R2'] })).toEqual(['R1', 'R2']);
+    expect(appointmentRoleIds({})).toBeNull();
   });
 
   it('labels properties', () => {

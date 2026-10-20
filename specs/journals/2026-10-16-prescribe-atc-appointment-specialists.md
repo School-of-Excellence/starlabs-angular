@@ -47,3 +47,13 @@ makes a wrong pick obvious. **Why the console.info lines:** the earlier silent e
 diagnosis round; now the console says exactly which condition stopped the prefill.
 **Verified:** helper 9/9; tsc + ng build green; emulator — p1 without id → card "Test Two-Role · 19 Oct 2026",
 author eis0 / observer eis1 after Edit; p0 (no ATC appointment) → no card + console reason.
+
+## 2026-10-20 — "Appointment found" header + role names from appointmentrole
+**Operator:** show the role each specialist filled, from `appointments.appointmentrole` → `eisroles/{id}.role`,
+with the header "Appointment found / Your appointment for this participant is found; specialists and change
+agents come from its roles."
+**Change:** rows carry `roleIds`; `appointmentRoleIds()` reads `appointmentrole` (refs or paths) and, when present,
+only roles on the appointment produce rows (a type's `atcrolemap` may list roles this booking didn't use).
+The component fetches each role's `role` name once per prefill; the card shows property · activity · role · names,
+with type and date under the header. **Verified:** helper 11/11, tsc + build green; emulator card shows
+"Primary Specialist" / "Secondary Specialist" under the two rows.

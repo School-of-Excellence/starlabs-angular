@@ -13,6 +13,7 @@ export interface AppointmentSpecialistRow {
   activity: string;
   atcproperty: string | null;
   label: string;          // AUTHOR / OBSERVER / MENTOR / CA / the raw property
+  roleIds: string[];      // eisroles ids this activity is filled by on the appointment
   profilePaths: string[]; // "profile_data/<pid>" — the same shape the page's pickers store
 }
 
@@ -39,18 +40,28 @@ function toProfilePath(h: any): string | null {
   return typeof h?.path === 'string' ? h.path : null;
 }
 
+/* eisroles ids on the appointment (appointmentrole: refs from booking, or path strings), or null when absent. */
+export function appointmentRoleIds(appointment: { appointmentrole?: any[] | null } | null): string[] | null {
+  const list = appointment?.appointmentrole;
+  if (!Array.isArray(list)) return null;
+  return list.map(r => (typeof r === 'string' ? r.split('/').pop() : r?.id)).filter((id): id is string => !!id);
+}
+
 /* One row per role in atcrolemap whose activity is a known bigactivity, in atcrolemap order.
+   Only roles on the appointment (appointmentrole) count, when the appointment lists them.
    Returns [] when the type does not require an ATC. A role nobody hosted gives a row with no people. */
 export function appointmentSpecialistRows(
-  appointment: { hostRole?: Record<string, any[]> | null } | null,
+  appointment: { hostRole?: Record<string, any[]> | null; appointmentrole?: any[] | null } | null,
   mapping: { atcrequired?: boolean; atcrolemap?: Record<string, string> | null } | null,
   activities: AtcActivity[],
 ): AppointmentSpecialistRow[] {
   if (!appointment || mapping?.atcrequired !== true) return [];
   const byId = new Map(activities.map(a => [a.docid, a]));
   const hostRole = appointment.hostRole ?? {};
+  const onAppointment = appointmentRoleIds(appointment);
   const rows: AppointmentSpecialistRow[] = [];
   for (const [roleId, activityId] of Object.entries(mapping.atcrolemap ?? {})) {
+    if (onAppointment && !onAppointment.includes(roleId)) continue;
     const act = typeof activityId === 'string' ? byId.get(activityId) : undefined;
     if (!act) continue;
     const hosts = hostRole['eisroles/' + roleId] ?? [];
@@ -59,6 +70,7 @@ export function appointmentSpecialistRows(
     if (existing) {
       // two roles mapped to the same activity: one row, both roles' hosts
       profilePaths.forEach(p => { if (!existing.profilePaths.includes(p)) existing.profilePaths.push(p); });
+      if (!existing.roleIds.includes(roleId)) existing.roleIds.push(roleId);
       continue;
     }
     rows.push({
@@ -66,6 +78,7 @@ export function appointmentSpecialistRows(
       activity: act.activity,
       atcproperty: act.atcproperty ?? null,
       label: propertyLabel(act.atcproperty),
+      roleIds: [roleId],
       profilePaths,
     });
   }
