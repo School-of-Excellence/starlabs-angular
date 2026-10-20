@@ -57,3 +57,18 @@ only roles on the appointment produce rows (a type's `atcrolemap` may list roles
 The component fetches each role's `role` name once per prefill; the card shows property · activity · role · names,
 with type and date under the header. **Verified:** helper 11/11, tsc + build green; emulator card shows
 "Primary Specialist" / "Secondary Specialist" under the two rows.
+
+## 2026-10-20 — participant-scoped reads; a role covers its whole property
+**Operator:** don't read whole collections — only the selected participant's appointment; take the roles from
+`appointmentrole` (eisroles refs), map role → bigactivity, and if that activity is an author activity, put the
+role's specialist on ALL author activities.
+**Change:**
+- Fallback reads `appointments where bookedby == participant`, then only each completed appointment's own
+  type mapping (newest first, `mappingFor()` caches per type) until one has `atcrequired` — the
+  `AppointmentType-To-Roles where atcrequired == true` collection query is gone.
+- Rows are one per `appointmentrole` (`roleId` → `atcrolemap` → `bigactivity.atcproperty`, + `hostRole` people).
+- `specialistsByProperty()` pools people per property; author → every `bigActivityAuthor`, observer → every
+  observer, mentoring → every mentor, assigned_to → every "set for all procedures" picker (not applied).
+- Card shows property · role name · people (no activity column — the person covers the whole section).
+**Verified:** helper 8/8; tsc + build green; emulator: one author role filled BOTH author activities
+(appt_BA1 and appt_BA3), observer role filled the observer activity.

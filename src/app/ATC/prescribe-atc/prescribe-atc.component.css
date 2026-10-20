@@ -805,7 +805,7 @@
 
 .spec-row {
   display: grid;
-  grid-template-columns: 110px minmax(150px, 1fr) minmax(140px, 1fr) 1.5fr;
+  grid-template-columns: 110px minmax(180px, 1fr) 2fr;
   gap: 12px;
   align-items: center;
   padding: 0.6rem 1.5rem;
@@ -820,11 +820,6 @@
 
 .spec-activity {
   font-size: 14px;
-}
-
-.spec-role {
-  font-size: 13px;
-  color: #5f6b7a;
 }
 
 .spec-meta {

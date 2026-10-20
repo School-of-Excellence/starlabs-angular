@@ -35,7 +35,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { UpdateDialogComponent } from '../../DialogBox/update-dialog/update-dialog.component';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MarkdownModule } from 'ngx-markdown';
-import { appointmentSpecialistRows, AppointmentSpecialistRow, latestAtcAppointment, appointmentRoleIds } from './appointment-specialists';
+import { appointmentSpecialistRows, AppointmentSpecialistRow, completedNewestFirst, specialistsByProperty } from './appointment-specialists';
 
 interface AssignmentData {
   clipurl?: string;
@@ -978,6 +978,16 @@ export class PrescribeATCComponent {
   // Appointment mode: fill the specialist pickers from the appointment instead of asking for them.
   // appointments.hostRole says who hosted each role; AppointmentType-To-Roles.atcrolemap says which
   // bigactivity each role fills. Read-only — nothing is saved until the user saves the ATC as usual.
+  // AppointmentType-To-Roles for one appointment type, read once per type (never the whole collection)
+  private mappingByType = new Map<string, Promise<any>>()
+  private mappingFor(typeRef: DocumentReference): Promise<any> {
+    if(!this.mappingByType.has(typeRef.id)){
+      this.mappingByType.set(typeRef.id, getDocs(query(collection(this.firestoreDefault, "AppointmentType-To-Roles"), where("assigned_appttype_ref", "==", typeRef), limit(1)))
+        .then(snap => snap.docs[0]?.data() ?? null))
+    }
+    return this.mappingByType.get(typeRef.id)
+  }
+
   async prefillFromAppointment(appointmentId: string){
     const skip = (why: string) => console.info("[prescribeATC] specialists not prefilled from appointment " + appointmentId + ": " + why)
     try {
@@ -989,27 +999,29 @@ export class PrescribeATCComponent {
       if(this.participantProfileid && appt['bookedby']?.id && appt['bookedby'].id != this.participantProfileid) return skip("booked by another participant")
       const typeRef = appt['appointment']
       if(!typeRef) return skip("appointment has no type")
-      const [mappingSnap, typeSnap] = await Promise.all([
-        getDocs(query(collection(this.firestoreDefault, "AppointmentType-To-Roles"), where("assigned_appttype_ref", "==", typeRef), limit(1))),
-        getDoc(typeRef)
-      ])
-      const rows = appointmentSpecialistRows(appt, mappingSnap.docs[0]?.data() ?? null, this.bigActivityList)
-      if(rows.length == 0) return skip("type has no ATC role map (atcrequired / atcrolemap) or its activities are unknown")
-      // Role names for the card: appointment.appointmentrole → eisroles/{id}.role
-      const roleIds = Array.from(new Set([...(appointmentRoleIds(appt) ?? []), ...rows.flatMap(r => r.roleIds)]))
-      const roleSnaps = await Promise.all(roleIds.map(id => getDoc(doc(this.firestoreDefault, "eisroles", id)).catch(() => null)))
+      const [mapping, typeSnap] = await Promise.all([this.mappingFor(typeRef), getDoc(typeRef)])
+      // appointmentrole → atcrolemap → bigactivity.atcproperty, with each role's hosts
+      const rows = appointmentSpecialistRows(appt, mapping, this.bigActivityList)
+      if(rows.length == 0) return skip("no appointmentrole maps to an ATC activity (check atcrequired / atcrolemap on the type)")
+      // Role names for the card: eisroles/{id}.role, only for this appointment's roles
+      const roleSnaps = await Promise.all(rows.map(r => getDoc(doc(this.firestoreDefault, "eisroles", r.roleId)).catch(() => null)))
       const roleNames: Record<string, string> = {}
-      roleSnaps.forEach((snap, i) => roleNames[roleIds[i]] = (snap?.data() as any)?.['role'] ?? roleIds[i])
+      roleSnaps.forEach((snap, i) => roleNames[rows[i].roleId] = (snap?.data() as any)?.['role'] ?? rows[i].roleId)
+      // A role's specialist covers EVERY activity of its property (author role → all AUTHOR activities, ...)
+      const byProperty = specialistsByProperty(rows)
       // same zone + rebuild steps as the live-studio prefill, so the closed mat-selects show the names at once
       this.ngZone.run(() => {
-        rows.forEach(row => {
-          if(row.atcproperty == "author") this.authorMap[row.activityId] = [...row.profilePaths]
-          else if(row.atcproperty == "observer") this.observerMap[row.activityId] = [...row.profilePaths]
-          else if(row.atcproperty == "mentoring") this.mentorMap[row.activityId] = [...row.profilePaths]
-          // assigned_to: preselect the "set for all procedures" picker only; Apply stays a user action
-          else if(row.atcproperty == "assigned_to") this.bulkAssignedSelection[row.activityId] = [...row.profilePaths]
-          else if(row.profilePaths.length != 0) this.additionalActivityMap.push({ activity: row.activityId, specialist: [...row.profilePaths] })
-        })
+        const fill = (activities: any[], target: Record<string, string[]>, people: string[] | undefined) => {
+          if(!people?.length) return
+          activities.forEach(a => target[a['docid']] = [...people])
+        }
+        fill(this.bigActivityAuthor, this.authorMap, byProperty['author'])
+        fill(this.bigActivityObserver, this.observerMap, byProperty['observer'])
+        fill(this.bigActivityMentor, this.mentorMap, byProperty['mentoring'])
+        // assigned_to (CA): preselect every "set for all procedures" picker; Apply stays a user action
+        fill(this.bigActivityAssignedto, this.bulkAssignedSelection, byProperty['assigned_to'])
+        rows.filter(r => !["author", "observer", "mentoring", "assigned_to"].includes(r.atcproperty) && r.profilePaths.length != 0)
+          .forEach(r => this.additionalActivityMap.push({ activity: r.activityId, specialist: [...r.profilePaths] }))
         this.onObserverSelect()
         this.appointmentTypeName = (typeSnap.data() as any)?.['appointmenttype'] ?? ''
         this.appointmentDate = appt['starttime']?.toDate?.() ?? null
@@ -1024,33 +1036,34 @@ export class PrescribeATCComponent {
     }
   }
 
-  // No ?appointmentid=: use the participant's most recent completed appointment whose type prescribes an ATC
+  // No ?appointmentid=: only this participant's appointments, newest completed first; each one's own type
+  // mapping is read until one prescribes an ATC.
   async prefillFromLatestAppointment(){
     try {
-      const [apptSnap, atcTypeSnap] = await Promise.all([
-        getDocs(query(collection(this.firestoreDefault, "appointments"), where("bookedby", "==", doc(this.firestoreDefault, "profile_data", this.participantProfileid)))),
-        getDocs(query(collection(this.firestoreDefault, "AppointmentType-To-Roles"), where("atcrequired", "==", true)))
-      ])
-      const atcTypeIds = new Set<string>(atcTypeSnap.docs.map(d => d.data()['assigned_appttype_ref']?.id).filter(Boolean))
-      const latestId = latestAtcAppointment(apptSnap.docs.map(d => ({
+      const apptSnap = await getDocs(query(collection(this.firestoreDefault, "appointments"), where("bookedby", "==", doc(this.firestoreDefault, "profile_data", this.participantProfileid))))
+      const typeRefs = new Map(apptSnap.docs.map(d => [d.id, d.data()['appointment']]))
+      const completed = completedNewestFirst(apptSnap.docs.map(d => ({
         id: d.id,
         start: d.data()['starttime']?.toDate?.() ?? null,
         attended: d.data()['attended'],
         cancelled: d.data()['cancelled'],
         typeId: d.data()['appointment']?.id ?? null,
-      })), atcTypeIds)
-      if(!latestId){
-        console.info("[prescribeATC] no completed ATC appointment for " + this.participantProfileid + " — pick specialists manually")
-        return
+      })))
+      for(const appt of completed){
+        const mapping = await this.mappingFor(typeRefs.get(appt.id))
+        if(mapping?.['atcrequired'] === true){
+          await this.prefillFromAppointment(appt.id)
+          return
+        }
       }
-      await this.prefillFromAppointment(latestId)
+      console.info("[prescribeATC] no completed ATC appointment for " + this.participantProfileid + " — pick specialists manually")
     } catch (error) {
       console.error("Could not find the participant's latest ATC appointment", error)
     }
   }
 
   roleNamesOf(row: AppointmentSpecialistRow): string {
-    return row.roleIds.map(id => this.appointmentRoleNames[id] ?? id).join(', ')
+    return this.appointmentRoleNames[row.roleId] ?? row.roleId
   }
 
   specialistName(path: string): string {
