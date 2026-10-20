@@ -47,3 +47,13 @@ the map dialog. Nothing new is written anywhere.
 - Unit spec for the helper (roles with 0/1/2 hosts, string vs ref hosts, non-ATC activity, atcrequired:false).
 - `ng build` green.
 - e2e: `atc` suite on the EMULATOR only (`/prescribeATC` is the sanctioned ATC test route).
+
+## Amendment 2026-10-20 — fallback when there is no `appointmentid` (operator-approved)
+Opened without `?appointmentid=` (menu, bookmark, `?profileid=` only, or picking the participant in the
+dropdown), the page found nothing and the pickers stayed empty — reproduced on the emulator. Now
+`onProfileSelect()` (before the live-studio check) calls `prefillFromLatestAppointment()`: the participant's
+appointments (`bookedby == profile_data/<pid>`) + ATC-enabled types (`AppointmentType-To-Roles.atcrequired`)
+→ `latestAtcAppointment()` picks the most recent attended, not-cancelled one → `prefillFromAppointment(id)`.
+An explicit `appointmentid` still wins; a live studio and an opened draft still override. The card subtitle
+now shows the appointment's date so an unexpected pick is visible, and each "nothing prefilled" exit logs
+one `[prescribeATC]` console.info line with the reason.

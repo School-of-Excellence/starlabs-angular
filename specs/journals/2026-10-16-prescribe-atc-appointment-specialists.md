@@ -35,3 +35,15 @@
 ## Pending
 - e2e in the `atc` suite: seed appointment + hostRole + mapping, open `/prescribeATC?appointmentid=…`,
   assert the card and the prefilled pickers, save, assert the app-written author/observer.
+
+## 2026-10-20 — fallback without `appointmentid`
+**Symptom (operator):** author/observer stayed empty. **Cause (reproduced on the emulator):** the page was
+opened without `?appointmentid=`, so appointment mode never started — with the id the card and pickers filled.
+**Change:** `latestAtcAppointment()` (pure, 3 specs) + `prefillFromLatestAppointment()` called from
+`onProfileSelect()`. **Why there:** it covers both `?profileid=` and the dropdown (which locks after the first
+pick), and it runs before the live-studio prefill and the draft picker, so their precedence is unchanged.
+**Why "most recent attended, not cancelled, ATC type":** the operator's rule; the date in the card subtitle
+makes a wrong pick obvious. **Why the console.info lines:** the earlier silent early-returns cost a long
+diagnosis round; now the console says exactly which condition stopped the prefill.
+**Verified:** helper 9/9; tsc + ng build green; emulator — p1 without id → card "Test Two-Role · 19 Oct 2026",
+author eis0 / observer eis1 after Edit; p0 (no ATC appointment) → no card + console reason.

@@ -121,7 +121,7 @@
         <div class="spec-head">
           <div>
             <h2 class="section-heading spec-title">Specialists</h2>
-            <div class="spec-sub">From the appointment roles<ng-container *ngIf="appointmentTypeName"> · {{ appointmentTypeName }}</ng-container></div>
+            <div class="spec-sub" data-testid="patc-specialists-source">From the appointment roles<ng-container *ngIf="appointmentTypeName"> · {{ appointmentTypeName }}</ng-container><ng-container *ngIf="appointmentDate"> · {{ appointmentDate | date: 'd MMM y' }}</ng-container></div>
           </div>
           <button data-testid="patc-specialists-edit" class="spec-edit" mat-stroked-button type="button" (click)="editSpecialists = !editSpecialists" [disabled]="assignmentInitiated">
             {{ editSpecialists ? 'Done' : 'Edit' }}

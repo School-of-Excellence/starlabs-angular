@@ -22,6 +22,17 @@ export function propertyLabel(atcproperty: string | null | undefined): string {
   return atcproperty ? (LABELS[atcproperty] ?? atcproperty.toUpperCase()) : '';
 }
 
+export interface AppointmentSummary { id: string; start: Date | null; attended?: boolean; cancelled?: boolean; typeId: string | null; }
+
+/* No ?appointmentid=: the participant's most recent completed (attended, not cancelled) appointment
+   whose type prescribes an ATC, or null. */
+export function latestAtcAppointment(appointments: AppointmentSummary[], atcTypeIds: Set<string>): string | null {
+  const done = appointments
+    .filter(a => a.attended === true && a.cancelled !== true && !!a.typeId && atcTypeIds.has(a.typeId) && !!a.start)
+    .sort((a, b) => b.start!.getTime() - a.start!.getTime());
+  return done[0]?.id ?? null;
+}
+
 /* hostRole values are profile_data DocumentReferences from booking, but older writers stored path strings. */
 function toProfilePath(h: any): string | null {
   if (typeof h === 'string') return h.includes('/') ? h : 'profile_data/' + h;

@@ -35,7 +35,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { UpdateDialogComponent } from '../../DialogBox/update-dialog/update-dialog.component';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MarkdownModule } from 'ngx-markdown';
-import { appointmentSpecialistRows, AppointmentSpecialistRow } from './appointment-specialists';
+import { appointmentSpecialistRows, AppointmentSpecialistRow, latestAtcAppointment } from './appointment-specialists';
 
 interface AssignmentData {
   clipurl?: string;
@@ -204,6 +204,7 @@ export class PrescribeATCComponent {
   // null = not in appointment mode, or a draft / live studio has since replaced the specialists.
   appointmentId: string = null
   appointmentTypeName = ''
+  appointmentDate: Date = null
   appointmentSpecialists: AppointmentSpecialistRow[] = null
   editSpecialists = false
   bigActivityReady: Promise<void> = Promise.resolve()
@@ -336,7 +337,7 @@ export class PrescribeATCComponent {
           await this.setupData()
           // Before onProfileSelect: a live-studio prefill (arena) and a draft the user opens both run later and win
           if(this.appointmentId){
-            await this.prefillFromAppointment()
+            await this.prefillFromAppointment(this.appointmentId)
           }
           // await the assignment check so its popup resolves before setup completes
           const profileMapData = await guardservice.getProfileMap()
@@ -943,22 +944,23 @@ export class PrescribeATCComponent {
   // Appointment mode: fill the specialist pickers from the appointment instead of asking for them.
   // appointments.hostRole says who hosted each role; AppointmentType-To-Roles.atcrolemap says which
   // bigactivity each role fills. Read-only — nothing is saved until the user saves the ATC as usual.
-  async prefillFromAppointment(){
+  async prefillFromAppointment(appointmentId: string){
+    const skip = (why: string) => console.info("[prescribeATC] specialists not prefilled from appointment " + appointmentId + ": " + why)
     try {
       await this.bigActivityReady
-      const apptSnap = await getDoc(doc(this.firestoreDefault, "appointments", this.appointmentId))
-      if(!apptSnap.exists()) return
+      const apptSnap = await getDoc(doc(this.firestoreDefault, "appointments", appointmentId))
+      if(!apptSnap.exists()) return skip("appointment not found")
       const appt = apptSnap.data()
       // only this participant's own appointment
-      if(this.participantProfileid && appt['bookedby']?.id && appt['bookedby'].id != this.participantProfileid) return
+      if(this.participantProfileid && appt['bookedby']?.id && appt['bookedby'].id != this.participantProfileid) return skip("booked by another participant")
       const typeRef = appt['appointment']
-      if(!typeRef) return
+      if(!typeRef) return skip("appointment has no type")
       const [mappingSnap, typeSnap] = await Promise.all([
         getDocs(query(collection(this.firestoreDefault, "AppointmentType-To-Roles"), where("assigned_appttype_ref", "==", typeRef), limit(1))),
         getDoc(typeRef)
       ])
       const rows = appointmentSpecialistRows(appt, mappingSnap.docs[0]?.data() ?? null, this.bigActivityList)
-      if(rows.length == 0) return
+      if(rows.length == 0) return skip("type has no ATC role map (atcrequired / atcrolemap) or its activities are unknown")
       // same zone + rebuild steps as the live-studio prefill, so the closed mat-selects show the names at once
       this.ngZone.run(() => {
         rows.forEach(row => {
@@ -971,6 +973,7 @@ export class PrescribeATCComponent {
         })
         this.onObserverSelect()
         this.appointmentTypeName = (typeSnap.data() as any)?.['appointmenttype'] ?? ''
+        this.appointmentDate = appt['starttime']?.toDate?.() ?? null
         this.appointmentSpecialists = rows
         this.editSpecialists = false
         this.personnelReady = false
@@ -981,12 +984,41 @@ export class PrescribeATCComponent {
     }
   }
 
+  // No ?appointmentid=: use the participant's most recent completed appointment whose type prescribes an ATC
+  async prefillFromLatestAppointment(){
+    try {
+      const [apptSnap, atcTypeSnap] = await Promise.all([
+        getDocs(query(collection(this.firestoreDefault, "appointments"), where("bookedby", "==", doc(this.firestoreDefault, "profile_data", this.participantProfileid)))),
+        getDocs(query(collection(this.firestoreDefault, "AppointmentType-To-Roles"), where("atcrequired", "==", true)))
+      ])
+      const atcTypeIds = new Set<string>(atcTypeSnap.docs.map(d => d.data()['assigned_appttype_ref']?.id).filter(Boolean))
+      const latestId = latestAtcAppointment(apptSnap.docs.map(d => ({
+        id: d.id,
+        start: d.data()['starttime']?.toDate?.() ?? null,
+        attended: d.data()['attended'],
+        cancelled: d.data()['cancelled'],
+        typeId: d.data()['appointment']?.id ?? null,
+      })), atcTypeIds)
+      if(!latestId){
+        console.info("[prescribeATC] no completed ATC appointment for " + this.participantProfileid + " — pick specialists manually")
+        return
+      }
+      await this.prefillFromAppointment(latestId)
+    } catch (error) {
+      console.error("Could not find the participant's latest ATC appointment", error)
+    }
+  }
+
   specialistName(path: string): string {
     return this.specialistList.find(e => e.authorpath == path)?.authorname ?? this.mapProfile[path.split('/').pop()]?.["name"] ?? path.split('/').pop()
   }
 
   async onProfileSelect(){
     console.log("Selected Profile", this.participantProfileid)
+    // Before the live-studio check below, so a live studio's specialists (and later an opened draft) still win
+    if(!this.appointmentId && this.participantProfileid && !this.bigActivity()){
+      await this.prefillFromLatestAppointment()
+    }
     this.selectedParticipantProfile = {}
     if(this.participantProfileid){
       getDoc(doc(this.firestoreDefault, "profile_data",this.participantProfileid)).then(profile =>{

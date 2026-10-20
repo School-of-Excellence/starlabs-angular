@@ -1,4 +1,4 @@
-import { appointmentSpecialistRows, propertyLabel, AtcActivity } from './appointment-specialists';
+import { appointmentSpecialistRows, propertyLabel, AtcActivity, latestAtcAppointment, AppointmentSummary } from './appointment-specialists';
 
 const ACTS: AtcActivity[] = [
   { docid: 'A_SOLO', activity: 'Diagnostics Solo', atcproperty: 'author' },
@@ -56,5 +56,32 @@ describe('appointment-specialists', () => {
     expect(propertyLabel('mentoring')).toBe('MENTOR');
     expect(propertyLabel('custom')).toBe('CUSTOM');
     expect(propertyLabel(null)).toBe('');
+  });
+});
+
+describe('latestAtcAppointment', () => {
+  const day = (d: number) => new Date(2026, 9, d, 10);
+  const a = (id: string, d: number, over: Partial<AppointmentSummary> = {}): AppointmentSummary =>
+    ({ id, start: day(d), attended: true, cancelled: false, typeId: 'ATC', ...over });
+  const atc = new Set(['ATC']);
+
+  it('picks the most recent completed appointment of an ATC type', () => {
+    expect(latestAtcAppointment([a('old', 10), a('new', 18), a('mid', 14)], atc)).toBe('new');
+  });
+
+  it('skips not-attended, cancelled, non-ATC and undated appointments', () => {
+    const list = [
+      a('ok', 10),
+      a('notyet', 19, { attended: false }),
+      a('cancelled', 18, { cancelled: true }),
+      a('otherType', 17, { typeId: 'PLAIN' }),
+      a('nodate', 16, { start: null }),
+    ];
+    expect(latestAtcAppointment(list, atc)).toBe('ok');
+  });
+
+  it('returns null when nothing qualifies', () => {
+    expect(latestAtcAppointment([a('x', 10, { typeId: 'PLAIN' })], atc)).toBeNull();
+    expect(latestAtcAppointment([], atc)).toBeNull();
   });
 });
