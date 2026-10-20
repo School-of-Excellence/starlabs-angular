@@ -710,7 +710,7 @@
       <span *ngIf="slotDialogMode === 'multi'"> - {{ editingStageName }}</span>
     </h2>
 
-    <!-- STEP 1: Type choice — only shown when the stage supports appointments and nothing's picked yet -->
+    <!-- STEP 1: Type choice -->
     <div *ngIf="editingSlotType === null" style="padding: 20px 0;">
       <h3 style="margin-bottom: 16px;">How would you like to add this slot?</h3>
       <div style="display: flex; gap: 12px;">
@@ -725,47 +725,49 @@
       </div>
     </div>
 
-    <!-- STEP 2a: Queue slot form — existing fields, now properly wrapped -->
+    <!-- SHARED: segment picker (multi mode, both slot types) -->
+    <div *ngIf="slotDialogMode === 'multi' && editingSlotType !== null">
+      <div class="stage-info-display">
+        <mat-icon>info</mat-icon>
+        <span>Creating slots for stage: <strong>{{ editingStageName }}</strong></span>
+      </div>
+
+      <mat-form-field appearance="outline" style="width:100%">
+        <mat-label>Select Segments</mat-label>
+        <mat-select data-testid="qpln-sel-9" [(ngModel)]="multiSlotData.selectedSegments" multiple placeholder="Select Segments">
+          <mat-option>
+            <ngx-mat-select-search [(ngModel)]="searchSegmentForMulti" placeholderLabel="Search Segment..."
+              noEntriesFoundLabel="No segments found">
+            </ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let segment of getAvailableSegmentsForMultiSlot()" [value]="segment.rowId"
+            [disabled]="segment.disabled">
+            <span [class.disabled-segment]="segment.disabled">
+              {{ getSegmentName(segment.segmentId) }}
+              <span *ngIf="segment.variationId"> - {{ getVariationName(segment.variationId) }}</span>
+              <span *ngIf="segment.disabled" class="not-in-table-label"> (Not in table)</span>
+            </span>
+          </mat-option>
+        </mat-select>
+        <mat-hint>{{ multiSlotData.selectedSegments?.length || 0 }} segment(s) selected</mat-hint>
+      </mat-form-field>
+
+      <div class="selected-segments-preview" *ngIf="multiSlotData.selectedSegments?.length > 0">
+        <h4>Selected Segments ({{ multiSlotData.selectedSegments.length }}):</h4>
+        <mat-chip-set>
+          <mat-chip *ngFor="let rowId of multiSlotData.selectedSegments" (removed)="removeSegmentFromMultiSlot(rowId)"
+            [removable]="true">
+            {{ getSegmentNameByRowId(rowId) }}
+            <span *ngIf="getVariationNameByRowId(rowId)"> - {{ getVariationNameByRowId(rowId) }}</span>
+            <mat-icon matChipRemove>cancel</mat-icon>
+          </mat-chip>
+        </mat-chip-set>
+      </div>
+    </div>
+
+    <!-- STEP 2a: Queue slot form -->
     <div *ngIf="editingSlotType === 'queue'">
       <div class="date-edit-form">
-
-        <div class="stage-info-display" *ngIf="slotDialogMode === 'multi'">
-          <mat-icon>info</mat-icon>
-          <span>Creating slots for stage: <strong>{{ editingStageName }}</strong></span>
-        </div>
-
-        <mat-form-field appearance="outline" *ngIf="slotDialogMode === 'multi'">
-          <mat-label>Select Segments</mat-label>
-          <mat-select data-testid="qpln-sel-9" [(ngModel)]="multiSlotData.selectedSegments" multiple placeholder="Select Segments">
-            <mat-option>
-              <ngx-mat-select-search [(ngModel)]="searchSegmentForMulti" placeholderLabel="Search Segment..."
-                noEntriesFoundLabel="No segments found">
-              </ngx-mat-select-search>
-            </mat-option>
-            <mat-option *ngFor="let segment of getAvailableSegmentsForMultiSlot()" [value]="segment.rowId"
-              [disabled]="segment.disabled">
-              <span [class.disabled-segment]="segment.disabled">
-                {{ getSegmentName(segment.segmentId) }}
-                <span *ngIf="segment.variationId"> - {{ getVariationName(segment.variationId) }}</span>
-                <span *ngIf="segment.disabled" class="not-in-table-label"> (Not in table)</span>
-              </span>
-            </mat-option>
-          </mat-select>
-          <mat-hint>{{ multiSlotData.selectedSegments?.length || 0 }} segment(s) selected</mat-hint>
-        </mat-form-field>
-
-        <div class="selected-segments-preview"
-          *ngIf="slotDialogMode === 'multi' && multiSlotData.selectedSegments?.length > 0">
-          <h4>Selected Segments ({{ multiSlotData.selectedSegments.length }}):</h4>
-          <mat-chip-set>
-            <mat-chip *ngFor="let rowId of multiSlotData.selectedSegments" (removed)="removeSegmentFromMultiSlot(rowId)"
-              [removable]="true">
-              {{ getSegmentNameByRowId(rowId) }}
-              <span *ngIf="getVariationNameByRowId(rowId)"> - {{ getVariationNameByRowId(rowId) }}</span>
-              <mat-icon matChipRemove>cancel</mat-icon>
-            </mat-chip>
-          </mat-chip-set>
-        </div>
 
         <div class="datetime-row">
           <mat-form-field appearance="outline" class="slot-field">
@@ -862,7 +864,7 @@
       </div>
     </div>
 
-    <!-- STEP 3: Action buttons — differ by which mode/type is active -->
+    <!-- STEP 3: Action buttons -->
     <mat-dialog-actions align="end">
       <button mat-button mat-dialog-close data-testid="qp-datedlg-cancel">Cancel</button>
 
@@ -878,7 +880,7 @@
         Create Slots for {{ multiSlotData.selectedSegments?.length || 0 }} Segment(s)
       </button>
       <button mat-raised-button color="primary" *ngIf="editingSlotType === 'appointment'"
-              [disabled]="selectedAppointmentSlots.length === 0"
+              [disabled]="selectedAppointmentSlots.length === 0 || (slotDialogMode === 'multi' && !(multiSlotData.selectedSegments?.length > 0))"
               (click)="saveAppointmentSlots()">
         Reserve {{ selectedAppointmentSlots.length }} Slot(s)
       </button>

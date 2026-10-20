@@ -35,6 +35,7 @@
       <button mat-menu-item data-testid="pa-act-add-remarks" (click)="addremarks(selection.selected)" [disabled]="selection.selected.length === 0">Add Remarks</button>
       <button mat-menu-item data-testid="pa-act-add-products" (click)="bulkAddProducts()" [disabled]="selection.selected.length === 0">Add Products</button>
       <button mat-menu-item data-testid="pa-act-tags" (click)="tagParticipants()">Tags</button>
+      <button mat-menu-item data-testid="pa-act-participants-flag" (click)="openFlagModal()" [disabled]="selection.selected.length === 0">Participants Flag</button>
       <!-- <button mat-menu-item (click)="addSegments()">Create Segments</button> -->
       <button mat-menu-item data-testid="pa-act-communication" mat-menu-item [mat-menu-trigger-for]="communication">Send Communication</button>
       <button mat-menu-item data-testid="pa-act-extend-subscription" (click)="addSubscription(selection.selected)" [disabled]="selection.selected.length === 0">Extent Subscription</button>
@@ -896,4 +897,85 @@
 
   </div>
 
+</div>
+<div data-testid="pa-flag-backdrop" class="backdrop" *ngIf="isFlagModalOpen">
+  <div class="modal-card flag-modal">
+    <div class="modal-header">
+      <div>
+        <h2>Participants Flag</h2>
+        <p>{{ flagParticipants.length }} participant(s) selected</p>
+      </div>
+      <button mat-icon-button data-testid="pa-flag-close" (click)="isFlagModalOpen = false">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <form [formGroup]="flagForm" class="flag-body">
+
+      <!-- Priority -->
+      <div class="flag-card" [class.active]="flagForm.get('priority')?.value">
+        <mat-checkbox data-testid="pa-flag-priority" formControlName="priority">Priority</mat-checkbox>
+
+        <div class="flag-section">
+          <div class="flag-section-title">Already flagged</div>
+          <div class="flag-chips">
+            <ng-container *ngFor="let p of flagParticipants">
+              <span class="flag-chip" *ngIf="p['priority'] === true">
+                {{ p['name'] }}
+                <button type="button" class="flag-chip-x" matTooltip="Remove this flag"
+                  [attr.data-testid]="'pa-flag-unflag-priority-' + p['profileid']"
+                  (click)="unflagParticipant(p, 'priority')">✕</button>
+              </span>
+            </ng-container>
+          </div>
+        </div>
+
+        <div class="flag-section" *ngIf="flagForm.get('priority')?.value">
+          <div class="flag-section-title add">Will be added</div>
+          <div class="flag-chips">
+            <ng-container *ngFor="let p of flagParticipants">
+              <span class="flag-chip add" *ngIf="p['priority'] !== true">{{ p['name'] }}</span>
+            </ng-container>
+          </div>
+        </div>
+      </div>
+
+      <!-- Up! Prep Appointments -->
+      <div class="flag-card" [class.active]="flagForm.get('queue_appointment')?.value">
+        <mat-checkbox data-testid="pa-flag-queue-appointment" formControlName="queue_appointment">Up! Prep Appointments</mat-checkbox>
+
+        <div class="flag-section">
+          <div class="flag-section-title">Already flagged</div>
+          <div class="flag-chips">
+            <ng-container *ngFor="let p of flagParticipants">
+              <span class="flag-chip" *ngIf="p['queue_appointment'] === true">
+                {{ p['name'] }}
+                <button type="button" class="flag-chip-x" matTooltip="Remove this flag"
+                  [attr.data-testid]="'pa-flag-unflag-qa-' + p['profileid']"
+                  (click)="unflagParticipant(p, 'queue_appointment')">✕</button>
+              </span>
+            </ng-container>
+          </div>
+        </div>
+
+        <div class="flag-section" *ngIf="flagForm.get('queue_appointment')?.value">
+          <div class="flag-section-title add">Will be added</div>
+          <div class="flag-chips">
+            <ng-container *ngFor="let p of flagParticipants">
+              <span class="flag-chip add" *ngIf="p['queue_appointment'] !== true">{{ p['name'] }}</span>
+            </ng-container>
+          </div>
+        </div>
+      </div>
+    </form>
+
+    <p class="flag-hint">
+      Tick a flag and press <b>Submit</b> to add it to the green names. Press <b>✕</b> on a name to remove just that person's flag.
+    </p>
+
+    <div class="modal-footer">
+      <button mat-stroked-button data-testid="pa-flag-cancel" type="button" (click)="isFlagModalOpen = false">Cancel</button>
+      <button mat-flat-button color="primary" data-testid="pa-flag-submit" type="button" (click)="updateParticipantsFlag()">Submit</button>
+    </div>
+  </div>
 </div>

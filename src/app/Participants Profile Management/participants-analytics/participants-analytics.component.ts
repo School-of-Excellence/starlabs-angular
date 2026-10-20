@@ -312,6 +312,12 @@ export class ParticipantsAnalyticsComponent {
   timeLeft = 600;
 
   watsonDatabase: Firestore;
+  // participants flag
+  isFlagModalOpen = false;
+  flagForm!: FormGroup;
+  flagParticipants: any[] = [];
+  flagPriorityNames: string[] = [];
+  flagQueueAppointmentNames: string[] = [];
 
   //loading function
   get loading() {
@@ -341,6 +347,11 @@ export class ParticipantsAnalyticsComponent {
     this.filterForm = this.fb.group({
       consumedProducts: this.fb.array([]),
       unconsumedProducts: this.fb.array([])
+    });
+
+    this.flagForm=this.fb.group({
+      priority:[false,{}],
+      queue_appointment:[false,{}],
     });
 
     // timer
@@ -3733,6 +3744,95 @@ export class ParticipantsAnalyticsComponent {
           console.log('Dialog closed with result:', result);
         }
       });
+  }
+
+  openFlagModal() {
+    this.flagParticipants = this.selection.selected.filter((p: any) => ![null, undefined, ''].includes(p?.profileid));
+    this.flagForm.reset({
+      priority: false,
+      queue_appointment: false,
+    });
+    this.isFlagModalOpen = true;
+  }
+
+  async updateParticipantsFlag() {
+    var flagvalue = {};
+    if (this.flagForm.get('priority')?.value) flagvalue['priority'] = true;
+    if (this.flagForm.get('queue_appointment')?.value) flagvalue['queue_appointment'] = true;
+    if (Object.keys(flagvalue).length === 0) {
+      alert('Please tick at least one flag');
+      return;
+    }
+    var selected = this.flagParticipants.filter((p: any) =>
+      Object.keys(flagvalue).some(k => p[k] !== true)
+    );
+
+    if (selected.length === 0) {
+      alert('Everyone selected already has the ticked flag(s)');
+      return;
+    }
+
+    if (!confirm(`Update flags for ${selected.length} participant(s)?`)) return;
+
+    this.isFlagModalOpen = false;
+    let loadingref = this.loading;
+    try {
+      for (let chunk of this.chunkArray(selected, 250)) {
+        var batch = writeBatch(this.firestore);
+        for (let participant of chunk) {
+          const profile_id = participant['profileid'];
+          const profile_dataRef = doc(this.firestore, 'profile_data', profile_id);
+          const metadataRef = doc(this.firestore, 'participant metadata', profile_id);
+
+          batch.set(profile_dataRef, {
+            ...flagvalue,
+            lastmodifieddate: new Date()
+          }, { merge: true });
+          batch.set(metadataRef, flagvalue, { merge: true });
+        }
+        await batch.commit();
+      }
+      const updatedIds = new Set(selected.map((p: any) => p['profileid']));
+      this.dashboardEntireData.forEach(row => {
+        if (updatedIds.has(row['profileid'])) Object.assign(row, flagvalue);
+      });
+      selected.forEach(row => Object.assign(row, flagvalue));
+
+      this.openSnackBar(`Flags updated for ${selected.length} participant(s)`, 'OK');
+    } catch (err) {
+      console.log(err);
+      alert(err);
+    }
+    loadingref.close();
+  }
+
+    async unflagParticipant(participant: any, flagKey: 'priority' | 'queue_appointment') {
+    const label = flagKey === 'priority' ? 'Priority' : 'Up! Prep Appointments';
+    if (!confirm(`Remove "${label}" flag from ${participant['name']}?`)) return;
+
+    const profile_id = participant['profileid'];
+    const flagvalue = { [flagKey]: false };
+    let loadingref = this.loading;
+    try {
+      const batch = writeBatch(this.firestore);
+      batch.set(doc(this.firestore, 'profile_data', profile_id), {
+        ...flagvalue,
+        lastmodifieddate: new Date()
+      }, { merge: true });
+      batch.set(doc(this.firestore, 'participant metadata', profile_id), flagvalue, { merge: true });
+      await batch.commit();
+
+      // Keep the modal list and the table row in sync
+      Object.assign(participant, flagvalue);
+      const row = this.dashboardEntireData.find(r => r['profileid'] === profile_id);
+      if (row) Object.assign(row, flagvalue);
+
+      this.openSnackBar(`${label} removed for ${participant['name']}`, 'OK');
+    } catch (err) {
+      console.log(err);
+      alert(err);
+    }
+    loadingref.close();
   }
 
   // rawProductsData

@@ -42,18 +42,20 @@ interface PlanningRow {
     [stageName: string]: {
       cohortIds: string[];
       dates: Array<{
-        docid?: string;
-        slottype?: 'queue' | 'appointment';
-        title: string | null,
-        description: string | null,
-        startdate: Date | null;
-        enddate: Date | null;
-        starttime: string;
-        endtime: string;
-        maxslot: number;
-        usedslot: number;
-        bigparticipants: any[];
-        participants: any[];
+          docid?: string;
+          slottype?: 'queue' | 'appointment';
+          availabilityid?: string;
+          hostref?: any;
+          title: string | null,
+          description: string | null,
+          startdate: Date | null;
+          enddate: Date | null;
+          starttime: string;
+          endtime: string;
+          maxslot: number;
+          usedslot: number;
+          bigparticipants: any[];
+          participants: any[];
       }>;
     };
   };
@@ -1196,6 +1198,8 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
       row.stageData[slot.stagename].dates.push({
         docid: slot.id,
         slottype: slot.slottype,
+        availabilityid: slot.availabilityid ?? null,
+        hostref: slot.hostref ?? null,
         title: slot.title ?? null,
         description: slot.description ?? null,
         startdate: startDate ? new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()) : null,
@@ -2208,7 +2212,7 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
   createSlotMultipleSegments(stageName: string) {
   this.slotDialogMode = 'multi';
   this.editingStageName = stageName;
-  this.editingSlotType = 'queue';
+  this.editingSlotType = this.stageSupportsAppointment(stageName) ? null : 'queue';
 
   // Reset the multi-slot data
   this.multiSlotData = {
@@ -2842,55 +2846,91 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
       alert('Please select at least one slot');
       return;
     }
+    const stageName = this.editingStageName;
+    let targetRows: PlanningRow[] = [];
+    if (this.slotDialogMode === 'multi') {
+      targetRows = (this.multiSlotData.selectedSegments || [])
+        .map(rowId => this.planningRows.find(r => r.id === rowId))
+        .filter(r => r && this.isStageAvailableForVariation(r, stageName));
+      if (targetRows.length === 0) {
+        alert('Please select at least one segment');
+        return;
+      }
+    } else {
+      targetRows = [this.editingRow];
+    }
 
     const batch = writeBatch(this.firestore);
-    const newEntries = [];
+    const pending: Array<{ row: PlanningRow, entry: any }> = [];
+    let skipped = 0;
 
-    this.selectedAppointmentSlots.forEach(slot => {
-      const newDocRef = doc(collection(this.firestore, 'queue availability'));
+    for (const row of targetRows) {
+      if (!row.stageData[stageName]) {
+        row.stageData[stageName] = { cohortIds: [], dates: [] };
+      }
 
-      const slotData = {
-        queueid: this.selectedQueue['docid'],
-        queueref: doc(this.firestore, 'queue generation', this.selectedQueue['docid']),
-        variationid: this.editingRow.selectedVariation,
-        segmentid: this.editingRow.selectedSegment,
-        stagename: this.editingStageName,
-        slottype: 'appointment',
-        startdate: slot.slotstart,
-        enddate: slot.slotend,
-        availabilityid: slot.availabilityid,
-        hostref: slot.hostref,
-        appointmentref: null,
-        bookedby: null,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      };
+      for (const slot of this.selectedAppointmentSlots) {
+        const slotStartMs = slot.slotstart.toDate().getTime();
 
-      batch.set(newDocRef, slotData);
+        const isDuplicate = row.stageData[stageName].dates.some(d =>
+          d.slottype === 'appointment' &&
+          d.availabilityid === slot.availabilityid &&
+          this.combineDateAndTime(d.startdate, d.starttime)?.getTime() === slotStartMs
+        );
+        if (isDuplicate) { skipped++; continue; }
 
-      newEntries.push({
-        docid: newDocRef.id,
-        slottype: 'appointment',
-        startdate: slot.slotstart.toDate(),
-        enddate: slot.slotend.toDate(),
-        starttime: this.formatTimeTo24Hour(slot.slotstart.toDate()),
-        endtime: this.formatTimeTo24Hour(slot.slotend.toDate()),
-        hostref: slot.hostref,
-        specialistName: slot.specialistName,
-        bigparticipants: [],
-        participants: []
-      });
-    });
+        const newDocRef = doc(collection(this.firestore, 'queue availability'));
+
+        batch.set(newDocRef, {
+          queueid: this.selectedQueue['docid'],
+          queueref: doc(this.firestore, 'queue generation', this.selectedQueue['docid']),
+          variationid: row.selectedVariation,
+          segmentid: row.selectedSegment,
+          stagename: stageName,
+          slottype: 'appointment',
+          startdate: slot.slotstart,
+          enddate: slot.slotend,
+          availabilityid: slot.availabilityid,
+          hostref: slot.hostref,
+          appointmentref: null,
+          bookedby: null,
+          booked: false,
+          available: true,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+
+        pending.push({
+          row,
+          entry: {
+            docid: newDocRef.id,
+            slottype: 'appointment',
+            availabilityid: slot.availabilityid,
+            startdate: slot.slotstart.toDate(),
+            enddate: slot.slotend.toDate(),
+            starttime: this.formatTimeTo24Hour(slot.slotstart.toDate()),
+            endtime: this.formatTimeTo24Hour(slot.slotend.toDate()),
+            hostref: slot.hostref,
+            specialistName: slot.specialistName,
+            bigparticipants: [],
+            participants: []
+          }
+        });
+      }
+    }
+
+    if (pending.length === 0) {
+      alert(skipped > 0 ? `No new slots created. ${skipped} duplicate(s) skipped.` : 'No slots were created.');
+      return;
+    }
 
     try {
       await batch.commit();
-
-      newEntries.forEach(entry => {
-        this.editingRow.stageData[this.editingStageName].dates.push(entry);
-      });
-
+      pending.forEach(p => p.row.stageData[stageName].dates.push(p.entry));
       this.dialog.closeAll();
-      this.guard.openSnackBar(`${newEntries.length} appointment slot(s) reserved`, 'OK', 600);
+      let msg = `${pending.length} appointment slot(s) reserved`;
+      if (skipped > 0) msg += ` (${skipped} duplicate(s) skipped)`;
+      this.guard.openSnackBar(msg, 'OK', 600);
     } catch (err) {
       console.log(err);
       alert('Error saving appointment slots. Please try again.');
