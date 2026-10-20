@@ -165,6 +165,37 @@ export class PrescribeATCComponent {
   casenotes = null;
   mentornotes = null;
 
+  // Ask · area of focus (EI Solution ATCs only). Saved as asks: [{ <askedby>: <askedfor> }, …],
+  // e.g. [{ "self": "for health" }] — draft (temporary_ATC) and the final ATC document.
+  readonly askedByOptions = [
+    { value: 'self', label: 'Self' }, { value: 'spouse', label: 'Spouse' },
+    { value: 'family', label: 'Family' }, { value: 'friends', label: 'Friends' },
+  ];
+  askRows: { askedby: string | null, askedfor: string }[] = [];
+
+  get isEISolution(): boolean {
+    return (this.product ?? '').toString().trim().toLowerCase() == 'ei solution';
+  }
+  // rows with both parts filled, in the saved shape
+  get completeAsks(): Record<string, string>[] {
+    return this.askRows
+      .filter(r => !!r.askedby && (r.askedfor ?? '').trim().length != 0)
+      .map(r => ({ [r.askedby]: r.askedfor.trim() }));
+  }
+  addAsk() { this.askRows.push({ askedby: null, askedfor: '' }); }
+  removeAsk(i: number) {
+    this.askRows.splice(i, 1);
+    if (this.askRows.length == 0) this.addAsk();
+    this.autoSave();
+  }
+  private asksFrom(saved: any): { askedby: string | null, askedfor: string }[] {
+    const rows = (Array.isArray(saved) ? saved : [])
+      .map((item: any) => Object.entries(item ?? {})[0])
+      .filter((e: any) => !!e)
+      .map(([askedby, askedfor]: any) => ({ askedby, askedfor: String(askedfor ?? '') }));
+    return rows.length ? rows : [{ askedby: null, askedfor: '' }];
+  }
+
   // totalProcedures = 0;
   // totalProcedureWritten = 0;
 
@@ -498,6 +529,7 @@ export class PrescribeATCComponent {
         this.consultationpoint = value['consultationpoint'] ?? null;
         this.casenotes = value['notes'] ?? null;
         this.mentornotes = value['mentornotes'] ?? null;
+        this.askRows = this.asksFrom(value['asks']);
 
         this.summarystring = value['aiatcsummary'] ?? null;
         this.areasstring = value['areastoexplore'] ?? [];
@@ -838,6 +870,7 @@ export class PrescribeATCComponent {
 
   onProductSelect(){
     console.log("Selected Product", this.product)
+    if(this.isEISolution && this.askRows.length == 0) this.addAsk()
     if(!this.assignmentInitiated){
       var selectedIndex = this.productAvailable.findIndex(e => e["atcmodel"] == this.product && e["directive"] != null)
       if(selectedIndex != -1){
@@ -1643,6 +1676,7 @@ export class PrescribeATCComponent {
           consultationpoint: this.consultationpoint ?? null,
           notes: this.casenotes ?? null,
           mentornotes: this.mentornotes ?? null,
+          asks: this.isEISolution ? this.completeAsks : [],
           atcassignment: this.atcAssignment ?? [],
           audioRecordings: this.existingAudioURLs ?? [],
           noteImageURLs: this.existingNoteImageURLs ?? [],
@@ -1753,6 +1787,7 @@ export class PrescribeATCComponent {
     this.consultationpoint = value['consultationpoint'] ?? null
     this.casenotes = value['notes'] ?? null
     this.mentornotes = value['mentornotes'] ?? null
+    this.askRows = this.asksFrom(value['asks'])
     // Carry the "edited from AI generation" provenance through to submit.
     this.aiedited = value['aiedited'] ?? false
     this.aigeneratedsource = value['aigeneratedsource'] ?? null
@@ -2265,6 +2300,9 @@ async removeATCImage(index: number) {
     else if((this.atcdirective ?? "").trim().length == 0){
       this.focusMissingField('atcfield-directive', 'Provide ATC directive')
     }
+    else if(this.isEISolution && this.completeAsks.length == 0){
+      this.focusMissingField('atcfield-asks', 'Add at least one complete ask (asked by and asked for)')
+    }
     else if((this.consultationpoint ?? "").trim().length == 0){
       this.focusMissingField('atcfield-consultationpoint', 'Consultation points required')
     }
@@ -2441,6 +2479,7 @@ async removeATCImage(index: number) {
           validator: validatorref.length != 0 ? validatorref : null,
           prescription_image: this.atcImageURL.length == 0 ? null : this.atcImageURL,
           bigactivity: atclevelBigActivity,
+          ...(this.isEISolution ? { asks: this.completeAsks } : {}),
           evolutionprogressdate: new Date(),
           aiatcsummary:this.summarystring ?? '',
           areastoexplore:this.areasstring ?? '',
@@ -2724,6 +2763,7 @@ async removeATCImage(index: number) {
       this.casenotes = null;
       this.consultationpoint = null;
       this.mentornotes = null;
+      this.askRows = [];
       this.audioBlob = [];
       this.audioBlobURL = [];
       this.autoSaveID = null;  // clear draft context so the name unlocks and a new participant can be selected
