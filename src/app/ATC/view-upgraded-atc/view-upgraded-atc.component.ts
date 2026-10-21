@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { Firestore, collection, getDocs ,doc, getDoc} from '@angular/fire/firestore';
+import { Firestore, collection, getDocs ,doc, getDoc, getFirestore} from '@angular/fire/firestore';
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthguardService } from '../../authguard.service';
@@ -31,6 +31,10 @@ export class ViewUpgradedAtcComponent implements OnInit {
   } = {};
   mapProcedures = {}
   mapProfile = {}
+  notFound = false
+  // ATC versions (atc_alpha / atc_to_validate + corrections/procedures) live in the named `firestore-atc`
+  // database; procedure NAMES stay on the default database.
+  firestoreATC = getFirestore("firestore-atc")
   get loading(){
     return this.matdialog.open(LoadingProgressComponent,{
       data:{msg: 'Fetching data please wait ....'}
@@ -51,11 +55,17 @@ export class ViewUpgradedAtcComponent implements OnInit {
         this.route.queryParams.subscribe(async context => {
           if(context['atcpath']){
             guard.getProfileMap().then(e => this.mapProfile = e.map)
-            getDoc(doc(this.firestore, context['atcpath'])).then(async atcsnap => {
+            getDoc(doc(this.firestoreATC, context['atcpath'])).then(async atcsnap => {
             const atcelement = atcsnap.exists() ? atcsnap.data() : null;
-            atcelement['atcref'] = doc(this.firestore, context['atcpath']);
+            if (atcelement == null) {
+              // unknown / deleted version: say so instead of crashing and leaving the loading dialog open
+              this.notFound = true
+              loading.close()
+              return
+            }
+            atcelement['atcref'] = doc(this.firestoreATC, context['atcpath']);
             if (atcelement != null) {
-              const atcElementRef = doc(this.firestore, context['atcpath']);
+              const atcElementRef = doc(this.firestoreATC, context['atcpath']);
                 atcelement['prescription'] = []
                 await getDocs(collection(atcElementRef, "corrections")).then(async correctionsnap => {
                   for (let j = 0; j < correctionsnap.docs.length; j++) {
@@ -74,6 +84,10 @@ export class ViewUpgradedAtcComponent implements OnInit {
               }
               console.log("close");
               this.atcdata = atcelement
+              loading.close()
+            }).catch(err => {
+              console.log(err)
+              this.notFound = true
               loading.close()
             })
             //getproceduresname
@@ -95,6 +109,7 @@ export class ViewUpgradedAtcComponent implements OnInit {
       // }
     }).catch(err=>{
       console.log(err)
+      loading.close()
     })
   }
 

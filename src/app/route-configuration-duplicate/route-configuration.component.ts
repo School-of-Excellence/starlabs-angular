@@ -176,6 +176,10 @@ export class RouteConfigurationComponent {
     }
   }
 
+  // Stable row identity so the snapshot that follows every save patches rows in place
+  // instead of re-creating the whole table (every row carries cdkDrag).
+  trackRow = (_: number, row: RouteItem) => row.isChild ? `${row.parentId}#${row.childIndex}` : row.docid;
+
   hasChildren(element: RouteItem): boolean {
     return element.children && element.children.length > 0;
   }

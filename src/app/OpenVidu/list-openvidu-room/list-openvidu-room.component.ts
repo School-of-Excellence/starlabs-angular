@@ -210,8 +210,9 @@ export class ListOpenviduRoomComponent {
         var endTime = new Date(appointmentData["endtime"].toDate())
 
         if(endTime.getTime() >= new Date().getTime()){
-          appointmentData["appointmentrole"].forEach(role=>{
-            appointmentData["hostRole"][role.path].forEach(host=>{
+          var appointmentRoles = appointmentData["appointmentrole"] ?? []
+          appointmentRoles.forEach(role=>{
+            (appointmentData["hostRole"]?.[role.path] ?? []).forEach(host=>{
               if(!profileIDtoMap.includes(host.id)) profileIDtoMap.push(host.id)
             })
           })

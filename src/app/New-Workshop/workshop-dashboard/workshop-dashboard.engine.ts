@@ -918,3 +918,65 @@ export function formatDateTime(timestamp: any): string {
     return `${day}, ${time}`;
   } catch { return ''; }
 }
+
+/**
+ * Narrow a side-panel participant list by a typed name.
+ *
+ * Trimmed, lower-cased, CONTAINS — the same rule the progress table's search and the dropdown
+ * typeaheads elsewhere in the app use, so "search" means one thing on this screen.
+ *
+ * An empty or whitespace-only term returns the list unchanged rather than nothing: a cleared box
+ * must show everything again, and an accidental space must not empty the panel.
+ *
+ * `nameOf` is passed in because the panel's entries come from several different builders — some
+ * carry `name` directly, others only a profileid the caller resolves against its profile maps.
+ */
+export function filterParticipantsByName<T>(
+  list: T[] | null | undefined,
+  term: string | null | undefined,
+  nameOf: (item: T) => string,
+): T[] {
+  const all = list || [];
+  const q = (term ?? '').trim().toLowerCase();
+  if (q === '') return all.slice();
+  return all.filter(item => {
+    const name = nameOf(item);
+    return (typeof name === 'string' ? name : '').trim().toLowerCase().includes(q);
+  });
+}
+
+/**
+ * Whole calendar days from today until an evergreen extension's `extenduntill`.
+ *
+ * CALENDAR days, not elapsed hours. `extenduntill` is stored at 23:59 on the chosen day, so an
+ * hours-based count would read "0 days left" for most of a participant's final day and "2 days"
+ * for something that is really tomorrow. Both dates are flattened to local midnight first, which is
+ * what someone asking "how long have they got?" actually means.
+ *
+ * Math.round, not floor: a DST change makes a calendar day 23 or 25 hours long, and dividing the
+ * raw millisecond gap would then be off by one for every date past the switch.
+ *
+ * Returns null when there is no date to count to — the caller shows nothing rather than "NaN days".
+ * A negative result means the access already lapsed.
+ */
+export function daysRemaining(
+  untilMillis: number | null | undefined,
+  nowMillis: number = Date.now(),
+): number | null {
+  if (untilMillis === null || untilMillis === undefined) return null;
+  if (typeof untilMillis !== 'number' || !isFinite(untilMillis)) return null;
+  const n = new Date(nowMillis);
+  const u = new Date(untilMillis);
+  if (isNaN(u.getTime())) return null;
+  const startOfToday = new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime();
+  const startOfUntil = new Date(u.getFullYear(), u.getMonth(), u.getDate()).getTime();
+  return Math.round((startOfUntil - startOfToday) / 86_400_000);
+}
+
+/** How `daysRemaining` reads on screen. Today is the LAST day, not zero days. */
+export function daysRemainingLabel(days: number | null | undefined): string {
+  if (days === null || days === undefined) return '';
+  if (days < 0) return 'Expired';
+  if (days === 0) return 'Last day';
+  return `${days} ${days === 1 ? 'day' : 'days'} left`;
+}
