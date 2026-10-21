@@ -93,3 +93,42 @@ Verified: build EXIT=0 · unit 107/107 · rendered with the real CSS. Real-data 
 - Unit tests: 109/109, including two new cases.
 - Not verified against production Watson here: the emulator has no Watson. The operator checks on
   localhost.
+
+## 2026-10-17 — Master Class Purchase export: Workshop column
+- `panelExportRows` adds a "Workshop" column, after User Type, whenever the panel's rows carry a
+  `workshopTag`. Today that is only Master Class Purchase. The value is the same detail-page title
+  the row shows ("Unknown workshop" when the reference no longer resolves). Other panels' exports
+  are unchanged.
+- Tests:
+  - Unit: 109/109.
+  - Hub WS-60 reads the downloaded file and checks the Workshop column holds `Dashboard Workshop
+    <run>`; it passes.
+  - The hub commit is local, waiting on the deferred Touch Point tests and a full-suite run before
+    the next push.
+
+## 2026-10-17 — Master Class: moved-to-existing payers are not "New User"
+- Bug (operator): someone in both `new_user_data` (with `movedtoexist: true`) and participant metadata
+  was tagged New User on the Master Class row, counted in the card's "new users", and exported with
+  User Type "New User".
+- Cause: the row tested only "is in new_user_data".
+- Fix: it now uses the dashboard's existing `isNewUserProfile` rule ("in new_user_data and
+  movedtoexist is not true"). That is the same rule the user counts and logs already use, so the row
+  tag, the card count and the export's User Type all agree.
+- Tests: a unit case for a payer in both with `movedtoexist: true` (110/110), and WS-60 still passes.
+
+## 2026-10-17 — Whole dashboard: movedtoexist == true is never a New User (operator)
+One rule everywhere: `isNewUserProfile`, meaning in new_user_data AND movedtoexist is not true.
+Sites brought in line:
+- Master Class Purchase rows and card count (earlier the same day).
+- New Users to Paid rows. Everyone there has moved, so a row with no participant metadata no longer
+  gets the New User tag; it shows as Existing in the filter and the export.
+- Engagement new-vs-existing watch time. A moved person not in participant metadata now counts on
+  the existing side; before, they counted as new.
+- Non-Active Users / Device Breakdown. A moved person with no metadata doc stays listed, but as
+  existing (isNud false), so they move out of the "New Users" bucket counts.
+- `resolveProfiles`, shared by the Viewers, Hot Leads and Non-Active panels: no New User tag for moved
+  docs, so cohort filters and export User Type follow.
+Already correct: Total New Users (filters movedtoexist), App Logs and consumption cohorts (already
+used isNewUserProfile).
+Tests: a unit case for the paid rows, the resolver and the export User Type (111/111). The
+eiflix-ops-dashboard e2e file was re-run; the machine was heavily loaded at the time.

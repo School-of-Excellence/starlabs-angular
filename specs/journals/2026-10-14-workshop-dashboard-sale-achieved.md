@@ -91,3 +91,35 @@ by recent purchase instead.
   and confirmed the on-screen order flips with the toggle and the downloaded CSV has one row per purchase.
   (A first read of the order right after the click looked unchanged — it was read before the re-render;
   polling showed the reorder.)
+
+## 2026-10-20 — Side-panel export crashed on Total Enrolled (production)
+- Symptom (operator, breakthroughs.app): Export in the Total Enrolled panel did nothing. Console:
+  "TypeError: Cannot read properties of undefined (reading 'email')" at exportParticipants.
+- Cause: the CSV mapping read `p.metadata.email` directly. Several panels build rows with
+  `metadata: this.mapProfile[id]` (participant metadata only), so an enrolled new user who exists
+  only in new_user_data has `metadata` undefined, and the whole export threw.
+- Fix: each row uses `p.metadata || mapProfile[id] || mapProfileNew[id] || {}`. Name falls back to the
+  directory name. Nothing in the column set changed.
+- Test: `workshop-dashboard.export.spec.ts` covers a row with missing metadata, a new-user-only row,
+  and a row in neither directory; it passes.
+- Fixed on request: 3 tests in `workshop-dashboard.exist-users.spec.ts` ("All Assignments") were
+  already failing. `onAssignmentCardClick` checks `this.can('allassignments')` and the fixture had no
+  `access`. The fixture now grants that one action, and a new case proves a click does nothing
+  without it. The file passes 53/53.
+- e2e: to add in the pending test round (an enrolled new-user-only profile exporting from Total
+  Enrolled).
+
+### Follow-up 2026-10-21: what exactly crashed, and the e2e
+- `mapProfile` already overlays genuine new users from `new_user_data` (`newUserOverlay`), so new users
+  were never the problem. The row with no `metadata` is a person **moved to existing
+  (movedtoexist: true) whose participant metadata doc doesn't exist yet**. The overlay skips them,
+  and `buildParticipantEntry` gave them `metadata: undefined` and the name "Unknown".
+- Two small name fixes so the panel and the file agree:
+  - `buildParticipantEntry` names them from `new_user_data`.
+  - The export uses the directory name whenever the row says "Unknown".
+- Hub WS-69 (`workshops/workshop-dashboard.spec.ts`):
+  - Seeds two extra W_DASH enrollments (NU_A, a genuine new user; and a moved-to-existing profile
+    with no metadata), opens Total Enrolled, and checks the moved person is listed by name.
+  - Exports and reads the CSV. The moved row has the name, email and phone from `new_user_data`. The
+    new user and p0 rows have their stored emails, read from Firestore. Nobody exports as "Unknown".
+  - Cleans up by id.

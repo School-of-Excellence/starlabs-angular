@@ -5,30 +5,41 @@
       <p class="page-subtitle">Configure, monitor and manage all workshop sessions</p>
     </div>
     <div class="header-actions">
-      <button data-testid="wor-open-popup-banner-dialog-1" mat-stroked-button class="action-btn secondary-btn" (click)="openPopupBannerDialog()">
-        <mat-icon>web_asset</mat-icon>
-        <span>Popup Banner</span>
+      <!-- One Actions button (operator 2026-10-16); the former header buttons live in its menu,
+           with the same hooks and the same access rules. -->
+      <button data-testid="wor-actions-menu" mat-flat-button class="action-btn primary-btn" [matMenuTriggerFor]="actionsMenu">
+        <mat-icon>apps</mat-icon>
+        <span>Actions</span>
+        <mat-icon class="actions-caret" iconPositionEnd>expand_more</mat-icon>
       </button>
-      <button data-testid="wor-open-new-users-tab-2" mat-stroked-button class="action-btn secondary-btn" (click)="openNewUsersTab()" *ngIf="canNewUsers">
-        <span>New Users</span>
-        <!-- <span>{{'New Users ( ' + objectKeys(mapProfileNew).length + ' )'}}</span> -->
-      </button>
-      <button data-testid="wor-open-refferalcode-dialog-3" mat-stroked-button class="action-btn secondary-btn" (click)="openRefferalcodeDialog()">
-        <mat-icon>card_giftcard</mat-icon>
-        <span>Referral Code</span>
-      </button>
-      <button data-testid="wor-open-eiflix-banner-dialog-4" mat-stroked-button class="action-btn secondary-btn" (click)="openEiflixBannerDialog()">
-        <mat-icon>movie_filter</mat-icon>
-        <span>EiFlix Banner</span>
-      </button>
-      <button data-testid="wor-route-to-products-5" mat-stroked-button class="action-btn secondary-btn" (click)="routeToProducts()">
-        <mat-icon>storefront</mat-icon>
-        <span>Products</span>
-      </button>
-      <button data-testid="wor-route-6" mat-flat-button class="action-btn primary-btn" (click)="route('create')" *ngIf="canEdit">
-        <mat-icon>add</mat-icon>
-        <span>New Workshop</span>
-      </button>
+      <mat-menu #actionsMenu="matMenu" xPosition="before">
+        <button data-testid="wor-route-6" mat-menu-item class="actions-item" (click)="route('create')" *ngIf="canEdit">
+          <mat-icon>add</mat-icon>
+          <span>New Workshop</span>
+        </button>
+        <mat-divider *ngIf="canEdit"></mat-divider>
+        <button data-testid="wor-open-popup-banner-dialog-1" mat-menu-item class="actions-item" (click)="openPopupBannerDialog()">
+          <mat-icon>web_asset</mat-icon>
+          <span>Popup Banner</span>
+        </button>
+        <button data-testid="wor-open-new-users-tab-2" mat-menu-item class="actions-item" (click)="openNewUsersTab()" *ngIf="canNewUsers">
+          <mat-icon>person_add</mat-icon>
+          <span>New Users</span>
+          <!-- <span>{{'New Users ( ' + objectKeys(mapProfileNew).length + ' )'}}</span> -->
+        </button>
+        <button data-testid="wor-open-refferalcode-dialog-3" mat-menu-item class="actions-item" (click)="openRefferalcodeDialog()">
+          <mat-icon>card_giftcard</mat-icon>
+          <span>Referral Code</span>
+        </button>
+        <button data-testid="wor-open-eiflix-banner-dialog-4" mat-menu-item class="actions-item" (click)="openEiflixBannerDialog()">
+          <mat-icon>movie_filter</mat-icon>
+          <span>EiFlix Banner</span>
+        </button>
+        <button data-testid="wor-route-to-products-5" mat-menu-item class="actions-item" (click)="routeToProducts()">
+          <mat-icon>storefront</mat-icon>
+          <span>Products</span>
+        </button>
+      </mat-menu>
     </div>
   </div>
   <div class="filter-bar">
