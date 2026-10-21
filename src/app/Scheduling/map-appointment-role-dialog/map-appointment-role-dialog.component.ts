@@ -59,7 +59,10 @@ export class MapAppointmentRoleDialogComponent {
     this.appointmentRoleList = data["rolelist"]
 
     // Subscribed before the edit-mode patch below, so patching required_role builds the ATC rows
-    this.mapAppointmentRoleForm.get('required_role').valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.syncAtcRoles())
+    this.mapAppointmentRoleForm.get('required_role').valueChanges.pipe(takeUntilDestroyed()).subscribe(() => {
+      this.dropRequiredFromAdditional()
+      this.syncAtcRoles()
+    })
     this.mapAppointmentRoleForm.get('atcrequired').valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.syncAtcRoles())
     this.syncAtcRoles()
     this.loadAtcActivities()
@@ -88,6 +91,7 @@ export class MapAppointmentRoleDialogComponent {
         atcrequired: existingData.atcrequired === true,
         atcmodel: existingData.atcmodel ?? null
       })
+      this.dropRequiredFromAdditional()
       // The rows exist now (built by the valueChanges above); atcrolemap is {roleId: [activityId, …]}
       // (older docs stored a single activityId string — read either)
       var savedMap = existingData.atcrolemap ?? {}
@@ -106,6 +110,24 @@ export class MapAppointmentRoleDialogComponent {
   // Required roles in picker order — one ATC row each
   get atcRoleIds(): string[] {
     return Object.keys(this.atcRoleGroup.controls)
+  }
+
+  // A role is either required or additional, never both: each picker hides the other's picks
+  get requiredRoleOptions() {
+    var additional: string[] = this.mapAppointmentRoleForm.get('additional_role').value ?? []
+    return this.appointmentRoleList.filter(e => !additional.includes(e.id))
+  }
+  get additionalRoleOptions() {
+    var required: string[] = this.mapAppointmentRoleForm.get('required_role').value ?? []
+    return this.appointmentRoleList.filter(e => !required.includes(e.id))
+  }
+  // Older docs may list a role in both: keep it as required
+  private dropRequiredFromAdditional() {
+    var required: string[] = this.mapAppointmentRoleForm.get('required_role').value ?? []
+    var additionalControl = this.mapAppointmentRoleForm.get('additional_role')
+    var additional: string[] = additionalControl.value ?? []
+    var kept = additional.filter(id => !required.includes(id))
+    if (kept.length != additional.length) additionalControl.setValue(kept, { emitEvent: false })
   }
 
   roleName(roleId: string): string {

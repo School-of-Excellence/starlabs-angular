@@ -53,3 +53,9 @@ an array. Also includes the operator's own subtitle edit (column hint text remov
 "What is the ATC given for?"). Required only while ATC is ticked; saved as `null` when unticked.
 **Why:** prescribeATC now finds a participant's ATC appointment by the ATC model chosen on that screen
 (`atcrequired == true && atcmodel == <chosen>`), so each ATC-enabled type must say which model it belongs to.
+
+## 2026-10-21 — Required and Additional roles are mutually exclusive
+**Operator:** "in required roles and additional roles show unique roles from both". Each picker hides the roles
+picked in the other (`requiredRoleOptions` / `additionalRoleOptions`); a doc that lists a role in both opens with it
+kept as required and dropped from additional (`dropRequiredFromAdditional`, also run on every required change).
+The ATC activity grouping by atcproperty was considered and dropped (operator: "you already have the role id").
