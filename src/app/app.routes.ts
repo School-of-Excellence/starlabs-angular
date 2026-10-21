@@ -7,6 +7,7 @@ import { workshopConfigUnsavedGuard } from './New-Workshop/workshop-configuratio
 export const routes: Routes = [
   {path: 'slackwebhookurls',loadComponent:()=> import('./slackwebhookurls/slackwebhookurls.component').then(m => m.SlackwebhookurlsComponent), canActivate:[authGuard]},
   {path: 'journeyonboardingdetail', loadComponent: () => import('./journey-onboarding-detail/journey-onboarding-detail.component').then(m => m.JourneyOnboardingDetailComponent), canActivate:[authGuard]},
+  {path: 'livevideosubtitles', loadComponent: () => import('./live-video-subtitles/live-video-subtitles.component').then(m => m.LiveVideoSubtitlesComponent), canActivate:[authGuard]},
   {path: '', redirectTo: '/EISDashboard', pathMatch:'full'},
   {path: 'login', loadComponent: () => import('./login/login.component').then(m => m.LoginComponent)},
   {path: 'routeconfiguration', loadComponent: () => import('./route-configuration-duplicate/route-configuration.component').then(m => m.RouteConfigurationComponent), canActivate:[authGuard]},

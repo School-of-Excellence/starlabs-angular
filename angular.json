@@ -20,6 +20,7 @@
               "zone.js"
             ],
             "tsConfig": "tsconfig.app.json",
+            "webWorkerTsConfig": "tsconfig.worker.json",
             "assets": [
               "src/favicon.ico",
               "src/assets",
@@ -40,6 +41,11 @@
                 "glob": "**/*",
                 "input": "node_modules/@zoom/meetingsdk/dist",
                 "output": "/zoom/"
+              },
+              {
+                "glob": "{rnnoise.wasm,rnnoise_simd.wasm,rnnoise/workletProcessor.js}",
+                "input": "node_modules/@sapphi-red/web-noise-suppressor/dist",
+                "output": "/assets/noise-suppressor/"
               }
             ],
             "styles": [

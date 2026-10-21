@@ -1,0 +1,258 @@
+<div class="lvs" data-testid="lvs-page">
+  <header class="lvs-head">
+    <div class="lvs-title">
+      <h1>Live video subtitles</h1>
+      <p class="lvs-sub">Subtitles and speakers worked out in your browser as the video plays. Nothing is uploaded or saved.</p>
+    </div>
+    @if (videoUrl()) {
+      <label class="lvs-btn lvs-btn-ghost" data-testid="lvs-upload">
+        <input type="file" accept="video/*" (change)="onFile($event)" data-testid="lvs-file-input" />
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0-5 5m5-5 5 5M4 20h16" /></svg>
+        Choose another video
+      </label>
+    }
+  </header>
+
+  <section class="lvs-toolbar" data-testid="lvs-settings">
+    <label class="lvs-field">
+      <span>Language</span>
+      <select [(ngModel)]="language" (ngModelChange)="onLanguageChange()" data-testid="lvs-language">
+        @for (l of languages; track l.label) {
+          <option [ngValue]="l.code">{{ l.label }}</option>
+        }
+      </select>
+    </label>
+    <label class="lvs-switch" title="Whisper large-v3-turbo (best words). Off: Whisper small (lighter, less accurate).">
+      <input type="checkbox" [(ngModel)]="highAccuracy" (ngModelChange)="onAccuracyChange()" data-testid="lvs-high-accuracy" />
+      <span class="lvs-track"></span>
+      High accuracy
+    </label>
+    <label class="lvs-switch" title="Who is speaking: faces, lip movement and profile matching">
+      <input type="checkbox" [ngModel]="namesOn()" (ngModelChange)="onNamesChange($event)" data-testid="lvs-names" />
+      <span class="lvs-track"></span>
+      Show names
+    </label>
+    <label class="lvs-switch" title="What you hear only — subtitles are always made from the original sound">
+      <input type="checkbox" [ngModel]="removeNoise()" (ngModelChange)="onNoiseChange($event)" data-testid="lvs-remove-noise" />
+      <span class="lvs-track"></span>
+      Remove background noise
+    </label>
+    <span class="lvs-spacer"></span>
+    <button
+      type="button"
+      class="lvs-btn lvs-btn-text"
+      [class.lvs-on]="showDiagnostics()"
+      (click)="showDiagnostics.set(!showDiagnostics())"
+      data-testid="lvs-diagnostics-toggle"
+    >
+      {{ showDiagnostics() ? 'Hide' : 'Show' }} diagnostics
+    </button>
+  </section>
+
+  @if (error()) {
+    <div class="lvs-error" data-testid="lvs-error">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v5m0 3h.01M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /></svg>
+      <span>{{ error() }}</span>
+      <button type="button" class="lvs-x" (click)="error.set('')" aria-label="Dismiss">×</button>
+    </div>
+  }
+
+  @if (videoUrl()) {
+    <div class="lvs-grid" #stage [class.lvs-full]="fullscreen()">
+      <!-- Left: the video -->
+      <div class="lvs-main">
+        <div class="lvs-player" #player data-testid="lvs-player">
+          <video
+            #video
+            [src]="videoUrl()"
+            controls
+            controlsList="nofullscreen"
+            disablePictureInPicture
+            playsinline
+            (dblclick)="toggleFullscreen()"
+            (play)="onUserPlay()"
+            (pause)="onUserPause()"
+            (seeked)="onSeeked()"
+            data-testid="lvs-video"
+          ></video>
+
+          @if (speakerBox(); as b) {
+            <div
+              class="lvs-box"
+              [class.lvs-box-known]="b.recognised"
+              [style.left.px]="b.left"
+              [style.top.px]="b.top"
+              [style.width.px]="b.width"
+              [style.height.px]="b.height"
+              data-testid="lvs-speaker-box"
+            >
+              <span class="lvs-box-name">{{ b.name }}</span>
+            </div>
+          }
+
+          @if (caption(); as c) {
+            <div class="lvs-caption" data-testid="lvs-caption">
+              @if (c.name) {
+                <b class="lvs-cap-name" [class.lvs-known]="c.recognised" data-testid="lvs-caption-name">{{ c.name }}{{ c.name.endsWith('?') ? '' : ':' }}</b>
+              }
+              {{ c.text }}
+            </div>
+          }
+
+          <button
+            type="button"
+            class="lvs-fs"
+            (click)="toggleFullscreen()"
+            [attr.aria-label]="fullscreen() ? 'Exit full screen' : 'Full screen with subtitles'"
+            [title]="fullscreen() ? 'Exit full screen (Esc)' : 'Full screen with subtitles and transcript'"
+            data-testid="lvs-fullscreen"
+          >
+            @if (fullscreen()) {
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /></svg>
+            } @else {
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
+            }
+          </button>
+
+          @if (buffering() || decoding() || loadPct() !== null || facesStatus()) {
+            <div class="lvs-overlay" data-testid="lvs-buffering">
+              <span class="lvs-spinner"></span>
+              @if (decoding()) {
+                Reading the soundtrack…
+              } @else if (loadPct() !== null) {
+                Loading the speech model… {{ loadPct() }}%
+              } @else if (!buffering() && facesStatus()) {
+                {{ facesStatus() }}
+              } @else {
+                Analysing ahead…
+              }
+            </div>
+          }
+        </div>
+
+        <div class="lvs-card lvs-info">
+          <div class="lvs-file">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 10l5-3v10l-5-3M4 6h11v12H4z" /></svg>
+            <span class="lvs-file-name" data-testid="lvs-file-name">{{ fileName() }}</span>
+            @if (status()) {
+              <span class="lvs-chip" data-testid="lvs-status">{{ status() }}</span>
+            }
+          </div>
+          <div class="lvs-progress">
+            <div class="lvs-progress-row" title="Transcribed so far">
+              <span>Subtitles</span>
+              <div class="lvs-bar"><div class="lvs-bar-fill" [style.width.%]="coveragePct()"></div></div>
+              <span class="lvs-pct">{{ coveragePct().toFixed(0) }}%</span>
+            </div>
+            @if (namesOn()) {
+              <div class="lvs-progress-row" title="Frames analysed for faces">
+                <span>Faces</span>
+                <div class="lvs-bar"><div class="lvs-bar-fill lvs-bar-faces" [style.width.%]="faceCoveragePct()"></div></div>
+                <span class="lvs-pct">{{ faceCoveragePct().toFixed(0) }}%</span>
+              </div>
+            }
+          </div>
+        </div>
+
+        @if (showDiagnostics()) {
+          <dl class="lvs-card lvs-diag" data-testid="lvs-diagnostics">
+            <dt>Model</dt>
+            <dd>{{ modelLabel() || '—' }}</dd>
+            <dt>Runs on</dt>
+            <dd>{{ device() || '—' }}</dd>
+            <dt>Speed</dt>
+            <dd>{{ speed() !== null ? (speed()!.toFixed(1) + '× realtime') : '—' }}</dd>
+            <dt>Transcribed</dt>
+            <dd>{{ fmt(doneMs()) }} of {{ fmt(durationMs()) }} ({{ coveragePct().toFixed(0) }}%)</dd>
+            <dt>Captions</dt>
+            <dd>{{ captions().length }}</dd>
+            <dt>Noise removal</dt>
+            <dd data-testid="lvs-noise-diag">{{ noiseDelayText() }}</dd>
+            @if (namesOn()) {
+              <dt>Faces run on</dt>
+              <dd>{{ faceDevice() || '—' }}</dd>
+              <dt>Faces analysed</dt>
+              <dd>{{ fmt(faceDoneMs()) }} ({{ faceCoveragePct().toFixed(0) }}%) · {{ faceTimingText() || '—' }}</dd>
+              <dt>Profiles</dt>
+              <dd>{{ profileCount() ?? '—' }}</dd>
+              <dt>Speaker basis</dt>
+              <dd data-testid="lvs-speaker-basis">{{ captionBasis() || '—' }}</dd>
+              <dt>People</dt>
+              <dd data-testid="lvs-people">
+                @for (p of peopleSummary(); track p) {
+                  <div>{{ p }}</div>
+                } @empty {
+                  —
+                }
+              </dd>
+            }
+          </dl>
+        }
+      </div>
+
+      <!-- Right: the transcript -->
+      <aside class="lvs-card lvs-transcript" [style.height.px]="transcriptHeight()" data-testid="lvs-transcript">
+        <div class="lvs-transcript-head">
+          <h2>Transcript</h2>
+          <span class="lvs-count">{{ captions().length }} lines</span>
+          <span class="lvs-spacer"></span>
+          @if (!follow()) {
+            <button type="button" class="lvs-btn lvs-btn-small" (click)="followNow()" data-testid="lvs-follow">
+              Jump to now
+            </button>
+          }
+        </div>
+        <div class="lvs-lines" #lines (wheel)="pauseFollow()" (touchmove)="pauseFollow()">
+          @for (c of captions(); track c.startMs) {
+            <button
+              type="button"
+              class="lvs-line"
+              [class.lvs-line-now]="isCurrent(c)"
+              [class.lvs-line-ahead]="c.startMs > positionMs()"
+              (click)="seekTo(c)"
+              data-testid="lvs-transcript-line"
+            >
+              @if (transcriptName(c); as n) {
+                <span class="lvs-avatar" [class.lvs-known]="n.recognised" [class.lvs-pending]="n.name === '…'">{{ initials(n.name) }}</span>
+              }
+              <span class="lvs-line-body">
+                <span class="lvs-line-meta">
+                  @if (transcriptName(c); as n) {
+                    <b class="lvs-line-name" [class.lvs-known]="n.recognised" data-testid="lvs-transcript-name">{{ n.name }}</b>
+                  }
+                  <span class="lvs-time">{{ fmt(c.startMs) }}</span>
+                </span>
+                <span class="lvs-line-text">{{ c.text }}</span>
+              </span>
+            </button>
+          } @empty {
+            <div class="lvs-lines-empty">
+              <span class="lvs-spinner lvs-spinner-dark"></span>
+              Lines appear here as they're transcribed.
+            </div>
+          }
+        </div>
+      </aside>
+    </div>
+  } @else {
+    <label
+      class="lvs-drop"
+      [class.lvs-drop-over]="dragOver()"
+      (dragover)="$event.preventDefault(); dragOver.set(true)"
+      (dragleave)="dragOver.set(false)"
+      (drop)="onDrop($event)"
+      data-testid="lvs-empty"
+    >
+      <input type="file" accept="video/*" (change)="onFile($event)" data-testid="lvs-file-input" />
+      <span class="lvs-drop-icon">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0-5 5m5-5 5 5M4 20h16" /></svg>
+      </span>
+      <span class="lvs-drop-title">Drop a video here, or <u>browse</u></span>
+      <span class="lvs-drop-hint">MP4 or WebM from your computer</span>
+      <span class="lvs-drop-note">
+        Works best in Chrome or Edge on a computer with a graphics card (WebGPU). The speech model downloads once
+        (about 560 MB for high accuracy) and is then cached.
+      </span>
+    </label>
+  }
+</div>
