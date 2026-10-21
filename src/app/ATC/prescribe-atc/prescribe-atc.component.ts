@@ -1076,7 +1076,9 @@ export class PrescribeATCComponent {
         console.info("[prescribeATC] no appointment type maps ATC model \"" + model + "\" (atcrequired + atcmodel) — pick specialists manually")
         return
       }
-      const apptSnap = await getDocs(query(collection(this.firestoreDefault, "appointments"), where("bookedby", "==", doc(this.firestoreDefault, "profile_data", this.participantProfileid))))
+      const apptSnap = await getDocs(query(collection(this.firestoreDefault, "appointments"),
+        where("bookedby", "==", doc(this.firestoreDefault, "profile_data", this.participantProfileid)),
+        where("cancelled", "==", false)))
       const appointmentId = pickAtcAppointment(apptSnap.docs.map(d => ({
         id: d.id,
         start: d.data()['starttime']?.toDate?.() ?? null,

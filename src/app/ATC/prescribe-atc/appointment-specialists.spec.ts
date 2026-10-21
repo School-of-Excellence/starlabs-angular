@@ -122,6 +122,7 @@ describe('completedNewestFirst', () => {
       a('ok', at(12)),
       a('tomorrow', at(21), { attended: true }),
       a('cancelledToday', at(20, 9), { cancelled: true }),
+      a('noCancelledField', at(19), { cancelled: undefined }),
       a('untyped', at(16), { typeId: null }),
       a('nodate', null),
     ];

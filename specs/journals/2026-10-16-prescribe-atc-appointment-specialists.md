@@ -119,3 +119,9 @@ model is already set) and from `onProductSelect()` (the user's own pick — draf
 still win). `pickAtcAppointment()` (pure, 3 specs) = type in set + you hosted + date rule + newest. The mapping
 query seeds the per-type cache so `prefillFromAppointment()` doesn't re-read it. `?appointmentid=` unchanged.
 **Verified:** helper 17/17; tsc + build green. Not run live (needs `atcmodel` set on the mappings first).
+
+## 2026-10-21 — appointment must be cancelled == false
+**Operator:** "in appointment doc has to be cancelled false". The appointments query now adds
+`where("cancelled", "==", false)` (equality-only, no composite index), and `completedNewestFirst` requires
+`cancelled === false` — a doc with no `cancelled` field no longer counts. Booking always writes `cancelled: false`.
+**Verified:** helper 17/17 (new case: missing `cancelled` is skipped); tsc green.
