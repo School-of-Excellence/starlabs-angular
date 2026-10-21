@@ -190,6 +190,12 @@
   gap: 16px;
 }
 
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
 .align-row {
   align-items: stretch;
 }
@@ -262,6 +268,11 @@
 .toggle-icon-mobile {
   background: var(--mobile-soft);
   color: var(--mobile-color);
+}
+
+.toggle-icon-eiflixmobile {
+  background: #fdecec;
+  color: #b42318;
 }
 
 .toggle-label {
@@ -836,7 +847,8 @@ tr[cdkDrag] {
     padding: 20px 16px;
   }
 
-  .grid-2 {
+  .grid-2,
+  .grid-3 {
     grid-template-columns: 1fr;
   }
 
