@@ -164,7 +164,7 @@
         </div>
         <div class="spec-row" data-testid="patc-specialists-row" *ngFor="let row of appointmentSpecialists">
           <div class="spec-label">{{ row.label }}</div>
-          <div class="spec-activity" data-testid="patc-specialists-role">{{ roleNamesOf(row) }}</div>
+          <div class="spec-activity">{{ row.activity }}<div class="spec-role" data-testid="patc-specialists-role">{{ roleNamesOf(row) }}</div></div>
           <div class="spec-people">
             <span class="spec-chip" data-testid="patc-specialists-name" *ngFor="let path of row.profilePaths">{{ specialistName(path) }}</span>
             <span class="spec-none" *ngIf="row.profilePaths.length == 0">Not assigned</span>

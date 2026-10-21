@@ -35,7 +35,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { UpdateDialogComponent } from '../../DialogBox/update-dialog/update-dialog.component';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MarkdownModule } from 'ngx-markdown';
-import { appointmentSpecialistRows, AppointmentSpecialistRow, completedNewestFirst, specialistsByProperty } from './appointment-specialists';
+import { appointmentSpecialistRows, AppointmentSpecialistRow, completedNewestFirst, appointmentHostIds } from './appointment-specialists';
 
 interface AssignmentData {
   clipurl?: string;
@@ -1017,21 +1017,23 @@ export class PrescribeATCComponent {
         const name = (snap?.data() as any)?.['name']
         if(name) peopleNames[people[i]] = name
       })
-      // A role's specialist covers EVERY activity of its property (author role → all AUTHOR activities, ...)
-      const byProperty = specialistsByProperty(rows)
       // same zone + rebuild steps as the live-studio prefill, so the closed mat-selects show the names at once
       this.ngZone.run(() => {
-        const fill = (activities: any[], target: Record<string, string[]>, people: string[] | undefined) => {
-          if(!people?.length) return
-          activities.forEach(a => target[a['docid']] = [...people])
+        // Only the activity each role maps to gets that role's host, and only while nobody is selected there;
+        // every other activity stays empty for manual entry.
+        const fillIfEmpty = (target: Record<string, string[]>, activityId: string, people: string[]) => {
+          if(!people.length || (target[activityId] ?? []).length != 0) return
+          target[activityId] = [...people]
         }
-        fill(this.bigActivityAuthor, this.authorMap, byProperty['author'])
-        fill(this.bigActivityObserver, this.observerMap, byProperty['observer'])
-        fill(this.bigActivityMentor, this.mentorMap, byProperty['mentoring'])
-        // assigned_to (CA): preselect every "set for all procedures" picker; Apply stays a user action
-        fill(this.bigActivityAssignedto, this.bulkAssignedSelection, byProperty['assigned_to'])
-        rows.filter(r => !["author", "observer", "mentoring", "assigned_to"].includes(r.atcproperty) && r.profilePaths.length != 0)
-          .forEach(r => this.additionalActivityMap.push({ activity: r.activityId, specialist: [...r.profilePaths] }))
+        rows.forEach(row => {
+          if(row.atcproperty == "author") fillIfEmpty(this.authorMap, row.activityId, row.profilePaths)
+          else if(row.atcproperty == "observer") fillIfEmpty(this.observerMap, row.activityId, row.profilePaths)
+          else if(row.atcproperty == "mentoring") fillIfEmpty(this.mentorMap, row.activityId, row.profilePaths)
+          // assigned_to (CA): preselect that activity's "set for all procedures" picker; Apply stays a user action
+          else if(row.atcproperty == "assigned_to") fillIfEmpty(this.bulkAssignedSelection, row.activityId, row.profilePaths)
+          else if(row.profilePaths.length != 0 && !this.additionalActivityMap.some(e => e.activity == row.activityId))
+            this.additionalActivityMap.push({ activity: row.activityId, specialist: [...row.profilePaths] })
+        })
         this.onObserverSelect()
         this.appointmentTypeName = (typeSnap.data() as any)?.['appointmenttype'] ?? ''
         this.appointmentDate = appt['starttime']?.toDate?.() ?? null
@@ -1049,13 +1051,15 @@ export class PrescribeATCComponent {
     }
   }
 
-  // No ?appointmentid=: only this participant's appointments, newest completed first; each one's own type
-  // mapping is read until one prescribes an ATC.
+  // No ?appointmentid=: only this participant's appointments that the logged-in specialist hosted, newest
+  // usable first; each one's own type mapping is read until one prescribes an ATC.
   async prefillFromLatestAppointment(){
     try {
       const apptSnap = await getDocs(query(collection(this.firestoreDefault, "appointments"), where("bookedby", "==", doc(this.firestoreDefault, "profile_data", this.participantProfileid))))
-      const typeRefs = new Map(apptSnap.docs.map(d => [d.id, d.data()['appointment']]))
-      const completed = completedNewestFirst(apptSnap.docs.map(d => ({
+      // only appointments the logged-in specialist shares with this participant (one of its hosts)
+      const shared = apptSnap.docs.filter(d => appointmentHostIds(d.data()).includes(this.loggedinProfileid))
+      const typeRefs = new Map(shared.map(d => [d.id, d.data()['appointment']]))
+      const completed = completedNewestFirst(shared.map(d => ({
         id: d.id,
         start: d.data()['starttime']?.toDate?.() ?? null,
         attended: d.data()['attended'],
@@ -1069,7 +1073,7 @@ export class PrescribeATCComponent {
           return
         }
       }
-      console.info("[prescribeATC] no completed ATC appointment for " + this.participantProfileid + " — pick specialists manually")
+      console.info("[prescribeATC] no ATC appointment of yours with " + this.participantProfileid + " (today or earlier) — pick specialists manually")
     } catch (error) {
       console.error("Could not find the participant's latest ATC appointment", error)
     }

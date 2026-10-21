@@ -1,6 +1,6 @@
 import {
   appointmentSpecialistRows, propertyLabel, AtcActivity, completedNewestFirst, AppointmentSummary, appointmentRoleIds,
-  specialistsByProperty, hostRoleIds,
+  hostRoleIds, appointmentHostIds,
 } from './appointment-specialists';
 
 const ACTS: AtcActivity[] = [
@@ -57,20 +57,20 @@ describe('appointment-specialists', () => {
     expect(appointmentSpecialistRows(appt, { atcrequired: true, atcrolemap: { R_DIAG: 'GONE' } }, ACTS)).toEqual([]);
   });
 
-  it('pools specialists per property, so a role covers every activity of its property', () => {
+  it('each row targets only the one activity its role maps to (other activities of that property are untouched)', () => {
     const rows = appointmentSpecialistRows({
-      appointmentrole: [ref('eisroles/R_DIAG'), ref('eisroles/R_SHADOW'), ref('eisroles/R_IMPL')],
-      hostRole: {
-        'eisroles/R_DIAG': [ref('profile_data/disha')],
-        'eisroles/R_SHADOW': [ref('profile_data/ishara')],
-        'eisroles/R_IMPL': [ref('profile_data/ishara'), ref('profile_data/vignesh')],
-      },
+      hostRole: { 'eisroles/R_DIAG': [ref('profile_data/disha')], 'eisroles/R_IMPL': [ref('profile_data/ishara')] },
     }, MAP, ACTS);
-    expect(specialistsByProperty(rows)).toEqual({
-      author: ['profile_data/disha'],
-      observer: ['profile_data/ishara'],
-      assigned_to: ['profile_data/ishara', 'profile_data/vignesh'],
-    });
+    // R_DIAG -> A_SOLO only (not the other author activity A_CONS); R_IMPL -> A_EIIMPL
+    expect(rows.map(r => [r.roleId, r.activityId])).toEqual([['R_DIAG', 'A_SOLO'], ['R_IMPL', 'A_EIIMPL']]);
+  });
+
+  it('lists every host on an appointment (hostRole people + hosts), as profile ids', () => {
+    expect(appointmentHostIds({
+      hostRole: { 'eisroles/R1': [ref('profile_data/raksha')], 'eisroles/R2': ['profile_data/vignesh'] },
+      hosts: [ref('profile_data/raksha'), ref('profile_data/charan')],
+    }).sort()).toEqual(['charan', 'raksha', 'vignesh']);
+    expect(appointmentHostIds({})).toEqual([]);
   });
 
   it('reads appointmentrole ids from refs or path strings', () => {

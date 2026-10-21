@@ -91,3 +91,13 @@ appointment's hosts (`appointmentPeopleNames`, used first by `specialistName`) a
 users_roles stream emits — so a prefilled mat-select can always display its value.
 **Verified:** helper 11/11; tsc + build green. NOT re-run on the emulator (it had been stopped); the name
 read is one getDoc per host.
+
+## 2026-10-21 — only your shared appointment; fill only its activities
+**Operator:** "if the logged-in person and the participant already have an appointment, patch and display based on
+the existing activity specialist; leave the remaining for manual entry" (the property-wide fill was wrong).
+**Change:** the fallback keeps only the participant's appointments where the logged-in specialist is a host
+(`appointmentHostIds()` = hostRole people + hosts[]). Each role's host goes ONLY into the activity that role maps
+to (`atcrolemap`), and only if that picker is still empty; every other activity is left for manual entry.
+`specialistsByProperty()` removed. The card lists property · activity (role beneath) · specialist.
+An explicit `?appointmentid=` is unchanged (bookedby check only).
+**Verified:** helper 12/12; tsc + build green. Not run live yet.

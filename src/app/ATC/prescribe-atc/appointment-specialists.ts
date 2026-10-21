@@ -4,7 +4,7 @@
      appointments.appointmentrole     [eisroles ref]            — fallback list of roles when hostRole is empty
      AppointmentType-To-Roles         atcrequired, atcrolemap { <roleId>: <bigactivity id> }
      bigactivity                      activity, atcproperty
-   role → activity → atcproperty; the role's hosts then fill EVERY activity of that property.
+   role → activity → atcproperty; the role's hosts fill that one activity (the rest stay for manual entry).
    Pure (no Angular / Firestore) so it is unit-testable; the component does the reads. */
 
 export interface AtcActivity { docid: string; activity: string; atcproperty?: string | null; }
@@ -42,6 +42,15 @@ export function completedNewestFirst(appointments: AppointmentSummary[], now: Da
 function toProfilePath(h: any): string | null {
   if (typeof h === 'string') return h.includes('/') ? h : 'profile_data/' + h;
   return typeof h?.path === 'string' ? h.path : null;
+}
+
+/* Every specialist on the appointment, as profile ids: hostRole's people plus hosts[] (refs or path strings). */
+export function appointmentHostIds(appointment: { hostRole?: Record<string, any[]> | null; hosts?: any[] | null } | null): string[] {
+  const ids = new Set<string>();
+  const add = (h: any) => { const p = toProfilePath(h); if (p) ids.add(p.split('/').pop()!); };
+  Object.values(appointment?.hostRole ?? {}).forEach(list => (Array.isArray(list) ? list : []).forEach(add));
+  (Array.isArray(appointment?.hosts) ? appointment!.hosts! : []).forEach(add);
+  return [...ids];
 }
 
 /* eisroles ids on the appointment (appointmentrole: refs from booking, or path strings), or null when absent. */
@@ -89,16 +98,4 @@ export function appointmentSpecialistRows(
     });
   }
   return rows;
-}
-
-/* A role's specialist covers every activity of its property: all author activities, all observer activities, ...
-   Returns property -> the union of its roles' specialists. */
-export function specialistsByProperty(rows: AppointmentSpecialistRow[]): Record<string, string[]> {
-  const out: Record<string, string[]> = {};
-  for (const r of rows) {
-    if (!r.atcproperty) continue;
-    const list = out[r.atcproperty] ?? (out[r.atcproperty] = []);
-    r.profilePaths.forEach(p => { if (!list.includes(p)) list.push(p); });
-  }
-  return out;
 }
