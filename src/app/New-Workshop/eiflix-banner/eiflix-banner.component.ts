@@ -49,6 +49,8 @@ interface Banner {
   timestamp: number;
   enable: boolean;
   enableapp: boolean;
+  /** Show on EiFlix mobile (operator 2026-10-21). Older banners don't have it: read as off. */
+  enableeiflixmobile?: boolean;
   order?: number;
 }
 
@@ -110,11 +112,13 @@ export class EiflixBannerComponent implements AfterViewInit {
     private dialogRef: MatDialogRef<EiflixBannerComponent>
   ) {
     this.form = this.fb.group({
-      title: ['', Validators.required],
-      description: ['', Validators.required],
+      // Title and description are optional (operator 2026-10-16).
+      title: [''],
+      description: [''],
       path: ['DeepLink', Validators.required],
       enable: [true, Validators.required],
       enableapp: [true, Validators.required],
+      enableeiflixmobile: [true],
       seriesId: [''],
       externallink: [''],
       image: [null, Validators.required],
@@ -132,8 +136,8 @@ export class EiflixBannerComponent implements AfterViewInit {
     this.dataSource.paginator = this.paginator;
     this.dataSource.filterPredicate = (data: Banner, filter: string) => {
       const searchStr = filter.toLowerCase();
-      return data.title.toLowerCase().includes(searchStr) ||
-        data.description.toLowerCase().includes(searchStr) ||
+      return (data.title || '').toLowerCase().includes(searchStr) ||
+        (data.description || '').toLowerCase().includes(searchStr) ||
         (data.seriesName?.toLowerCase().includes(searchStr) || false);
     };
   }
@@ -241,11 +245,6 @@ export class EiflixBannerComponent implements AfterViewInit {
   async submit() {
     const formValue = this.form.value;
 
-    if (!formValue.title || !formValue.description) {
-      this.snackBar.open('Please fill all fields', 'OK', { duration: 2000 });
-      return;
-    }
-
     this.isUploading = true;
 
     try {
@@ -272,11 +271,12 @@ export class EiflixBannerComponent implements AfterViewInit {
       }
 
       const payload: any = {
-        title: formValue.title,
-        description: formValue.description,
+        title: formValue.title || '',
+        description: formValue.description || '',
         path: formValue.path,
         enable: formValue.enable ?? true,
         enableapp: formValue.enableapp ?? true,
+        enableeiflixmobile: formValue.enableeiflixmobile ?? true,
         seriesRefId: formValue.seriesId || '',
         buttonname: formValue.buttonname || '',
         externallink: formValue.externallink || '',
@@ -317,7 +317,8 @@ export class EiflixBannerComponent implements AfterViewInit {
     this.form.reset({
       path: 'DeepLink',
       enable: true,
-      enableapp:true
+      enableapp:true,
+      enableeiflixmobile: true
     });
     this.imagePreview = null;
     this.imagePreviewApp = null;
@@ -336,6 +337,7 @@ export class EiflixBannerComponent implements AfterViewInit {
       path: banner.path,
       enable: banner.enable ?? false,
       enableapp: banner.enableapp ?? false,
+      enableeiflixmobile: banner.enableeiflixmobile ?? false,
       seriesId: banner.seriesRefId || '',
       externallink: banner.externallink || '',
       buttonname: banner.buttonname || ''
@@ -348,8 +350,8 @@ export class EiflixBannerComponent implements AfterViewInit {
     this.tabGroup.selectedIndex = 0;
   }
 
-  async togglePlatform(banner: any, platform: 'web' | 'app') {
-    const field = platform === 'web' ? 'enable' : 'enableapp';
+  async togglePlatform(banner: any, platform: 'web' | 'app' | 'eiflixmobile') {
+    const field = platform === 'web' ? 'enable' : platform === 'app' ? 'enableapp' : 'enableeiflixmobile';
     const newValue = !banner[field];
     await updateDoc(doc(this.firestore, 'eiflixbanner', banner.id), {
       [field]: newValue
