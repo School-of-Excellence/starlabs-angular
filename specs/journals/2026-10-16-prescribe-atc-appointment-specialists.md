@@ -125,3 +125,8 @@ query seeds the per-type cache so `prefillFromAppointment()` doesn't re-read it.
 `where("cancelled", "==", false)` (equality-only, no composite index), and `completedNewestFirst` requires
 `cancelled === false` — a doc with no `cancelled` field no longer counts. Booking always writes `cancelled: false`.
 **Verified:** helper 17/17 (new case: missing `cancelled` is skipped); tsc green.
+
+## 2026-10-21 — helper folded into the component
+**Operator:** no extra files in `prescribe-atc/`. `appointment-specialists.ts` was inlined at the top of
+`prescribe-atc.component.ts` (module-level functions, no longer exported) and it and its spec were deleted.
+Behaviour unchanged; tsc + build green. The 17 helper unit tests went with the spec file.
