@@ -1,6 +1,6 @@
 import {
   appointmentSpecialistRows, propertyLabel, AtcActivity, completedNewestFirst, AppointmentSummary, appointmentRoleIds,
-  hostRoleIds, appointmentHostIds,
+  hostRoleIds, appointmentHostIds, activityIdsOf,
 } from './appointment-specialists';
 
 const ACTS: AtcActivity[] = [
@@ -63,6 +63,22 @@ describe('appointment-specialists', () => {
     }, MAP, ACTS);
     // R_DIAG -> A_SOLO only (not the other author activity A_CONS); R_IMPL -> A_EIIMPL
     expect(rows.map(r => [r.roleId, r.activityId])).toEqual([['R_DIAG', 'A_SOLO'], ['R_IMPL', 'A_EIIMPL']]);
+  });
+
+  it('a role mapped to several activities (array) gives one row per activity, each with that role\'s hosts', () => {
+    const rows = appointmentSpecialistRows(
+      { hostRole: { 'eisroles/R_SHADOW': [ref('profile_data/ishara')] } },
+      { atcrequired: true, atcrolemap: { R_SHADOW: ['A_SHADOW', 'A_EIIMPL', 'GONE'] } }, ACTS);
+    expect(rows.map(r => [r.roleId, r.activityId, r.label, r.profilePaths])).toEqual([
+      ['R_SHADOW', 'A_SHADOW', 'OBSERVER', ['profile_data/ishara']],
+      ['R_SHADOW', 'A_EIIMPL', 'CA', ['profile_data/ishara']],
+    ]);
+  });
+
+  it('reads atcrolemap values as arrays or single ids', () => {
+    expect(activityIdsOf(['a', 'b', 'a', '', 3])).toEqual(['a', 'b']);
+    expect(activityIdsOf('a')).toEqual(['a']);
+    expect(activityIdsOf(undefined)).toEqual([]);
   });
 
   it('lists every host on an appointment (hostRole people + hosts), as profile ids', () => {

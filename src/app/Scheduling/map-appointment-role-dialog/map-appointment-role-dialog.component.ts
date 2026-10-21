@@ -83,12 +83,13 @@ export class MapAppointmentRoleDialogComponent {
         additional_role: additional,
         atcrequired: existingData.atcrequired === true
       })
-      // The rows exist now (built by the valueChanges above); atcrolemap is {roleId: activityId}
+      // The rows exist now (built by the valueChanges above); atcrolemap is {roleId: [activityId, …]}
+      // (older docs stored a single activityId string — read either)
       var savedMap = existingData.atcrolemap ?? {}
       var atcGroup = this.atcRoleGroup
       for (const roleId of Object.keys(atcGroup.controls)) {
         var saved = savedMap[roleId]
-        atcGroup.get(roleId).setValue(typeof saved === 'string' ? saved : null)
+        atcGroup.get(roleId).setValue(Array.isArray(saved) ? saved.filter(e => typeof e === 'string') : (typeof saved === 'string' ? [saved] : []))
       }
     }
   }
@@ -116,7 +117,7 @@ export class MapAppointmentRoleDialogComponent {
       atcGroup.removeControl(roleId, { emitEvent: false })
     }
     for (const roleId of required) {
-      atcGroup.addControl(roleId, new FormControl(previous[roleId] ?? null, Validators.required), { emitEvent: false })
+      atcGroup.addControl(roleId, new FormControl(previous[roleId] ?? [], Validators.required), { emitEvent: false })
     }
     if (this.mapAppointmentRoleForm.get('atcrequired').value === true) {
       atcGroup.enable({ emitEvent: false })
@@ -155,7 +156,7 @@ export class MapAppointmentRoleDialogComponent {
       var atcrolemap = {}
       if (atcrequired) {
         for (const roleId of value.required_role) {
-          atcrolemap[roleId] = value.atcrolemap[roleId]
+          atcrolemap[roleId] = [...(value.atcrolemap[roleId] ?? [])]
         }
       }
       var newData = {

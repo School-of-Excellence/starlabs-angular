@@ -40,3 +40,9 @@ open unticked and save `atcrequired:false, atcrolemap:{}`.
 - e2e spec in `starlabs-e2e-tests` `appointments` suite (owns `src/app/Scheduling/**`) for the
   `mard-atc-*` hooks, against the emulator — required by CLAUDE.md before pushing.
 - Optional: an "ATC" column on the list screen.
+
+## 2026-10-21 — ATC activities become a multi-select, saved as an array
+**Operator:** "add atc activity multiselect and save this as array". Each required role's ATC activities picker is
+now `multiple`; saved as `atcrolemap: { <eisroles id>: [<bigactivity id>, …] }` (still required: at least one per
+role). Editing an older doc that stored a single id string loads it as a one-item list, and saving rewrites it as
+an array. Also includes the operator's own subtitle edit (column hint text removed).

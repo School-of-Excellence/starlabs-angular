@@ -54,13 +54,13 @@
           <div *ngIf="atcRoleIds.length > 0" formGroupName="atcrolemap">
             <div class="atc-grid atc-colhead">
               <div>ROLE</div>
-              <div>ATC ACTIVITY <span class="atc-colsub">(BIGACTIVITY · ATC PROPERTY)</span></div>
+              <div>ATC ACTIVITIES <span class="atc-colsub"></span></div>
             </div>
             <div class="atc-grid atc-row" *ngFor="let roleId of atcRoleIds">
               <div class="atc-role" data-testid="mard-atc-role-6">{{ roleName(roleId) }}</div>
               <mat-form-field class="atc-field" appearance="outline">
-                <mat-label>ATC activity</mat-label>
-                <mat-select data-testid="mard-atc-activity-7" [formControlName]="roleId" placeholder="Select activity">
+                <mat-label>ATC activities</mat-label>
+                <mat-select data-testid="mard-atc-activity-7" [formControlName]="roleId" placeholder="Select activities" multiple>
                   <mat-option class="matOption" *ngFor="let act of atcActivityList" [value]="act.id">{{ act.activity }} · {{ act.atcproperty }}</mat-option>
                 </mat-select>
                 <mat-error *ngIf="atcRoleGroup.get(roleId)?.hasError('required')">

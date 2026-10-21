@@ -101,3 +101,10 @@ to (`atcrolemap`), and only if that picker is still empty; every other activity 
 `specialistsByProperty()` removed. The card lists property · activity (role beneath) · specialist.
 An explicit `?appointmentid=` is unchanged (bookedby check only).
 **Verified:** helper 12/12; tsc + build green. Not run live yet.
+
+## 2026-10-21 — card removed; activity arrays
+**Operator:** don't show the "Appointment found" card. The card and the Edit wrapper are gone — the AUTHORS /
+OBSERVERS / MENTORS sections always show, with the prefilled values (prefill logic unchanged). The helper reads
+`atcrolemap` values as arrays (`activityIdsOf`, single strings from older docs still accepted) and yields one row
+per (role, activity), so a role mapped to several activities fills each of them (only if empty).
+**Verified:** helper 14/14; tsc + build green.
