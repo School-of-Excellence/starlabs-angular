@@ -65,3 +65,9 @@ The ATC activity grouping by atcproperty was considered and dropped (operator: "
 required AND additional role (additional ones tagged "Additional"). Required-role rows still need at least one
 activity; additional-role rows are optional (a booking may not use that role) and are saved into `atcrolemap` only
 when an activity is picked. Reverses the 2026-10-15 "required roles only" decision above.
+
+## 2026-10-21 — role pickers untouched; ATC rows unique
+**Operator:** "in required roles additional roles don't change anything; in atc option alone show activity map unique".
+The Required / Additional mutual-exclusion (4c67aaac) is undone: both pickers list every role again and nothing is
+auto-removed. Only the ATC section dedupes: a role picked in both lists gets ONE row (treated as required) and one
+`atcrolemap` entry.

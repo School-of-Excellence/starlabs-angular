@@ -18,7 +18,7 @@
       <mat-form-field class="inputfield" appearance="outline">
         <mat-label>Required Role</mat-label>
         <mat-select formControlName="required_role" multiple>
-          <mat-option class="matOption" *ngFor="let role of requiredRoleOptions" [value]="role.id">{{role.role}}</mat-option>
+          <mat-option class="matOption" *ngFor="let role of appointmentRoleList" [value]="role.id">{{role.role}}</mat-option>
         </mat-select>
         <mat-error *ngIf="mapAppointmentRoleForm.get('required_role').hasError('required')">
           Role <strong>Required</strong>
@@ -28,7 +28,7 @@
       <mat-form-field class="inputfield" appearance="outline">
         <mat-label>Additional Role</mat-label>
         <mat-select formControlName="additional_role" multiple>
-          <mat-option class="matOption" *ngFor="let role of additionalRoleOptions" [value]="role.id">{{role.role}}</mat-option>
+          <mat-option class="matOption" *ngFor="let role of appointmentRoleList" [value]="role.id">{{role.role}}</mat-option>
         </mat-select>
       </mat-form-field>
     </div>
