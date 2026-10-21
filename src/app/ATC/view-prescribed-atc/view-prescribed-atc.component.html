@@ -168,7 +168,7 @@
               </label>
               <!-- ATC Version -->
               <div class="versionbtnarea nonprintable" *ngIf="(mapAtcVersionDoc[atc.ref.path] || []).length != 0">
-                <button class="versionbtn" mat-stroked-button *ngFor="let versionatc of mapAtcVersionDoc[atc.ref.path]; let vIdx = index; trackBy: trackByAtcId" mat-stroked-button type="button" (click)="openVersionAtc(versionatc['atcPath'])">
+                <button data-testid="vatc-version-btn" class="versionbtn" mat-stroked-button *ngFor="let versionatc of mapAtcVersionDoc[atc.ref.path]; let vIdx = index; trackBy: trackByAtcId" mat-stroked-button type="button" (click)="openVersionAtc(versionatc['atcPath'])">
                   Version {{mapAtcVersionDoc[atc.ref.path].length - vIdx}}:
                   &nbsp;
                   {{versionatc['lasteditedon'] ? (versionatc['lasteditedon'].toDate() | date:'medium') : (versionatc['prescription_date']?.toDate() | date:'medium')}}

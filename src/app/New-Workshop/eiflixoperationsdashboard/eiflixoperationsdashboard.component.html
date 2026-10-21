@@ -923,6 +923,10 @@
               role="button"
               tabindex="0"
               [attr.aria-expanded]="row.expandable ? !!row.expanded : null"
+              (mouseenter)="showPlanTip(row, $any($event.currentTarget))"
+              (mouseleave)="hidePlanTip()"
+              (focus)="showPlanTip(row, $any($event.currentTarget))"
+              (blur)="hidePlanTip()"
               (click)="onRowClick(p, row)"
               (keydown.enter)="onRowClick(p, row)"
               (keydown.space)="$event.preventDefault(); onRowClick(p, row)">
@@ -983,3 +987,32 @@
   }
 
 </div>
+
+<!-- Purchases hover card for New Users to Paid (operator 2026-10-14): one line per product bought
+     (Watson ParticipantPurchases, read-only). Fixed, above the side panel (z-index 1002 > 1001). -->
+@if (planTipRow) {
+  <div class="eod-plan-tip" data-testid="eif-plan-tip" role="tooltip" [ngStyle]="planTipStyle"
+    (mouseenter)="keepPlanTip()" (mouseleave)="hidePlanTip()">
+    <div class="eod-plan-tip-head">
+      <span class="eod-plan-tip-name">{{ planTipRow.name }}</span>
+      <span class="eod-plan-tip-sub">Purchases · excl. GST</span>
+    </div>
+    <div class="eod-plan-tip-list">
+      @for (s of planTipRow.planPurchases; track $index) {
+        <div class="eod-plan-tip-row">
+          <span class="eod-plan-tip-when">
+            <span class="eod-plan-tip-date">{{ s.dateLabel }}</span>
+            @if (s.product) {
+              <span class="eod-plan-tip-product">{{ s.product }}</span>
+            }
+          </span>
+          <span class="eod-plan-tip-amt">{{ s.amountLabel }}</span>
+        </div>
+      }
+    </div>
+    <div class="eod-plan-tip-foot">
+      <span>Total · {{ planTipRow.planPurchases.length }} {{ planTipRow.planPurchases.length === 1 ? 'product' : 'products' }}</span>
+      <span class="eod-plan-tip-amt">{{ planTipRow.planPurchaseTotalLabel }}</span>
+    </div>
+  </div>
+}
