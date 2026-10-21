@@ -127,6 +127,11 @@ export class ViewPrescribedATCComponent {
     bigactivity: {}
   }
 
+  // Bulk change agent — keyed `${atcId}_${activityDocId}` (page-only, never saved)
+  bulkAgentSelection = {} // selected profile paths per opened ATC × assigned_to activity
+  bulkAgentFilter = {} // separate search text per bulk dropdown
+  bulkLoadedAdjustments = new Set<string>() // adjustment paths whose procedures have arrived at least once
+
   atcModelList:any[] = []
   startDate!: Date;
   endDate!: Date;
@@ -994,6 +999,9 @@ export class ViewPrescribedATCComponent {
 
     // Clear Previous Subscription
     this.unSubscribeSingleTranscription(atcData)
+    // forget this ATC's earlier load so the bulk box waits for fresh procedures on re-open
+    var previousTranscription = this.mapATCtranscription[atc.id]?.["transcription"] ?? []
+    previousTranscription.forEach(t => this.bulkLoadedAdjustments.delete(t.adjustment.ref.path))
 
     this.fetchATCnotes(atcData) // Load ATC Notes
 
@@ -1033,6 +1041,7 @@ export class ViewPrescribedATCComponent {
               transcription[i]["procedure"].push(proDoc)
             }
           }
+          this.bulkLoadedAdjustments.add(adjDoc.ref.path) // procedures of this adjustment have loaded
         })
         this.mapTranscriptionSubscription.set(atc.id, [...this.mapTranscriptionSubscription.get(atc.id), proSubscription])
       }
@@ -1134,6 +1143,83 @@ export class ViewPrescribedATCComponent {
       console.log("Err Update", err)
     })
     this.clearUpdateEdit()
+  }
+
+  // ATC fully loaded = adjustments in, and every adjustment's procedures have arrived at least once
+  isBulkReady(atcId: string): boolean {
+    var transcription = this.mapATCtranscription[atcId]?.["transcription"] ?? []
+    return transcription.length != 0 && transcription.every(t => this.bulkLoadedAdjustments.has(t.adjustment.ref.path))
+  }
+
+  // loaded procedures the bulk box may change: skips deleted adjustments, deleted and completed procedures
+  bulkEligibleProcedures(atcId: string): QueryDocumentSnapshot<any>[] {
+    var eligible = [];
+    var transcription = this.mapATCtranscription[atcId]?.["transcription"] ?? [];
+    transcription.forEach(t => {
+      if (t.adjustment.data()?.["isdelete"]) return;
+      (t.procedure ?? []).forEach(procedure => {
+        var procedureData = procedure.data();
+        if (!procedureData["isdelete"] && procedureData["status"] != "completed") eligible.push(procedure);
+      });
+    });
+    return eligible;
+  }
+
+  // same list as the per-procedure "Assign Change Agent", filtered by this dropdown's own search text
+  availableBulkAssignerList(key: string): Array<any> {
+    var search = (this.bulkAgentFilter[key] ?? "").toLowerCase()
+    return this.assignerList.filter(e => e.authorname.toLowerCase().includes(search))
+  }
+
+  // overwrite ONE activity's agents on every open procedure of this ATC (mirrors updateProcedureValue), in one batch
+  bulkUpdateChangeAgent(atc: QueryDocumentSnapshot<any>, activity) {
+    var key = atc.id + "_" + activity.docid
+    var selected: string[] = this.bulkAgentSelection[key] ?? []
+    if (selected.length == 0 || !this.isBulkReady(atc.id)) return
+    var procedures = this.bulkEligibleProcedures(atc.id)
+    var names = selected.map(path => this.assignerList.find(e => e.authorpath == path)?.authorname ?? path).join(", ")
+    if (!confirm(`Update ${activity.activity} to ${names} on ${procedures.length} procedures of this ATC? This saves immediately and replaces the current ${activity.activity} on every procedure that is not deleted or completed.`)) return
+
+    var batch = writeBatch(this.firestoreATC)
+    procedures.forEach(procedure => {
+      var procedureData = procedure.data()
+      // current agents per activity as profile paths (same mapping as onSelectProcedureEdit, incl. legacy assigned_to)
+      var agents = {}
+      var activityKeys = Object.keys(procedureData["bigactivity"] ?? {})
+      if (activityKeys.length == 0 && (procedureData["assigned_to"] ?? []).length != 0) {
+        if (this.assignedToActivity.length != 0) {
+          agents[this.assignedToActivity[0]["docid"]] = procedureData["assigned_to"].map(e => e.path)
+        }
+      }
+      else {
+        activityKeys.forEach(activityKey => {
+          agents[activityKey] = (procedureData["bigactivity"][activityKey] ?? []).map(e => doc(this.firestoreDefault, "profile_data/" + e).path)
+        })
+      }
+      agents[activity.docid] = [...selected]
+
+      // same shape updateProcedureValue writes: bigactivity = ids per activity, assigned_to = union as refs
+      var bigactivity = {}
+      var assigned = []
+      Object.keys(agents).forEach(activityKey => {
+        if ((agents[activityKey] || []).length != 0) {
+          bigactivity[activityKey] = agents[activityKey].map(e => doc(this.firestoreATC, e).id)
+          assigned = [...assigned, ...agents[activityKey]]
+        }
+      })
+      batch.update(doc(this.firestoreATC, procedure.ref.path), {
+        bigactivity: bigactivity,
+        assigned_to: assigned.map(e => doc(this.firestoreATC, e))
+      })
+    })
+
+    batch.commit().then(() => {
+      this.bulkAgentSelection[key] = []
+      this.bulkAgentFilter[key] = ""
+    }).catch(err => {
+      console.log("Err Bulk Update", err)
+      alert("Could not update the change agents. Nothing was changed — please try again.")
+    })
   }
 
   onSelectProductEdit(atc: QueryDocumentSnapshot<any>) {

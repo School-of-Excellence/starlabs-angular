@@ -107,14 +107,6 @@
 </mat-menu>
 
 <mat-menu #checklistsMenu="matMenu" xPosition="before">
-  <div class="menu-group" (click)="$event.stopPropagation()">Watson status</div>
-  @for (c of watsonChecklists; track c.id) {
-    <button data-testid="pi-watson-checklist-item" mat-menu-item (click)="openChecklist(c)">
-      <span class="material-symbols-rounded mi">rule</span>
-      {{ c.label }}
-    </button>
-  }
-  <div class="menu-group" (click)="$event.stopPropagation()">Reconciliation</div>
   @for (c of checklists; track c.id) {
     <button mat-menu-item (click)="openChecklist(c)">
       <span class="material-symbols-rounded mi">{{ c.wired ? 'fact_check' : 'lock' }}</span>

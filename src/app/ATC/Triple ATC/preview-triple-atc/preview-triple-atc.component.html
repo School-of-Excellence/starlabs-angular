@@ -57,7 +57,7 @@
       <span>Adjustments & Procedures</span>
     </div>
     <div class="section-content">
-      <div *ngFor="let triple of tripleatclist; let posIndex = index" class="perceptual-position">
+      <div *ngFor="let triple of tripleatclist; let posIndex = index" class="perceptual-position" data-testid="trp-pos">
         <div>
           <div class="position-badge">
           <span class="position-text"><b>Perceptual Position {{posIndex + 1}}</b></span>
@@ -69,7 +69,7 @@
           <div class="adjustment-question">
             <div class="question-header">
               <span class="question-number">{{ transIndex + 1 }}</span>
-              <span class="question-text">{{ transcription.adjustment }}</span>
+              <span data-testid="trp-adj" class="question-text">{{ transcription.adjustment }}</span>
             </div>
             <div class="question-meta" *ngIf="transcription['comment'] && transcription['comment'].trim().length > 0">
               <span class="meta-label">How aware was the person about this before the diagnostic/consultation?:</span>
@@ -82,7 +82,7 @@
           <div class="procedures-list">
             <div *ngFor="let procedure of transcription['procedure']" class="procedure-item">
               <mat-icon class="procedure-radio">{{ procedure['completed'] ? 'radio_button_checked' : 'radio_button_unchecked' }}</mat-icon>
-              <span class="procedure-name">{{ procedure['procedurename'] }}</span>
+              <span data-testid="trp-proc" class="procedure-name">{{ procedure['procedurename'] }}</span>
               <span *ngIf="procedure.mandatory" class="mandatory-tag">MANDATORY</span>
             </div>
           </div>
@@ -99,6 +99,7 @@
     </div>
     <div class="section-content">
       <textarea 
+        data-testid="trp-notes"
         class="action-notes-textarea"
         [(ngModel)]="actionNotes"
         placeholder="Enter your notes here"></textarea>
@@ -107,11 +108,11 @@
 
   <!-- Action Buttons -->
   <div class="action-buttons">
-    <button mat-stroked-button class="action-button rework-button" (click)="markForRework()">
+    <button data-testid="trp-rework" mat-stroked-button class="action-button rework-button" (click)="markForRework()">
       <mat-icon>refresh</mat-icon>
       Mark for Rework
     </button>
-    <button mat-stroked-button class="action-button validate-button" (click)="validateATC()">
+    <button data-testid="trp-validate" mat-stroked-button class="action-button validate-button" (click)="validateATC()">
       <mat-icon>verified</mat-icon>
       ATC Validated
     </button>

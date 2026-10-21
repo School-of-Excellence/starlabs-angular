@@ -139,8 +139,9 @@ export class RoasterComponent implements OnInit, OnDestroy {
       for (let i = 0; i < booked.length; i++) {
         const appointment = booked[i];
         var specialist = []
-        appointment["appointmentrole"].forEach(role=>{
-          appointment["hostRole"][role.path].forEach(host=>{
+        var appointmentRoles = appointment["appointmentrole"] ?? []
+        appointmentRoles.forEach(role=>{
+          (appointment["hostRole"]?.[role.path] ?? []).forEach(host=>{
             specialist.push(this.mapProfile[host.id])
           })
         })

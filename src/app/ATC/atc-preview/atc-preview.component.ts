@@ -316,7 +316,10 @@ export class AtcPreviewComponent {
         return updateDoc(doc(this.firestoreDefault, "big participants assignments", this.participantAssignmentId), {
           activitylog: updatedActivityLog,
           status: "rework",
-          activityref: doc(this.firestoreATC, this.collectionName, this.atcID)
+          // DEFAULT-database pointer with the ATC's path — the convention every other screen uses (prescribe,
+          // edit, add/edit triple). An ATC-database ref cannot be stored in this default-database doc: the SDK
+          // rejects cross-database references, so Rework silently never saved (fixed 2026-10-17).
+          activityref: doc(this.firestoreDefault, this.collectionName, this.atcID)
         });
       }).then(() => {
         console.log("New activity log added");

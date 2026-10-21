@@ -1,9 +1,12 @@
 import { Component, OnDestroy, OnInit, HostListener, inject, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule, formatDate } from '@angular/common';
+import { getApp, getApps, initializeApp } from '@angular/fire/app';
+import { getFirestore } from '@angular/fire/firestore';
+import { environment } from '../../../environments/environment';
 import { FormsModule } from '@angular/forms';
 import { A11yModule } from '@angular/cdk/a11y';
 import {
-  Firestore, collection, collectionData, getDocs, query, where, orderBy, documentId, Timestamp,
+  Firestore, collection, collectionData, getDoc, getDocs, query, where, orderBy, documentId, Timestamp,
   doc, setDoc, serverTimestamp
 } from '@angular/fire/firestore';
 import { MatIconModule } from '@angular/material/icon';
@@ -15,7 +18,34 @@ import { Subject, takeUntil } from 'rxjs';
 import * as XLSX from 'xlsx';
 import { EodDialogService } from './eod-dialog/eod-dialog.service';
 
-/** One `loginlog` document as the EiFlix Mobile App Logs table shows it. */
+/** One bucket of the EiFlix Report: unique PEOPLE, split by cohort. */
+interface CohortCount { existing: number; new: number; total: number; }
+
+/** The EiFlix Report's four buckets. Mobile and web are counted independently — see buildReportCounts. */
+interface ReportCounts {
+  android: CohortCount;
+  ios: CohortCount;
+  mobileTotal: CohortCount;
+  web: CohortCount;
+}
+
+/**
+ * Watch time for one surface. Seconds; formatted for display by formatConsumption.
+ *
+ * Two independent cuts of the SAME total: by cohort (existing/new) and by where the content lives
+ * (workshop/library). The second pair is not a subdivision of the first, and neither pair is
+ * required to add up to `totalSeconds` — a `from` value that is neither workshop nor library still
+ * counts towards the total.
+ */
+interface ConsumptionCounts {
+  existingSeconds: number;
+  newSeconds: number;
+  totalSeconds: number;
+  workshopSeconds: number;
+  librarySeconds: number;
+}
+
+/** One `loginlog` document as the EiFlix App Logs table shows it. */
 interface LogRow {
   id: string; profileid: string; name: string;
   date: Date | null; dateLabel: string;
@@ -26,6 +56,112 @@ interface LogRow {
 
 type Accent = 'indigo' | 'emerald' | 'amber' | 'violet' | 'rose' | 'orange' | 'red';
 type RangeKey = 'today' | '7d' | '30d' | 'custom';
+
+/**
+ * Journey Support's TOTAL AMOUNT, copied EXACTLY from
+ * journeyplan.component.ts watsonParticipantSchedule() — same filter, same
+ * arithmetic, same order. TOTAL AMOUNT there is the last running total.
+ * Returns null when no rows remain (Journey Support then shows no total).
+ */
+/**
+ * Rupees in words, Indian system (crore / lakh / thousand / hundred), rounded to
+ * the rupee: 10486474 -> "One crore four lakh eighty-six thousand four hundred seventy-four".
+ */
+export function indianNumberWords(value: number): string {
+  const ONES = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+    'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+  const TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+  const two = (n: number) => n < 20 ? ONES[n] : TENS[Math.floor(n / 10)] + (n % 10 ? '-' + ONES[n % 10] : '');
+  const three = (n: number) => [n >= 100 ? ONES[Math.floor(n / 100)] + ' hundred' : '', n % 100 ? two(n % 100) : '']
+    .filter(Boolean).join(' ');
+  const words = (n: number): string => {
+    const crore = Math.floor(n / 1e7); n %= 1e7;
+    const lakh = Math.floor(n / 1e5); n %= 1e5;
+    const thousand = Math.floor(n / 1e3); n %= 1e3;
+    return [crore ? words(crore) + ' crore' : '', lakh ? two(lakh) + ' lakh' : '',
+      thousand ? two(thousand) + ' thousand' : '', n ? three(n) : ''].filter(Boolean).join(' ');
+  };
+  const n = Math.round(Math.abs(Number(value) || 0));
+  const out = n ? words(n) : 'zero';
+  return out.charAt(0).toUpperCase() + out.slice(1);
+}
+
+// Purchases rows now live in the shared, read-only Watson helpers (also used by the workshop dashboard).
+export { watsonPurchaseRows } from '../watson-purchases';
+import { watsonPurchaseRows, formatRupees } from '../watson-purchases';
+
+export function journeySupportTotal(scheduleDocs: any[]): number | null {
+  const watsonScheduleList = scheduleDocs.filter((e) => e['schedulemodified'] != true);
+  let runningTotal = 0;
+  const cumulativeTotals: number[] = [];
+  watsonScheduleList.forEach(schedule => {
+    runningTotal += (schedule.amount / 1.18); // Calculate the amount before GST
+    cumulativeTotals.push(runningTotal);
+  });
+  return cumulativeTotals.length ? cumulativeTotals[cumulativeTotals.length - 1] : null;
+}
+
+/**
+ * Journey Support's participant match, copied EXACTLY: walk the Participants
+ * returned for the profile's email and take the first whose name OR email
+ * matches (lower-cased, whitespace removed). Returns its `id` field, or null
+ * ("unable to find Client in Watson").
+ */
+export function journeySupportParticipantId(participantDocs: any[], profileData: any): any {
+  let participantid = null;
+  for (let i = 0; i < participantDocs.length; i++) {
+    const participantdata = participantDocs[i];
+    if (participantdata["name"]?.toLowerCase().replace(/\s/g, "") == profileData["name"]?.toLowerCase().replace(/\s/g, "") || participantdata["email"]?.toLowerCase().replace(/\s/g, "") == profileData["email"]?.toLowerCase().replace(/\s/g, "")) {
+      participantid = participantdata["id"];
+      break;
+    }
+  }
+  return participantid;
+}
+
+/** Firestore's cross-type order (null < boolean < number < timestamp < string < other), enough for `date`. */
+function firestoreRank(v: any): number {
+  if (v === null) return 0;
+  if (typeof v === 'boolean') return 1;
+  if (typeof v === 'number') return 2;
+  if (v && typeof v.toMillis === 'function') return 3;
+  if (typeof v === 'string') return 4;
+  return 5;
+}
+function firestoreCompare(a: any, b: any): number {
+  const ra = firestoreRank(a), rb = firestoreRank(b);
+  if (ra !== rb) return ra - rb;
+  if (ra === 3) return a.toMillis() - b.toMillis();
+  if (ra === 1 || ra === 2) return Number(a) - Number(b);
+  if (ra === 4) return a < b ? -1 : a > b ? 1 : 0;
+  return 0;
+}
+const byDocId = (a: { id: string }, b: { id: string }) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+
+/**
+ * What `where(field, '==', v)` returns for each v, rebuilt from one batched `in` read: docs grouped
+ * by the field's exact value, in document-id order (the default order of an equality query).
+ */
+export function groupLikeEquality(docs: { id: string; data: any }[], field: string): Map<any, { id: string; data: any }[]> {
+  const out = new Map<any, { id: string; data: any }[]>();
+  [...docs].sort(byDocId).forEach(d => {
+    const k = d.data?.[field];
+    if (!out.has(k)) out.set(k, []);
+    out.get(k)!.push(d);
+  });
+  return out;
+}
+
+/** Journey Support's `orderBy('date', 'asc')`: docs without `date` drop out, ties break on document id. */
+export function journeySupportScheduleOrder(docs: { id: string; data: any }[]): any[] {
+  return docs
+    .filter(d => d.data && Object.prototype.hasOwnProperty.call(d.data, 'date'))
+    .sort((a, b) => firestoreCompare(a.data.date, b.data.date) || byDocId(a, b))
+    .map(d => d.data);
+}
+
+/** The Users section adds 'all' — see `usersRange` for why it is the default. */
+type UsersRangeKey = 'all' | RangeKey;
 
 /**
  * One stat card on the operations dashboard. The dashboard is config-driven:
@@ -47,6 +183,12 @@ interface OpsCard {
   rafId?: number;
   /** Optional per-bucket counts rendered as the chip stack. */
   breakdown?: { label: string; count: number }[];
+  /** Optional emphasised figure under the count (Master Class Purchase: the ₹ total). */
+  highlight?: string;
+  /** Small caption inside the highlight, e.g. "total amount". */
+  highlightLabel?: string;
+  /** The highlighted figure in words (New Users to Paid). */
+  highlightWords?: string;
 }
 
 /** The shared right-hand side panel. Every card type renders through this. */
@@ -65,8 +207,8 @@ interface PanelState {
   /** ---- v2 toolbar state (search / cohort filter / sort) ---- */
   q: string;
   cohort: 'all' | 'nud' | 'pm';
-  sortKey: 'default' | 'name' | 'hours';
-  sortOptions: ('default' | 'name' | 'hours')[];
+  sortKey: 'default' | 'name' | 'hours' | 'amount';
+  sortOptions: ('default' | 'name' | 'hours' | 'amount')[];
   sortOpen: boolean;
   showCohort: boolean;
   journeyFilter: string;
@@ -145,7 +287,7 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
     {
       key: 'total-new-users',
       title: 'Total New Users',
-      caption: 'Signed up · not yet moved to paid',
+      caption: 'Signed up · not yet purchased journey',
       icon: 'person_add',
       accent: 'indigo',
       emptyText: 'No users here yet.',
@@ -155,10 +297,20 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
     {
       key: 'new-users-to-paid',
       title: 'New Users to Paid',
-      caption: 'Moved to existing / paid profiles',
+      caption: 'Purchased Journey',
       icon: 'workspace_premium',
       accent: 'emerald',
       emptyText: 'No users here yet.',
+      users: [],
+      displayCount: 0
+    },
+    {
+      key: 'masterclass-purchase',
+      title: 'Master Class Purchase',
+      caption: 'Captured payments',
+      icon: 'school',
+      accent: 'amber',
+      emptyText: 'No captured purchases in this range.',
       users: [],
       displayCount: 0
     },
@@ -173,6 +325,45 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
       displayCount: 0
     }
   ];
+
+  // ---- Users section date range (operator 2026-10-12) ----
+  /**
+   * 'all' is both the default and the cleared state, deliberately. These are
+   * headline totals that have always meant "every signup" / "everyone who
+   * moved across", so defaulting to a window would silently rewrite a number
+   * the operator reads every day. Today / 7D / 30D and the manual From-To
+   * narrow them on request.
+   */
+  usersRange: UsersRangeKey = 'all';
+  usersCustomStart = '';
+  usersCustomEnd = '';
+  /** Human label for the active window ('' while unfiltered). */
+  usersRangeLabel = '';
+  /** Raw docs from the live listener, kept so a range change re-buckets in memory. */
+  private nudDocs: any[] = [];
+
+  // ---- Watson TOTAL AMOUNT for New Users to Paid (operator 2026-10-13) ----
+  /** profileid -> total plan value excl. GST; null = not found in Watson / no schedule. */
+  private planTotals = new Map<string, number | null>();
+  private planPending = new Set<string>();
+  /** profileid -> the products that person bought (Watson ParticipantPurchases), for the hover card. */
+  private planPurchases = new Map<string, { date: Date | null; product: string; amount: number | null; dateLabel: string; amountLabel: string }[]>();
+  /** profileid -> sum of those purchases' amounts (the card footer). */
+  private planPurchaseTotals = new Map<string, number>();
+  /** The paid-panel row whose purchases are showing in the hover card. */
+  planTipRow: any = null;
+  planTipStyle: Record<string, string> = {};
+  private planTipTimer: any = null;
+  /** 'unavailable' = this build has no Watson config (the emulator build, deliberately). */
+  planStatus: 'idle' | 'loading' | 'ready' | 'unavailable' = 'idle';
+
+  // ---- Master Class Purchase (operator 2026-10-13) ----
+  /** Captured `workshoppaymentlog` rows, read once. */
+  private mcPayments: any[] = [];
+  /** workshopconfiguration doc id -> detailpage.title, read once. */
+  private workshopTitles = new Map<string, string>();
+  mcLoading = true;
+  mcError = false;
 
   // ---- Directories, each loaded ONCE for the whole dashboard ----
   /** Entire 'participant metadata' collection keyed by doc id (PRIMARY). */
@@ -265,7 +456,10 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
   ];
 
   // ---- Device Breakdown ----
-  dbRange: 1 | 2 | 3 = 1;
+  dbRange: 1 | 2 | 3 | 'custom' = 1;
+  /** Manual From–To for Device Breakdown, as 'yyyy-MM-dd' — the register's own key format. */
+  dbFrom = '';
+  dbTo = '';
   dbTotalSeconds = 0;
   dbRows: {
     key: string; label: string; seconds: number; hours: number;
@@ -325,6 +519,10 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
   }
 
   get dbRangeLabel(): string {
+    if (this.dbRange === 'custom') {
+      const { from, to } = this.dbKeyBounds();
+      return this.formatRange(this.parseDateInput(from), this.parseDateInput(to));
+    }
     return this.dbRange === 1 ? 'last 1 month' : 'last ' + this.dbRange + ' months';
   }
 
@@ -342,6 +540,7 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (data: any[]) => {
           this.splitUsers(data);
+          this.computeNudCounts();   // free: the documents are already here
           this.loading = false;
           this.loadError = false;
           if (!this.naLoading) this.computeNonActive();
@@ -370,6 +569,7 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
           this.pmLoading = false;
           this.updateBigParticipantsCard();
           this.rebuildPaidCard();
+          this.rebuildMasterclassCard();
           if (!this.naLoading) this.computeNonActive();
           this.pmReadyResolve();
         },
@@ -383,13 +583,18 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
 
     this.epReady = this.loadDirectory('episodes', this.epMap);
     this.loadJourneyNames();
+    this.loadMasterclass();
     this.loadNaRegister();
     this.fetchEngagement();
+    this.refreshConsumption();
+    this.refreshMasterclass();
   }
 
-  // ==================== EiFlix Mobile App Logs (loginlog) ====================
+  // ==================== EiFlix App Logs (loginlog) ====================
   /** Range in days: 1 = today (since local midnight), 7, 30. */
   logRange: 1 | 7 | 30 = 1;
+  /** How many days the rows currently in logAll actually cover — what the report reuses. */
+  private logFetchedDays = 0;
   logLoading = false;
   logError = false;
   /** Every EiFlix row in the range, newest first — filters/sort/paging derive from this. */
@@ -437,30 +642,43 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
    * range, no composite index. The app filter is applied client-side afterwards, as requested, so a
    * document without the field is simply not an EiFlix row.
    */
+  /**
+   * One `loginlog` read for the last `days` days, mapped to LogRow.
+   *
+   * Shared by the table and the EiFlix Report so there is exactly one definition of "an EiFlix
+   * login row" — the same server-side range query, the same app/web filter, the same OS
+   * normalisation and the same cohort resolution.
+   */
+  private async fetchLoginRows(days: number): Promise<LogRow[]> {
+    const snap = await getDocs(query(
+      collection(this.firestore, 'loginlog'),
+      where('date', '>=', Timestamp.fromDate(this.logRangeStart(days))),
+      orderBy('date', 'desc'),
+    ));
+    await Promise.all([this.pmReady, this.nudReady]).catch(() => undefined);
+    const rows: LogRow[] = [];
+    snap.docs.forEach(d => {
+      const data = d.data() || {};
+      if (!this.isEiflixLogin(data)) return;
+      const date = this.toDate(data['date']);
+      const profileid = String(data['profileid'] ?? '').trim();
+      rows.push({
+        id: d.id, profileid,
+        name: this.logNameFor(profileid),
+        date, dateLabel: date ? formatDate(date, 'dd MMM yyyy, h:mm a', 'en-IN') : '—',
+        device_os: this.logDeviceOs(data),
+        current_version: String(data['current_version'] ?? '').trim(),
+        isNewUser: this.isNewUserProfile(profileid),
+      });
+    });
+    return rows;
+  }
+
   async loadLoginLogs(): Promise<void> {
     this.logLoading = true; this.logError = false;
     try {
-      const snap = await getDocs(query(
-        collection(this.firestore, 'loginlog'),
-        where('date', '>=', Timestamp.fromDate(this.logRangeStart(this.logRange))),
-        orderBy('date', 'desc'),
-      ));
-      await Promise.all([this.pmReady, this.nudReady]).catch(() => undefined);
-      const rows: LogRow[] = [];
-      snap.docs.forEach(d => {
-        const data = d.data() || {};
-        if (data['app'] !== 'EiFlix') return;
-        const date = this.toDate(data['date']);
-        const profileid = String(data['profileid'] ?? '').trim();
-        rows.push({
-          id: d.id, profileid,
-          name: this.logNameFor(profileid),
-          date, dateLabel: date ? formatDate(date, 'dd MMM yyyy, h:mm a', 'en-IN') : '—',
-          device_os: String(data['device_os'] ?? '').trim(),
-          current_version: String(data['current_version'] ?? '').trim(),
-          isNewUser: this.isNewUserProfile(profileid),
-        });
-      });
+      const rows = await this.fetchLoginRows(this.logRange);
+      this.logFetchedDays = this.logRange;
       this.logAll = rows;
       const names = new Map<string, string>();
       const os = new Set<string>();
@@ -471,6 +689,8 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
       if (this.logOsFilter !== 'all' && !os.has(this.logOsFilter)) this.logOsFilter = 'all';
       this.logPageIndex = 0;
       this.applyLogFilters();
+      // A wider table fetch may now cover a report range that previously needed its own read.
+      this.refreshReport();
     } catch (err) {
       console.error('eiflixoperationsdashboard: loginlog load failed', err);
       this.logError = true; this.logAll = []; this.logShown = []; this.logPage = [];
@@ -490,6 +710,511 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
    * Everyone else who can sign in to the app is existing: the split is total, so no log row
    * disappears from both halves of the filter.
    */
+  /**
+   * Which `loginlog` documents belong on this table.
+   *
+   * Two kinds of EiFlix sign-in are recorded differently: the apps set `app: 'EiFlix'`, while the web
+   * client sets the boolean `eiflixweb: true` instead. Either one is an EiFlix login and both belong
+   * here; anything else (SolarVoice and friends) does not.
+   *
+   * Strictly `=== true`, not truthy: the flag is written as a boolean, and accepting the string
+   * 'false' — which is truthy — would pull in rows that explicitly said they were not web.
+   */
+  private isEiflixLogin(data: any): boolean {
+    return data?.['app'] === 'EiFlix' || data?.['eiflixweb'] === true;
+  }
+
+  /**
+   * The Device OS column.
+   *
+   * A web sign-in has no device OS of its own, so `eiflixweb: true` reads as 'web'. That takes
+   * precedence over any stored `device_os`: the flag says where the session actually happened, and a
+   * row carrying both is a web session whatever the other field was left as.
+   */
+  private logDeviceOs(data: any): string {
+    if (data?.['eiflixweb'] === true) return 'web';
+    return String(data?.['device_os'] ?? '').trim();
+  }
+
+  // ==================== EiFlix Report ====================
+
+  repRange: 1 | 7 | 30 = 1;
+  repLoading = false;
+  repError = false;
+  repCounts: ReportCounts = this.emptyReportCounts();
+  /** Rows for a window WIDER than the table's — fetched only when the table's cannot cover it. */
+  private repRows: LogRow[] = [];
+  private repFetchedDays = 0;
+  private repToken = 0;
+
+  get repRangeLabel(): string { return this.repRange === 1 ? 'today' : 'last ' + this.repRange + ' days'; }
+
+  // ---- Total Content Consumption (content analytics) ----
+  repConsumption: { app: ConsumptionCounts; web: ConsumptionCounts } = this.emptyConsumption();
+  /**
+   * Web App Users, counted from `content analytics` (platform_name 'Eiflixweb') rather than from
+   * `loginlog` — operator decision, 2026-10-09. A web session is recorded in the analytics rows,
+   * and the loginlog side was missing people. Fed by the consumption pass, so no extra read.
+   */
+  repWebUsers: CohortCount = { existing: 0, new: 0, total: 0 };
+  repConsLoading = false;
+  repConsError = false;
+  /** Cached per range in days — one read per distinct range for the life of the session. */
+  private repConsCache = new Map<number, { app: ConsumptionCounts; web: ConsumptionCounts; webUsers: CohortCount }>();
+  private repConsToken = 0;
+
+  /** The `platform_name` values each surface is recorded under, compared case-insensitively. */
+  private static readonly PLATFORM_WEB = 'eiflixweb';
+  private static readonly PLATFORM_APP = 'eiflixapp';
+  /** `from` values that say which library a watched item came out of. */
+  private static readonly FROM_WORKSHOP = 'eiflixworkshop';
+  private static readonly FROM_LIBRARY = 'eiflixcontent';
+
+  // ---- Purchases & signups ----
+  /** new_user_data.movedon within the report window — people who bought a journey. */
+  repJourneyPurchased = 0;
+  /** new_user_data.created within the report window — people who joined. */
+  repNewUsersJoined = 0;
+  /** workshoppaymentlog.datetime within the window AND status 'captured'. */
+  repMasterclass = 0;
+  repMasterclassLoading = false;
+  repMasterclassError = false;
+  private repMasterclassCache = new Map<number, number>();
+  private repMasterclassToken = 0;
+
+  private emptyConsumption(): { app: ConsumptionCounts; web: ConsumptionCounts; webUsers: CohortCount } {
+    const z = (): ConsumptionCounts => ({
+      existingSeconds: 0, newSeconds: 0, totalSeconds: 0, workshopSeconds: 0, librarySeconds: 0,
+    });
+    return { app: z(), web: z(), webUsers: { existing: 0, new: 0, total: 0 } };
+  }
+
+  private emptyReportCounts(): ReportCounts {
+    const z = (): CohortCount => ({ existing: 0, new: 0, total: 0 });
+    return { android: z(), ios: z(), mobileTotal: z(), web: z() };
+  }
+
+  setRepRange(days: 1 | 7 | 30): void {
+    if (this.repRange === days) return;
+    this.repRange = days;
+    this.refreshReport();
+    this.refreshConsumption();
+    this.computeNudCounts();
+    this.refreshMasterclass();
+  }
+
+  /**
+   * Total Content Consumption for both surfaces, over the report's own window.
+   *
+   * ONE `content analytics` read per distinct range, cached for the session — the same collection
+   * and the same single-field `logdate` range the dashboard already uses, so no new index.
+   *
+   * It does NOT piggyback on fetchEngagement's pass, deliberately: engagement's "7D" starts at
+   * today−7 while the report's starts at today−6 (seven calendar days including today, matching the
+   * user counts directly above it). Sharing the aggregate would make "7D" mean two different things
+   * inside one card, which is worse than one extra read.
+   */
+  async refreshConsumption(): Promise<void> {
+    const token = ++this.repConsToken;
+    const want = this.repRange;
+    const cached = this.repConsCache.get(want);
+    if (cached) { this.repConsumption = cached; this.repWebUsers = cached.webUsers; this.repConsError = false; return; }
+    this.repConsLoading = true;
+    this.repConsError = false;
+    try {
+      const start = this.logRangeStart(want);
+      const end = new Date(); end.setHours(23, 59, 59, 999);
+      const snap = await getDocs(query(
+        collection(this.firestore, 'content analytics'),
+        where('logdate', '>', Timestamp.fromDate(start)),
+        where('logdate', '<', Timestamp.fromDate(end)),
+      ));
+      await Promise.all([this.pmReady, this.nudReady]).catch(() => undefined);
+      if (token !== this.repConsToken) return;
+      const built = this.buildConsumption(snap.docs.map(d => d.data()));
+      this.repConsCache.set(want, built);
+      this.repConsumption = built;
+      this.repWebUsers = built.webUsers;
+    } catch (err) {
+      if (token !== this.repConsToken) return;
+      console.error('eiflixoperationsdashboard: consumption load failed', err);
+      this.repConsError = true;
+      this.repConsumption = this.emptyConsumption();
+      this.repWebUsers = { existing: 0, new: 0, total: 0 };
+    } finally {
+      if (token === this.repConsToken) this.repConsLoading = false;
+    }
+  }
+
+  /** Start/end of the report's current window, shared by everything in the section. */
+  private repWindow(days: number): { start: number; end: number } {
+    const end = new Date(); end.setHours(23, 59, 59, 999);
+    return { start: this.logRangeStart(days).getTime(), end: end.getTime() };
+  }
+
+  /**
+   * How many documents carry `field` as a timestamp inside the window.
+   *
+   * Pure and defensive: a doc with the field missing, null, or unparseable is simply not in the
+   * window — it must never be counted and must never throw. toDate() already copes with a
+   * Timestamp, a Date, or a {seconds} shape, which is what a mixed-age collection holds.
+   */
+  private countInWindow(docs: Iterable<any>, field: string, start: number, end: number): number {
+    let n = 0;
+    for (const d of docs || []) {
+      const at = this.toDate(d?.[field]);
+      if (!at) continue;
+      const t = at.getTime();
+      // toDate() hands back an Invalid Date for junk (it falls through to `new Date(value)`), and
+      // NaN comparisons are all false — so this already excluded it. Made explicit so it is a
+      // decision rather than a happy accident.
+      if (!Number.isFinite(t)) continue;
+      if (t >= start && t <= end) n++;
+    }
+    return n;
+  }
+
+  /**
+   * Journey Purchased and New Users Joined — both from `new_user_data`, which is ALREADY in memory.
+   *
+   * ngOnInit holds a realtime listener over that whole collection and keeps every document in
+   * nudMap, so these two counts need no query at all: they are a filter over what is already here,
+   * and they re-run for free whenever the listener emits.
+   */
+  private computeNudCounts(): void {
+    const { start, end } = this.repWindow(this.repRange);
+    const docs = [...this.nudMap.values()];
+    this.repJourneyPurchased = this.countInWindow(docs, 'movedon', start, end);
+    this.repNewUsersJoined = this.countInWindow(docs, 'created', start, end);
+  }
+
+  /**
+   * Masterclass Purchase — `workshoppaymentlog`.
+   *
+   * ONE `where` on `datetime` only, with `status` tested in code. That is deliberate and is this
+   * dashboard's convention throughout: a second equality alongside a range would need a composite
+   * index, and every other query here is kept to a single-field range for the same reason.
+   *
+   * Cached per range for the session, like the consumption figures.
+   */
+  async refreshMasterclass(): Promise<void> {
+    const token = ++this.repMasterclassToken;
+    const want = this.repRange;
+    const cached = this.repMasterclassCache.get(want);
+    if (cached !== undefined) { this.repMasterclass = cached; this.repMasterclassError = false; return; }
+    this.repMasterclassLoading = true;
+    this.repMasterclassError = false;
+    try {
+      const { start, end } = this.repWindow(want);
+      const snap = await getDocs(query(
+        collection(this.firestore, 'workshoppaymentlog'),
+        where('datetime', '>=', Timestamp.fromDate(new Date(start))),
+        where('datetime', '<=', Timestamp.fromDate(new Date(end))),
+      ));
+      if (token !== this.repMasterclassToken) return;
+      let n = 0;
+      snap.forEach(d => {
+        const data: any = d.data() || {};
+        // The status filter lives here, not in the query — see the note above.
+        if (String(data['status'] ?? '').trim().toLowerCase() !== 'captured') return;
+        n++;
+      });
+      this.repMasterclassCache.set(want, n);
+      this.repMasterclass = n;
+    } catch (err) {
+      if (token !== this.repMasterclassToken) return;
+      console.error('eiflixoperationsdashboard: masterclass purchases load failed', err);
+      this.repMasterclassError = true;
+      this.repMasterclass = 0;
+    } finally {
+      if (token === this.repMasterclassToken) this.repMasterclassLoading = false;
+    }
+  }
+
+  /**
+   * Sum `totaltimespend` per surface, split by cohort.
+   *
+   * Platform is matched case-insensitively on the raw `platform_name`: the value is free text from
+   * the client and `platformKey()` elsewhere preserves its case, so 'Eiflixweb' and 'eiflixweb' are
+   * the same surface and must not land in different buckets.
+   *
+   * The cohort rule is `isNewUserProfile` — the same one the user counts above use, and the same one
+   * the Users cards use. A person moved to paid is EXISTING even though new_user_data still has them.
+   *
+   * Mobile is one bucket: Android and iOS both record `platform_name: 'eiflixapp'`, so there is
+   * nothing to split here.
+   *
+   * `existingSeconds` is derived as `total − new`, so the parts always agree with the whole.
+   */
+  private buildConsumption(docs: any[]): { app: ConsumptionCounts; web: ConsumptionCounts; webUsers: CohortCount } {
+    const blank = () => ({ total: 0, fresh: 0, workshop: 0, library: 0 });
+    const web = blank();
+    const app = blank();
+    // Web App Users come from these same rows (see repWebUsers): unique PEOPLE, not sessions.
+    const webIds = new Set<string>();
+    const webNewIds = new Set<string>();
+    for (const d of docs || []) {
+      const platform = String(d?.['platform_name'] ?? '').trim().toLowerCase();
+      const isWeb = platform === EiflixoperationsdashboardComponent.PLATFORM_WEB;
+      const isApp = platform === EiflixoperationsdashboardComponent.PLATFORM_APP;
+      if (!isWeb && !isApp) continue;
+      const seconds = Number(d?.['totaltimespend']) || 0;
+      if (seconds <= 0) continue;
+      const bucket = isWeb ? web : app;
+      bucket.total += seconds;
+
+      const pid = String(d?.['profileid'] ?? '').trim();
+      const isNew = !!pid && this.isNewUserProfile(pid);
+      if (isNew) bucket.fresh += seconds;
+      // A row with no profileid still contributes its SECONDS (the time was watched) but cannot
+      // count as a PERSON — the two answers legitimately differ on the same row.
+      if (isWeb && pid) { webIds.add(pid); if (isNew) webNewIds.add(pid); }
+
+      // Same free-text treatment as platform_name, for the same reason.
+      const from = String(d?.['from'] ?? '').trim().toLowerCase();
+      if (from === EiflixoperationsdashboardComponent.FROM_WORKSHOP) bucket.workshop += seconds;
+      else if (from === EiflixoperationsdashboardComponent.FROM_LIBRARY) bucket.library += seconds;
+    }
+    const shape = (b: ReturnType<typeof blank>): ConsumptionCounts => ({
+      totalSeconds: b.total,
+      newSeconds: b.fresh,
+      existingSeconds: b.total - b.fresh,
+      workshopSeconds: b.workshop,
+      librarySeconds: b.library,
+    });
+    return {
+      app: shape(app),
+      web: shape(web),
+      webUsers: { total: webIds.size, new: webNewIds.size, existing: webIds.size - webNewIds.size },
+    };
+  }
+
+  // ==================== export ====================
+
+  repExporting = false;
+  /** Shown beside the button: an export is user-initiated, so a silent failure is not acceptable. */
+  repExportError = false;
+
+  /** `d MMM` for the sheet's period line, e.g. "Sept 25". */
+  private sheetDay(d: Date): string {
+    return formatDate(d, 'MMM d', 'en-US');
+  }
+
+  /**
+   * The report as an .xlsx, laid out like the weekly report the team writes by hand.
+   *
+   * The grid, the merges and the column widths mirror that workbook cell for cell so the two can
+   * sit side by side. SheetJS's community build cannot write cell STYLES (bold, borders), so the
+   * file carries the layout and the values but not the manual sheet's bold headings — swapping
+   * `xlsx` for the drop-in `xlsx-js-style` would add those without touching this code's shape.
+   *
+   * Everything written here is already on screen. Export never re-queries, so the file and the
+   * dashboard can never disagree.
+   */
+  /**
+   * The workbook's grid and merges — pure, so the layout can be tested without writing a file.
+   *
+   * Mirrors the weekly report the team writes by hand, cell for cell: same row order, same merged
+   * title/period/section bands, and the Total header spanning rows 6-7 beside the two-column
+   * Android and iOS groups.
+   */
+  buildReportSheet(): { rows: (string | number)[][]; merges: any[] } {
+    const { start } = this.repWindow(this.repRange);
+    const now = new Date();
+    const period = this.repRange === 1
+      ? formatDate(now, 'MMM d, y', 'en-US')
+      : `${this.sheetDay(new Date(start))} to ${formatDate(now, 'MMM d, y', 'en-US')}`;
+
+    const m = this.repCounts, c = this.repConsumption, w = this.repWebUsers;
+    const dur = (sec: number) => this.formatConsumption(sec);
+    const E = '';
+
+    const rows: (string | number)[][] = [
+      ['EiFlix Weekly Report', E, E, E, E],
+      [E, E, E, E, E],
+      [period, E, E, E, E],
+      [E, E, E, E, E],
+      ['EiFlix Mobile App Users', E, E, E, E],
+      ['Android', E, 'iOS', E, 'Total'],
+      ['Existing Users', 'New Users', 'Existing Users', 'New Users', E],
+      [m.android.existing, m.android.new, m.ios.existing, m.ios.new, m.mobileTotal.total],
+      [E, E, E, E, E],
+      ['EiFlix Web App Users', E, E, E, E],
+      ['Existing Users', 'New Users', 'Total', E, E],
+      [w.existing, w.new, w.total, E, E],
+      [E, E, E, E, E],
+      ['Total Content Consumption', E, E, E, E],
+      ['EiFlix Mobile App Users', E, E, E, E],
+      ['Existing Users', 'New Users', 'Total', 'Workshop Videos', 'Library Videos'],
+      [dur(c.app.existingSeconds), dur(c.app.newSeconds), dur(c.app.totalSeconds),
+       dur(c.app.workshopSeconds), dur(c.app.librarySeconds)],
+      [E, E, E, E, E],
+      ['EiFlix Web App Users', E, E, E, E],
+      ['Existing Users', 'New Users', 'Total', 'Workshop Videos', 'Library Videos'],
+      [dur(c.web.existingSeconds), dur(c.web.newSeconds), dur(c.web.totalSeconds),
+       dur(c.web.workshopSeconds), dur(c.web.librarySeconds)],
+      [E, E, E, E, E],
+      ['New Users Joined in EiFlix', 'Journey Purchased', 'Masterclass Purchase', E, E],
+      [this.repNewUsersJoined, this.repJourneyPurchased, this.repMasterclass, E, E],
+    ];
+
+    const merges = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } },    // title
+      { s: { r: 2, c: 0 }, e: { r: 2, c: 4 } },    // period
+      { s: { r: 4, c: 0 }, e: { r: 4, c: 4 } },    // Mobile App Users
+      { s: { r: 5, c: 0 }, e: { r: 5, c: 1 } },    // Android
+      { s: { r: 5, c: 2 }, e: { r: 5, c: 3 } },    // iOS
+      { s: { r: 5, c: 4 }, e: { r: 6, c: 4 } },    // Total, two rows tall
+      { s: { r: 9, c: 0 }, e: { r: 9, c: 2 } },    // Web App Users
+      { s: { r: 13, c: 0 }, e: { r: 13, c: 4 } },  // Total Content Consumption
+      { s: { r: 14, c: 0 }, e: { r: 14, c: 4 } },  // …Mobile
+      { s: { r: 18, c: 0 }, e: { r: 18, c: 4 } },  // …Web
+    ];
+    return { rows, merges };
+  }
+
+  exportReport(): void {
+    if (this.repExporting) return;
+    this.repExporting = true;
+    this.repExportError = false;
+    try {
+      const { rows, merges } = this.buildReportSheet();
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      ws['!merges'] = merges;
+      // Wide enough for "322 hours 09 minutes 30 seconds" without the reader resizing anything.
+      ws['!cols'] = [{ wch: 30 }, { wch: 30 }, { wch: 30 }, { wch: 30 }, { wch: 30 }];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Weekly Report');
+      XLSX.writeFile(wb, `EiFlix Report ${formatDate(new Date(), 'yyyy-MM-dd', 'en-US')}.xlsx`);
+      this.repExportError = false;
+    } catch (err) {
+      console.error('eiflixoperationsdashboard: report export failed', err);
+      this.repExportError = true;
+    } finally {
+      this.repExporting = false;
+    }
+  }
+
+  /**
+   * "127 hours 06 minutes 42 seconds".
+   *
+   * Hours are NOT capped at 24 — this is a running total across many people, so three figures are
+   * normal. Minutes and seconds are zero-padded so a column of these stays aligned.
+   */
+  formatConsumption(seconds: number | null | undefined): string {
+    const total = Math.max(0, Math.floor(Number(seconds) || 0));
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const sec = total % 60;
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${h} hours ${pad(m)} minutes ${pad(sec)} seconds`;
+  }
+
+  /**
+   * Recount the report.
+   *
+   * READ REUSE is the point here. The table has already read `loginlog` for its own range, and a
+   * LogRow carries everything the report needs — profileid, date, the normalised device_os (already
+   * 'web' for an eiflixweb sign-in) and the resolved cohort. So:
+   *
+   *   • report window ⊆ the table's window      → count from logAll, ZERO extra reads
+   *   • otherwise, and already fetched wider    → count from the report's own cached rows
+   *   • otherwise                               → one read, cached for the rest of the session
+   *
+   * Picking Today while the table is on 30D therefore costs nothing, and the first load costs
+   * nothing because both default to Today.
+   */
+  async refreshReport(): Promise<void> {
+    const token = ++this.repToken;
+    const want = this.repRange;
+    try {
+      let source: LogRow[] | null = null;
+      if (this.logFetchedDays >= want) source = this.logAll;
+      else if (this.repFetchedDays >= want) source = this.repRows;
+
+      if (!source) {
+        this.repLoading = true;
+        this.repError = false;
+        const rows = await this.fetchLoginRows(want);
+        if (token !== this.repToken) return;
+        this.repRows = rows;
+        this.repFetchedDays = want;
+        source = rows;
+      }
+      // The cached rows cover AT LEAST the wanted window, usually more — trim to the one asked for.
+      const since = this.logRangeStart(want).getTime();
+      const inWindow = source.filter(r => !!r.date && r.date.getTime() >= since);
+      this.repCounts = this.buildReportCounts(inWindow);
+      this.repError = false;
+    } catch (err) {
+      if (token !== this.repToken) return;
+      console.error('eiflixoperationsdashboard: report load failed', err);
+      this.repError = true;
+      this.repCounts = this.emptyReportCounts();
+    } finally {
+      if (token === this.repToken) this.repLoading = false;
+    }
+  }
+
+  /**
+   * Which surface a row came from.
+   *
+   * `web` first and by exact match: logDeviceOs() already rewrote an `eiflixweb: true` row to
+   * exactly 'web', so nothing else can claim it. The mobile tests are substring matches because
+   * device_os is free text from the client — "Android 13", "iOS 17.2", "iPadOS" all arrive.
+   */
+  private deviceClass(os: string): 'web' | 'android' | 'ios' | 'other' {
+    const v = (os || '').trim().toLowerCase();
+    if (v === 'web') return 'web';
+    if (v.includes('android')) return 'android';
+    if (v.includes('ios') || v.includes('iphone') || v.includes('ipad')) return 'ios';
+    return 'other';
+  }
+
+  /**
+   * Unique PEOPLE per surface, split into existing and new.
+   *
+   * Counts are of profileids, not rows — somebody who signed in nine times today is one person.
+   *
+   * MOBILE TOTAL is the union of Android and iOS, deduplicated: a person who used both phones is
+   * one person, so the total is normally LESS than Android + iOS rather than their sum.
+   *
+   * WEB IS COUNTED SEPARATELY and is deliberately NOT deduplicated against mobile. Plenty of people
+   * use a phone and the web, and collapsing them would hide exactly that. The two sections answer
+   * different questions and their totals are not meant to be added together.
+   *
+   * `existing` is derived as `total - new` rather than counted on its own, so the two halves can
+   * never disagree with the total they are shown beside.
+   */
+  private buildReportCounts(rows: LogRow[]): ReportCounts {
+    const bucket = (keep: (c: 'web' | 'android' | 'ios' | 'other') => boolean): CohortCount => {
+      const ids = new Set<string>();
+      const newIds = new Set<string>();
+      for (const r of rows || []) {
+        // Trimmed here rather than trusting the caller: fetchLoginRows already trims, but a
+        // whitespace-only id is not a person and this function should be right on its own terms.
+        const pid = String(r?.profileid ?? '').trim();
+        if (!pid) continue;
+        if (!keep(this.deviceClass(r.device_os))) continue;
+        ids.add(pid);
+        if (r.isNewUser) newIds.add(pid);
+      }
+      return { total: ids.size, new: newIds.size, existing: ids.size - newIds.size };
+    };
+    return {
+      android: bucket(c => c === 'android'),
+      ios: bucket(c => c === 'ios'),
+      mobileTotal: bucket(c => c === 'android' || c === 'ios'),
+      // PARKED 2026-10-09 (operator): Web App Users now come from `content analytics`
+      // (platform_name 'Eiflixweb') via repWebUsers, not from loginlog's device_os. The loginlog
+      // rule is kept here, switched off, because the hooks and the deviceClass('web') branch are
+      // still live for the App Logs table and this may be wanted back.
+      //   web: bucket(c => c === 'web'),
+      web: { existing: 0, new: 0, total: 0 },
+    };
+  }
+
   private isNewUserProfile(profileid: string): boolean {
     const nud = profileid ? this.nudMap.get(profileid) : null;
     return !!nud && nud['movedtoexist'] !== true;
@@ -542,6 +1267,7 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
   trackLog(_: number, r: LogRow): string { return r.id; }
 
   ngOnDestroy(): void {
+    if (this.planTipTimer) clearTimeout(this.planTipTimer);
     this.destroy$.next();
     this.destroy$.complete();
     if (typeof cancelAnimationFrame !== 'undefined') {
@@ -580,6 +1306,7 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
     if (!this.pmLoading) {
       this.updateBigParticipantsCard();
       this.rebuildPaidCard();
+      this.rebuildMasterclassCard();
     }
   }
 
@@ -595,6 +1322,80 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
 
   // ==================== Users ====================
 
+  setUsersRange(key: 'all' | 'today' | '7d' | '30d'): void {
+    this.usersRange = key;
+    this.usersCustomStart = '';
+    this.usersCustomEnd = '';
+    this.refreshUsersCards();
+  }
+
+  /** Both pickers set -> switch to the manual range (mirrors Engagement). */
+  applyUsersCustom(): void {
+    if (!this.usersCustomStart || !this.usersCustomEnd) return;
+    this.usersRange = 'custom';
+    this.refreshUsersCards();
+  }
+
+  /** True while exactly one custom date is picked — shows the header hint. */
+  get usersCustomHint(): boolean {
+    return !!this.usersCustomStart !== !!this.usersCustomEnd;
+  }
+
+  /**
+   * The active window as timestamps, or null for "no date filter". Computed
+   * ONCE per rebuild and passed down, never evaluated per row.
+   */
+  private usersWindow(): { start: number; end: number } | null {
+    if (this.usersRange === 'all') return null;
+    // A cleared picker leaves the key on 'custom' with no bounds — read that
+    // as unfiltered rather than filtering against nothing.
+    if (this.usersRange === 'custom' && (!this.usersCustomStart || !this.usersCustomEnd)) return null;
+    const start = new Date();
+    const end = new Date();
+    if (this.usersRange === 'custom') {
+      const s = this.parseDateInput(this.usersCustomStart);
+      const e = this.parseDateInput(this.usersCustomEnd);
+      // Tolerate a reversed pick — the earlier date is the start.
+      start.setTime(Math.min(s.getTime(), e.getTime()));
+      end.setTime(Math.max(s.getTime(), e.getTime()));
+    } else if (this.usersRange === '7d') {
+      start.setDate(start.getDate() - 7);
+    } else if (this.usersRange === '30d') {
+      start.setDate(start.getDate() - 30);
+    }
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+    return { start: start.getTime(), end: end.getTime() };
+  }
+
+  /**
+   * Is this stored date inside the window? A row whose date is missing or
+   * unreadable cannot be placed in any window, so it drops out while a range
+   * is active and is kept while there is none.
+   */
+  private inUsersWindow(value: any, win: { start: number; end: number } | null): boolean {
+    if (!win) return true;
+    const t = this.toDate(value)?.getTime();
+    return typeof t === 'number' && Number.isFinite(t) && t >= win.start && t <= win.end;
+  }
+
+  /**
+   * Re-bucket both date-driven cards from the documents already in memory.
+   * `new_user_data` is a full realtime listener, so every range change on this
+   * section costs ZERO Firestore reads.
+   */
+  private refreshUsersCards(): void {
+    const win = this.usersWindow();
+    this.usersRangeLabel = !win ? ''
+      : this.usersRange === 'today' ? 'today'
+      : this.usersRange === '7d' ? 'in the last 7 days'
+      : this.usersRange === '30d' ? 'in the last 30 days'
+      : this.formatRange(new Date(win.start), new Date(win.end));
+    this.rebuildNewUsersCard();
+    this.rebuildPaidCard();
+    this.rebuildMasterclassCard();
+  }
+
   /**
    * Bucket the raw docs into the cards, newest first. Display strings are
    * precomputed once per emission so change detection never re-formats rows.
@@ -605,20 +1406,10 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
     for (const u of data) {
       if (u.id) this.nudMap.set(u.id, u);
     }
-    const sorted = data
-      .map(u => ({
-        ...u,
-        createdLabel: this.formatCreated(u.created),
-        initialsLabel: this.initials(u.name),
-        sourceTag: 'New User'
-      }))
-      .sort((a, b) => (this.toDate(b.created)?.getTime() || 0) - (this.toDate(a.created)?.getTime() || 0));
-    const newCard = this.cards.find(c => c.key === 'total-new-users');
-    if (newCard) {
-      newCard.users = sorted.filter(u => u.movedtoexist !== true);
-      this.animateCount(newCard, newCard.users.length);
-    }
+    this.nudDocs = data;
+    this.rebuildNewUsersCard();
     this.rebuildPaidCard();
+    this.rebuildMasterclassCard();
     // Keep an open users panel in sync with realtime updates.
     if (this.activePanel?.kind === 'users') {
       const card = this.cards.find(c => c.key === this.activePanel!.cardKey);
@@ -626,6 +1417,127 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
         this.setPanelRows(this.activePanel, card.users);
         this.activePanel.loading = false;
       }
+    }
+  }
+
+  /**
+   * Total New Users — rows not yet moved to paid, narrowed by the section
+   * range on the SIGNUP date.
+   */
+  private rebuildNewUsersCard(): void {
+    const card = this.cards.find(c => c.key === 'total-new-users');
+    if (!card) return;
+    const win = this.usersWindow();
+    const rows = this.nudDocs
+      .filter(u => u['movedtoexist'] !== true && this.inUsersWindow(u['created'], win))
+      .map(u => ({
+        ...u,
+        createdLabel: this.formatCreated(u.created),
+        initialsLabel: this.initials(u.name),
+        sourceTag: 'New User'
+      }))
+      .sort((a, b) => (this.toDate(b.created)?.getTime() || 0) - (this.toDate(a.created)?.getTime() || 0));
+    card.users = rows;
+    card.caption = win ? 'Signed up ' + this.usersRangeLabel : 'Signed up · not yet purchased journey';
+    this.animateCount(card, rows.length);
+    if (this.activePanel?.kind === 'users' && this.activePanel.cardKey === card.key) {
+      this.setPanelRows(this.activePanel, rows);
+      this.activePanel.loading = false;
+    }
+  }
+
+  /**
+   * Master Class Purchase: ONE equality query (status == 'captured', so no
+   * composite index), plus one read of workshopconfiguration for the titles.
+   * The Users range then narrows on `datetime` in memory — a range change
+   * costs no read.
+   */
+  private async loadMasterclass(): Promise<void> {
+    this.mcLoading = true;
+    this.mcError = false;
+    try {
+      const [paySnap, wsSnap] = await Promise.all([
+        getDocs(query(collection(this.firestore, 'workshoppaymentlog'), where('status', '==', 'captured'))),
+        getDocs(collection(this.firestore, 'workshopconfiguration'))
+      ]);
+      this.workshopTitles.clear();
+      wsSnap.forEach(d => {
+        const title = String((d.data() as any)?.['detailpage']?.['title'] ?? '').trim();
+        if (title) this.workshopTitles.set(d.id, title);
+      });
+      this.mcPayments = paySnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+    } catch (err) {
+      console.error('Master Class Purchase load failed', err);
+      this.mcError = true;
+      this.mcPayments = [];
+    } finally {
+      this.mcLoading = false;
+      this.rebuildMasterclassCard();
+    }
+  }
+
+  /** workshopref is a DocumentReference; tolerate a plain path string too. */
+  private refId(ref: any): string {
+    if (!ref) return '';
+    if (typeof ref === 'string') return ref.split('/').filter(Boolean).pop() || '';
+    if (typeof ref.id === 'string') return ref.id;
+    if (typeof ref.path === 'string') return ref.path.split('/').filter(Boolean).pop() || '';
+    return '';
+  }
+
+  /**
+   * One row per captured payment in the Users range. Name comes from the
+   * directories (participant metadata first, then new_user_data); a payer who
+   * is in new_user_data is tagged New User (operator rule). Re-run whenever the
+   * range or either directory changes, so names and tags stay current.
+   */
+  private rebuildMasterclassCard(): void {
+    const card = this.cards.find(c => c.key === 'masterclass-purchase');
+    if (!card) return;
+    const win = this.usersWindow();
+    let rupees = 0;
+    let newUsers = 0;
+    const rows = this.mcPayments
+      .filter(p => this.inUsersWindow(p['datetime'], win))
+      .map(p => {
+        const pid = String(p['profileid'] ?? '').trim();
+        const pm = pid ? this.pmMap.get(pid) : undefined;
+        const nud = pid ? this.nudMap.get(pid) : undefined;
+        const src: any = pm || nud || {};
+        const amount = Number(p['amountRupees']);
+        const rs = Number.isFinite(amount) ? amount : 0;
+        rupees += rs;
+        if (nud) newUsers++;
+        const wsId = this.refId(p['workshopref']);
+        return {
+          id: p.id,
+          profileid: pid,
+          name: src.name || pid || 'Unknown',
+          email: src.email,
+          phonenumber: src.phonenumber,
+          initialsLabel: this.initials(src.name),
+          unknown: !pm && !nud,
+          ...(nud ? { sourceTag: 'New User' } : {}),
+          // Journey exists only on participant metadata — new-user-only payers get none.
+          ...(pm ? { journeyTag: this.journeyTagFor(pm) } : {}),
+          workshopTag: this.workshopTitles.get(wsId) || (wsId ? 'Unknown workshop' : undefined),
+          amountLabel: '₹' + rs.toLocaleString('en-IN'),
+          amountValue: rs,
+          created: p['datetime'],
+          createdLabel: this.formatCreated(p['datetime'])
+        };
+      })
+      .sort((a, b) => (this.toDate(b.created)?.getTime() || 0) - (this.toDate(a.created)?.getTime() || 0));
+    card.users = rows;
+    card.breakdown = rows.length ? [{ label: 'new users', count: newUsers }] : undefined;
+    card.highlight = this.mcError ? undefined : '₹' + rupees.toLocaleString('en-IN');
+    card.caption = this.mcError
+      ? 'Couldn’t load purchases — refresh to retry'
+      : 'Captured payments' + (win ? ' · ' + this.usersRangeLabel : '');
+    this.animateCount(card, rows.length);
+    if (this.activePanel?.kind === 'users' && this.activePanel.cardKey === card.key) {
+      this.setPanelRows(this.activePanel, rows);
+      this.activePanel.loading = false;
     }
   }
 
@@ -660,9 +1572,15 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
   private rebuildPaidCard(): void {
     const card = this.cards.find(c => c.key === 'new-users-to-paid');
     if (!card) return;
+    const win = this.usersWindow();
     const rows: any[] = [];
     this.nudMap.forEach((nud, id) => {
       if (nud.movedtoexist !== true) return;
+      // The move date is read off the NEW-USER doc, never off `src` below: the
+      // row renders from participant metadata when a twin exists and that
+      // document carries no move date, so reading it there would drop everyone
+      // with a full profile the moment a range is applied.
+      if (!this.inUsersWindow(nud['movedon'], win)) return;
       const pm = this.pmMap.get(id);
       const src = pm || nud;
       rows.push({
@@ -670,11 +1588,38 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
         created: src.created ?? nud.created,
         createdLabel: this.formatCreated(src.created ?? nud.created),
         initialsLabel: this.initials(src.name),
-        ...(pm ? { journeyTag: this.journeyTagFor(pm) } : { sourceTag: 'New User' })
+        ...(pm ? { journeyTag: this.journeyTagFor(pm) } : { sourceTag: 'New User' }),
+        amountLabel: this.planLabel(id),
+        // Numeric copy for the panel's Amount sort; not found / loading sort last.
+        planValue: this.planTotals?.get(id) ?? undefined,
+        planPurchases: this.planPurchases?.get(id),
+        planPurchaseTotalLabel: this.planPurchaseTotals?.has(id) ? this.formatPlan(this.planPurchaseTotals.get(id) as number) : undefined
       });
     });
     rows.sort((a, b) => (this.toDate(b.created)?.getTime() || 0) - (this.toDate(a.created)?.getTime() || 0));
     card.users = rows;
+    card.caption = win ? 'Purchased Journey · ' + this.usersRangeLabel : 'Purchased Journey';
+    // Card total = the people currently in the card (so it follows the range).
+    if (this.planStatus === 'unavailable' || this.planStatus === 'idle') {
+      card.highlight = undefined;
+    } else if (rows.some(r => !this.planTotals.has(r.id))) {
+      card.highlight = '…';
+    } else {
+      const found = rows.filter(r => typeof this.planTotals.get(r.id) === 'number');
+      if (!found.length && rows.length) {
+        // Nobody in the card was found in Watson — say so; never show ₹0.
+        card.highlight = '—';
+      } else {
+        const sum = found.reduce((acc, r) => acc + (this.planTotals.get(r.id) as number), 0);
+        card.highlight = this.formatPlan(sum);
+        card.highlightWords = indianNumberWords(sum);
+      }
+    }
+    if (!card.highlight || card.highlight === '…' || card.highlight === '—' || card.highlight === this.formatPlan(0)) card.highlightWords = undefined;
+    // No label inside the pill — the amount (and its words) only (operator 2026-10-13).
+    card.highlightLabel = undefined;
+    // Once both directories have loaded, look up anyone not yet fetched.
+    if (!this.loading && !this.pmLoading) void this.loadPlanTotals();
     this.animateCount(card, rows.length);
     if (this.activePanel?.kind === 'users' && this.activePanel.cardKey === card.key) {
       this.setPanelRows(this.activePanel, rows);
@@ -682,9 +1627,169 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
     }
   }
 
+  /** Rupees with Indian digit grouping (₹2,06,94,876) — the shared formatter, same as the workshop dashboard. */
+  private formatPlan(v: number): string {
+    return formatRupees(v);
+  }
+
+  private planLabel(profileid: string): string | undefined {
+    if (this.planStatus === 'unavailable' || this.planStatus === 'idle') return undefined;
+    if (!this.planTotals.has(profileid)) return '…';
+    const v = this.planTotals.get(profileid);
+    return v === null || v === undefined ? '—' : this.formatPlan(v);
+  }
+
+  /** Same initialisation as AuthguardService.initializeWatson; null when this build has no Watson config. */
+  private watsonDb(): any | null {
+    const cfg = (environment as any)['watson'];
+    if (!cfg) return null;
+    if (!getApps().some(a => a.name === 'watson')) initializeApp(cfg, 'watson');
+    return getFirestore(getApp('watson'));
+  }
+
+  /**
+   * Watson TOTAL AMOUNT for everyone on the paid side — the EXACT chain Journey
+   * Support runs for one person, run here for each person:
+   *   profile_data/{profileid}            -> name + email
+   *   Watson Participants where email ==  -> first name-or-email match -> id
+   *   Watson Payment Schedule where participantid == , orderBy date asc
+   *   -> journeySupportTotal()
+   * Each person is fetched once per visit and cached. Every step reads 30 people per query, all
+   * queries at once, and rebuilds each person's equality result from the batch.
+   */
+  private async loadPlanTotals(): Promise<void> {
+    const wanted: string[] = [];
+    this.nudMap.forEach((nud, id) => {
+      if (nud.movedtoexist !== true || this.planTotals.has(id) || this.planPending.has(id)) return;
+      wanted.push(id);
+    });
+    if (!wanted.length) return;
+    const watsonDatabase = this.watsonDb();
+    if (!watsonDatabase) {
+      if (this.planStatus !== 'unavailable') { this.planStatus = 'unavailable'; this.rebuildPaidCard(); }
+      return;
+    }
+    wanted.forEach(id => this.planPending.add(id));
+    this.planStatus = 'loading';
+    const purchaseRowsFor = (docs: any[]) => watsonPurchaseRows(docs).map(r => ({
+      ...r,
+      dateLabel: r.date ? formatDate(r.date, 'd MMM y', 'en-US') : '—',
+      amountLabel: r.amount === null ? '—' : this.formatPlan(r.amount)
+    }));
+    const setPurchases = (profileid: string, docs: any[]) => {
+      const rows = purchaseRowsFor(docs);
+      this.planPurchases.set(profileid, rows);
+      this.planPurchaseTotals.set(profileid, rows.reduce((acc, r) => acc + (r.amount ?? 0), 0));
+    };
+    // The single-person chain, kept for a profile whose email is not text (the batched read needs text).
+    const one = async (profileid: string, profileData: any): Promise<number | null> => {
+      try {
+        const participant = await getDocs(query(collection(watsonDatabase, 'Participants'), where('email', '==', profileData['email'])));
+        const participantid = journeySupportParticipantId(participant.docs.map(d => d.data()), profileData);
+        if (participantid == null) return null;   // Journey Support: "unable to find Client in Watson"
+        const [schedule, purchases] = await Promise.all([
+          getDocs(query(collection(watsonDatabase, 'Payment Schedule'), where('participantid', '==', participantid), orderBy('date', 'asc'))),
+          getDocs(query(collection(watsonDatabase, 'ParticipantPurchases'), where('participantid', '==', participantid))),
+        ]);
+        setPurchases(profileid, purchases.docs.map(d => d.data()));
+        return journeySupportTotal(schedule.docs.map(d => d.data()));
+      } catch (err) {
+        console.error('eiflixoperationsdashboard: Watson total amount lookup failed for ' + profileid, err);
+        return null;
+      }
+    };
+    // Same chain as Journey Support, read 30 people per query with every query in flight at once
+    // (the workshop dashboard's Sale Achieved fix, 2026-10-15). READ ONLY — Watson is never written.
+    const readIn = async (db: any, coll: string, field: any, values: any[]): Promise<{ id: string; data: any }[]> => {
+      const chunks: any[][] = [];
+      for (let k = 0; k < values.length; k += 30) chunks.push(values.slice(k, k + 30));
+      const snaps = await Promise.all(chunks.map(c =>
+        getDocs(query(collection(db, coll), where(field, 'in', c))).catch(err => {
+          console.error('eiflixoperationsdashboard: Watson total amount read failed (' + coll + ')', err);
+          return null;
+        })));
+      return snaps.flatMap(sn => sn ? sn.docs.map(d => ({ id: d.id, data: d.data() })) : []);
+    };
+    const totals = new Map<string, number | null>();
+    try {
+      const profiles = new Map((await readIn(this.firestore, 'profile_data', documentId(), wanted)).map(d => [d.id, d.data]));
+      const textEmail = wanted.filter(id => typeof profiles.get(id)?.['email'] === 'string');
+      const emails = [...new Set(textEmail.map(id => profiles.get(id)!['email']))];
+      const participantsByEmail = groupLikeEquality(await readIn(watsonDatabase, 'Participants', 'email', emails), 'email');
+      const participantOf = new Map<string, any>();
+      textEmail.forEach(id => {
+        const profileData = profiles.get(id);
+        const pid = journeySupportParticipantId((participantsByEmail.get(profileData['email']) ?? []).map(d => d.data), profileData);
+        if (pid != null) participantOf.set(id, pid);   // null: "unable to find Client in Watson"
+      });
+      const pids = [...new Set(participantOf.values())];
+      const [scheduleDocs, purchaseDocs] = await Promise.all([
+        readIn(watsonDatabase, 'Payment Schedule', 'participantid', pids),
+        readIn(watsonDatabase, 'ParticipantPurchases', 'participantid', pids),
+      ]);
+      const scheduleBy = groupLikeEquality(scheduleDocs, 'participantid');
+      const purchasesBy = groupLikeEquality(purchaseDocs, 'participantid');
+      participantOf.forEach((pid, id) => {
+        setPurchases(id, (purchasesBy.get(pid) ?? []).map(d => d.data));
+        totals.set(id, journeySupportTotal(journeySupportScheduleOrder(scheduleBy.get(pid) ?? [])));
+      });
+      // A profile with a non-text email still gets the exact single-person chain.
+      await Promise.all(wanted
+        .filter(id => profiles.has(id) && !textEmail.includes(id))
+        .map(async id => totals.set(id, await one(id, profiles.get(id)))));
+    } catch (err) {
+      console.error('eiflixoperationsdashboard: Watson total amount lookup failed', err);
+    }
+    wanted.forEach(id => {
+      this.planTotals.set(id, totals.has(id) ? totals.get(id)! : null);
+      this.planPending.delete(id);
+    });
+    this.planStatus = 'ready';
+    this.rebuildPaidCard();
+  }
+
+  /**
+   * Purchases hover card (operator 2026-10-14): one line per product bought,
+   * from Watson ParticipantPurchases. Only rows that carry purchases open it. The side panel sits at z-index 1001 — above the
+   * CDK overlay layer (1000) — so this is a fixed card at 1002 placed beside the
+   * panel, level with the row; with no room beside it (phones) it drops below.
+   */
+  showPlanTip(row: any, el: HTMLElement): void {
+    this.keepPlanTip();
+    if (!row?.planPurchases?.length || !el) { this.planTipRow = null; return; }
+    const r = el.getBoundingClientRect();
+    const panel = (el.closest('.eod-panel') as HTMLElement | null)?.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const tipMax = 360;   // matches .eod-plan-tip max-height + head/foot
+    const roomLeft = panel ? panel.left : r.left;
+    this.planTipStyle = roomLeft >= 320
+      ? { top: Math.max(8, Math.min(r.top, vh - tipMax - 8)) + 'px', right: (vw - roomLeft + 10) + 'px' }
+      : { top: Math.max(8, Math.min(r.bottom + 6, vh - tipMax - 8)) + 'px', left: '12px', right: '12px' };
+    this.planTipRow = row;
+  }
+
+  /** Pointer moved onto the card (to scroll it) — cancel the pending close. */
+  keepPlanTip(): void {
+    if (this.planTipTimer) { clearTimeout(this.planTipTimer); this.planTipTimer = null; }
+  }
+
+  /** Close after a short grace, so the pointer can travel from the row onto the card. */
+  hidePlanTip(): void {
+    this.keepPlanTip();
+    this.planTipTimer = setTimeout(() => { this.planTipRow = null; this.planTipTimer = null; }, 140);
+  }
+
+  // B!G Participants lives in its own section (operator 2026-10-13). The
+  // `cards` array stays whole so loading, panels and live updates are shared.
+  get userCards(): OpsCard[] { return this.cards.filter(c => c.key !== 'big-participants'); }
+  get bigCards(): OpsCard[] { return this.cards.filter(c => c.key === 'big-participants'); }
+
   /** The Users cards load from two different listeners. */
   cardLoading(card: OpsCard): boolean {
-    return card.key === 'big-participants' ? this.pmLoading : this.loading;
+    if (card.key === 'big-participants') return this.pmLoading;
+    if (card.key === 'masterclass-purchase') return this.mcLoading;
+    return this.loading;
   }
 
   /**
@@ -1617,6 +2722,49 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
 
   setDbRange(months: 1 | 2 | 3): void {
     this.dbRange = months;
+    this.dbFrom = '';
+    this.dbTo = '';
+    this.applyDbChange();
+  }
+
+  /** Both pickers set -> switch to the manual range (mirrors Engagement / Users). */
+  applyDbCustom(): void {
+    if (!this.dbFrom || !this.dbTo) return;
+    this.dbRange = 'custom';
+    this.applyDbChange();
+  }
+
+  /** True while exactly one manual date is picked — shows the header hint. */
+  get dbCustomHint(): boolean {
+    return !!this.dbFrom !== !!this.dbTo;
+  }
+
+  /**
+   * Earliest day the register holds — the From picker's floor. Device Breakdown
+   * is summed from register pages only, so a date before this has no data.
+   */
+  get dbMinDate(): string {
+    return this.naRegisterSince || '';
+  }
+
+  /**
+   * The window as inclusive register keys. Keys and <input type="date"> values
+   * are both 'yyyy-MM-dd', so plain string comparison is a date comparison.
+   */
+  private dbKeyBounds(): { from: string; to: string } {
+    if (this.dbRange === 'custom' && this.dbFrom && this.dbTo) {
+      // Tolerate a reversed pick — the earlier date is the start.
+      return this.dbFrom <= this.dbTo
+        ? { from: this.dbFrom, to: this.dbTo }
+        : { from: this.dbTo, to: this.dbFrom };
+    }
+    const months = this.dbRange === 'custom' ? 1 : this.dbRange;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - months * 30);
+    return { from: this.dayKey(cutoff), to: this.dayKey(new Date()) };
+  }
+
+  private applyDbChange(): void {
     this.computeDeviceBreakdown();
     // A range change while a platform panel is open refreshes it in place.
     if (this.activePanel?.kind === 'platform' && this.activePanel.cardKey) {
@@ -1625,12 +2773,10 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
   }
 
   private platformPerProfile(platform: string): Map<string, number> {
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - this.dbRange * 30);
-    const cutoffKey = this.dayKey(cutoff);
+    const { from, to } = this.dbKeyBounds();
     const perProfile = new Map<string, number>();
     this.naPages.forEach((page, key) => {
-      if (key < cutoffKey) return;
+      if (key < from || key > to) return;
       const byProfile = page?.platforms?.[platform];
       if (!byProfile) return;
       for (const [pid, sec] of Object.entries(byProfile as Record<string, number>)) {
@@ -1665,14 +2811,12 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
     }
   }
 
-  /** Share of watch time per platform over the last 1/2/3 months of pages. */
+  /** Share of watch time per platform over the chosen window of register pages. */
   private computeDeviceBreakdown(): void {
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - this.dbRange * 30);
-    const cutoffKey = this.dayKey(cutoff);
+    const { from, to } = this.dbKeyBounds();
     const totals = new Map<string, number>();
     this.naPages.forEach((page, key) => {
-      if (key < cutoffKey) return;
+      if (key < from || key > to) return;
       const plats = page?.platforms;
       if (!plats) return;
       for (const [name, byProfile] of Object.entries(plats)) {
@@ -1751,7 +2895,9 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
   private setPanelRows(panel: PanelState, rows: any[]): void {
     panel.rows = rows;
     const hasHours = rows.some(r => r.hoursSeconds !== undefined);
-    panel.sortOptions = hasHours ? ['default', 'name', 'hours'] : ['default', 'name'];
+    // Amount appears once rows carry a Watson total (New Users to Paid).
+    const hasAmount = rows.some(r => typeof r.planValue === 'number');
+    panel.sortOptions = ['default', 'name', ...(hasHours ? ['hours' as const] : []), ...(hasAmount ? ['amount' as const] : [])];
     if (!panel.sortOptions.includes(panel.sortKey)) panel.sortKey = 'default';
     const hasNud = rows.some(r => !!r.sourceTag);
     const hasPm = rows.some(r => !r.sourceTag && !r.unknown);
@@ -1780,6 +2926,10 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
       rows = [...rows].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     } else if (panel.sortKey === 'hours') {
       rows = [...rows].sort((a, b) => (b.hoursSeconds || 0) - (a.hoursSeconds || 0));
+    } else if (panel.sortKey === 'amount') {
+      // Highest total first; people not found in Watson (or still loading) last.
+      const v = (r: any) => (typeof r.planValue === 'number' ? r.planValue : -1);
+      rows = [...rows].sort((a, b) => v(b) - v(a));
     }
     // Precompute highlight segments once per view change — never per CD cycle.
     panel.viewRows = q
@@ -1811,32 +2961,8 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
    * actually displays them.
    */
   exportPanel(panel: PanelState): void {
-    const rows = panel.viewRows;
-    if (!rows.length) return;
-    const hasHours = rows.some(r => r.hoursSeconds !== undefined || r.hoursLabel);
-    const hasLastSeen = rows.some(r => r.lastSeenLabel);
-    const hasCreated = rows.some(r => r.createdLabel);
-    const hasVideos = rows.some(r => Array.isArray(r.videos));
-    const header = ['Name', 'Phone Number', 'Email', 'Journey', 'User Type'];
-    if (hasHours) header.push('Watch Hours');
-    if (hasVideos) header.push('Videos Watched');
-    if (hasLastSeen) header.push('Last Seen');
-    if (hasCreated) header.push('Created');
-    const data = rows.map(r => {
-      const line: (string | number)[] = [
-        String(r.name ?? ''),
-        String(r.phonenumber ?? ''),
-        String(r.email ?? ''),
-        r.journeyTag || '',
-        r.unknown ? 'Unknown' : (r.sourceTag ? 'New User' : 'Existing')
-      ];
-      if (hasHours) line.push(r.hoursSeconds !== undefined ? +(r.hoursSeconds / 3600).toFixed(2) : '');
-      if (hasVideos) line.push(Array.isArray(r.videos) ? r.videos.length : '');
-      if (hasLastSeen) line.push(r.lastSeenLabel || '');
-      if (hasCreated) line.push(r.createdLabel || '');
-      return line;
-    });
-    const worksheetData = [header, ...data];
+    const worksheetData = this.panelExportRows(panel);
+    if (worksheetData.length < 2) return;
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(worksheetData);
     const maxWidths: number[] = [];
@@ -1851,19 +2977,58 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
     XLSX.writeFile(wb, slug + '-' + this.todayStr + '.xlsx');
   }
 
+  /** Header + one line per visible panel row — the sheet exportPanel writes. */
+  panelExportRows(panel: PanelState): (string | number)[][] {
+    const rows = panel.viewRows;
+    if (!rows.length) return [];
+    // Amounts go out as NUMBERS so the sheet can be summed: the Watson total
+    // (rounded to the rupee, as Journey Support displays it) for New Users to
+    // Paid, the payment amount for Master Class Purchase. Blank when unknown.
+    const hasPlan = rows.some(r => typeof r.planValue === 'number');
+    const hasAmount = !hasPlan && rows.some(r => typeof r.amountValue === 'number');
+    const hasHours = rows.some(r => r.hoursSeconds !== undefined || r.hoursLabel);
+    const hasLastSeen = rows.some(r => r.lastSeenLabel);
+    const hasCreated = rows.some(r => r.createdLabel);
+    const hasVideos = rows.some(r => Array.isArray(r.videos));
+    const header = ['Name', 'Phone Number', 'Email', 'Journey', 'User Type'];
+    if (hasHours) header.push('Watch Hours');
+    if (hasVideos) header.push('Videos Watched');
+    if (hasLastSeen) header.push('Last Seen');
+    if (hasCreated) header.push('Created');
+    if (hasPlan) header.push('Total Amount');
+    if (hasAmount) header.push('Amount');
+    const data = rows.map(r => {
+      const line: (string | number)[] = [
+        String(r.name ?? ''),
+        String(r.phonenumber ?? ''),
+        String(r.email ?? ''),
+        r.journeyTag || '',
+        r.unknown ? 'Unknown' : (r.sourceTag ? 'New User' : 'Existing')
+      ];
+      if (hasHours) line.push(r.hoursSeconds !== undefined ? +(r.hoursSeconds / 3600).toFixed(2) : '');
+      if (hasVideos) line.push(Array.isArray(r.videos) ? r.videos.length : '');
+      if (hasLastSeen) line.push(r.lastSeenLabel || '');
+      if (hasCreated) line.push(r.createdLabel || '');
+      if (hasPlan) line.push(typeof r.planValue === 'number' ? Math.round(r.planValue) : '');
+      if (hasAmount) line.push(typeof r.amountValue === 'number' ? r.amountValue : '');
+      return line;
+    });
+    return [header, ...data];
+  }
+
   setPanelJourney(panel: PanelState, value: string): void {
     panel.journeyFilter = value || 'all';
     this.updatePanelView(panel);
   }
 
-  setPanelSort(panel: PanelState, key: 'default' | 'name' | 'hours'): void {
+  setPanelSort(panel: PanelState, key: 'default' | 'name' | 'hours' | 'amount'): void {
     panel.sortKey = key;
     panel.sortOpen = false;
     this.updatePanelView(panel);
   }
 
-  sortLabel(key: 'default' | 'name' | 'hours'): string {
-    return key === 'name' ? 'Name A–Z' : key === 'hours' ? 'Watch hours' : 'Default';
+  sortLabel(key: 'default' | 'name' | 'hours' | 'amount'): string {
+    return key === 'name' ? 'Name A–Z' : key === 'hours' ? 'Watch hours' : key === 'amount' ? 'Amount high–low' : 'Default';
   }
 
   /** 'Abdul Hakkim' + 'ha' -> ['Abdul ', 'Ha', 'kkim']; no match -> [text, '', ''].
@@ -1890,6 +3055,7 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
   }
 
   closePanel(): void {
+    this.planTipRow = null;
     this.activePanel = null;
     this.unlockScroll();
   }

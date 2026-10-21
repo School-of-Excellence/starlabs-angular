@@ -25,6 +25,40 @@ import {
   canOpenNewUsers as canOpenNewUsersRule,
 } from '../workshop-access/workshop-access.model';
 
+export type WorkshopStatusFilter = 'all' | 'active' | 'inactive' | 'completed';
+export type WorkshopTypeFilter = 'all' | 'Workshop' | 'CP Workshop' | 'Evergreen Workshop';
+
+/** Root `workshoptype` (v2) wins; legacy documents fall back to the Settings flags. */
+export function workshopTypeLabel(w: any): Exclude<WorkshopTypeFilter, 'all'> {
+  switch (w?.workshoptype) {
+    case 'evergreenworkshop': return 'Evergreen Workshop';
+    case 'cpworkshop': return 'CP Workshop';
+    case 'liveworkshop': return 'Workshop';
+  }
+  return w?.evergreenWorkshop ? 'Evergreen Workshop' : (w?.categorybased ? 'CP Workshop' : 'Workshop');
+}
+
+/** Live anywhere: the app switch, the web switch or the EiFlix mobile switch. */
+export function isLiveAnywhere(w: any): boolean {
+  return w?.active === true || w?.webactive === true || w?.eiflixmobileactive === true;
+}
+
+/** What the Active filter and the green Active chip both mean: live anywhere and not completed. */
+export function isActiveWorkshop(w: any): boolean {
+  return w?.workshopcompleted !== true && isLiveAnywhere(w);
+}
+
+/** Status and type filters; a completed workshop is neither active nor inactive. */
+export function filterWorkshops(list: any[], status: WorkshopStatusFilter, type: WorkshopTypeFilter): any[] {
+  return list.filter(w => {
+    const done = w?.workshopcompleted === true;
+    if (status === 'active' && (done || !isLiveAnywhere(w))) return false;
+    if (status === 'inactive' && (done || isLiveAnywhere(w))) return false;
+    if (status === 'completed' && !done) return false;
+    return type === 'all' || workshopTypeLabel(w) === type;
+  });
+}
+
 
 @Component({
   selector: 'app-workshops',
@@ -43,7 +77,9 @@ import {
   styleUrl: './workshops.component.css'
 })
 export class WorkshopsComponent implements OnInit {
-  displayedColumns: string[] = ['active', 'webactive', 'title', 'type', 'created', 'startDate', 'endDate', 'status', 'edit'];
+  // The Active column (Breakthroughs App / Web / EiFlix Mobile switches) is hidden for now (operator
+  // 2026-10-15); its markup is commented out in the template. Put 'active' back first to restore it.
+  displayedColumns: string[] = [/* 'active', */ 'title', 'type', 'created', 'startDate', 'endDate', 'status', 'edit'];
   workshops$: Observable<any[]>;
   mapProfileNew: any = {};
   mapProfile: any = {};
@@ -54,7 +90,8 @@ export class WorkshopsComponent implements OnInit {
   canEdit = false;
   canNewUsers = false;
 
-  statusFilter: 'all' | 'active' | 'inactive' | 'completed' = 'all';
+  statusFilter: WorkshopStatusFilter = 'all';
+  typeFilter: WorkshopTypeFilter = 'all';
   sortField: 'created' | 'startDate' | 'endDate' = 'created';
   sortDirection: 'asc' | 'desc' = 'desc';
   filteredWorkshops: any[] = [];
@@ -123,14 +160,7 @@ export class WorkshopsComponent implements OnInit {
   }
 
   applyAllFilters(workshops: any[]): any[] {
-    let result = [...workshops];
-    if (this.statusFilter === 'active') {
-      result = result.filter(w => w.active && !w.workshopcompleted);
-    } else if (this.statusFilter === 'inactive') {
-      result = result.filter(w => !w.active);
-    } else if (this.statusFilter === 'completed') {
-      result = result.filter(w => w.workshopcompleted);
-    }
+    const result = filterWorkshops(workshops, this.statusFilter, this.typeFilter);
 
     result.sort((a, b) => {
       let aVal = 0, bVal = 0;
@@ -303,6 +333,32 @@ export class WorkshopsComponent implements OnInit {
     }
   }
 
+  async onWorkshopMobileStatusChange(workshop: any, event: any): Promise<void> {
+    const isActive = event.checked;
+    if (!this.canEdit) { event.source.checked = !isActive; this.denyEdit(); return; }
+    const title = workshop?.detailpage?.title || 'this workshop';
+    const confirmed = window.confirm(
+      `Are you sure you want to ${isActive ? 'activate' : 'deactivate'} "${title}" on EiFlix mobile?`
+    );
+    if (!confirmed) {
+      event.source.checked = !isActive;
+      return;
+    }
+    try {
+      const workshopRef = doc(this.firestore, `workshopconfiguration/${workshop.docid}`);
+      await updateDoc(workshopRef, { eiflixmobileactive: isActive });
+      this.snackBar.open(
+        `Workshop ${isActive ? 'activated' : 'deactivated'} on EiFlix mobile successfully!`,
+        'Close', { duration: 2000 }
+      );
+      workshop.eiflixmobileactive = isActive;
+    } catch (error) {
+      console.error('Error updating workshop EiFlix mobile status:', error);
+      event.source.checked = !isActive;
+      this.snackBar.open('Error updating workshop EiFlix mobile status. Please try again.', 'Close', { duration: 3000 });
+    }
+  }
+
   async onWorkshopCompletedChange(workshop: any, event: any): Promise<void> {
     const isCompleted = event.checked;
     if (!this.canEdit) { event.source.checked = !isCompleted; this.denyEdit(); return; }
@@ -329,14 +385,12 @@ export class WorkshopsComponent implements OnInit {
     }
   }
 
-  /** Root `workshoptype` (v2) wins; legacy documents fall back to the Settings flags. */
   typeLabel(w: any): string {
-    switch (w?.workshoptype) {
-      case 'evergreenworkshop': return 'Evergreen Workshop';
-      case 'cpworkshop': return 'CP Workshop';
-      case 'liveworkshop': return 'Workshop';
-    }
-    return w?.evergreenWorkshop ? 'Evergreen Workshop' : (w?.categorybased ? 'CP Workshop' : 'Workshop');
+    return workshopTypeLabel(w);
+  }
+
+  isActive(w: any): boolean {
+    return isActiveWorkshop(w);
   }
 
   async duplicateWorkshop(workshop: any): Promise<void> {
