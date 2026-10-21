@@ -59,3 +59,9 @@ an array. Also includes the operator's own subtitle edit (column hint text remov
 picked in the other (`requiredRoleOptions` / `additionalRoleOptions`); a doc that lists a role in both opens with it
 kept as required and dropped from additional (`dropRequiredFromAdditional`, also run on every required change).
 The ATC activity grouping by atcproperty was considered and dropped (operator: "you already have the role id").
+
+## 2026-10-21 — ATC rows for additional roles too
+**Operator:** "the role is showing only required roles not additional roles". The ATC section now has a row per
+required AND additional role (additional ones tagged "Additional"). Required-role rows still need at least one
+activity; additional-role rows are optional (a booking may not use that role) and are saved into `atcrolemap` only
+when an activity is picked. Reverses the 2026-10-15 "required roles only" decision above.

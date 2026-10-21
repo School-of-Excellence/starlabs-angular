@@ -64,6 +64,7 @@ export class MapAppointmentRoleDialogComponent {
       this.syncAtcRoles()
     })
     this.mapAppointmentRoleForm.get('atcrequired').valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.syncAtcRoles())
+    this.mapAppointmentRoleForm.get('additional_role').valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.syncAtcRoles())
     this.syncAtcRoles()
     this.loadAtcActivities()
     this.loadAtcModels()
@@ -130,6 +131,10 @@ export class MapAppointmentRoleDialogComponent {
     if (kept.length != additional.length) additionalControl.setValue(kept, { emitEvent: false })
   }
 
+  isAdditionalRole(roleId: string): boolean {
+    return !(this.mapAppointmentRoleForm.get('required_role').value ?? []).includes(roleId)
+  }
+
   roleName(roleId: string): string {
     return this.appointmentRoleList.find(e => e.id == roleId)?.role ?? roleId
   }
@@ -137,7 +142,10 @@ export class MapAppointmentRoleDialogComponent {
   // Keeps one required control per required role. Unticking ATC disables the group (so it neither
   // validates nor saves) but keeps the picks, so ticking it again restores them.
   private syncAtcRoles() {
+    // One row per selected role: required roles must name an activity, additional roles may (a booking
+    // doesn't always use them)
     var required: string[] = this.mapAppointmentRoleForm.get('required_role').value ?? []
+    var additional: string[] = (this.mapAppointmentRoleForm.get('additional_role').value ?? []).filter(id => !required.includes(id))
     var atcGroup = this.atcRoleGroup
     var previous = atcGroup.getRawValue()
     for (const roleId of Object.keys(atcGroup.controls)) {
@@ -145,6 +153,9 @@ export class MapAppointmentRoleDialogComponent {
     }
     for (const roleId of required) {
       atcGroup.addControl(roleId, new FormControl(previous[roleId] ?? [], Validators.required), { emitEvent: false })
+    }
+    for (const roleId of additional) {
+      atcGroup.addControl(roleId, new FormControl(previous[roleId] ?? []), { emitEvent: false })
     }
     var atcModel = this.mapAppointmentRoleForm.get('atcmodel')
     if (this.mapAppointmentRoleForm.get('atcrequired').value === true) {
@@ -201,6 +212,11 @@ export class MapAppointmentRoleDialogComponent {
       if (atcrequired) {
         for (const roleId of value.required_role) {
           atcrolemap[roleId] = [...(value.atcrolemap[roleId] ?? [])]
+        }
+        // additional roles: saved only when an activity was chosen for them
+        for (const roleId of (value.additional_role ?? [])) {
+          var picked = value.atcrolemap[roleId] ?? []
+          if (!value.required_role.includes(roleId) && picked.length != 0) atcrolemap[roleId] = [...picked]
         }
       }
       var newData = {

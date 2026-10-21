@@ -58,7 +58,7 @@
           </mat-form-field>
 
           <div class="atc-hint" data-testid="mard-atc-norole-5" *ngIf="atcRoleIds.length == 0">
-            Select a Required Role above to assign ATC activities.
+            Select a Required or Additional Role above to assign ATC activities.
           </div>
 
           <div *ngIf="atcRoleIds.length > 0" formGroupName="atcrolemap">
@@ -67,7 +67,7 @@
               <div>ATC ACTIVITIES <span class="atc-colsub"></span></div>
             </div>
             <div class="atc-grid atc-row" *ngFor="let roleId of atcRoleIds">
-              <div class="atc-role" data-testid="mard-atc-role-6">{{ roleName(roleId) }}</div>
+              <div class="atc-role" data-testid="mard-atc-role-6">{{ roleName(roleId) }}<span class="atc-role-tag" *ngIf="isAdditionalRole(roleId)">Additional</span></div>
               <mat-form-field class="atc-field" appearance="outline">
                 <mat-label>ATC activities</mat-label>
                 <mat-select data-testid="mard-atc-activity-7" [formControlName]="roleId" placeholder="Select activities" multiple>

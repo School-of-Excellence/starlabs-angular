@@ -117,3 +117,15 @@ mat-form-field.atc-model{
   width: 100%;
   margin-top: 10px;
 }
+
+.atc-role-tag{
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  line-height: 16px;
+  background: #eceff1;
+  color: #5f6b7a;
+  vertical-align: middle;
+}
