@@ -47,6 +47,16 @@
         </mat-checkbox>
 
         <ng-container *ngIf="mapAppointmentRoleForm.get('atcrequired').value === true">
+          <mat-form-field class="atc-field atc-model" appearance="outline">
+            <mat-label>ATC model</mat-label>
+            <mat-select data-testid="mard-atc-model-8" formControlName="atcmodel" placeholder="Select ATC model">
+              <mat-option class="matOption" *ngFor="let model of atcModelList" [value]="model">{{ model }}</mat-option>
+            </mat-select>
+            <mat-error *ngIf="mapAppointmentRoleForm.get('atcmodel').hasError('required')">
+              ATC model <strong>required</strong>
+            </mat-error>
+          </mat-form-field>
+
           <div class="atc-hint" data-testid="mard-atc-norole-5" *ngIf="atcRoleIds.length == 0">
             Select a Required Role above to assign ATC activities.
           </div>

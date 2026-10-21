@@ -35,7 +35,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { UpdateDialogComponent } from '../../DialogBox/update-dialog/update-dialog.component';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MarkdownModule } from 'ngx-markdown';
-import { appointmentSpecialistRows, AppointmentSpecialistRow, completedNewestFirst, appointmentHostIds } from './appointment-specialists';
+import { appointmentSpecialistRows, AppointmentSpecialistRow, pickAtcAppointment, appointmentHostIds } from './appointment-specialists';
 
 interface AssignmentData {
   clipurl?: string;
@@ -874,6 +874,8 @@ export class PrescribeATCComponent {
   onProductSelect(){
     console.log("Selected Product", this.product)
     if(this.isEISolution && this.askRows.length == 0) this.addAsk()
+    // participant + ATC model known → prefill specialists from your matching appointment (if any)
+    this.prefillFromAtcModel()
     if(!this.assignmentInitiated){
       var selectedIndex = this.productAvailable.findIndex(e => e["atcmodel"] == this.product && e["directive"] != null)
       if(selectedIndex != -1){
@@ -1051,31 +1053,47 @@ export class PrescribeATCComponent {
     }
   }
 
-  // No ?appointmentid=: only this participant's appointments that the logged-in specialist hosted, newest
-  // usable first; each one's own type mapping is read until one prescribes an ATC.
-  async prefillFromLatestAppointment(){
+  // Participant + "What is the ATC given for?" chosen (no ?appointmentid=):
+  //  1. AppointmentType-To-Roles where atcrequired == true and atcmodel == the chosen ATC model → the ATC types
+  //  2. appointments where bookedby == participant, of those types, hosted by the logged-in specialist (hostRole),
+  //     newest usable first (today, or an earlier day that was attended)
+  //  3. prefillFromAppointment(): hostRole role → atcrolemap activities → that activity's Specialist picker
+  // Nothing found at any step → the pickers stay empty for manual entry.
+  async prefillFromAtcModel(){
+    if(this.appointmentId || !this.participantProfileid || !this.product || this.bigActivity()) return
+    const model = this.product
     try {
+      const mappingSnap = await getDocs(query(collection(this.firestoreDefault, "AppointmentType-To-Roles"),
+        where("atcrequired", "==", true), where("atcmodel", "==", model)))
+      const atcTypeIds = new Set<string>()
+      mappingSnap.docs.forEach(d => {
+        const typeId = d.data()['assigned_appttype_ref']?.id
+        if(!typeId) return
+        atcTypeIds.add(typeId)
+        if(!this.mappingByType.has(typeId)) this.mappingByType.set(typeId, Promise.resolve(d.data()))
+      })
+      if(atcTypeIds.size == 0){
+        console.info("[prescribeATC] no appointment type maps ATC model \"" + model + "\" (atcrequired + atcmodel) — pick specialists manually")
+        return
+      }
       const apptSnap = await getDocs(query(collection(this.firestoreDefault, "appointments"), where("bookedby", "==", doc(this.firestoreDefault, "profile_data", this.participantProfileid))))
-      // only appointments the logged-in specialist shares with this participant (one of its hosts)
-      const shared = apptSnap.docs.filter(d => appointmentHostIds(d.data()).includes(this.loggedinProfileid))
-      const typeRefs = new Map(shared.map(d => [d.id, d.data()['appointment']]))
-      const completed = completedNewestFirst(shared.map(d => ({
+      const appointmentId = pickAtcAppointment(apptSnap.docs.map(d => ({
         id: d.id,
         start: d.data()['starttime']?.toDate?.() ?? null,
         attended: d.data()['attended'],
         cancelled: d.data()['cancelled'],
         typeId: d.data()['appointment']?.id ?? null,
-      })))
-      for(const appt of completed){
-        const mapping = await this.mappingFor(typeRefs.get(appt.id))
-        if(mapping?.['atcrequired'] === true){
-          await this.prefillFromAppointment(appt.id)
-          return
-        }
+        hostIds: appointmentHostIds(d.data()),
+      })), atcTypeIds, this.loggedinProfileid)
+      if(!appointmentId){
+        console.info("[prescribeATC] no \"" + model + "\" appointment of yours with " + this.participantProfileid + " (today or earlier) — pick specialists manually")
+        return
       }
-      console.info("[prescribeATC] no ATC appointment of yours with " + this.participantProfileid + " (today or earlier) — pick specialists manually")
+      // the participant or model may have changed while we were reading
+      if(this.product != model || this.appointmentId) return
+      await this.prefillFromAppointment(appointmentId)
     } catch (error) {
-      console.error("Could not find the participant's latest ATC appointment", error)
+      console.error("Could not find the ATC appointment for this participant", error)
     }
   }
 
@@ -1097,8 +1115,8 @@ export class PrescribeATCComponent {
   async onProfileSelect(){
     console.log("Selected Profile", this.participantProfileid)
     // Before the live-studio check below, so a live studio's specialists (and later an opened draft) still win
-    if(!this.appointmentId && this.participantProfileid && !this.bigActivity()){
-      await this.prefillFromLatestAppointment()
+    if(!this.appointmentId && this.participantProfileid && this.product && !this.bigActivity()){
+      await this.prefillFromAtcModel()
     }
     this.selectedParticipantProfile = {}
     if(this.participantProfileid){

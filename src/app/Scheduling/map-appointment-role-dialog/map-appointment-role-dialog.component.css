@@ -112,3 +112,8 @@ mat-form-field.atc-field{
   word-wrap: break-word;
   white-space: pre-wrap;
 }
+
+mat-form-field.atc-model{
+  width: 100%;
+  margin-top: 10px;
+}

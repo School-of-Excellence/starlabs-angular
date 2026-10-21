@@ -1,6 +1,6 @@
 import {
   appointmentSpecialistRows, propertyLabel, AtcActivity, completedNewestFirst, AppointmentSummary, appointmentRoleIds,
-  hostRoleIds, appointmentHostIds, activityIdsOf,
+  hostRoleIds, appointmentHostIds, activityIdsOf, pickAtcAppointment,
 } from './appointment-specialists';
 
 const ACTS: AtcActivity[] = [
@@ -126,5 +126,34 @@ describe('completedNewestFirst', () => {
       a('nodate', null),
     ];
     expect(completedNewestFirst(list, NOW).map(x => x.id)).toEqual(['ok']);
+  });
+});
+
+describe('pickAtcAppointment', () => {
+  const NOW = new Date(2026, 9, 21, 15, 0);
+  const at = (d: number, h = 10) => new Date(2026, 9, d, h);
+  const a = (id: string, d: number, over: any = {}) =>
+    ({ id, start: at(d), attended: true, cancelled: false, typeId: 'EI_DIAG', hostIds: ['me', 'other'], ...over });
+  const types = new Set(['EI_DIAG', 'EI_IMPL']);
+
+  it('picks the newest appointment of a matching type that the logged-in specialist hosted', () => {
+    expect(pickAtcAppointment([a('old', 10), a('new', 18, { typeId: 'EI_IMPL' }), a('mid', 14)], types, 'me', NOW)).toBe('new');
+  });
+
+  it('ignores other types, appointments you did not host, future and cancelled ones', () => {
+    const list = [
+      a('ok', 12),
+      a('otherType', 19, { typeId: 'EI_SOL' }),
+      a('notMine', 20, { hostIds: ['someone'] }),
+      a('tomorrow', 22),
+      a('cancelled', 20, { cancelled: true }),
+    ];
+    expect(pickAtcAppointment(list, types, 'me', NOW)).toBe('ok');
+  });
+
+  it('returns null when nothing matches (the specialist fills the pickers manually)', () => {
+    expect(pickAtcAppointment([a('x', 12, { hostIds: ['someone'] })], types, 'me', NOW)).toBeNull();
+    expect(pickAtcAppointment([a('x', 12)], new Set(), 'me', NOW)).toBeNull();
+    expect(pickAtcAppointment([a('x', 12)], types, '', NOW)).toBeNull();
   });
 });

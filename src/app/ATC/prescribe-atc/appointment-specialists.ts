@@ -29,13 +29,23 @@ export interface AppointmentSummary { id: string; start: Date | null; attended?:
 /* No ?appointmentid=: the participant's usable appointments, newest first. Not cancelled, typed, dated, and
    not after today: a past day must be attended; today's counts even before its status is updated (prescribing
    right after the session). Future days never count. The caller checks each one's own type mapping in order. */
-export function completedNewestFirst(appointments: AppointmentSummary[], now: Date = new Date()): AppointmentSummary[] {
+export function completedNewestFirst<T extends AppointmentSummary>(appointments: T[], now: Date = new Date()): T[] {
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const startOfTomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
   return appointments
     .filter(a => a.cancelled !== true && !!a.typeId && !!a.start && a.start < startOfTomorrow
       && (a.attended === true || a.start >= startOfToday))
     .sort((a, b) => b.start!.getTime() - a.start!.getTime());
+}
+
+/* prescribeATC (participant + "What is the ATC given for?" chosen): the newest usable appointment whose type is one
+   of the ATC types for that model (AppointmentType-To-Roles atcrequired + atcmodel) and that the logged-in
+   specialist hosted. null = nothing to prefill (the specialist fills the pickers manually). */
+export function pickAtcAppointment(
+  appointments: (AppointmentSummary & { hostIds: string[] })[], atcTypeIds: Set<string>, hostId: string, now: Date = new Date(),
+): string | null {
+  const mine = appointments.filter(a => !!a.typeId && atcTypeIds.has(a.typeId) && !!hostId && a.hostIds.includes(hostId));
+  return completedNewestFirst(mine, now)[0]?.id ?? null;
 }
 
 /* hostRole values are profile_data DocumentReferences from booking, but older writers stored path strings. */

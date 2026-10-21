@@ -33,6 +33,8 @@ export class MapAppointmentRoleDialogComponent {
   appointmentRoleList = []
   // bigactivity docs that carry an atcproperty — the options for each role's ATC activity
   atcActivityList: { id: string, activity: string, atcproperty: string }[] = []
+  // ATC model names (the "atc model" collection) — the same list prescribeATC offers as "What is the ATC given for?"
+  atcModelList: string[] = []
 
   mapAppointmentRoleForm:FormGroup
   loading:boolean = false
@@ -48,6 +50,7 @@ export class MapAppointmentRoleDialogComponent {
       required_role: [,{validators : [Validators.required],updateOn : "change"}],
       additional_role: [[],{validators : [],updateOn : "change"}],
       atcrequired: [false],
+      atcmodel: [{ value: null, disabled: true }],  // required only while ATC is ticked (syncAtcRoles)
       // one control per required role (keyed by eisroles id), kept in sync by syncAtcRoles()
       atcrolemap: this.formBuilder.group({}),
     })
@@ -60,6 +63,7 @@ export class MapAppointmentRoleDialogComponent {
     this.mapAppointmentRoleForm.get('atcrequired').valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.syncAtcRoles())
     this.syncAtcRoles()
     this.loadAtcActivities()
+    this.loadAtcModels()
 
     var existingData = data["data"]
     if(existingData != null && existingData != undefined){
@@ -81,7 +85,8 @@ export class MapAppointmentRoleDialogComponent {
         selectedApptType : existingData.assigned_appttype_ref.id,
         required_role: required,
         additional_role: additional,
-        atcrequired: existingData.atcrequired === true
+        atcrequired: existingData.atcrequired === true,
+        atcmodel: existingData.atcmodel ?? null
       })
       // The rows exist now (built by the valueChanges above); atcrolemap is {roleId: [activityId, …]}
       // (older docs stored a single activityId string — read either)
@@ -119,12 +124,18 @@ export class MapAppointmentRoleDialogComponent {
     for (const roleId of required) {
       atcGroup.addControl(roleId, new FormControl(previous[roleId] ?? [], Validators.required), { emitEvent: false })
     }
+    var atcModel = this.mapAppointmentRoleForm.get('atcmodel')
     if (this.mapAppointmentRoleForm.get('atcrequired').value === true) {
       atcGroup.enable({ emitEvent: false })
+      atcModel.setValidators(Validators.required)
+      atcModel.enable({ emitEvent: false })
     } else {
       atcGroup.disable({ emitEvent: false })
+      atcModel.clearValidators()
+      atcModel.disable({ emitEvent: false })
     }
     atcGroup.updateValueAndValidity()
+    atcModel.updateValueAndValidity({ emitEvent: false })
   }
 
   private async loadAtcActivities() {
@@ -135,6 +146,17 @@ export class MapAppointmentRoleDialogComponent {
         .filter(e => e.atcproperty != null && e.atcproperty !== "")
     } catch (error) {
       console.error("Could not load ATC activities", error)
+    }
+  }
+
+  private async loadAtcModels() {
+    try {
+      var snap = await getDocs(query(collection(this.firestore, "atc model"), orderBy("atcmodel")))
+      this.atcModelList = Array.from(new Set(snap.docs
+        .map(d => (d.data()["atcmodel"] ?? "").toString().trim())
+        .filter(name => name.length != 0)))
+    } catch (error) {
+      console.error("Could not load ATC models", error)
     }
   }
 
@@ -166,6 +188,7 @@ export class MapAppointmentRoleDialogComponent {
         additional_role: additionallist,
         assigned_role: requiredlist.concat(additionallist),
         atcrequired: atcrequired,
+        atcmodel: atcrequired ? (value.atcmodel ?? null) : null,
         atcrolemap: atcrolemap
       }
       console.log(newData)

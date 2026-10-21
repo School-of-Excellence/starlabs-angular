@@ -108,3 +108,14 @@ OBSERVERS / MENTORS sections always show, with the prefilled values (prefill log
 `atcrolemap` values as arrays (`activityIdsOf`, single strings from older docs still accepted) and yields one row
 per (role, activity), so a role mapped to several activities fills each of them (only if empty).
 **Verified:** helper 14/14; tsc + build green.
+
+## 2026-10-21 — prefill keyed on participant + "What is the ATC given for?"
+**Operator's logic:** select participant and ATC model → `AppointmentType-To-Roles` where `atcrequired == true` and
+`atcmodel == <model>` (the types) → `appointments` where `bookedby == participant`, of those types, hosted by the
+logged-in specialist (hostRole/hosts) → hostRole role → `atcrolemap` activities → that activity's Specialist picker
+(only if empty). Nothing found → manual. No card (old UI only).
+**Change:** `prefillFromAtcModel()` replaces the participant-only fallback; called from `onProfileSelect()` (when the
+model is already set) and from `onProductSelect()` (the user's own pick — draft loading never calls it, so drafts
+still win). `pickAtcAppointment()` (pure, 3 specs) = type in set + you hosted + date rule + newest. The mapping
+query seeds the per-type cache so `prefillFromAppointment()` doesn't re-read it. `?appointmentid=` unchanged.
+**Verified:** helper 17/17; tsc + build green. Not run live (needs `atcmodel` set on the mappings first).

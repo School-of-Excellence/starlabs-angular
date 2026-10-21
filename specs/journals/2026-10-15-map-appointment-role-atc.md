@@ -46,3 +46,10 @@ open unticked and save `atcrequired:false, atcrolemap:{}`.
 now `multiple`; saved as `atcrolemap: { <eisroles id>: [<bigactivity id>, …] }` (still required: at least one per
 role). Editing an older doc that stored a single id string loads it as a one-item list, and saving rewrites it as
 an array. Also includes the operator's own subtitle edit (column hint text removed).
+
+## 2026-10-21 — ATC model on the mapping
+**Operator:** when ATC is ticked, ask for the ATC model (dropdown) and save it as an `atcmodel` string in the same
+`AppointmentType-To-Roles` doc. Options = distinct `atc model.atcmodel` names (the list prescribeATC shows as
+"What is the ATC given for?"). Required only while ATC is ticked; saved as `null` when unticked.
+**Why:** prescribeATC now finds a participant's ATC appointment by the ATC model chosen on that screen
+(`atcrequired == true && atcmodel == <chosen>`), so each ATC-enabled type must say which model it belongs to.
