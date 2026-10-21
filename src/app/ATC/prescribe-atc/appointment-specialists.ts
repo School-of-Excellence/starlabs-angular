@@ -1,7 +1,7 @@
 /* Specialists for an ATC, taken from the appointment it was prescribed in.
    Join (all default Firestore, read-only; only the participant's own appointment and its type's mapping):
-     appointments.appointmentrole     [eisroles ref]            — the roles of this booking
-     appointments.hostRole            { "eisroles/<roleId>": [profile_data ref | "profile_data/<pid>"] }
+     appointments.hostRole            { "eisroles/<roleId>": [profile_data ref | "profile_data/<pid>"] }  — roles + people
+     appointments.appointmentrole     [eisroles ref]            — fallback list of roles when hostRole is empty
      AppointmentType-To-Roles         atcrequired, atcrolemap { <roleId>: <bigactivity id> }
      bigactivity                      activity, atcproperty
    role → activity → atcproperty; the role's hosts then fill EVERY activity of that property.
@@ -51,8 +51,17 @@ export function appointmentRoleIds(appointment: { appointmentrole?: any[] | null
   return list.map(r => (typeof r === 'string' ? r.split('/').pop() : r?.id)).filter((id): id is string => !!id);
 }
 
-/* One row per role of the appointment (appointmentrole; every atcrolemap role when it is absent) that maps to a
-   known bigactivity: role -> activity -> atcproperty, with the role's hosts. [] when the type has no ATC. */
+/* eisroles ids that have a host on the appointment: the keys of hostRole ("eisroles/<id>" -> <id>). */
+export function hostRoleIds(appointment: { hostRole?: Record<string, any[]> | null } | null): string[] {
+  return Object.keys(appointment?.hostRole ?? {})
+    .filter(k => k.startsWith('eisroles/'))
+    .map(k => k.split('/').pop()!)
+    .filter(Boolean);
+}
+
+/* One row per role on the appointment that maps to a known bigactivity: role -> activity -> atcproperty, with the
+   role's hosts. Roles come from hostRole's keys (who hosted what); when hostRole is empty, from appointmentrole,
+   else every atcrolemap role. [] when the type has no ATC. */
 export function appointmentSpecialistRows(
   appointment: { hostRole?: Record<string, any[]> | null; appointmentrole?: any[] | null } | null,
   mapping: { atcrequired?: boolean; atcrolemap?: Record<string, string> | null } | null,
@@ -62,7 +71,8 @@ export function appointmentSpecialistRows(
   const byId = new Map(activities.map(a => [a.docid, a]));
   const hostRole = appointment.hostRole ?? {};
   const roleMap = mapping.atcrolemap ?? {};
-  const roles = appointmentRoleIds(appointment) ?? Object.keys(roleMap);
+  const hosted = hostRoleIds(appointment);
+  const roles = hosted.length ? hosted : (appointmentRoleIds(appointment) ?? Object.keys(roleMap));
   const rows: AppointmentSpecialistRow[] = [];
   for (const roleId of Array.from(new Set(roles))) {
     const activityId = roleMap[roleId];

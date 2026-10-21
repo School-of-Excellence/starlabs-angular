@@ -1,6 +1,6 @@
 import {
   appointmentSpecialistRows, propertyLabel, AtcActivity, completedNewestFirst, AppointmentSummary, appointmentRoleIds,
-  specialistsByProperty,
+  specialistsByProperty, hostRoleIds,
 } from './appointment-specialists';
 
 const ACTS: AtcActivity[] = [
@@ -25,10 +25,19 @@ describe('appointment-specialists', () => {
     ]);
   });
 
-  it('only the appointment\'s roles count; without appointmentrole every mapped role does', () => {
+  it('roles come from hostRole keys; appointmentrole is the fallback, then every mapped role', () => {
     const hostRole = { 'eisroles/R_DIAG': [ref('profile_data/a')], 'eisroles/R_IMPL': [ref('profile_data/b')] };
-    expect(appointmentSpecialistRows({ appointmentrole: [ref('eisroles/R_DIAG')], hostRole }, MAP, ACTS).map(r => r.roleId)).toEqual(['R_DIAG']);
-    expect(appointmentSpecialistRows({ hostRole }, MAP, ACTS).map(r => r.roleId)).toEqual(['R_DIAG', 'R_SHADOW', 'R_IMPL']);
+    // hostRole wins over appointmentrole
+    expect(appointmentSpecialistRows({ appointmentrole: [ref('eisroles/R_DIAG')], hostRole }, MAP, ACTS).map(r => r.roleId)).toEqual(['R_DIAG', 'R_IMPL']);
+    // empty hostRole -> appointmentrole
+    expect(appointmentSpecialistRows({ appointmentrole: [ref('eisroles/R_SHADOW')], hostRole: {} }, MAP, ACTS).map(r => r.roleId)).toEqual(['R_SHADOW']);
+    // neither -> every atcrolemap role
+    expect(appointmentSpecialistRows({}, MAP, ACTS).map(r => r.roleId)).toEqual(['R_DIAG', 'R_SHADOW', 'R_IMPL']);
+  });
+
+  it('reads role ids from hostRole keys, ignoring keys that are not eisroles paths', () => {
+    expect(hostRoleIds({ hostRole: { 'eisroles/PaKfMmwbBiGWV7QuXkqN': [], 'other/x': [] } })).toEqual(['PaKfMmwbBiGWV7QuXkqN']);
+    expect(hostRoleIds({})).toEqual([]);
   });
 
   it('accepts path strings and bare ids as hosts, de-duplicated; a role nobody hosted keeps an empty row', () => {

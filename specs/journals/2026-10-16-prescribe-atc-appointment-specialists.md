@@ -79,3 +79,15 @@ role's specialist on ALL author activities.
 (prescribing right after the session); future days never count, even if marked attended (hand-edited data).
 **Verified:** helper 10/10; build green; emulator — a today, not-yet-attended appointment was picked over
 yesterday's attended one (card "Test Two-Role · 20 Oct 2026", swapped hosts).
+
+## 2026-10-21 — roles from hostRole keys; names from profile_data
+**Operator:** take the latest appointment, read the roles from `hostRole` (`eisroles/<id>` keys → role id), map
+them through `AppointmentType-To-Roles.atcrolemap` to the activity, and show each host's name from its own
+`profile_data` doc.
+**Change:** `hostRoleIds()`; `appointmentSpecialistRows` takes roles from hostRole keys (fallback
+`appointmentrole`, then every `atcrolemap` role). The component reads `profile_data/{id}.name` for just the
+appointment's hosts (`appointmentPeopleNames`, used first by `specialistName`) and adds hosts missing from
+`specialistList` (users_roles with a specialist flag) via `withAppointmentPeople()` — also re-applied when the
+users_roles stream emits — so a prefilled mat-select can always display its value.
+**Verified:** helper 11/11; tsc + build green. NOT re-run on the emulator (it had been stopped); the name
+read is one getDoc per host.

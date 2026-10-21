@@ -237,6 +237,8 @@ export class PrescribeATCComponent {
   appointmentTypeName = ''
   appointmentDate: Date = null
   appointmentRoleNames: Record<string, string> = {}  // eisroles id → role name, for the Specialists card
+  appointmentPeopleNames: Record<string, string> = {}  // "profile_data/<pid>" → profile_data.name of each host
+  appointmentPeople: { authorname: string, authorpath: string }[] = []  // hosts kept selectable in the pickers
   appointmentSpecialists: AppointmentSpecialistRow[] = null
   editSpecialists = false
   bigActivityReady: Promise<void> = Promise.resolve()
@@ -752,7 +754,7 @@ export class PrescribeATCComponent {
             })
           }
         }
-        this.specialistList = usersWithRoles
+        this.specialistList = this.withAppointmentPeople(usersWithRoles)
         this.mentorNameList = mentor
         this.profileList = profileList
         console.log("Specialists loaded")
@@ -1007,6 +1009,14 @@ export class PrescribeATCComponent {
       const roleSnaps = await Promise.all(rows.map(r => getDoc(doc(this.firestoreDefault, "eisroles", r.roleId)).catch(() => null)))
       const roleNames: Record<string, string> = {}
       roleSnaps.forEach((snap, i) => roleNames[rows[i].roleId] = (snap?.data() as any)?.['role'] ?? rows[i].roleId)
+      // Specialist names: each host's own profile_data/{id}.name (only these few docs)
+      const people = Array.from(new Set(rows.flatMap(r => r.profilePaths)))
+      const peopleSnaps = await Promise.all(people.map(path => getDoc(doc(this.firestoreDefault, path)).catch(() => null)))
+      const peopleNames: Record<string, string> = {}
+      peopleSnaps.forEach((snap, i) => {
+        const name = (snap?.data() as any)?.['name']
+        if(name) peopleNames[people[i]] = name
+      })
       // A role's specialist covers EVERY activity of its property (author role → all AUTHOR activities, ...)
       const byProperty = specialistsByProperty(rows)
       // same zone + rebuild steps as the live-studio prefill, so the closed mat-selects show the names at once
@@ -1026,6 +1036,9 @@ export class PrescribeATCComponent {
         this.appointmentTypeName = (typeSnap.data() as any)?.['appointmenttype'] ?? ''
         this.appointmentDate = appt['starttime']?.toDate?.() ?? null
         this.appointmentRoleNames = roleNames
+        this.appointmentPeopleNames = peopleNames
+        this.appointmentPeople = people.map(path => ({ authorname: peopleNames[path] ?? path.split('/').pop(), authorpath: path }))
+        this.specialistList = this.withAppointmentPeople(this.specialistList)
         this.appointmentSpecialists = rows
         this.editSpecialists = false
         this.personnelReady = false
@@ -1066,7 +1079,14 @@ export class PrescribeATCComponent {
     return this.appointmentRoleNames[row.roleId] ?? row.roleId
   }
 
+  // The appointment's hosts must stay pickable even when users_roles doesn't list them as specialists
+  withAppointmentPeople(list: any[]): any[] {
+    const extra = this.appointmentPeople.filter(p => !list.some(e => e.authorpath == p.authorpath))
+    return extra.length ? [...list, ...extra] : list
+  }
+
   specialistName(path: string): string {
+    if(this.appointmentPeopleNames[path]) return this.appointmentPeopleNames[path]
     return this.specialistList.find(e => e.authorpath == path)?.authorname ?? this.mapProfile[path.split('/').pop()]?.["name"] ?? path.split('/').pop()
   }
 
