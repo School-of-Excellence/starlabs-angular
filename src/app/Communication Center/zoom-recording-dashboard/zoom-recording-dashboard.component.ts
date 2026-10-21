@@ -89,8 +89,12 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
     // Only the "In Zoom" header is sortable: ascending = In Zoom first, then
     // Not in Zoom, then unknown (—); clicking again reverses; a third click
     // returns to the default date order.
-    this.recordsBackup.sortingDataAccessor = (row: any, column: string) =>
-      column === 'zoom' ? ({ yes: 0, no: 1, unknown: 2 } as any)[this.existsInZoom(row)] : row[column]
+    this.recordsBackup.sortingDataAccessor = (row: any, column: string) => {
+      if (column === 'zoom') return ({ yes: 0, no: 1, unknown: 2 } as any)[this.existsInZoom(row)]
+      if (column === 'meetingTopic') return String(row.meetingTopic || '').toLowerCase()
+      if (column === 'totalSize') return this.zoomTotal(row)
+      return row[column]
+    }
     this.recordsBackup.sort = this.sort;
   }
 
@@ -554,11 +558,14 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
   public verifyAllState: {
     running: boolean; stop: boolean; total: number; done: number
     verified: number; repairing: number; failed: number; skipped: number; errors: number; removed: number
-    problems: Array<{ topic: string; text: string }>
+    problems: Array<{ topic: string; text: string; gone: boolean }>
   } | null = null
 
   // Records Verify all would check: everything listed except runs in progress
   // and recordings already moved to Zoom trash.
+  verifyAllGone(st: { problems: Array<{ gone: boolean }> }) { return st.problems.filter((p) => p.gone) }
+  verifyAllActionable(st: { problems: Array<{ gone: boolean }> }) { return st.problems.filter((p) => !p.gone) }
+
   get verifyAllTargets(): any[] {
     return (this.recordsBackup.filteredData || []).filter((r) => r?.id && r.status !== 'processing' && !r.zoomTrashedAt)
   }
@@ -580,12 +587,18 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
           else if (r.result === 'repairing') st.repairing++
           else if (r.result === 'skipped') st.skipped++
           else if (r.result === 'duplicate_removed') st.removed++
-          else if (r.result === 'failed') { st.failed++; st.problems.push({ topic: r.topic, text: r.problems.join('; ') }) }
-          else { st.errors++; st.problems.push({ topic: r.topic || r.docId, text: r.problems.join('; ') }) }
+          else if (r.result === 'failed') {
+            st.failed++
+            // "No longer in Zoom" = the backup can't be completed any more; keep
+            // those apart from failures someone can still act on.
+            const gone = (r.problems[0] || '').startsWith('No longer in Zoom')
+            st.problems.push({ topic: r.topic, text: (gone ? r.problems.slice(1) : r.problems).join('; '), gone })
+          }
+          else { st.errors++; st.problems.push({ topic: r.topic || r.docId, text: r.problems.join('; '), gone: false }) }
         }
       } catch (e: any) {
         st.errors += chunk.length
-        st.problems.push({ topic: `${chunk.length} record(s)`, text: e?.error?.error || e?.message || 'Request failed' })
+        st.problems.push({ topic: `${chunk.length} record(s)`, text: e?.error?.error || e?.message || 'Request failed', gone: false })
       }
       st.done = Math.min(st.total, i + chunk.length)
     }
@@ -598,10 +611,12 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
 
   // Verify found gaps and the server is backing them up right now.
   // Ends when the repair run re-verifies (repairing is cleared) or crashes
-  // (failedAt after the check).
+  // (failedAt after the check). Treated as over after 2h, so a repair that
+  // never ran can't leave a row "backing up" forever.
   isRepairing(record: any): boolean {
     const v = record?.verification
     if (v?.repairing !== true) return false
+    if (Date.now() - new Date(v.checkedAt).getTime() > 2 * 60 * 60 * 1000) return false
     const failedAt = this.toDate(record?.failedAt)?.getTime() ?? 0
     return !(record?.status === 'failed' && failedAt > new Date(v.checkedAt).getTime())
   }
@@ -685,6 +700,47 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
     }
     if (!folder) return null
     return this.migrationApi.folderOpenUrl(folder) || null
+  }
+
+  // ---- Zoom size vs Dropbox size (validation) ----
+  // Dropbox size of one file: from the last verification (what is really in
+  // Dropbox now), else what the upload committed. null = not known yet.
+  dropboxSizeFor(record: any, file: any): number | null {
+    const v = record?.verification?.files?.[file?._key]?.dropboxSize
+    if (typeof v === 'number') return v
+    return typeof file?.dropboxSize === 'number' ? file.dropboxSize : null
+  }
+
+  // Zoom's CURRENT size from the last verification, when it differs from the
+  // size recorded at backup time (Zoom re-processed the file).
+  zoomNowFor(record: any, file: any): number | null {
+    const z = record?.verification?.files?.[file?._key]?.zoomSize
+    return typeof z === 'number' && z !== Number(file?.fileSize) ? z : null
+  }
+
+  zoomTotal(record: any): number {
+    const files = this.filesWithKeys(record?.files)
+    return files.length ? files.reduce((s, f) => s + (Number(f.fileSize) || 0), 0) : Number(record?.totalSize) || 0
+  }
+
+  // Sum of Dropbox sizes, or null when any file's Dropbox size is unknown.
+  dropboxTotal(record: any): number | null {
+    const files = this.filesWithKeys(record?.files)
+    if (!files.length) return null
+    let sum = 0
+    for (const f of files) {
+      const b = this.dropboxSizeFor(record, f)
+      if (b === null) return null
+      sum += b
+    }
+    return sum
+  }
+
+  bytesTitle(zoom: number, dropbox: number | null): string {
+    const fmt = (n: number) => n.toLocaleString('en-IN')
+    return dropbox === null
+      ? `Zoom: ${fmt(zoom)} bytes · Dropbox size not known yet — Verify to check`
+      : `Zoom: ${fmt(zoom)} bytes · Dropbox: ${fmt(dropbox)} bytes` + (zoom === dropbox ? ' · exact match' : ` · differ by ${fmt(Math.abs(zoom - dropbox))} bytes`)
   }
 
   // ---- formatting helpers ----
