@@ -448,6 +448,8 @@ describe('WorkshopDashboard — All Assignments: a text answer expands its own c
     c.expandedAssignmentTexts = new Set<string>();
     c.viewed = [];
     c.viewParticipantAssignment = (a: any, p: any) => { c.viewed.push(p.profileid); };
+    // The card click is gated on the All Assignments action (onAssignmentCardClick -> can('allassignments')).
+    c.access = { can: (key: string) => key === 'allassignments' };
     return c;
   }
   const text = { profileid: 'p1', assignmentType: 'question', submissionformat: 'text', result: 'A long typed answer…', hasResult: true };
@@ -455,6 +457,14 @@ describe('WorkshopDashboard — All Assignments: a text answer expands its own c
   const upload = { profileid: 'p3', assignmentType: 'question', submissionformat: 'upload', assignmentresult: [{}], hasResult: true };
   const form = { profileid: 'p4', assignmentType: 'form', result: { id: 'r' }, hasResult: true };
   const none = { profileid: 'p5', assignmentType: 'question', submissionformat: 'text', result: '', hasResult: false };
+
+  it('without All Assignments access a click neither expands nor opens anything', () => {
+    const c = make(); c.access = { can: () => false };
+    c.onAssignmentCardClick({}, 0, text);
+    c.onAssignmentCardClick({}, 0, upload);
+    expect(c.expandedAssignmentTexts.size).toBe(0);
+    expect(c.viewed).toEqual([]);
+  });
 
   it('recognises a typed answer, and only that', () => {
     const c = make();

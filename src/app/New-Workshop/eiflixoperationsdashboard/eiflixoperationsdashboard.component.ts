@@ -1503,11 +1503,15 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
         const pid = String(p['profileid'] ?? '').trim();
         const pm = pid ? this.pmMap.get(pid) : undefined;
         const nud = pid ? this.nudMap.get(pid) : undefined;
+        // The dashboard's one new-user rule: movedtoexist == true means they now live in participant
+        // metadata — existing, never "New User" (row tag, card count and the export's User Type all
+        // read this). Operator 2026-10-17.
+        const isNew = this.isNewUserProfile(pid);
         const src: any = pm || nud || {};
         const amount = Number(p['amountRupees']);
         const rs = Number.isFinite(amount) ? amount : 0;
         rupees += rs;
-        if (nud) newUsers++;
+        if (isNew) newUsers++;
         const wsId = this.refId(p['workshopref']);
         return {
           id: p.id,
@@ -1517,7 +1521,7 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
           phonenumber: src.phonenumber,
           initialsLabel: this.initials(src.name),
           unknown: !pm && !nud,
-          ...(nud ? { sourceTag: 'New User' } : {}),
+          ...(isNew ? { sourceTag: 'New User' } : {}),
           // Journey exists only on participant metadata — new-user-only payers get none.
           ...(pm ? { journeyTag: this.journeyTagFor(pm) } : {}),
           workshopTag: this.workshopTitles.get(wsId) || (wsId ? 'Unknown workshop' : undefined),
@@ -1588,7 +1592,8 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
         created: src.created ?? nud.created,
         createdLabel: this.formatCreated(src.created ?? nud.created),
         initialsLabel: this.initials(src.name),
-        ...(pm ? { journeyTag: this.journeyTagFor(pm) } : { sourceTag: 'New User' }),
+        // Everyone on this card has movedtoexist == true, so none is a New User (operator 2026-10-17).
+        ...(pm ? { journeyTag: this.journeyTagFor(pm) } : {}),
         amountLabel: this.planLabel(id),
         // Numeric copy for the panel's Amount sort; not found / loading sort last.
         planValue: this.planTotals?.get(id) ?? undefined,
@@ -1965,7 +1970,8 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
           let plat = perPlatform.get(platKey);
           if (!plat) { plat = Object.create(null) as Record<string, number>; perPlatform.set(platKey, plat); }
           plat[pid] = (plat[pid] || 0) + seconds;
-          if (this.pmMap.has(pid)) {
+          // Existing = participant metadata, or new_user_data already moved to existing.
+          if (this.pmMap.has(pid) || (this.nudMap.has(pid) && !this.isNewUserProfile(pid))) {
             pmSeconds += seconds; pmIds.add(pid);
             if (bucket >= 0) pmB[bucket] += seconds;
           } else if (this.nudMap.has(pid)) {
@@ -2390,8 +2396,8 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
 
   /**
    * profileid -> full profile doc, entirely from the in-memory directory.
-   * 'participant metadata' is PRIMARY; ids found only in new_user_data
-   * carry the 'New User' tag; leftovers render as unknown.
+   * 'participant metadata' is PRIMARY; ids found only in new_user_data carry the
+   * 'New User' tag unless moved to existing; leftovers render as unknown.
    */
   private async resolveProfiles(ids: string[]): Promise<any[]> {
     await Promise.all([this.pmReady, this.nudReady]);
@@ -2400,7 +2406,8 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
         const pm = this.pmMap.get(id);
         if (pm) return { ...pm, id, initialsLabel: this.initials(pm.name), journeyTag: this.journeyTagFor(pm) };
         const nud = this.nudMap.get(id);
-        if (nud) return { ...nud, id, initialsLabel: this.initials(nud.name), sourceTag: 'New User' };
+        // A moved-to-existing doc is not a New User (no tag -> "Existing" in filters and export).
+        if (nud) return { ...nud, id, initialsLabel: this.initials(nud.name), ...(this.isNewUserProfile(id) ? { sourceTag: 'New User' } : {}) };
         return { id, name: 'Unknown profile', email: id, phonenumber: '—', initialsLabel: '?', unknown: true };
       })
       .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
@@ -2564,7 +2571,8 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
     this.nudMap.forEach((nudDoc, id) => {
       if (this.pmMap.has(id)) return; // participant metadata is primary
       const created = this.toDate(nudDoc.created);
-      assign(id, true, created ? this.daysBetween(today, created) : null);
+      // movedtoexist == true: still a user, but an existing one — never counted as new.
+      assign(id, this.isNewUserProfile(id), created ? this.daysBetween(today, created) : null);
     });
     this.naAsOf = new Date();
     this.computeDeviceBreakdown();
@@ -2990,7 +2998,10 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
     const hasLastSeen = rows.some(r => r.lastSeenLabel);
     const hasCreated = rows.some(r => r.createdLabel);
     const hasVideos = rows.some(r => Array.isArray(r.videos));
+    // Master Class Purchase rows carry the workshop they paid for (operator 2026-10-17).
+    const hasWorkshop = rows.some(r => r.workshopTag);
     const header = ['Name', 'Phone Number', 'Email', 'Journey', 'User Type'];
+    if (hasWorkshop) header.push('Workshop');
     if (hasHours) header.push('Watch Hours');
     if (hasVideos) header.push('Videos Watched');
     if (hasLastSeen) header.push('Last Seen');
@@ -3005,6 +3016,7 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
         r.journeyTag || '',
         r.unknown ? 'Unknown' : (r.sourceTag ? 'New User' : 'Existing')
       ];
+      if (hasWorkshop) line.push(r.workshopTag || '');
       if (hasHours) line.push(r.hoursSeconds !== undefined ? +(r.hoursSeconds / 3600).toFixed(2) : '');
       if (hasVideos) line.push(Array.isArray(r.videos) ? r.videos.length : '');
       if (hasLastSeen) line.push(r.lastSeenLabel || '');

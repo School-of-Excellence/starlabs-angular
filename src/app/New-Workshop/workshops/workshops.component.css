@@ -118,6 +118,18 @@
   color: #fff !important;
   box-shadow: 0 2px 8px rgba(26,60,94,.25) !important;
 }
+.actions-caret {
+  margin-left: -2px;
+  opacity: .85;
+}
+.actions-item {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13.5px;
+  min-width: 210px;
+}
+.actions-item mat-icon {
+  color: var(--primary);
+}
 .primary-btn:hover {
   background: var(--primary-light) !important;
   box-shadow: 0 4px 14px rgba(26,60,94,.35) !important;

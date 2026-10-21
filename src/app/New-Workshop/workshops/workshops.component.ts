@@ -13,6 +13,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
 import { MatMenuModule } from '@angular/material/menu';
+import { MatDividerModule } from '@angular/material/divider';
 import { MatDialogModule } from '@angular/material/dialog';
 import { MatDialog } from '@angular/material/dialog';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -71,6 +72,7 @@ export function filterWorkshops(list: any[], status: WorkshopStatusFilter, type:
     MatSlideToggleModule,
     MatSnackBarModule,
     MatMenuModule,
+    MatDividerModule,
     MatTooltipModule,
   ],
   templateUrl: './workshops.component.html',
