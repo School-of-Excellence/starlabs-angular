@@ -1,6 +1,7 @@
 <!-- Shell from Segment Board (standalone).html; the engine renders into #main, the drawer and the dialogs. -->
 <div class="sb-root" #root>
 <div class="app" id="app">
+  <nav class="gnav" id="gnav" data-testid="sgb-gnav" aria-label="Segment groups" hidden></nav>
   <main id="main"></main>
 </div>
 <aside class="drawer" id="drawer" data-testid="sgb-drawer" aria-label="Details"></aside>
@@ -12,6 +13,7 @@
 <dialog id="teamDlg" aria-labelledby="teamTitle"><div class="dlg"></div></dialog>
 <dialog id="cmpDlg" aria-labelledby="cmpTitle"><div class="dlg"></div></dialog>
 <dialog id="migDlg" aria-labelledby="migTitle" data-testid="sgb-mig-dlg"><div class="dlg"></div></dialog>
+<dialog id="grpDlg" aria-labelledby="grpTitle" data-testid="sgb-grp-dlg"><div class="dlg"></div></dialog>
 <div id="selbar" class="selbar" hidden></div>
 <div id="toast" role="status" aria-live="polite"></div>
 </div>
