@@ -9,7 +9,14 @@ export interface SegmentBoardStore {
   load(): Promise<any[]>;                                   // every doc in segmentboardconfig, archived included
   // Every write carries its history: one entry per changed segment, written in the same batch to
   // segmentboardconfig/{segmentid}/segmenthistory/{auto id} (the store adds `at` and `by`). See HistoryEntry.
-  saveSegment(doc: any, opts: { isNew: boolean; orderUpdates: OrderUpdate[]; history: HistoryEntry[] }): Promise<void>;
+  saveSegment(doc: any, opts: { isNew: boolean; orderUpdates: OrderUpdate[]; history: HistoryEntry[]; groupHistory: GroupHistoryEntry[] }): Promise<void>;
+  // segment groups (reference labels): segmentboardgroups/{autoId}, soft delete only; history in segmentboardgroups/{id}/grouphistory
+  loadGroups(): Promise<SegmentGroup[]>;                    // every group, deleted included (old history still names them)
+  createGroup(name: string, order: number): Promise<SegmentGroup>;
+  renameGroup(id: string, from: string, to: string): Promise<void>;
+  deleteGroup(id: string, name: string, segments: { id: string; name: string }[]): Promise<void>;   // soft delete + groupid removed from those segments
+  loadGroupHistory(groupId: string): Promise<any[]>;
+  historyNeedsBackfill(): Promise<boolean>;                 // any segment history entry still on the old at / by fields
   saveDisplayOrder(updates: OrderUpdate[], history: HistoryEntry[]): Promise<void>;   // card order = sequence
   archiveSegment(id: string, history: HistoryEntry[]): Promise<void>;
   unarchiveSegment(id: string, place: { sequence?: number; displayIndex: number }, history: HistoryEntry[]): Promise<void>;
@@ -17,7 +24,7 @@ export interface SegmentBoardStore {
   newSegmentId(): string;                                   // a Firestore auto id for a new segmentboardconfig doc
   profileNames(profileIds: string[]): Promise<Record<string, string>>;   // profile_data name per profile id (history "by")
   // one-time move of text-id segments to auto ids (+ who fields email -> profile id); see MigrationRow
-  migrationPreview(): Promise<MigrationRow[]>;
+  migrationPreview(): Promise<{ rows: MigrationRow[]; history: { count: number; unresolved: number } }>;
   runMigration(rows: MigrationRow[], progress: (done: number, total: number) => void): Promise<MigrationResult>;
   loadAllHistory(limit: number): Promise<any[]>;            // every segment's history (collection group), newest first
   loadParticipants(): Promise<any[]>;                      // participant metadata docs, already mapped (segment-board.facts.ts)
@@ -49,7 +56,13 @@ export interface MigrationRow {
   name: string; archived: boolean; listSize: number | null; historyCount: number;
   who: Record<string, { from: string; to: string | null }>;   // createdBy / updatedBy / archivedBy email -> profile id
 }
-export interface MigrationResult { moved: number; whoFixed: number; filtersRemapped: number; failed: { id: string; error: string }[] }
+export interface MigrationResult { moved: number; whoFixed: number; filtersRemapped: number; historyUpdated: number; failed: { id: string; error: string }[] }
+export interface SegmentGroup { id: string; name: string; order: number; deleted: boolean }
+// one group event: create / rename / delete, or a segment added to or removed from the group
+export interface GroupHistoryEntry {
+  groupid: string; action: 'create' | 'rename' | 'delete' | 'segment-added' | 'segment-removed';
+  segmentid?: string; segmentname?: string; changes: Record<string, unknown>; summary: string;
+}
 export function mountSegmentBoard(root: HTMLElement, store: SegmentBoardStore): () => void {
 const cleanups: Array<() => void> = [];
 const listen = (target, type, fn, opts?) => { target.addEventListener(type, fn, opts); cleanups.push(() => target.removeEventListener(type, fn, opts)); };
@@ -90,6 +103,8 @@ const BIG_LEVELS=['SE Solo','SE Shadow','Diagnostics Shadow','Diagnostics Collab
 // participation request, loaded only for the events picked in the filter (same split as Participant Intelligence).
 let EVENT_NAME={}, QUEUE_NAME={}, QSTAGES={};
 const QTOK=new Map(), CONFIRMED=new Map();
+// queue tokens are read on demand, once per visit: 'none' -> 'loading' -> 'loaded' (or 'error', retried on the next use)
+let tokState='none';
 let confirmedLoading=false;
 const EVENT_MONTH=new Intl.DateTimeFormat('en-IN',{month:'short',year:'numeric'});
 const asMap=a=>Object.fromEntries(a.map(x=>[x,x]));
@@ -270,7 +285,14 @@ const ARCHIVED_IDS=new Set();   // archived docs keep their id reserved
 let ARCHIVED=[];                // archived segments, for the Archived view
 // Firestore auto ids: 20 letters/digits. Older segments used a slug of the name; MIG_NEEDED counts docs still to migrate.
 const AUTO_ID_RE=/^[A-Za-z0-9]{20}$/;
-let MIG_NEEDED=0;
+let MIG_NEEDED=0, HIST_BACKFILL=false;
+// segment groups: id -> group (deleted ones kept so history and old labels still resolve)
+let GROUPS=[]; const GROUP_BY=new Map();
+const liveGroups=()=>GROUPS.filter(g=>!g.deleted).sort((a,b)=>(a.order??0)-(b.order??0)||a.name.localeCompare(b.name));
+const groupName=id=>{ const g=id&&GROUP_BY.get(id); return g?g.name+(g.deleted?' (deleted)':''):''; };
+const liveGroupOf=x=>{ const g=x.groupid&&GROUP_BY.get(x.groupid); return g&&!g.deleted?g:null; };
+const GROUP_OPTS=()=>Object.fromEntries([...liveGroups().map(g=>[g.id,g.name]),['__NONE__','No group']]);
+function setGroups(list){ GROUPS=list.slice(); GROUP_BY.clear(); for(const g of GROUPS) GROUP_BY.set(g.id,g); }
 computeSet(master);
 const AUDIT=[];                 // in-session notes only; the stored history is segmentboardconfig/{id}/segmenthistory
 
@@ -307,9 +329,9 @@ function commitOrder(set,ids,updates){
 
 // ---------- history entries ----------
 // the config fields history tracks, in the stored doc's shapes (rule = plain condition list; {any:[…]} kept)
-const HIST_FIELDS=['name','description','status','journeys','rule','eligibility'];
+const HIST_FIELDS=['name','description','status','journeys','groupid','rule','eligibility'];
 function storedFields(x){
-  const out={name:x.name, description:x.description||'', status:x.status||'active', journeys:[...(x.journeys||[])]};
+  const out={name:x.name, description:x.description||'', status:x.status||'active', journeys:[...(x.journeys||[])], groupid:x.groupid||null};
   if(x.mode==='auto'){ const r=x.rule; out.rule=Array.isArray(r)?r:(r?.all||r||[]); } else out.eligibility=x.eligibility||null;
   return out;
 }
@@ -351,6 +373,17 @@ function stageOptions(){
   for(const toks of QTOK.values()) for(const t of toks) if(F.queues.includes(t.q)&&t.stage&&!out.includes(t.stage)) out.push(t.stage);
   return Object.fromEntries(out.map(x=>[x,x]));
 }
+// queue members: read the first time a queue (or stage) is picked in the Queue filter, then kept for the visit
+function ensureTokens(){
+  const F=S.filters; if(!(F.queues.length||F.queueStages.length)||tokState==='loaded'||tokState==='loading') return;
+  tokState='loading'; reRender();
+  store.loadQueueTokens().then(toks=>{
+    QTOK.clear();
+    for(const t of toks){ if(!t.profileId||!t.queueId) continue; if(!QTOK.has(t.profileId)) QTOK.set(t.profileId,[]); QTOK.get(t.profileId).push({q:t.queueId,stage:t.stage||''}); }
+    tokState='loaded';
+  }).catch(e=>{ tokState='error'; toast(`Couldn’t load queue members: ${e?.message||e}`); })
+    .finally(()=>{ refreshFilter(); reRender(); });
+}
 // confirmed = approved requests, read only for the picked events that aren't loaded yet
 function ensureConfirmed(){
   const F=S.filters; if(F.eventsMode==='attended'||confirmedLoading) return;
@@ -381,11 +414,12 @@ function canonModes(){
 async function load(){
   S.loading=true; S.loadError=null; render();
   try{
-    const [docs,parts,lists,cat,toks]=await Promise.all([store.load(),store.loadParticipants(),store.loadLists(),store.loadCatalog(),
-      store.loadQueueTokens().catch(()=>[])]);
+    // queue_token is not read here: it is fetched the first time the Queue filter is used (ensureTokens)
+    const [docs,parts,lists,cat,groups,backfill]=await Promise.all([store.load(),store.loadParticipants(),store.loadLists(),store.loadCatalog(),
+      store.loadGroups().catch(()=>[]),store.historyNeedsBackfill().catch(()=>false)]);
+    setGroups(groups); HIST_BACKFILL=!!backfill;
     setCatalog(cat);
-    QTOK.clear(); CONFIRMED.clear();
-    for(const t of toks){ if(!t.profileId||!t.queueId) continue; if(!QTOK.has(t.profileId)) QTOK.set(t.profileId,[]); QTOK.get(t.profileId).push({q:t.queueId,stage:t.stage||''}); }
+    QTOK.clear(); CONFIRMED.clear(); tokState='none';
     // A–Z by name (then profile id): every list on the board walks P, so they all come out in this order
     P=parts.slice().sort((x,y)=>x.name.localeCompare(y.name,undefined,{sensitivity:'base',numeric:true})||x.pid.localeCompare(y.pid)); PI=new Map(P.map(p=>[p.pid,p]));
     canonModes();
@@ -406,6 +440,7 @@ async function load(){
     computeSet(master);
   }catch(e){ S.loadError=e?.message||String(e); }
   S.loading=false; render();
+  ensureTokens();   // a Queue filter kept across a reload needs its members again
 }
 
 // ---------- helpers ----------
@@ -434,6 +469,7 @@ const IC={
   rules:ico('<path d="M9 6h11M9 12h11M9 18h11"/><path d="m3 6 1 1 2-2M3 12l1 1 2-2M3 18l1 1 2-2"/>'),
   list:ico('<circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M21 20a6 6 0 0 0-4-5.6"/>'),
   more:ico('<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'),
+  folder:ico('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'),
   close:ico('<path d="M18 6 6 18M6 6l12 12"/>'),
   arrowR:ico('<path d="M5 12h14M13 6l6 6-6 6"/>'),
   grip:ico('<circle cx="9" cy="6" r="1.2"/><circle cx="15" cy="6" r="1.2"/><circle cx="9" cy="12" r="1.2"/><circle cx="15" cy="12" r="1.2"/><circle cx="9" cy="18" r="1.2"/><circle cx="15" cy="18" r="1.2"/>'),
@@ -447,7 +483,7 @@ const emptyFilters=()=>({journey:[],customer:[],finance:[],mode:[],product:'',
   events:[],eventsMode:'any', queues:[],queueStages:[], workshops:[],workshopState:'any',
   ongoing:[], ageMin:'', ageMax:'', bigLevel:[],
   // uP! / CPM attended: count of the picked products in consumedproducts, compared like the conditions
-  upProducts:[], upOp:'gte', upN:'', upN2:'', cpmProducts:[], cpmOp:'gte', cpmN:'', cpmN2:''});
+  upProducts:[], upOp:'gte', upN:'', upN2:'', cpmProducts:[], cpmOp:'gte', cpmN:'', cpmN2:'', groups:[]});
 const COUNT_OPS=[['gte','at least'],['lte','at most'],['eq','exactly'],['between','between']];
 const countOn=(F,k)=>F[k+'Products'].length>0&&F[k+'N']!==''&&(F[k+'Op']!=='between'||F[k+'N2']!=='');
 function countOk(F,k,f){
@@ -456,14 +492,14 @@ function countOk(F,k,f){
 }
 const OPTS={journey:()=>VAL.journeyId, customer:()=>VAL.customerStatus, finance:()=>VAL.financeStatus,
   mode:()=>VAL.participantMode, events:()=>EVENT_NAME, queues:()=>QUEUE_NAME, queueStages:()=>stageOptions(), workshops:()=>asMap(WORKSHOPS),
-  ongoing:()=>PROD, bigLevel:()=>asMap(BIG_LEVELS), upProducts:()=>PROD, cpmProducts:()=>PROD};
+  ongoing:()=>PROD, groups:()=>GROUP_OPTS(), bigLevel:()=>asMap(BIG_LEVELS), upProducts:()=>PROD, cpmProducts:()=>PROD};
 const S={q:'',qRaw:'',showArchived:false,stale:new Set(),refreshing:null,role:'admin',setId:'master',teamId:null,arranging:false,drawer:null,sel:new Set(),dq:'',limit:150,dev:false,dragPids:null,cardView:{},filters:emptyFilters(),fids:null,collapsed:new Set(),prevCollapsed:null,cardSel:new Set()};
 // board search (name or email) narrows like a filter: cards keep only matching rows; empty cards hide
 const qMatch=(p,q)=>p.name.toLowerCase().includes(q)||(p.email||'').toLowerCase().includes(q);
 function filtersOn(){ return filtersActive()||!!S.q; }
 function filtersActive(){const F=S.filters;
   return !!(countOn(F,'up')||countOn(F,'cpm')||F.journey.length||F.customer.length||F.finance.length||F.mode.length||F.product||F.events.length
-    ||F.queues.length||F.queueStages.length||F.workshops.length||F.workshopState!=='any'||F.ongoing.length
+    ||F.queues.length||F.queueStages.length||F.groups.length||F.workshops.length||F.workshopState!=='any'||F.ongoing.length
     ||F.ageMin!==''||F.ageMax!==''||F.bigLevel.length);}
 function matchFilter(p){
   const F=S.filters, f=p.f;
@@ -647,7 +683,7 @@ function renderMain(){
   </div>
   ${appliedBar(t)}
   </div><div class="board-scroll">`;
-  if(edit&&MIG_NEEDED&&!S.showArchived) h+=`<div class="banner mig"><div><b>${plural(MIG_NEEDED,'segment')} still use${MIG_NEEDED===1?'s':''} the old id format.</b>
+  if(edit&&(MIG_NEEDED||HIST_BACKFILL)&&!S.showArchived) h+=`<div class="banner mig"><div><b>${MIG_NEEDED?`${plural(MIG_NEEDED,'segment')} still use${MIG_NEEDED===1?'s':''} the old id format`:''}${MIG_NEEDED&&HIST_BACKFILL?' · ':''}${HIST_BACKFILL?'Older history entries use the old field names':''}.</b>
     <p>New segments get random ids and record who changed them by profile id. Migrate the existing ones once: you’ll see a preview before anything is written.</p></div>
     <div class="acts"><button class="btn primary" data-testid="sgb-mig-open" data-act="migrate">Migrate segment ids…</button></div></div>`;
   if(!edit) h+=`<div class="banner"><div><b>View only.</b> Master segments can be changed by Admins. Everyone else can look, filter and export.</div></div>`;
@@ -660,6 +696,7 @@ function renderMain(){
   } else {
     let segs=set.displayOrder.map(id=>set._by.get(id)).filter(Boolean);
     if(S.q) segs=segs.filter(x=>(t.fby[x.id]||0)>0);   // search: only segments holding a matching participant
+    if(S.filters.groups.length) segs=segs.filter(x=>S.filters.groups.includes(liveGroupOf(x)?.id||'__NONE__'));   // Group filter: cards only
     h+=!segs.length?`<div class="empty"><h3>No segment has a participant matching “${esc(S.qRaw)}”</h3><p class="subtle">Search looks at names and emails in the saved segment lists.</p></div>`
       :`<div class="${S.arranging?'arranging':''}" id="groups"><div class="cards">${segs.map(x=>segCard(set,x,t)).join('')}</div></div>`;
   }
@@ -691,7 +728,7 @@ function fdrop(key,label,on,panel){
 }
 // which filter fields each control owns, so one applied filter can be removed on its own
 const FILTER_KEYS={journey:['journey'],customer:['customer'],finance:['finance'],product:['product','mode'],ongoing:['ongoing'],age:['ageMin','ageMax'],
-  upCnt:['upProducts','upOp','upN','upN2'],cpmCnt:['cpmProducts','cpmOp','cpmN','cpmN2'],events:['events','eventsMode'],queues:['queues','queueStages']};
+  upCnt:['upProducts','upOp','upN','upN2'],cpmCnt:['cpmProducts','cpmOp','cpmN','cpmN2'],groups:['groups'],events:['events','eventsMode'],queues:['queues','queueStages']};
 const PARSE=html=>{const d=document.createElement('div'); d.innerHTML=html; return d;};
 // the applied filters, each removable, under the toolbar; only shown while something narrows the board
 function appliedBar(t){
@@ -705,6 +742,7 @@ function filterBar(t){
   // a chip names what is picked: "Journey: uP!" or "Journey: uP! +2"
   const F=S.filters, sel=(a,all,map)=>!a.length?all:`${map&&map[a[0]]||a[0]}${a.length>1?` +${a.length-1}`:''}`;
   const bar=[
+    fdrop('groups',`Group: ${sel(F.groups,'All',GROUP_OPTS())}`,F.groups.length,checkList('groups',GROUP_OPTS())+'<p class="subtle small" style="margin:8px 6px 0">Shows only the segments in these groups.</p>'),
     fdrop('journey',`Journey: ${sel(F.journey,'All',VAL.journeyId)}`,F.journey.length,checkList('journey',VAL.journeyId)),
     fdrop('customer',`Customer status: ${sel(F.customer,'All',VAL.customerStatus)}`,F.customer.length,checkList('customer',VAL.customerStatus)),
     fdrop('finance',`Finance status: ${sel(F.finance,'All',VAL.financeStatus)}`,F.finance.length,checkList('finance',VAL.financeStatus)),
@@ -727,7 +765,7 @@ function filterBar(t){
     fdrop('queues',`Queue: ${sel(F.queues,'Any',QUEUE_NAME)}${F.queueStages.length?` · ${sel(F.queueStages,'')}`:''}`,F.queues.length||F.queueStages.length,
       `<label class="f">Queues</label>${checkList('queues',QUEUE_NAME)}
        ${F.queues.length?`<label class="f">Stage <span class="opt">optional</span></label>${checkList('queueStages',stageOptions())}`:'<p class="subtle small" style="margin:8px 6px 0">Pick a queue to narrow by its stage.</p>'}
-       <p class="subtle small" style="margin:8px 6px 0">Active, approved queue tokens.</p>`),
+       <p class="subtle small" style="margin:8px 6px 0">${tokState==='loading'?'Loading queue members…':'Active, approved queue tokens, read when you pick a queue.'}</p>`),
     countDrop('up','uP! events'),
     countDrop('cpm','CPM events')
   ].join('');
@@ -769,7 +807,7 @@ function segCard(set,s,t){
       ${S.arranging?`<span class="handle c-handle" title="Drag to move" aria-hidden="true">${IC.grip}</span>`:`<input type="checkbox" class="cardsel" data-cardsel="${s.id}" ${S.cardSel.has(s.id)?'checked':''} aria-label="Select ${esc(s.name)} for an action">`}
       <div class="card-icon" aria-hidden="true">${esc(s.name.replace(/[^A-Za-z0-9]/g,'')[0]||'S')}</div>
       <div class="card-info"><div class="card-title" data-testid="sgb-card-title" title="${esc(s.name)}">${esc(s.name)}</div>
-        <div class="card-meta"><span class="card-n">${filtersOn()?`<b>${fmt(fn)}</b> of ${fmt(n)} match`:`<b>${fmt(n)}</b> participant${n===1?'':'s'}`}</span></div></div>
+        <div class="card-meta"><span class="card-n">${filtersOn()?`<b>${fmt(fn)}</b> of ${fmt(n)} match`:`<b>${fmt(n)}</b> participant${n===1?'':'s'}`}</span>${liveGroupOf(s)?`<span class="card-grp" data-testid="sgb-card-group" title="Group">${IC.folder}${esc(liveGroupOf(s).name)}</span>`:''}</div></div>
       <div class="card-acts"><button class="icon-btn card-count" data-cardtab="${s.id}" aria-pressed="${view!=='people'}" aria-label="${view==='people'?'Show':'Hide'} the conditions of ${esc(s.name)}" title="${view==='people'?'Show conditions':'Hide conditions'}">${IC.rules}</button>${edit?`<button class="icon-btn" data-testid="sgb-card-edit" data-act="edit-seg" data-seg="${s.id}" title="Edit segment" aria-label="Edit ${esc(s.name)}">${IC.edit}</button>`:''}
         <button class="icon-btn collapse-btn" data-collapse="${s.id}" aria-expanded="${!collapsed}" aria-label="${collapsed?'Expand':'Collapse'} ${esc(s.name)}" title="${collapsed?'Expand':'Collapse'}">${IC.chev}</button></div>
     </div>
@@ -859,12 +897,111 @@ async function unarchiveSeg(id){
   render(); toast(`Restored “${seg.name}”.`);
   if(seg.mode==='auto'&&seg.status!=='inactive') await refreshLists([id]); else if(seg.mode==='manual') { await syncAutoLists(); render(); }
 }
+// ---------- segment groups (reference labels): Manage groups dialog + the dialog's Group field ----------
+let GRP=null;            // { histOpen: groupId|null, err }
+const GHIST=new Map();   // groupId -> { loading | rows | error }
+const segsInGroup=id=>[...master.segments,...ARCHIVED].filter(x=>x.groupid===id);
+function groupFieldHtml(){
+  const gs=liveGroups();
+  return `<label class="f" for="sGroup">Group <span class="opt">optional · for reference only</span></label>
+    <select id="sGroup" data-testid="sgb-dlg-group"><option value="">No group</option>${gs.map(g=>`<option value="${esc(g.id)}" ${g.id===B.groupid?'selected':''}>${esc(g.name)}</option>`).join('')}<option value="__new__">+ New group…</option></select>
+    <div id="sGroupNewBox" class="grp-new" hidden><input id="sGroupNew" data-testid="sgb-dlg-group-new" type="text" placeholder="Group name" autocomplete="off"><button type="button" class="btn" data-b="grp-add" data-testid="sgb-dlg-group-add">Add</button></div>`;
+}
+async function addGroup(name){
+  name=String(name||'').trim();
+  if(name.length<2) throw new Error('Give the group a name of at least 2 characters.');
+  if(liveGroups().some(g=>g.name.toLowerCase()===name.toLowerCase())) throw new Error('A group with that name already exists.');
+  const g=await store.createGroup(name,Math.max(0,...GROUPS.map(x=>x.order||0))+1);
+  setGroups([...GROUPS,g]); return g;
+}
+function openGroups(){ if(!canEdit(curSet())) return; GRP={histOpen:null,err:''}; renderGrp(); $('#grpDlg').showModal(); }
+function renderGrp(){
+  const box=$('#grpDlg .dlg'); if(!box||!GRP) return; const gs=liveGroups();
+  const rows=gs.map(g=>{ const n=segsInGroup(g.id).length, st=GHIST.get(g.id);
+    return `<li class="grp-row" data-testid="sgb-grp-row" data-gid="${esc(g.id)}">
+      <div class="grp-line"><input type="text" class="grp-name" data-testid="sgb-grp-name" data-gname="${esc(g.id)}" value="${esc(g.name)}" aria-label="Group name">
+        <span class="subtle small grp-n">${plural(n,'segment')}</span>
+        <button class="btn tertiary" data-testid="sgb-grp-rename" data-grp="rename" data-gid="${esc(g.id)}">Rename</button>
+        <button class="btn tertiary" data-testid="sgb-grp-hist" data-grp="hist" data-gid="${esc(g.id)}" aria-pressed="${GRP.histOpen===g.id}">History</button>
+        <button class="btn danger" data-testid="sgb-grp-delete" data-grp="delete" data-gid="${esc(g.id)}">Delete</button></div>
+      ${GRP.histOpen===g.id?`<div class="grp-hist">${historyListHtml(st,true)}</div>`:''}</li>`; }).join('');
+  box.innerHTML=`<div class="dlg-h"><h2 id="grpTitle">Segment groups</h2><p class="subtle">For reference only: a group labels what its segments are for. It never changes lists or order.</p></div>
+    <div class="dlg-b">
+      <div class="grp-new"><input id="gNew" data-testid="sgb-grp-new-name" type="text" placeholder="New group name" autocomplete="off"><button class="btn primary" data-testid="sgb-grp-create" data-grp="create">${IC.plus}<span>Add group</span></button></div>
+      ${GRP.err?`<div class="info warn">${esc(GRP.err)}</div>`:''}
+      ${gs.length?`<ul class="grp-list">${rows}</ul>`:'<div class="h-empty">No groups yet. Add one above, then pick it in a segment’s Group field.</div>'}
+    </div>
+    <div class="dlg-f"><button class="btn" data-dlg="cancel">Close</button></div>`;
+}
+async function grpAction(kind,gid){
+  const g=gid&&GROUP_BY.get(gid); GRP.err='';
+  try{
+    if(kind==='create'){ await addGroup($('#gNew').value); }
+    else if(kind==='rename'){
+      const to=String($(`input[data-gname="${gid}"]`).value||'').trim();
+      if(to===g.name) return;
+      if(to.length<2) throw new Error('Give the group a name of at least 2 characters.');
+      if(liveGroups().some(x=>x.id!==gid&&x.name.toLowerCase()===to.toLowerCase())) throw new Error('A group with that name already exists.');
+      await store.renameGroup(gid,g.name,to); g.name=to; GHIST.delete(gid);
+    } else if(kind==='delete'){
+      const segs=segsInGroup(gid);
+      if(!confirm(`Delete the group “${g.name}”?\n\n${segs.length?`It is removed from ${plural(segs.length,'segment')}; the segments themselves stay.`:'No segments are in it.'}`)) return;
+      await store.deleteGroup(gid,g.name,segs.map(x=>({id:x.id,name:x.name})));
+      g.deleted=true; for(const x of segs) delete x.groupid; forgetHistory(segs.map(x=>x.id)); GHIST.delete(gid);
+      if(S.filters.groups.includes(gid)){ S.filters.groups=S.filters.groups.filter(x=>x!==gid); refreshFilter(); }
+    } else if(kind==='hist'){
+      GRP.histOpen=GRP.histOpen===gid?null:gid;
+      if(GRP.histOpen&&!GHIST.has(gid)){ GHIST.set(gid,{loading:true});
+        store.loadGroupHistory(gid).then(rows=>{ GHIST.set(gid,{rows}); loadNames(rows); }).catch(e=>GHIST.set(gid,{rows:[],error:e?.message||String(e)})).finally(renderGrp); }
+    }
+  }catch(e){ GRP.err=e?.message||String(e); }
+  renderGrp(); render();
+}
+
+// ---------- groups side panel ----------
+// segments of a group on the board (archived left out); '__NONE__' = segments with no live group
+const boardSegsOf=gid=>master.segments.filter(x=>(liveGroupOf(x)?.id||'__NONE__')===gid);
+const sendableSegsOf=gid=>boardSegsOf(gid).filter(x=>x.status!=='inactive');
+// unique participants across these segments, following the active filters (as the send would)
+function uniquePeople(segIds){ if(!segIds.length) return 0; return actionTargets({segs:segIds}).length; }
+// always-visible left panel: All segments, every live group, Not grouped. A click shows only that group's cards
+// (the Group filter); Select puts its active segments in the send bar.
+function renderNav(){
+  const nav=$('#gnav'); if(!nav) return;
+  if(S.loading||S.loadError||S.teamId){ nav.hidden=true; return; }
+  nav.hidden=false;
+  const set=curSet(), edit=canEdit(set), cur=S.filters.groups.length===1?S.filters.groups[0]:(S.filters.groups.length?'__MULTI__':'');
+  const item=(id,name,attr,none)=>{
+    const segs=id?boardSegsOf(id):set.segments, send=id?sendableSegsOf(id):[], people=id?uniquePeople(send.map(x=>x.id)):tally(set).total-tally(set).unseg;
+    const on=id===cur||(!id&&!cur);
+    return `<li class="gn-item ${on?'on':''} ${none?'none':''}" ${attr}>
+      <button class="gn-link" data-act="gnav" data-gnav="${esc(id)}" aria-current="${on}" title="${esc(name)}">${none||!id?'':IC.folder}<span class="gn-name">${esc(name)}</span>
+        <span class="gn-n" data-testid="sgb-gnav-count">${fmt(segs.length)}</span></button>
+      ${id?`<div class="gn-sub"><span>${fmt(people)} participant${people===1?'':'s'}</span>${edit&&send.length?`<button class="btn link" data-testid="sgb-gnav-select" data-act="select-group" data-gsel="${esc(id)}" ${S.arranging?'disabled':''} title="Select this group's active segments to send">Select</button>`:''}</div>`:''}
+    </li>`;
+  };
+  nav.innerHTML=`<div class="gn-h"><span>Groups</span>${edit?`<button class="icon-btn" data-testid="sgb-groups-manage" data-act="manage-groups" title="Manage groups" aria-label="Manage groups">${IC.edit}</button>`:''}</div>
+    <ul class="gn-list">
+      ${item('','All segments','data-testid="sgb-gnav-all"')}
+      ${liveGroups().map(g=>item(g.id,g.name,'data-testid="sgb-gnav-item"')).join('')}
+      ${item('__NONE__','Not grouped','data-testid="sgb-gnav-none"',true)}
+    </ul>
+    ${!liveGroups().length&&edit?'<p class="gn-empty">No groups yet. Use the pencil to add one, then pick it in a segment’s Group field.</p>':''}`;
+}
+// select every active segment of a group, as if their cards were ticked; the bar then sends to them
+function selectGroup(gid){
+  if(!canEdit(curSet())||S.arranging) return;
+  const ids=sendableSegsOf(gid).map(x=>x.id); if(!ids.length) return toast('No active segments in this group.');
+  S.sel.clear(); S.cardSel=new Set(ids); S.selGroup=gid;
+  render(); renderSelBar();
+}
+
 // ---------- one-time id migration (text ids -> auto ids; who fields email -> profile id) ----------
 let MIG=null;
 function openMigrate(){
   if(!canEdit(curSet())) return;
   MIG={state:'loading'}; renderMig(); $('#migDlg').showModal();
-  store.migrationPreview().then(rows=>{ MIG={state:'preview',rows}; renderMig(); })
+  store.migrationPreview().then(({rows,history})=>{ MIG={state:'preview',rows,hist:history}; renderMig(); })
     .catch(e=>{ MIG={state:'error',error:e?.message||String(e)}; renderMig(); });
 }
 function renderMig(){
@@ -873,8 +1010,10 @@ function renderMig(){
   if(MIG.state==='loading') body='<div class="h-empty"><div class="sb-spinner" role="status" aria-label="Reading"></div>Reading segments, lists and history…</div>';
   else if(MIG.state==='error') body=`<div class="info warn">Couldn’t prepare the migration: ${esc(MIG.error)}</div>`;
   else if(MIG.state==='preview'||MIG.state==='running'){
-    const rows=MIG.rows, moves=rows.filter(r=>r.newId), unresolved=rows.flatMap(r=>Object.values(r.who).filter(w=>!w.to).map(w=>w.from));
-    body=!rows.length?'<div class="info">Nothing to migrate: every segment already uses a random id and profile ids.</div>'
+    const rows=MIG.rows, moves=rows.filter(r=>r.newId), unresolved=rows.flatMap(r=>Object.values(r.who).filter(w=>!w.to).map(w=>w.from)), hc=MIG.hist?.count||0;
+    const histLine=hc?`<div class="mig-sum"><b>${fmt(hc)} history ${hc===1?'entry':'entries'}</b> get <code>updatedat</code> / <code>updatedby</code> (profile id) in place of <code>at</code> / <code>by</code>${MIG.hist.unresolved?` · <span class="chip warn">${fmt(MIG.hist.unresolved)} ${MIG.hist.unresolved===1?'entry':'entries'}: editor not found, keeps its old “by”</span>`:''}</div>`:'';
+    body=!rows.length&&!hc?'<div class="info">Nothing to migrate: every segment already uses a random id and profile ids.</div>'
+      :!rows.length?histLine+(MIG.state==='running'?`<div class="info" id="migProg">Updating history…</div>`:'<div class="info warn">Make sure nobody edits segments while this runs.</div>')
       :`<p class="subtle small" style="margin:0 0 10px">Each segment moves in one batch: a new config doc with a random id (the old id kept as <code>legacyid</code>), its list under the new id, its history copied, and the old doc archived with a pointer to the new one. Nothing is hard-deleted. Saved Participant Intelligence filters that pick these segments are updated too.</p>
       <div class="mig-sum"><b>${plural(moves.length,'segment')}</b> get a new id · <b>${plural(rows.filter(r=>Object.keys(r.who).length).length,'segment')}</b> get profile ids for who changed them${unresolved.length?` · <span class="chip warn">${plural(new Set(unresolved).size,'email')} not found in profile_data (left as is)</span>`:''}</div>
       <div class="tbl-wrap mig-tbl"><table class="pt"><thead><tr><th>Segment</th><th>Id</th><th class="num">List</th><th class="num">History</th><th>Who fields</th></tr></thead><tbody>
@@ -883,11 +1022,12 @@ function renderMig(){
         <td class="num">${r.listSize==null?'—':fmt(r.listSize)}</td><td class="num">${fmt(r.historyCount)}</td>
         <td class="small">${Object.entries(r.who).map(([k,w])=>`${k}: ${esc(w.from)} → ${w.to?esc(w.to):'<span class="chip warn">not found</span>'}`).join('<br>')||'<span class="subtle">—</span>'}</td></tr>`).join('')}
       </tbody></table></div>
+      ${histLine}
       ${MIG.state==='running'?`<div class="info" id="migProg">Migrating… ${MIG.done||0} of ${rows.length}</div>`:'<div class="info warn">Back up segmentboardconfig and segmentboardlist first, and make sure nobody edits segments while this runs.</div>'}`;
-    if(rows.length) foot=`<button class="btn" data-dlg="cancel" ${MIG.state==='running'?'disabled':''}>Cancel</button><button class="btn primary" data-testid="sgb-mig-run" data-act="mig-run" ${MIG.state==='running'?'disabled':''}>${MIG.state==='running'?'Migrating…':`Migrate ${plural(rows.length,'segment')}`}</button>`;
+    if(rows.length||hc) foot=`<button class="btn" data-dlg="cancel" ${MIG.state==='running'?'disabled':''}>Cancel</button><button class="btn primary" data-testid="sgb-mig-run" data-act="mig-run" ${MIG.state==='running'?'disabled':''}>${MIG.state==='running'?'Migrating…':rows.length?`Migrate ${plural(rows.length,'segment')}`:'Update history'}</button>`;
   } else if(MIG.state==='done'){
     const r=MIG.result;
-    body=`<div class="info ${r.failed.length?'warn':''}"><b>Done.</b> ${plural(r.moved,'segment')} moved to new ids · ${plural(r.whoFixed,'segment')} updated to profile ids · ${plural(r.filtersRemapped,'saved filter')} updated.${r.failed.length?`<br>${plural(r.failed.length,'segment')} failed and can be retried: ${r.failed.map(f=>`${esc(f.id)} (${esc(f.error)})`).join(', ')}`:''}</div>`;
+    body=`<div class="info ${r.failed.length?'warn':''}"><b>Done.</b> ${plural(r.moved,'segment')} moved to new ids · ${plural(r.whoFixed,'segment')} updated to profile ids · ${plural(r.filtersRemapped,'saved filter')} updated · ${fmt(r.historyUpdated)} history ${r.historyUpdated===1?'entry':'entries'} updated.${r.failed.length?`<br>${plural(r.failed.length,'segment')} failed and can be retried: ${r.failed.map(f=>`${esc(f.id)} (${esc(f.error)})`).join(', ')}`:''}</div>`;
     foot='<button class="btn primary" data-testid="sgb-mig-done" data-act="mig-done">Reload the board</button>';
   }
   box.innerHTML=`<div class="dlg-h"><h2 id="migTitle">Migrate segment ids</h2><p class="subtle">One time${MIG.rows?' · '+plural(MIG.rows.length,'segment'):''}</p></div><div class="dlg-b">${body}</div><div class="dlg-f">${foot}</div>`;
@@ -1018,13 +1158,16 @@ function conditionsHtml(set,s,compact){
     ${!compact&&edit?`<button class="btn" data-act="edit-seg" data-seg="${s.id}">Edit segment</button>`:''}
     ${compact?'':`<pre class="dev-note block">${esc(JSON.stringify({journeys:js.ids,rule:s.rule},null,2))}</pre>`}`;
 }
-const H_ACTION={create:'Created',edit:'Edited',archive:'Archived',unarchive:'Unarchived',reorder:'Moved',migrate:'New id'};
-const H_FIELD={id:'Segment id',name:'Name',description:'Description',status:'Status',journeys:'Journey',rule:'Conditions',eligibility:'Eligibility',position:'Board position',sequence:'Sequence',archived:'Archived'};
+const H_ACTION={create:'Created',edit:'Edited',archive:'Archived',unarchive:'Unarchived',reorder:'Moved',migrate:'New id',rename:'Renamed',delete:'Deleted','segment-added':'Segment added','segment-removed':'Segment removed'};
+const H_FIELD={id:'Segment id',groupid:'Group',segments:'Segments',deleted:'Deleted',name:'Name',description:'Description',status:'Status',journeys:'Journey',rule:'Conditions',eligibility:'Eligibility',position:'Board position',sequence:'Sequence',archived:'Archived'};
 function hVal(f,v){
   if(v===null||v===undefined||v===''||(Array.isArray(v)&&!v.length)) return '<span class="subtle">—</span>';
   if(f==='rule'||f==='eligibility'){ const r=Array.isArray(v)?{all:v}:v; try{ const ex=expand(r); return `<ul class="h-rules">${(ex.all||ex.any).map(n=>`<li>${esc(describe(n))}</li>`).join('')}</ul>${ex.any?'<span class="subtle small">any of these</span>':''}`; }catch(e){ return `<code>${esc(JSON.stringify(v))}</code>`; } }
   if(f==='journeys') return esc(v.map(id=>VAL.journeyId[id]||id).join(', '));
   if(f==='status') return v==='inactive'?'Inactive':'Active';
+  if(f==='groupid') return esc(groupName(v)||v);
+  if(f==='segments'&&typeof v==='object') return esc([...(v.added||[]).map(id=>'+ '+segName(curSet(),id)),...(v.removed||[]).map(id=>'− '+segName(curSet(),id))].join(', ')||'—');
+  if(f==='deleted') return v?'Yes':'No';
   if(f==='archived') return v?'Yes':'No';
   return esc(String(v));
 }
@@ -1051,7 +1194,7 @@ function loadNames(rows){
   if(!ids.length||pnLoading) return; pnLoading=true;
   store.profileNames(ids).then(m=>{ for(const id of ids) PNAMES.set(id,m[id]||''); })
     .catch(()=>{ for(const id of ids) PNAMES.set(id,''); })
-    .finally(()=>{ pnLoading=false; if(S.drawer&&(S.drawer.kind==='history'||S.drawer.tab==='history')) renderDrawer(); });
+    .finally(()=>{ pnLoading=false; if(S.drawer&&(S.drawer.kind==='history'||S.drawer.tab==='history')) renderDrawer(); if(GRP) renderGrp(); });
 }
 function loadSegHistory(id){
   if(HIST.has(id)) return; HIST.set(id,{loading:true});
@@ -1088,7 +1231,7 @@ function renderDrawer(fresh){
     const pinnedOut=auto?hit.length-d.live.size:0;   // match, but sit in a manual segment
     const n=auto?d.live.size:(t.by[s.id]||0);
     const saved=L?L.ids.size:0, inBoth=auto&&L?[...d.live].filter(id=>L.ids.has(id)).length:0;
-    chips=`<span class="chip ${s.mode}">${auto?'Automated':'Manual'}</span><span class="chip">${plural(n,'participant')}${auto?' match now':''}</span>${s.sourceSegmentId?'<span class="chip">Copied from master</span>':''}`;
+    chips=`${liveGroupOf(s)?`<span class="chip grp">${IC.folder}${esc(liveGroupOf(s).name)}</span>`:''}<span class="chip ${s.mode}">${auto?'Automated':'Manual'}</span><span class="chip">${plural(n,'participant')}${auto?' match now':''}</span>${s.sourceSegmentId?'<span class="chip">Copied from master</span>':''}`;
     const tb=[['people',`Participants · ${fmt(n)}`],['rules','Conditions'],['history','History']];
     tabs=`<div class="tabs" role="tablist">${tb.map(([k,l])=>`<button class="tab" role="tab" ${k==='history'?'data-testid="sgb-drawer-tab-history"':''} data-tab="${k}" aria-selected="${d.tab===k}">${l}</button>`).join('')}</div>`;
     if(d.tab==='rules') content=conditionsHtml(set,s);
@@ -1198,10 +1341,13 @@ function renderSelBar(){
   }
   if(S.cardSel.size){
     const ids=[...S.cardSel];
-    const n=team?ids.reduce((a,id)=>a+groupCount(team.groups.find(g=>g.id===id),t),0)
-               :ids.reduce((a,id)=>a+((filtersOn()?t.fby[id]:t.by[id])||0),0);
+    // unique people across the selected segments: what a send reaches (someone in two of them counts once)
+    const n=team?ids.reduce((a,id)=>a+groupCount(team.groups.find(g=>g.id===id),t),0):uniquePeople(ids);
+    const sendable=S.selGroup?sendableSegsOf(S.selGroup).map(x=>x.id):[];
+    const whole=S.selGroup&&sendable.length===ids.length&&sendable.every(id=>S.cardSel.has(id));
+    const gname=whole?(S.selGroup==='__NONE__'?'Not grouped':groupName(S.selGroup)):'';
     bar.hidden=false;
-    bar.innerHTML=`<b>${plural(ids.length,team?'group':'segment')} selected · ${fmt(n)} participants</b>
+    bar.innerHTML=`<b data-testid="sgb-selbar-label">${gname?`Group: ${esc(gname)} · ${plural(ids.length,'segment')}`:`${plural(ids.length,team?'group':'segment')} selected`} · ${fmt(n)} participant${n===1?'':'s'}</b>
       ${actionsWidget('data-multi="1"')}
       <span class="bar-sep"></span>
       <button class="btn small ghost" data-act="clear-cardsel">Clear</button>`;
@@ -1212,7 +1358,7 @@ function renderSelBar(){
 function toggleSel(pid){S.sel.has(pid)?S.sel.delete(pid):S.sel.add(pid);
   $$(`[data-pid="${pid}"]`).forEach(el=>{el.classList.toggle('sel',S.sel.has(pid));const c=el.querySelector('input[data-selpid]');if(c)c.checked=S.sel.has(pid);});
   updateBulk();}
-function toggleCardSel(id){S.cardSel.has(id)?S.cardSel.delete(id):S.cardSel.add(id);
+function toggleCardSel(id){S.cardSel.has(id)?S.cardSel.delete(id):S.cardSel.add(id); if(!S.cardSel.size) S.selGroup=null;
   $$(`[data-cardsel="${id}"]`).forEach(b=>{b.checked=S.cardSel.has(id);b.closest('.card')?.classList.toggle('picked',S.cardSel.has(id));});
   renderSelBar();}
 
@@ -1294,8 +1440,8 @@ function openSegDlg(mode,segId){
   const set=curSet();
   if(mode==='edit'){
     const s=set._by.get(segId||S.drawer.id), auto=s.mode==='auto', ex=auto?expand(s.rule):null, comb=ex&&ex.any?'any':'all';
-    B={mode,id:s.id,name:s.name,description:s.description||'',scope:jScope([...(s.journeys||[])]),type:s.mode,comb,rows:auto?toRows(ex[comb]):[],sequence:s.sequence,status:s.status||'active',eligibility:s.eligibility||null};}
-  else B={mode:'create',newId:store.newSegmentId(),name:'',description:'',scope:{type:'journey',ids:[]},type:'auto',status:'active',comb:'all',rows:[],eligibility:null,
+    B={mode,id:s.id,groupid:liveGroupOf(s)?.id||'',name:s.name,description:s.description||'',scope:jScope([...(s.journeys||[])]),type:s.mode,comb,rows:auto?toRows(ex[comb]):[],sequence:s.sequence,status:s.status||'active',eligibility:s.eligibility||null};}
+  else B={mode:'create',newId:store.newSegmentId(),groupid:'',name:'',description:'',scope:{type:'journey',ids:[]},type:'auto',status:'active',comb:'all',rows:[],eligibility:null,
     order:[...seqSegs(set).map(x=>x.id),NEW_ID]};   // where the new segment is checked; it starts last
   renderSegDlg(); $('#segDlg').showModal();
 }
@@ -1349,6 +1495,7 @@ function renderSegDlg(){
   h.push(`<div class="dlg-h"><h2>${B.mode==='edit'?'Edit segment':'New segment'}</h2><p class="subtle">${esc(set.name)}${B.mode==='edit'?' · '+(B.type==='auto'?'automated':'manual')+' segment':''}</p></div><div class="dlg-b">`);
   h.push(`<label class="f" for="sName">Segment name</label><input id="sName" data-testid="sgb-dlg-name" type="text" value="${esc(B.name)}" placeholder="e.g. CPM – ready for Arena" autocomplete="off">`);
   h.push(`<label class="f" for="sDesc">Description <span class="opt">optional</span></label><textarea id="sDesc" rows="2" maxlength="${DESC_MAX}" placeholder="Who this segment is for and what it is used for">${esc(B.description)}</textarea><div class="char-count" id="sDescN">${B.description.length} / ${DESC_MAX}</div>`);
+  h.push(groupFieldHtml());
   if(B.mode==='create')
     h.push(`<label class="f">How participants get in</label><div class="radio-cards"><label><input type="radio" data-testid="sgb-dlg-type-auto" name="sType" value="auto" ${B.type==='auto'?'checked':''}> <b>Automated</b><span>Rules place people here and keep it up to date.</span></label><label><input type="radio" data-testid="sgb-dlg-type-manual" name="sType" value="manual" ${B.type==='manual'?'checked':''}> <b>Manual</b><span>People are placed here by hand and stay until moved.</span></label></div><p class="subtle small">You can’t change this after the segment is created.</p>`);
   h.push(`<label class="f">Status</label><div class="seg-toggle" role="radiogroup" aria-label="Status">${[['active','Active'],['inactive','Inactive']].map(([v,l])=>`<label><input type="radio" ${v==='active'?'data-testid="sgb-dlg-status-active"':'data-testid="sgb-dlg-status-inactive"'} name="sStatus" value="${v}" ${B.status===v?'checked':''}>${l}</label>`).join('')}</div>
@@ -1419,6 +1566,7 @@ function buildDoc(){   // the Firestore document this dialog saves
   const set=curSet(), name=B.name.trim(), desc=B.description.trim(), edit=B.mode==='edit';
   const doc={id:edit?B.id:B.newId, name};
   if(desc) doc.description=desc;
+  if(B.groupid) doc.groupid=B.groupid;
   doc.mode=B.type; doc.status=B.status;
   doc.journeys=[...B.scope.ids];
   // rule is stored as a plain list of conditions, all of which must be true (no "all" wrapper);
@@ -1493,6 +1641,7 @@ async function saveSeg(){
     if(name!==s.name) changes.push(`renamed from “${s.name}” to “${name}”`);
     const was=jScope(s.journeys); if(scopeKey(was)!==scopeKey(B.scope)) changes.push(`journey changed: ${scopeText(was)} → ${scopeText(B.scope)}`);
     const desc=B.description.trim(); if(desc!==(s.description||'')) changes.push(desc?'description updated':'description removed');
+    if((liveGroupOf(s)?.id||'')!==(B.groupid||'')) changes.push(`group: ${groupName(liveGroupOf(s)?.id)||'none'} → ${groupName(B.groupid)||'none'}`);
     if(B.type==='auto'){const before=describeRule(s.rule), after=describeRule(buildRule()); if(before!==after) changes.push(`conditions changed: ${before} → ${after}`);}
     if(!changes.length){$('#segDlg').close(); toast('No changes to save.'); return;}
   }
@@ -1519,20 +1668,27 @@ async function saveSeg(){
     if(Object.keys(ch).length) history.push(hEntry({id:B.id,name},'edit',ch,changes.map(c=>c[0].toUpperCase()+c.slice(1)).join(' · ')));
   }
   history.push(...plan.history);
+  // the groups record what joined and left them
+  const groupHistory=[], segId=isNew?doc.id:B.id, oldG=isNew?'':(liveGroupOf(set._by.get(B.id))?.id||''), newG=B.groupid||'';
+  if(oldG!==newG){
+    if(oldG) groupHistory.push({groupid:oldG,action:'segment-removed',segmentid:segId,segmentname:name,changes:{segments:{added:[],removed:[segId]}},summary:`Removed “${name}”`});
+    if(newG) groupHistory.push({groupid:newG,action:'segment-added',segmentid:segId,segmentname:name,changes:{segments:{added:[segId],removed:[]}},summary:`Added “${name}”`});
+  }
   saving=true; err(''); if(go){go.disabled=true; go.textContent='Saving…';}
-  try{ await store.saveSegment(doc,{isNew,orderUpdates:plan.updates,history}); }
+  try{ await store.saveSegment(doc,{isNew,orderUpdates:plan.updates,history,groupHistory}); }
   catch(e){ saving=false; if(go){go.disabled=false; go.textContent=isNew?'Create segment':'Save changes';} return err(`Couldn’t save to segmentboardconfig: ${e?.message||e}`); }
   saving=false;
   if(!isNew&&changes.some(c=>/^(conditions|journey|status)/.test(c))) S.stale.add(B.id);
   // written: apply the same doc to the board
   const seg=fromDoc(doc);
-  forgetHistory([seg.id,...plan.updates.map(u=>u.id)]);
+  forgetHistory([seg.id,...plan.updates.map(u=>u.id)]); for(const g of groupHistory) GHIST.delete(g.groupid);
   if(isNew){
     set.segments.push(seg); set.defaultDisplayOrder.push(seg.id);
     commitOrder(set,newOrder,plan.updates);
   } else {
     const i=set.segments.findIndex(x=>x.id===seg.id), old=set.segments[i];
     set.segments[i]={...old,...seg,_stored:old._stored,sequence:old.sequence};
+    if(!doc.groupid) delete set.segments[i].groupid;
     if(!doc.description) delete set.segments[i].description;
   }
   computeSet(set);
@@ -1822,7 +1978,7 @@ function stopSort(){sortables.forEach(s=>s.destroy());sortables=[];}
 function readOrder(){return $$('#groups .card').map(x=>x.dataset.seg);}
 
 // ---------- render all ----------
-function render(){ stopSort(); renderMain(); if(S.drawer) renderDrawer(); if(S.arranging) enableSort(); }
+function render(){ stopSort(); renderMain(); renderNav(); if(S.drawer) renderDrawer(); if(S.arranging) enableSort(); }
 
 // ---------- events ----------
 listen(root,'click',e=>{
@@ -1844,6 +2000,12 @@ listen(root,'click',e=>{
       else if(t.closest('[data-act="cmp-back"]')){ CMP.result=null; renderCmp(); }
       else if(t.closest('[data-act="cmp-export"]')) cmpExport(false);
       else if(t.closest('[data-act="cmp-export-all"]')) cmpExport(true);
+      return;
+    }
+    if(dlg.id==='grpDlg'&&GRP){ const b=t.closest('[data-grp]'); if(b) grpAction(b.dataset.grp,b.dataset.gid); return; }
+    if(dlg.id==='segDlg'&&t.closest('[data-b="grp-add"]')){
+      addGroup($('#sGroupNew').value).then(g=>{ B.groupid=g.id; const box=$('#sGroupNewBox'); renderSegDlg(); $('#sErr').textContent=''; })
+        .catch(e=>{ $('#sErr').textContent=e?.message||String(e); });
       return;
     }
     if(dlg.id==='migDlg'){
@@ -1899,6 +2061,9 @@ listen(root,'click',e=>{
     else if(act==='reload') load();
     else if(act==='export-list') exportList();
     else if(act==='migrate') openMigrate();
+    else if(act==='gnav'){ const id=a.dataset.gnav; S.filters.groups=id?[id]:[]; S.cardSel.clear(); S.selGroup=null; refreshFilter(); render(); renderSelBar(); }
+    else if(act==='manage-groups') openGroups();
+    else if(act==='select-group') selectGroup(a.dataset.gsel);
     else if(act==='show-archived'){ S.showArchived=!S.showArchived; render(); }
     else if(act==='unarchive') unarchiveSeg(a.dataset.seg);
     else if(act==='move-manual') openManualMove();
@@ -1907,7 +2072,7 @@ listen(root,'click',e=>{
     else if(act==='refresh-all') refreshLists(set._auto.map(x=>x.id));
     else if(act==='more'){S.limit+=150;renderDrawer();}
     else if(act==='clear-sel'){S.sel.clear();$$('input[data-selpid]').forEach(i=>i.checked=false);updateBulk();}
-    else if(act==='clear-cardsel'){S.cardSel.clear();render();renderSelBar();}
+    else if(act==='clear-cardsel'){S.cardSel.clear();S.selGroup=null;render();renderSelBar();}
     else if(act==='move') openMove([...S.sel]);
     else if(act==='history'){ ALLHIST=null; openDrawer({kind:'history'}); }
     else if(act==='new-seg') openSegDlg('create');
@@ -1925,7 +2090,7 @@ listen(root,'click',e=>{
     else if(act==='clear-filters'){S.filters=emptyFilters();refreshFilter();render();}
     else if(act==='collapse-all'){const items=S.teamId?curTeam().groups:set.segments; const all=items.every(x=>S.collapsed.has(x.id));
       items.forEach(x=>all?S.collapsed.delete(x.id):S.collapsed.add(x.id)); render();}
-    else if(act==='arrange'){closeDrawer();S.arranging=true;S.prevCollapsed=new Set(S.collapsed);(S.teamId?curTeam().groups:set.segments).forEach(x=>S.collapsed.add(x.id));render();
+    else if(act==='arrange'){closeDrawer(); if(S.filters.groups.length||S.q){ S.filters.groups=[]; S.q=''; S.qRaw=''; refreshFilter(); }S.arranging=true;S.prevCollapsed=new Set(S.collapsed);(S.teamId?curTeam().groups:set.segments).forEach(x=>S.collapsed.add(x.id));render();
       toast('Drag cards by their title row, then Save arrangement.');}
     else if(act==='arr-cancel'){S.arranging=false;if(S.prevCollapsed){S.collapsed=S.prevCollapsed;S.prevCollapsed=null;}render();}
     else if(act==='arr-reset'){set.displayOrder=clone(set.defaultDisplayOrder);render();toast('Back to the default layout. Save to keep it.');}
@@ -1938,7 +2103,7 @@ listen(root,'click',e=>{
   if(fa){const [key,on]=fa.dataset.fall.split(':');
     S.filters[key]= on==='1' ? Object.keys(OPTS[key]()) : [];
     if(key==='queues'){const ok=stageOptions(); S.filters.queueStages=S.filters.queueStages.filter(x=>ok[x]);}
-    refreshFilter(); render(); if(key==='events') setTimeout(ensureConfirmed); const d=$(`.fdrop[data-drop="${key}"]`); if(d) d.open=true; return;}
+    refreshFilter(); render(); if(key==='events') setTimeout(ensureConfirmed); if(key==='queues'||key==='queueStages') setTimeout(ensureTokens); const d=$(`.fdrop[data-drop="${key}"]`); if(d) d.open=true; return;}
   const ct=t.closest('[data-cardtab]'); if(ct){const id=ct.dataset.cardtab;S.cardView[id]=(S.cardView[id]||'people')==='people'?'rules':'people';renderMain();updateBulk();return;}
   const cs=t.closest('[data-cardsel]'); if(cs){toggleCardSel(cs.dataset.cardsel);return;}
   const cb=t.closest('[data-collapse]'); if(cb){const id=cb.dataset.collapse;S.collapsed.has(id)?S.collapsed.delete(id):S.collapsed.add(id);render();updateBulk();return;}
@@ -1980,6 +2145,7 @@ listen(root,'change',e=>{
     if(k==='queues'){const ok=stageOptions(); F.queueStages=F.queueStages.filter(x=>ok[x]);}
     refreshFilter(); render();
     if(k==='events'||k==='eventsMode') setTimeout(ensureConfirmed);
+    if(k==='queues'||k==='queueStages') setTimeout(ensureTokens);
     const d=$(`.fdrop[data-drop="${open}"]`); if(d){ d.open=true;
       // keep the panel's search text across the re-render
       const q=d.querySelector('.ms-q'); if(q&&fq){ q.value=fq; q.dispatchEvent(new Event('input',{bubbles:true})); } }
@@ -1996,6 +2162,7 @@ listen(root,'change',e=>{
     t.checked?set.add(id):set.delete(id); GB.segmentIds=[...set];
     updateGroupPreview(); $('#gErr').textContent=''; return;}
   if(t.dataset.addpid){t.checked?ADD.sel.add(t.dataset.addpid):ADD.sel.delete(t.dataset.addpid);const go=$('#aGo');go.textContent=ADD.sel.size?`Add ${plural(ADD.sel.size,'participant')}`:'Add';go.disabled=!ADD.sel.size;$('#aErr').textContent='';return;}
+  if(t.id==='sGroup'){ if(t.value==='__new__'){ $('#sGroupNewBox').hidden=false; $('#sGroupNew').focus(); t.value=B.groupid||''; } else { B.groupid=t.value; $('#sGroupNewBox').hidden=true; } return; }
   if(t.closest('#segDlg')){
     if(t.name==='sType'){B.type=t.value;renderSegDlg();return;}
     if(t.name==='sStatus'){B.status=t.value;$('#sStatusHint').textContent=statusHint();return;}
