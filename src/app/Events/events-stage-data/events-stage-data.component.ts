@@ -351,12 +351,14 @@ export class EventsStageDataComponent {
 
       // segmentId → name
       const segName: Record<string, string> = {};
-      segSnap.docs.forEach(d => { segName[d.id] = d.data()['segmentname'] ?? d.id; });
+      // soft-deleted (isdeleted, set by Participant Intelligence) counts as deleted
+      segSnap.docs.forEach(d => { if (d.data()['isdeleted'] !== true) segName[d.id] = d.data()['segmentname'] ?? d.id; });
 
       // profileId → set of segment names, via each participant list's profilelist + segmentid back-ref.
       const bySeg: Record<string, Set<string>> = {};
       listSnap.docs.forEach(d => {
         const data = d.data();
+        if (data['isdeleted'] === true) return;
         const profiles: string[] = data['profilelist'] ?? [];
         const segIds: string[] = data['segmentid'] ?? [];
         if (!profiles.length || !segIds.length) return;
