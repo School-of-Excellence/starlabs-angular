@@ -326,6 +326,7 @@ export class JourneycoachDashboardComponent {
     last15daysnotOnboarded: { count: 0, data: [] },
     onboarded: { count: 0, data: [] },
     toBeOnboardedProduct: { count: 0, data: [] },
+    notAssuredProduct: { count: 0, data: [] },
 
     // Product Initiation
     alljourneynotstarted: { count: 0, data: [] },
@@ -832,22 +833,49 @@ export class JourneycoachDashboardComponent {
     this.onboardingProducts = Object.values(map).sort((a: any, b: any) => b.toOnboard - a.toOnboard);
   }
 
-  openOnboardingProduct(p: any) {
-    const filtered = (this.originalData['all']?.data || []).filter((r: any) => {
-      const jid = r && r['journeyref'] && r['journeyref'].id ? r['journeyref'].id : null;
-      const pname = this.getProductName(r);
-      const name = (jid && this.mapjourneyname[jid]) ? this.mapjourneyname[jid] : (pname !== '-' ? pname : 'Unassigned');
-      return name === p.product;
-    });
-    const title = 'To Be Onboarded — ' + p.product;
+  // one place for the product name lookup (was duplicated)
+private onboardingProductName(r: any): string {
+  const jid = r?.['journeyref']?.id;
+  if (jid && this.mapjourneyname[jid]) return this.mapjourneyname[jid];
+  const pname = this.getProductName(r);
+  return pname !== '-' ? pname : 'Unassigned';
+}
 
-    if (this.currentTableConfig?.title !== title) { this.showTable = false; }
+openOnboardingProduct(p: any, type: 'toOnboard' | 'within7' | 'plus7' | 'notAssured' = 'toOnboard') {
+  const matchesProduct = (r: any) => {
+    const jid = r && r['journeyref'] && r['journeyref'].id ? r['journeyref'].id : null;
+    const pname = this.getProductName(r);
+    const name = (jid && this.mapjourneyname[jid]) ? this.mapjourneyname[jid] : (pname !== '-' ? pname : 'Unassigned');
+    return name === p.product;
+  };
 
-    this.originalData['toBeOnboardedProduct'].data = filtered;
-    this.originalData['toBeOnboardedProduct']['count'] = filtered.length;
-    this.tableConfigs['toBeOnboardedProduct'].title = title;
-    this.onBoxClick('toBeOnboardedProduct');
+  const isNotAssured = type === 'notAssured';
+  let sourceKey = 'all';
+  let titlePrefix = 'To Be Onboarded — ';
+
+  if (isNotAssured) {
+    sourceKey = 'notassured';
+    titlePrefix = 'Not Assured — ';
+  } else if (type === 'within7') {
+    sourceKey = 'last7DaysnotOnboarded';
+    titlePrefix = 'To Be Onboarded (7 Days) — ';
+  } else if (type === 'plus7') {
+    sourceKey = 'last15daysnotOnboarded';
+    titlePrefix = 'To Be Onboarded (7+ Days) — ';
   }
+
+  const boxKey = isNotAssured ? 'notAssuredProduct' : 'toBeOnboardedProduct';
+  const title = titlePrefix + p.product;
+
+  const filtered = (this.originalData[sourceKey]?.data || []).filter(matchesProduct);
+
+  if (this.currentTableConfig?.title !== title) { this.showTable = false; }
+
+  this.originalData[boxKey].data = filtered;
+  this.originalData[boxKey]['count'] = filtered.length;
+  this.tableConfigs[boxKey].title = title;
+  this.onBoxClick(boxKey);
+}
 
   // Gross Sales legend — same engine rules the drill-table legend uses (each pill = its drilled list length)
   getGrossPendingCount() { return engine.countPending(this.originalData['grosssale']?.data || []); }
@@ -1552,6 +1580,13 @@ export class JourneycoachDashboardComponent {
         data: [],
         dataKey: 'toBeOnboardedProduct',
         filters: ['search', 'purchasedate', 'journey', 'journeycoach']
+      },
+      notAssuredProduct: {
+        title: 'Not Assured',
+        columns: this.notAssuredColumns,
+        data: [],
+        dataKey: 'notAssuredProduct',
+        filters: ['search', 'purchasedate', 'journey']
       },
       activeEngagement: {
         title: 'Active Engagement',
