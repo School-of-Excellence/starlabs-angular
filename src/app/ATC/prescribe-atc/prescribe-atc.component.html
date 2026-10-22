@@ -116,6 +116,40 @@
         </div>
       </section>
       
+      <!-- Ask · area of focus — EI Solution ATCs only; saved as asks: [{ <askedby>: <askedfor> }] -->
+      <section class="content-section" id="atcfield-asks" data-testid="patc-asks-card" *ngIf="isEISolution">
+        <h2 class="section-heading">ASK · AREA OF FOCUS*</h2>
+        <div class="personnel-container">
+          <div class="field-grid field-header">
+            <div class="field-activity">Asked By</div>
+            <div class="field-person">Asked For</div>
+          </div>
+          <div class="field-grid" data-testid="patc-ask-row" *ngFor="let row of askRows; let i = index">
+            <div class="field-activity">
+              <mat-form-field appearance="outline" class="flat-field">
+                <mat-select data-testid="patc-ask-by" placeholder="Choose" [(ngModel)]="row.askedby" (selectionChange)="autoSave()" [disabled]="assignmentInitiated">
+                  <mat-option *ngFor="let o of askedByOptions" [value]="o.value">{{ o.label }}</mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+            <div class="field-person">
+              <mat-form-field appearance="outline" class="flat-field">
+                <input matInput data-testid="patc-ask-for" placeholder="What they asked for" [(ngModel)]="row.askedfor" (focusout)="autoSave()" [disabled]="assignmentInitiated">
+              </mat-form-field>
+            </div>
+            <div class="field-actions">
+              <button class="action-button remove-button" data-testid="patc-ask-remove" mat-icon-button type="button" (click)="removeAsk(i)" [disabled]="assignmentInitiated">
+                <mat-icon>remove</mat-icon>
+              </button>
+            </div>
+          </div>
+          <mat-error class="ask-error" *ngIf="submitAttempted && completeAsks.length == 0">At least one complete ask (asked by and asked for) is required</mat-error>
+          <div class="empty-activities">
+            <button class="primary-button" data-testid="patc-ask-add" mat-button type="button" (click)="addAsk()" [disabled]="assignmentInitiated">Add New Ask</button>
+          </div>
+        </div>
+      </section>
+
       <!-- Authors Section -->
       <section class="content-section" id="atcfield-author" *ngIf="!this.bigActivity()">
         <h2 class="section-heading">AUTHORS</h2>

@@ -772,3 +772,6 @@
   15%  { box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.35); background: rgba(220, 38, 38, 0.10); }
   100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.0); background: transparent; }
 }
+
+/* Ask · area of focus (EI Solution): reuses the section/field-grid styles above */
+.ask-error { display: block; padding: 0 0 0.5rem 0.25rem; }

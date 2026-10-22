@@ -44,6 +44,129 @@ interface AssignmentData {
 
 const generateId = (firestore: Firestore, collectionName: string) => doc(collection(firestore, collectionName)).id;
 
+// ---- Appointment specialists: prefill helpers (used only by PrescribeATCComponent below) ----
+/* Specialists for an ATC, taken from the appointment it was prescribed in.
+   Join (all default Firestore, read-only; only the participant's own appointment and its type's mapping):
+     appointments.hostRole            { "eisroles/<roleId>": [profile_data ref | "profile_data/<pid>"] }  — roles + people
+     appointments.appointmentrole     [eisroles ref]            — fallback list of roles when hostRole is empty
+     AppointmentType-To-Roles         atcrequired, atcrolemap { <roleId>: [<bigactivity id>, …] }
+     bigactivity                      activity, atcproperty
+   role → activity → atcproperty; the role's hosts fill that one activity (the rest stay for manual entry).
+   Pure functions (no Angular / Firestore); the component does the reads. */
+
+interface AtcActivity { docid: string; activity: string; atcproperty?: string | null; }
+
+interface AppointmentSpecialistRow {
+  roleId: string;         // eisroles id from appointment.appointmentrole
+  activityId: string;     // the bigactivity this role maps to (AppointmentType-To-Roles.atcrolemap)
+  activity: string;
+  atcproperty: string | null;
+  label: string;          // AUTHOR / OBSERVER / MENTOR / CA / the raw property
+  profilePaths: string[]; // who hosted the role: "profile_data/<pid>", the shape the page's pickers store
+}
+
+const LABELS: Record<string, string> = { author: 'AUTHOR', observer: 'OBSERVER', mentoring: 'MENTOR', assigned_to: 'CA' };
+
+function propertyLabel(atcproperty: string | null | undefined): string {
+  return atcproperty ? (LABELS[atcproperty] ?? atcproperty.toUpperCase()) : '';
+}
+
+interface AppointmentSummary { id: string; start: Date | null; attended?: boolean; cancelled?: boolean; typeId: string | null; }
+
+/* No ?appointmentid=: the participant's usable appointments, newest first. cancelled === false, typed, dated, and
+   not after today: a past day must be attended; today's counts even before its status is updated (prescribing
+   right after the session). Future days never count. The caller checks each one's own type mapping in order. */
+function completedNewestFirst<T extends AppointmentSummary>(appointments: T[], now: Date = new Date()): T[] {
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfTomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  return appointments
+    .filter(a => a.cancelled === false && !!a.typeId && !!a.start && a.start < startOfTomorrow
+      && (a.attended === true || a.start >= startOfToday))
+    .sort((a, b) => b.start!.getTime() - a.start!.getTime());
+}
+
+/* prescribeATC (participant + "What is the ATC given for?" chosen): the newest usable appointment whose type is one
+   of the ATC types for that model (AppointmentType-To-Roles atcrequired + atcmodel) and that the logged-in
+   specialist hosted. null = nothing to prefill (the specialist fills the pickers manually). */
+function pickAtcAppointment(
+  appointments: (AppointmentSummary & { hostIds: string[] })[], atcTypeIds: Set<string>, hostId: string, now: Date = new Date(),
+): string | null {
+  const mine = appointments.filter(a => !!a.typeId && atcTypeIds.has(a.typeId) && !!hostId && a.hostIds.includes(hostId));
+  return completedNewestFirst(mine, now)[0]?.id ?? null;
+}
+
+/* hostRole values are profile_data DocumentReferences from booking, but older writers stored path strings. */
+function toProfilePath(h: any): string | null {
+  if (typeof h === 'string') return h.includes('/') ? h : 'profile_data/' + h;
+  return typeof h?.path === 'string' ? h.path : null;
+}
+
+/* Every specialist on the appointment, as profile ids: hostRole's people plus hosts[] (refs or path strings). */
+function appointmentHostIds(appointment: { hostRole?: Record<string, any[]> | null; hosts?: any[] | null } | null): string[] {
+  const ids = new Set<string>();
+  const add = (h: any) => { const p = toProfilePath(h); if (p) ids.add(p.split('/').pop()!); };
+  Object.values(appointment?.hostRole ?? {}).forEach(list => (Array.isArray(list) ? list : []).forEach(add));
+  (Array.isArray(appointment?.hosts) ? appointment!.hosts! : []).forEach(add);
+  return [...ids];
+}
+
+/* eisroles ids on the appointment (appointmentrole: refs from booking, or path strings), or null when absent. */
+function appointmentRoleIds(appointment: { appointmentrole?: any[] | null } | null): string[] | null {
+  const list = appointment?.appointmentrole;
+  if (!Array.isArray(list)) return null;
+  return list.map(r => (typeof r === 'string' ? r.split('/').pop() : r?.id)).filter((id): id is string => !!id);
+}
+
+/* eisroles ids that have a host on the appointment: the keys of hostRole ("eisroles/<id>" -> <id>). */
+function hostRoleIds(appointment: { hostRole?: Record<string, any[]> | null } | null): string[] {
+  return Object.keys(appointment?.hostRole ?? {})
+    .filter(k => k.startsWith('eisroles/'))
+    .map(k => k.split('/').pop()!)
+    .filter(Boolean);
+}
+
+/* atcrolemap value -> activity ids: an array (current shape) or a single id string (older docs). */
+function activityIdsOf(value: unknown): string[] {
+  if (Array.isArray(value)) return Array.from(new Set(value.filter((v): v is string => typeof v === 'string' && !!v)));
+  return typeof value === 'string' && value ? [value] : [];
+}
+
+/* One row per (role, activity) on the appointment that maps to a known bigactivity: role -> activity -> atcproperty, with the
+   role's hosts. Roles come from hostRole's keys (who hosted what); when hostRole is empty, from appointmentrole,
+   else every atcrolemap role. [] when the type has no ATC. */
+function appointmentSpecialistRows(
+  appointment: { hostRole?: Record<string, any[]> | null; appointmentrole?: any[] | null } | null,
+  mapping: { atcrequired?: boolean; atcrolemap?: Record<string, string | string[]> | null } | null,
+  activities: AtcActivity[],
+): AppointmentSpecialistRow[] {
+  if (!appointment || mapping?.atcrequired !== true) return [];
+  const byId = new Map(activities.map(a => [a.docid, a]));
+  const hostRole = appointment.hostRole ?? {};
+  const roleMap = mapping.atcrolemap ?? {};
+  const hosted = hostRoleIds(appointment);
+  const roles = hosted.length ? hosted : (appointmentRoleIds(appointment) ?? Object.keys(roleMap));
+  const rows: AppointmentSpecialistRow[] = [];
+  for (const roleId of Array.from(new Set(roles))) {
+    const hosts = hostRole['eisroles/' + roleId] ?? [];
+    const profilePaths = Array.from(new Set((Array.isArray(hosts) ? hosts : []).map(toProfilePath).filter((p): p is string => !!p)));
+    // a role maps to one or more activities ({roleId: [activityId, …]}; older docs: a single string)
+    for (const activityId of activityIdsOf(roleMap[roleId])) {
+      const act = byId.get(activityId);
+      if (!act) continue;
+      rows.push({
+        roleId,
+        activityId: act.docid,
+        activity: act.activity,
+        atcproperty: act.atcproperty ?? null,
+        label: propertyLabel(act.atcproperty),
+        profilePaths: [...profilePaths],
+      });
+    }
+  }
+  return rows;
+}
+// ---- end appointment specialists ----
+
 @Component({
   selector: 'app-prescribe-atc',
   imports: [
@@ -164,6 +287,37 @@ export class PrescribeATCComponent {
   casenotes = null;
   mentornotes = null;
 
+  // Ask · area of focus (EI Solution ATCs only). Saved as asks: [{ <askedby>: <askedfor> }, …],
+  // e.g. [{ "self": "for health" }] — draft (temporary_ATC) and the final ATC document.
+  readonly askedByOptions = [
+    { value: 'self', label: 'Self' }, { value: 'spouse', label: 'Spouse' },
+    { value: 'family', label: 'Family' }, { value: 'friends', label: 'Friends' },
+  ];
+  askRows: { askedby: string | null, askedfor: string }[] = [];
+
+  get isEISolution(): boolean {
+    return (this.product ?? '').toString().trim().toLowerCase() == 'ei solution';
+  }
+  // rows with both parts filled, in the saved shape
+  get completeAsks(): Record<string, string>[] {
+    return this.askRows
+      .filter(r => !!r.askedby && (r.askedfor ?? '').trim().length != 0)
+      .map(r => ({ [r.askedby]: r.askedfor.trim() }));
+  }
+  addAsk() { this.askRows.push({ askedby: null, askedfor: '' }); }
+  removeAsk(i: number) {
+    this.askRows.splice(i, 1);
+    if (this.askRows.length == 0) this.addAsk();
+    this.autoSave();
+  }
+  private asksFrom(saved: any): { askedby: string | null, askedfor: string }[] {
+    const rows = (Array.isArray(saved) ? saved : [])
+      .map((item: any) => Object.entries(item ?? {})[0])
+      .filter((e: any) => !!e)
+      .map(([askedby, askedfor]: any) => ({ askedby, askedfor: String(askedfor ?? '') }));
+    return rows.length ? rows : [{ askedby: null, askedfor: '' }];
+  }
+
   // totalProcedures = 0;
   // totalProcedureWritten = 0;
 
@@ -199,6 +353,17 @@ export class PrescribeATCComponent {
   liveassignmentid = null
   liveassignmentdata = null
   personnelReady = true   // toggled false→true after a programmatic patch to force the author/observer/mentor mat-selects to rebuild
+  // Appointment mode (?appointmentid=): specialists come from who hosted each role in that appointment.
+  // null = not in appointment mode, or a draft / live studio has since replaced the specialists.
+  appointmentId: string = null
+  appointmentTypeName = ''
+  appointmentDate: Date = null
+  appointmentRoleNames: Record<string, string> = {}  // eisroles id → role name, for the Specialists card
+  appointmentPeopleNames: Record<string, string> = {}  // "profile_data/<pid>" → profile_data.name of each host
+  appointmentPeople: { authorname: string, authorpath: string }[] = []  // hosts kept selectable in the pickers
+  appointmentSpecialists: AppointmentSpecialistRow[] = null
+  editSpecialists = false
+  bigActivityReady: Promise<void> = Promise.resolve()
   tokendata = null
   queueid:string = null
   stagename:string = null
@@ -298,6 +463,7 @@ export class PrescribeATCComponent {
         this.marathonId = data['marathonid']
         this.assignmentId = data['assignmentid']
         this.participantAssignmentId = data['participantassignmentid']
+        this.appointmentId = data['appointmentid'] ?? null
       }
       // this.participantProfileid = data['profileid']
       // this.marathonId = data['marathonid']
@@ -325,6 +491,10 @@ export class PrescribeATCComponent {
           }
           // this.addActivity()
           await this.setupData()
+          // Before onProfileSelect: a live-studio prefill (arena) and a draft the user opens both run later and win
+          if(this.appointmentId){
+            await this.prefillFromAppointment(this.appointmentId)
+          }
           // await the assignment check so its popup resolves before setup completes
           const profileMapData = await guardservice.getProfileMap()
           await this.getDirectiveAssignments(profileMapData.docdata)
@@ -484,6 +654,7 @@ export class PrescribeATCComponent {
         this.consultationpoint = value['consultationpoint'] ?? null;
         this.casenotes = value['notes'] ?? null;
         this.mentornotes = value['mentornotes'] ?? null;
+        this.askRows = this.asksFrom(value['asks']);
 
         this.summarystring = value['aiatcsummary'] ?? null;
         this.areasstring = value['areastoexplore'] ?? [];
@@ -705,7 +876,7 @@ export class PrescribeATCComponent {
             })
           }
         }
-        this.specialistList = usersWithRoles
+        this.specialistList = this.withAppointmentPeople(usersWithRoles)
         this.mentorNameList = mentor
         this.profileList = profileList
         console.log("Specialists loaded")
@@ -746,8 +917,8 @@ export class PrescribeATCComponent {
         }
       })
 
-      // Big Activity
-      getDocs(query(collection(this.firestoreDefault, "bigactivity"), orderBy("activity"))).then(activityList=>{
+      // Big Activity (bigActivityReady lets the appointment prefill wait for the lists and the empty maps)
+      this.bigActivityReady = getDocs(query(collection(this.firestoreDefault, "bigactivity"), orderBy("activity"))).then(activityList=>{
         for (let i = 0; i < activityList.docs.length; i++) {
           const activityDoc = activityList.docs[i];
           var activityData = activityDoc.data()
@@ -824,6 +995,9 @@ export class PrescribeATCComponent {
 
   onProductSelect(){
     console.log("Selected Product", this.product)
+    if(this.isEISolution && this.askRows.length == 0) this.addAsk()
+    // participant + ATC model known → prefill specialists from your matching appointment (if any)
+    this.prefillFromAtcModel()
     if(!this.assignmentInitiated){
       var selectedIndex = this.productAvailable.findIndex(e => e["atcmodel"] == this.product && e["directive"] != null)
       if(selectedIndex != -1){
@@ -927,8 +1101,147 @@ export class PrescribeATCComponent {
     }
   }
 
+  // Appointment mode: fill the specialist pickers from the appointment instead of asking for them.
+  // appointments.hostRole says who hosted each role; AppointmentType-To-Roles.atcrolemap says which
+  // bigactivity each role fills. Read-only — nothing is saved until the user saves the ATC as usual.
+  // AppointmentType-To-Roles for one appointment type, read once per type (never the whole collection)
+  private mappingByType = new Map<string, Promise<any>>()
+  private mappingFor(typeRef: DocumentReference): Promise<any> {
+    if(!this.mappingByType.has(typeRef.id)){
+      this.mappingByType.set(typeRef.id, getDocs(query(collection(this.firestoreDefault, "AppointmentType-To-Roles"), where("assigned_appttype_ref", "==", typeRef), limit(1)))
+        .then(snap => snap.docs[0]?.data() ?? null))
+    }
+    return this.mappingByType.get(typeRef.id)
+  }
+
+  async prefillFromAppointment(appointmentId: string){
+    const skip = (why: string) => console.info("[prescribeATC] specialists not prefilled from appointment " + appointmentId + ": " + why)
+    try {
+      await this.bigActivityReady
+      const apptSnap = await getDoc(doc(this.firestoreDefault, "appointments", appointmentId))
+      if(!apptSnap.exists()) return skip("appointment not found")
+      const appt = apptSnap.data()
+      // only this participant's own appointment
+      if(this.participantProfileid && appt['bookedby']?.id && appt['bookedby'].id != this.participantProfileid) return skip("booked by another participant")
+      const typeRef = appt['appointment']
+      if(!typeRef) return skip("appointment has no type")
+      const [mapping, typeSnap] = await Promise.all([this.mappingFor(typeRef), getDoc(typeRef)])
+      // appointmentrole → atcrolemap → bigactivity.atcproperty, with each role's hosts
+      const rows = appointmentSpecialistRows(appt, mapping, this.bigActivityList)
+      if(rows.length == 0) return skip("no appointmentrole maps to an ATC activity (check atcrequired / atcrolemap on the type)")
+      // Role names for the card: eisroles/{id}.role, only for this appointment's roles
+      const roleSnaps = await Promise.all(rows.map(r => getDoc(doc(this.firestoreDefault, "eisroles", r.roleId)).catch(() => null)))
+      const roleNames: Record<string, string> = {}
+      roleSnaps.forEach((snap, i) => roleNames[rows[i].roleId] = (snap?.data() as any)?.['role'] ?? rows[i].roleId)
+      // Specialist names: each host's own profile_data/{id}.name (only these few docs)
+      const people = Array.from(new Set(rows.flatMap(r => r.profilePaths)))
+      const peopleSnaps = await Promise.all(people.map(path => getDoc(doc(this.firestoreDefault, path)).catch(() => null)))
+      const peopleNames: Record<string, string> = {}
+      peopleSnaps.forEach((snap, i) => {
+        const name = (snap?.data() as any)?.['name']
+        if(name) peopleNames[people[i]] = name
+      })
+      // same zone + rebuild steps as the live-studio prefill, so the closed mat-selects show the names at once
+      this.ngZone.run(() => {
+        // Only the activity each role maps to gets that role's host, and only while nobody is selected there;
+        // every other activity stays empty for manual entry.
+        const fillIfEmpty = (target: Record<string, string[]>, activityId: string, people: string[]) => {
+          if(!people.length || (target[activityId] ?? []).length != 0) return
+          target[activityId] = [...people]
+        }
+        rows.forEach(row => {
+          if(row.atcproperty == "author") fillIfEmpty(this.authorMap, row.activityId, row.profilePaths)
+          else if(row.atcproperty == "observer") fillIfEmpty(this.observerMap, row.activityId, row.profilePaths)
+          else if(row.atcproperty == "mentoring") fillIfEmpty(this.mentorMap, row.activityId, row.profilePaths)
+          // assigned_to (CA): preselect that activity's "set for all procedures" picker; Apply stays a user action
+          else if(row.atcproperty == "assigned_to") fillIfEmpty(this.bulkAssignedSelection, row.activityId, row.profilePaths)
+          else if(row.profilePaths.length != 0 && !this.additionalActivityMap.some(e => e.activity == row.activityId))
+            this.additionalActivityMap.push({ activity: row.activityId, specialist: [...row.profilePaths] })
+        })
+        this.onObserverSelect()
+        this.appointmentTypeName = (typeSnap.data() as any)?.['appointmenttype'] ?? ''
+        this.appointmentDate = appt['starttime']?.toDate?.() ?? null
+        this.appointmentRoleNames = roleNames
+        this.appointmentPeopleNames = peopleNames
+        this.appointmentPeople = people.map(path => ({ authorname: peopleNames[path] ?? path.split('/').pop(), authorpath: path }))
+        this.specialistList = this.withAppointmentPeople(this.specialistList)
+        this.appointmentSpecialists = rows
+        this.editSpecialists = false
+        this.personnelReady = false
+        setTimeout(() => this.personnelReady = true)
+      })
+    } catch (error) {
+      console.error("Could not load specialists from the appointment", error)
+    }
+  }
+
+  // Participant + "What is the ATC given for?" chosen (no ?appointmentid=):
+  //  1. AppointmentType-To-Roles where atcrequired == true and atcmodel == the chosen ATC model → the ATC types
+  //  2. appointments where bookedby == participant, of those types, hosted by the logged-in specialist (hostRole),
+  //     newest usable first (today, or an earlier day that was attended)
+  //  3. prefillFromAppointment(): hostRole role → atcrolemap activities → that activity's Specialist picker
+  // Nothing found at any step → the pickers stay empty for manual entry.
+  async prefillFromAtcModel(){
+    if(this.appointmentId || !this.participantProfileid || !this.product || this.bigActivity()) return
+    const model = this.product
+    try {
+      const mappingSnap = await getDocs(query(collection(this.firestoreDefault, "AppointmentType-To-Roles"),
+        where("atcrequired", "==", true), where("atcmodel", "==", model)))
+      const atcTypeIds = new Set<string>()
+      mappingSnap.docs.forEach(d => {
+        const typeId = d.data()['assigned_appttype_ref']?.id
+        if(!typeId) return
+        atcTypeIds.add(typeId)
+        if(!this.mappingByType.has(typeId)) this.mappingByType.set(typeId, Promise.resolve(d.data()))
+      })
+      if(atcTypeIds.size == 0){
+        console.info("[prescribeATC] no appointment type maps ATC model \"" + model + "\" (atcrequired + atcmodel) — pick specialists manually")
+        return
+      }
+      const apptSnap = await getDocs(query(collection(this.firestoreDefault, "appointments"),
+        where("bookedby", "==", doc(this.firestoreDefault, "profile_data", this.participantProfileid)),
+        where("cancelled", "==", false)))
+      const appointmentId = pickAtcAppointment(apptSnap.docs.map(d => ({
+        id: d.id,
+        start: d.data()['starttime']?.toDate?.() ?? null,
+        attended: d.data()['attended'],
+        cancelled: d.data()['cancelled'],
+        typeId: d.data()['appointment']?.id ?? null,
+        hostIds: appointmentHostIds(d.data()),
+      })), atcTypeIds, this.loggedinProfileid)
+      if(!appointmentId){
+        console.info("[prescribeATC] no \"" + model + "\" appointment of yours with " + this.participantProfileid + " (today or earlier) — pick specialists manually")
+        return
+      }
+      // the participant or model may have changed while we were reading
+      if(this.product != model || this.appointmentId) return
+      await this.prefillFromAppointment(appointmentId)
+    } catch (error) {
+      console.error("Could not find the ATC appointment for this participant", error)
+    }
+  }
+
+  roleNamesOf(row: AppointmentSpecialistRow): string {
+    return this.appointmentRoleNames[row.roleId] ?? row.roleId
+  }
+
+  // The appointment's hosts must stay pickable even when users_roles doesn't list them as specialists
+  withAppointmentPeople(list: any[]): any[] {
+    const extra = this.appointmentPeople.filter(p => !list.some(e => e.authorpath == p.authorpath))
+    return extra.length ? [...list, ...extra] : list
+  }
+
+  specialistName(path: string): string {
+    if(this.appointmentPeopleNames[path]) return this.appointmentPeopleNames[path]
+    return this.specialistList.find(e => e.authorpath == path)?.authorname ?? this.mapProfile[path.split('/').pop()]?.["name"] ?? path.split('/').pop()
+  }
+
   async onProfileSelect(){
     console.log("Selected Profile", this.participantProfileid)
+    // Before the live-studio check below, so a live studio's specialists (and later an opened draft) still win
+    if(!this.appointmentId && this.participantProfileid && this.product && !this.bigActivity()){
+      await this.prefillFromAtcModel()
+    }
     this.selectedParticipantProfile = {}
     if(this.participantProfileid){
       getDoc(doc(this.firestoreDefault, "profile_data",this.participantProfileid)).then(profile =>{
@@ -1054,6 +1367,7 @@ export class PrescribeATCComponent {
               // name only appears once the dropdown is opened. Schedule the assignment on a fresh macrotask INSIDE
               // Angular's zone so a clean top-down change-detection cycle renders the selected names immediately.
               this.ngZone.run(() => {
+                this.appointmentSpecialists = null // the live studio's specialists replace the appointment's
                 this.authorMap = authorValue
                 this.observerMap = observerValue
                 this.mentorMap = mentorValue
@@ -1552,6 +1866,7 @@ export class PrescribeATCComponent {
           consultationpoint: this.consultationpoint ?? null,
           notes: this.casenotes ?? null,
           mentornotes: this.mentornotes ?? null,
+          asks: this.isEISolution ? this.completeAsks : [],
           atcassignment: this.atcAssignment ?? [],
           audioRecordings: this.existingAudioURLs ?? [],
           noteImageURLs: this.existingNoteImageURLs ?? [],
@@ -1646,6 +1961,7 @@ export class PrescribeATCComponent {
 
   // map a draft document (server, local, or a conflict winner) onto the form fields. Reused on open AND after a resolve.
   private applyDraftValue(value: any) {
+    this.appointmentSpecialists = null // an opened draft's specialists win over the appointment's
     this.date = value['date']
     this.product = value['product']
     this.atcdirective = value['atcdirective'] ?? null
@@ -1661,6 +1977,7 @@ export class PrescribeATCComponent {
     this.consultationpoint = value['consultationpoint'] ?? null
     this.casenotes = value['notes'] ?? null
     this.mentornotes = value['mentornotes'] ?? null
+    this.askRows = this.asksFrom(value['asks'])
     // Carry the "edited from AI generation" provenance through to submit.
     this.aiedited = value['aiedited'] ?? false
     this.aigeneratedsource = value['aigeneratedsource'] ?? null
@@ -2173,6 +2490,9 @@ async removeATCImage(index: number) {
     else if((this.atcdirective ?? "").trim().length == 0){
       this.focusMissingField('atcfield-directive', 'Provide ATC directive')
     }
+    else if(this.isEISolution && this.completeAsks.length == 0){
+      this.focusMissingField('atcfield-asks', 'Add at least one complete ask (asked by and asked for)')
+    }
     else if((this.consultationpoint ?? "").trim().length == 0){
       this.focusMissingField('atcfield-consultationpoint', 'Consultation points required')
     }
@@ -2349,6 +2669,7 @@ async removeATCImage(index: number) {
           validator: validatorref.length != 0 ? validatorref : null,
           prescription_image: this.atcImageURL.length == 0 ? null : this.atcImageURL,
           bigactivity: atclevelBigActivity,
+          ...(this.isEISolution ? { asks: this.completeAsks } : {}),
           evolutionprogressdate: new Date(),
           aiatcsummary:this.summarystring ?? '',
           areastoexplore:this.areasstring ?? '',
@@ -2632,6 +2953,7 @@ async removeATCImage(index: number) {
       this.casenotes = null;
       this.consultationpoint = null;
       this.mentornotes = null;
+      this.askRows = [];
       this.audioBlob = [];
       this.audioBlobURL = [];
       this.autoSaveID = null;  // clear draft context so the name unlocks and a new participant can be selected

@@ -50,6 +50,7 @@ export class SpecialistAppointmentService {
 
   private ready: Promise<void> | null = null;
   private productCache = new Map<string, Promise<ProductBreakdown[]>>();
+  private atcTypes: Promise<Set<string>> | null = null;
 
   constructor(private firestore: Firestore, private guard: AuthguardService) {}
 
@@ -203,6 +204,17 @@ export class SpecialistAppointmentService {
   async atcModels(): Promise<string[]> {
     const s = await getDocs(collection(this.firestore, 'products'));
     return [...new Set(s.docs.map(x => (x.data()['atcmodel'] ?? '').trim()).filter(Boolean))].sort() as string[];
+  }
+
+  /* Appointment type ids whose mapping prescribes an ATC (AppointmentType-To-Roles.atcrequired) —
+     gates the Prescribe ATC action on a completed session. Read once per studio. */
+  atcRequiredTypeIds(): Promise<Set<string>> {
+    if (!this.atcTypes) {
+      this.atcTypes = getDocs(query(collection(this.firestore, 'AppointmentType-To-Roles'), where('atcrequired', '==', true)))
+        .then(s => new Set(s.docs.map(d => d.data()['assigned_appttype_ref']?.id).filter(Boolean) as string[]))
+        .catch(e => { console.error('Specialist appointment studio: ATC types failed', e); this.atcTypes = null; return new Set<string>(); });
+    }
+    return this.atcTypes;
   }
 
   /* ---------- Mentor team chain ----------

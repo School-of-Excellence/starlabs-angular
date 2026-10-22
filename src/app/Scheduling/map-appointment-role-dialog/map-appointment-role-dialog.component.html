@@ -32,6 +32,56 @@
         </mat-select>
       </mat-form-field>
     </div>
+
+    <div class="atc-card" data-testid="mard-atc-card-3">
+      <div class="atc-head">
+        <div>
+          <div class="atc-title">ATC</div>
+          <div class="atc-subtitle">Is an ATC prescribed in this appointment, and which ATC activities does each role fill?</div>
+        </div>
+        <span class="atc-badge">New</span>
+      </div>
+      <div class="atc-body">
+        <mat-checkbox data-testid="mard-atc-required-4" formControlName="atcrequired" color="primary">
+          An ATC is given in this appointment
+        </mat-checkbox>
+
+        <ng-container *ngIf="mapAppointmentRoleForm.get('atcrequired').value === true">
+          <mat-form-field class="atc-field atc-model" appearance="outline">
+            <mat-label>ATC model</mat-label>
+            <mat-select data-testid="mard-atc-model-8" formControlName="atcmodel" placeholder="Select ATC model">
+              <mat-option class="matOption" *ngFor="let model of atcModelList" [value]="model">{{ model }}</mat-option>
+            </mat-select>
+            <mat-error *ngIf="mapAppointmentRoleForm.get('atcmodel').hasError('required')">
+              ATC model <strong>required</strong>
+            </mat-error>
+          </mat-form-field>
+
+          <div class="atc-hint" data-testid="mard-atc-norole-5" *ngIf="atcRoleIds.length == 0">
+            Select a Required or Additional Role above to assign ATC activities.
+          </div>
+
+          <div *ngIf="atcRoleIds.length > 0" formGroupName="atcrolemap">
+            <div class="atc-grid atc-colhead">
+              <div>ROLE</div>
+              <div>ATC ACTIVITIES <span class="atc-colsub"></span></div>
+            </div>
+            <div class="atc-grid atc-row" *ngFor="let roleId of atcRoleIds">
+              <div class="atc-role" data-testid="mard-atc-role-6">{{ roleName(roleId) }}<span class="atc-role-tag" *ngIf="isAdditionalRole(roleId)">Additional</span></div>
+              <mat-form-field class="atc-field" appearance="outline">
+                <mat-label>ATC activities</mat-label>
+                <mat-select data-testid="mard-atc-activity-7" [formControlName]="roleId" placeholder="Select activities" multiple>
+                  <mat-option class="matOption" *ngFor="let act of atcActivityList" [value]="act.id">{{ act.activity }} · {{ act.atcproperty }}</mat-option>
+                </mat-select>
+                <mat-error *ngIf="atcRoleGroup.get(roleId)?.hasError('required')">
+                  Activity <strong>required</strong>
+                </mat-error>
+              </mat-form-field>
+            </div>
+          </div>
+        </ng-container>
+      </div>
+    </div>
   </div>
 
   <div class="btnarea">
