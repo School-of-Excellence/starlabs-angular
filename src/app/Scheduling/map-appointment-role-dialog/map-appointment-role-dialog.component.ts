@@ -1,11 +1,11 @@
 import { CommonModule } from '@angular/common';
-import { Component, Inject } from '@angular/core';
+import { Component, ElementRef, Inject, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { collection, doc, Firestore, getDocs, orderBy, query, setDoc } from '@angular/fire/firestore';
 import { FormGroup, FormControl, Validators, FormBuilder, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
-import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -23,7 +23,9 @@ import { MatSelectModule } from '@angular/material/select';
     MatFormFieldModule,
     MatButtonModule,
     MatSelectModule,
-    MatCheckboxModule
+    MatCheckboxModule,
+    // mat-dialog-title / mat-dialog-content / mat-dialog-actions — without it the body never scrolls
+    MatDialogModule
   ],
   templateUrl: './map-appointment-role-dialog.component.html',
   styleUrl: './map-appointment-role-dialog.component.css'
@@ -38,6 +40,9 @@ export class MapAppointmentRoleDialogComponent {
 
   mapAppointmentRoleForm:FormGroup
   loading:boolean = false
+  // Shown in the footer when the Firestore write fails; the dialog stays open so nothing is lost
+  saveError: string = null
+  private host = inject(ElementRef)
 
   constructor(
     @Inject(MAT_DIALOG_DATA) public data : any, 
@@ -125,16 +130,25 @@ export class MapAppointmentRoleDialogComponent {
     var required: string[] = this.mapAppointmentRoleForm.get('required_role').value ?? []
     var additional: string[] = (this.mapAppointmentRoleForm.get('additional_role').value ?? []).filter(id => !required.includes(id))
     var atcGroup = this.atcRoleGroup
-    var previous = atcGroup.getRawValue()
+    // Re-use each role's existing control instance. A row on screen stays bound to the instance it was built
+    // with (Angular does not re-bind controls replaced inside a nested group), so a fresh FormControl here
+    // would leave the visible select writing into a dead control and the form silently invalid.
+    var existing = { ...atcGroup.controls }
     for (const roleId of Object.keys(atcGroup.controls)) {
       atcGroup.removeControl(roleId, { emitEvent: false })
     }
+    // removed and re-added (same instances) so the rows keep their order: required roles first, then additional
     for (const roleId of required) {
-      atcGroup.addControl(roleId, new FormControl(previous[roleId] ?? [], Validators.required), { emitEvent: false })
+      var requiredControl = existing[roleId] ?? new FormControl([])
+      requiredControl.setValidators(Validators.required)
+      atcGroup.addControl(roleId, requiredControl, { emitEvent: false })
     }
     for (const roleId of additional) {
-      atcGroup.addControl(roleId, new FormControl(previous[roleId] ?? []), { emitEvent: false })
+      var additionalControl = existing[roleId] ?? new FormControl([])
+      additionalControl.clearValidators()
+      atcGroup.addControl(roleId, additionalControl, { emitEvent: false })
     }
+    Object.values(atcGroup.controls).forEach(control => control.updateValueAndValidity({ emitEvent: false }))
     var atcModel = this.mapAppointmentRoleForm.get('atcmodel')
     if (this.mapAppointmentRoleForm.get('atcrequired').value === true) {
       atcGroup.enable({ emitEvent: false })
@@ -172,9 +186,15 @@ export class MapAppointmentRoleDialogComponent {
   }
 
   async onformsubmit(value){
-    this.loading = true
+    this.saveError = null
     console.log(value)
-    if(this.mapAppointmentRoleForm.valid){
+    if(!this.mapAppointmentRoleForm.valid){
+      this.mapAppointmentRoleForm.markAllAsTouched()
+      this.scrollToFirstError()
+      return
+    }
+    this.loading = true
+    try {
       var requiredlist = []
       for (let i = 0; i < value.required_role.length; i++) {
         requiredlist.push(doc(this.firestore, "eisroles/"+value.required_role[i])); 
@@ -213,10 +233,21 @@ export class MapAppointmentRoleDialogComponent {
       await setDoc(doc(this.firestore, "AppointmentType-To-Roles/"+docid), newData, {mergeFields: Object.keys(newData)})
       this.mapAppointmentRoleForm.reset();
       this.close()
-    } else {
-      this.mapAppointmentRoleForm.markAllAsTouched()
+    } catch (error) {
+      // Before this, a failed write left loading=true: the button stayed disabled with no message
+      console.error("Could not save the appointment role mapping", error)
+      this.saveError = (error?.message ?? error ?? "Unknown error").toString()
+    } finally {
+      this.loading = false
     }
-    this.loading = false
+  }
+
+  // The body scrolls, so an error can sit below the visible area — bring the first one into view
+  private scrollToFirstError() {
+    setTimeout(() => {
+      var invalid = this.host.nativeElement.querySelector('.mat-form-field-invalid')
+      invalid?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
   }
 
   close(){

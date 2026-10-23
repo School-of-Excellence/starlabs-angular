@@ -1,8 +1,13 @@
-<div class="mainscreen">
-  <div class="heading" mat-dialog-title>Map Appointment Type and Delivery Role</div>
-  <div [formGroup]="mapAppointmentRoleForm" mat-dialog-content >
-    <div>
-      <mat-form-field appearance="outline">
+<div class="mard">
+  <header class="mard-head">
+    <h2 class="mard-title" mat-dialog-title>Map Appointment Type and Delivery Role</h2>
+    <p class="mard-sub">Choose the roles each appointment type needs, and whether an ATC is given in it.</p>
+  </header>
+
+  <div class="mard-body" [formGroup]="mapAppointmentRoleForm" mat-dialog-content>
+    <section class="mard-section">
+      <div class="mard-label">Appointment</div>
+      <mat-form-field class="mard-field" appearance="outline">
         <mat-label>Appointment Type</mat-label>
         <mat-select formControlName="selectedApptType" [disabled]="data['data'] != null">
           <mat-option class="matOption" *ngFor="let list of appointmentTypeList" [value]="list.id">{{list.appointmenttype}}</mat-option>
@@ -14,24 +19,28 @@
           Already <strong>Exists</strong>
         </mat-error>
       </mat-form-field>
-      <br>
-      <mat-form-field class="inputfield" appearance="outline">
-        <mat-label>Required Role</mat-label>
-        <mat-select formControlName="required_role" multiple>
-          <mat-option class="matOption" *ngFor="let role of appointmentRoleList" [value]="role.id">{{role.role}}</mat-option>
-        </mat-select>
-        <mat-error *ngIf="mapAppointmentRoleForm.get('required_role').hasError('required')">
-          Role <strong>Required</strong>
-        </mat-error>
-      </mat-form-field>
-      <br>
-      <mat-form-field class="inputfield" appearance="outline">
-        <mat-label>Additional Role</mat-label>
-        <mat-select formControlName="additional_role" multiple>
-          <mat-option class="matOption" *ngFor="let role of appointmentRoleList" [value]="role.id">{{role.role}}</mat-option>
-        </mat-select>
-      </mat-form-field>
-    </div>
+    </section>
+
+    <section class="mard-section">
+      <div class="mard-label">Delivery roles</div>
+      <div class="mard-two">
+        <mat-form-field class="mard-field" appearance="outline">
+          <mat-label>Required Role</mat-label>
+          <mat-select formControlName="required_role" multiple>
+            <mat-option class="matOption" *ngFor="let role of appointmentRoleList" [value]="role.id">{{role.role}}</mat-option>
+          </mat-select>
+          <mat-error *ngIf="mapAppointmentRoleForm.get('required_role').hasError('required')">
+            Role <strong>Required</strong>
+          </mat-error>
+        </mat-form-field>
+        <mat-form-field class="mard-field" appearance="outline">
+          <mat-label>Additional Role</mat-label>
+          <mat-select formControlName="additional_role" multiple>
+            <mat-option class="matOption" *ngFor="let role of appointmentRoleList" [value]="role.id">{{role.role}}</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+    </section>
 
     <div class="atc-card" data-testid="mard-atc-card-3">
       <div class="atc-head">
@@ -42,12 +51,12 @@
         <span class="atc-badge">New</span>
       </div>
       <div class="atc-body">
-        <mat-checkbox data-testid="mard-atc-required-4" formControlName="atcrequired" color="primary">
+        <mat-checkbox class="mard-check" data-testid="mard-atc-required-4" formControlName="atcrequired" color="primary">
           An ATC is given in this appointment
         </mat-checkbox>
 
         <ng-container *ngIf="mapAppointmentRoleForm.get('atcrequired').value === true">
-          <mat-form-field class="atc-field atc-model" appearance="outline">
+          <mat-form-field class="mard-field atc-model" appearance="outline">
             <mat-label>ATC model</mat-label>
             <mat-select data-testid="mard-atc-model-8" formControlName="atcmodel" placeholder="Select ATC model">
               <mat-option class="matOption" *ngFor="let model of atcModelList" [value]="model">{{ model }}</mat-option>
@@ -64,11 +73,11 @@
           <div *ngIf="atcRoleIds.length > 0" formGroupName="atcrolemap">
             <div class="atc-grid atc-colhead">
               <div>ROLE</div>
-              <div>ATC ACTIVITIES <span class="atc-colsub"></span></div>
+              <div>ATC ACTIVITIES</div>
             </div>
             <div class="atc-grid atc-row" *ngFor="let roleId of atcRoleIds">
               <div class="atc-role" data-testid="mard-atc-role-6">{{ roleName(roleId) }}<span class="atc-role-tag" *ngIf="isAdditionalRole(roleId)">Additional</span></div>
-              <mat-form-field class="atc-field" appearance="outline">
+              <mat-form-field class="mard-field" appearance="outline">
                 <mat-label>ATC activities</mat-label>
                 <mat-select data-testid="mard-atc-activity-7" [formControlName]="roleId" placeholder="Select activities" multiple>
                   <mat-option class="matOption" *ngFor="let act of atcActivityList" [value]="act.id">{{ act.activity }} · {{ act.atcproperty }}</mat-option>
@@ -84,10 +93,15 @@
     </div>
   </div>
 
-  <div class="btnarea">
-    <button data-testid="mard-close-1" class="closebtn" mat-stroked-button (click)="close()">Cancel</button> 
-    <button data-testid="mard-onformsubmit-2" class="submitbtn" mat-stroked-button (click)="onformsubmit(mapAppointmentRoleForm.value)" [disabled]="loading">
-      Update Role
-    </button>
+  <div class="mard-foot" mat-dialog-actions>
+    <div class="mard-error" data-testid="mard-save-error-9" role="alert" *ngIf="saveError">
+      Couldn't save: {{ saveError }}. Check your connection and try again.
+    </div>
+    <div class="mard-actions">
+      <button data-testid="mard-close-1" class="mard-btn mard-btn-ghost" mat-stroked-button type="button" (click)="close()">Cancel</button>
+      <button data-testid="mard-onformsubmit-2" class="mard-btn mard-btn-primary" mat-flat-button type="button" (click)="onformsubmit(mapAppointmentRoleForm.value)" [disabled]="loading">
+        {{ loading ? 'Saving…' : 'Update Role' }}
+      </button>
+    </div>
   </div>
 </div>

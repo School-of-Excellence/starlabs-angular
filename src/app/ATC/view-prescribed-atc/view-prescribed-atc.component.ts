@@ -1322,6 +1322,43 @@ export class ViewPrescribedATCComponent {
     return procedure.id;
   }
 
+  // ---- 2026-10-23: template sections on a saved ATC (EI Solution ask / WiSH outcomes) ----
+  // One stable array per ATC: atc.data() builds a NEW object on every change detection, so looping over
+  // atc.data()['ask'] directly would hand *ngFor a new list each pass and re-render it without end (froze the page).
+  private templateRowsCache: { [atcId: string]: { ask: any[], outcomes: any[] } } = {}
+  templateRows(atc: any): { ask: any[], outcomes: any[] } {
+    if (!this.templateRowsCache[atc.id]) {
+      var data = atc.data() ?? {}
+      this.templateRowsCache[atc.id] = {
+        ask: Array.isArray(data['ask']) ? data['ask'] : [],
+        outcomes: Array.isArray(data['outcomes']) ? data['outcomes'] : [],
+      }
+    }
+    return this.templateRowsCache[atc.id]
+  }
+  trackByIndex(index: number): number {
+    return index
+  }
+  // prototype ATC card: the model tag colour and the initials shown when a participant has no photo
+  modelTagClass(product: any): string {
+    var model = (product ?? "").toString().toLowerCase()
+    return model == "ei solution" ? "tag-ei" : model == "wish" ? "tag-wish" : "tag-model"
+  }
+  initialsOf(name: any): string {
+    var words = (name ?? "").toString().replace(/@.*/, "").split(/[\s._+-]+/).filter(w => w.length != 0)
+    return words.slice(0, 2).map(w => w[0].toUpperCase()).join("") || "?"
+  }
+  askLabel(value: string): string {
+    var labels = { self: "Self", spouse: "Spouse", family: "Family", friends: "Friends", sponsors: "Sponsors" }
+    return labels[value] ?? value
+  }
+  outcomeNumber(index: number): string {
+    return (index + 1 < 10 ? "0" : "") + (index + 1)
+  }
+  isWiSHModel(product: any): boolean {
+    return (product ?? "").toString().toLowerCase() == "wish"
+  }
+
   trackByActivityKey(index: number, item: any): any {
     return item.key;
   }

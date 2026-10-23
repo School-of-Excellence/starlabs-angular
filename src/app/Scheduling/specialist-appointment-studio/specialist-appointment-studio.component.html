@@ -313,9 +313,6 @@
                   @if (h.status(r) === 'Pending') {
                     <button class="sas-btn is-secondary" data-testid="sas-home-update-status" (click)="h.openDetail(r); $event.stopPropagation()">Update status</button>
                   }
-                  @if (canPrescribeAtc(r)) {
-                    <button class="sas-btn is-secondary" data-testid="sas-home-prescribe-atc" (click)="prescribeAtc(r); $event.stopPropagation()">Prescribe ATC</button>
-                  }
                 </td>
               </tr>
             }

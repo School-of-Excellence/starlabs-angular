@@ -1,75 +1,203 @@
-.mainscreen{
-    width: 100%;
-    padding: 20px;
-  }
-  
-  .title{
-    text-align: center;
-    font-size: 16px;
-    font-weight: bold;
-    color: rgb(3, 48, 63);
-  }
-  
-  .selectbtn{
-    color: green;
-    border: 1px solid green;
-    margin-left: 15px;
-    margin-right: 15px;
-  }
-  
-  .deletebtn{
-    color: red;
-    border: 1px solid red;
-    vertical-align: bottom;
-  }
-  
-  .icon{
-    vertical-align: middle;
-    margin-bottom: 3px;
-  }
-  
-  .actionbox{
-    text-align: center;
-    margin-top: 10px;
-  }
-  
-  .closebtn{
-    color: rgb(3, 48, 63);
-    border: 1px solid rgb(3, 48, 63);
-  }
-.aiatc-badge {
+/* StarLabs Operations look (Geist + Electric Blue), same tokens as the Map Appointment Role dialog.
+   Shared by Prescribe ATC, Edit ATC and the Triple ATC screens — layout and labels only, no behaviour. */
+.atco {
+  --atco-ink: #0f172a;
+  --atco-ink2: #475569;
+  --atco-muted: #64748b;
+  --atco-border: #e2e8f0;
+  --atco-border2: #cbd5e1;
+  --atco-soft: #f8fafc;
+  --atco-accent: #2563eb;
+  --atco-accent-hover: #1d4ed8;
+  --atco-accent-soft: #dbeafe;
+  --atco-danger: #dc2626;
+  --atco-danger-soft: #fee2e2;
+
+  display: flex;
+  flex-direction: column;
+  width: 560px;
+  max-width: 100%;
+  max-height: 90vh;
+  font-family: 'Geist', 'Segoe UI', system-ui, sans-serif;
+  color: var(--atco-ink);
+  background: #fff;
+}
+
+/* ---- header ---- */
+.atco-head {
+  flex: none;
+  padding: 20px 24px 14px;
+  border-bottom: 1px solid var(--atco-border);
+}
+.atco-title {
+  margin: 0;
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--atco-ink);
+}
+.atco-sub {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--atco-ink2);
+}
+
+/* ---- body (scrolls when there are many drafts) ---- */
+.atco-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 24px 8px;
+}
+.atco-section { margin-bottom: 14px; }
+.atco-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--atco-ink2);
+  margin-bottom: 8px;
+}
+
+.atco-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  border: 1px solid var(--atco-border);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.atco-card:hover { border-color: var(--atco-border2); }
+.atco-card-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.atco-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--atco-ink);
+  overflow-wrap: anywhere;
+}
+.atco-card-text {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--atco-ink);
+  overflow-wrap: anywhere;
+}
+.atco-card-meta {
+  font-size: 12.5px;
+  line-height: 17px;
+  color: var(--atco-muted);
+}
+.atco-card-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.atco-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.atco-badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-left: 8px;
-  padding: 2px 8px;
-  border-radius: 12px;
-  background: #efe9fc;
-  color: #6c4ad6;
-  font-size: 12px;
-  font-weight: 700;
-  vertical-align: middle;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 500;
+  background: #d1fae5;
+  color: #047857;
 }
-
-.aiatc-badge .icon {
+.atco-badge-local {
+  background: #fef3c7;
+  color: #b45309;
+}
+.atco-badge-ai {
+  background: #f5f3ff;
+  color: #6d28d9;
+}
+.atco-badge-icon {
   font-size: 14px;
   width: 14px;
   height: 14px;
 }
 
-/* origin badge: tells the specialist whether a draft is the synced server copy or an unsynced local one */
-.source-badge {
-  display: inline-block;
-  margin-left: 8px;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 11px;
-  font-weight: 700;
-  background: #e3f0e6;
-  color: #1d6b34;
-  vertical-align: middle;
+/* ---- footer ---- */
+.atco-foot {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 24px 18px;
+  border-top: 1px solid var(--atco-border);
+  background: var(--atco-soft);
 }
-.source-badge.local {
-  background: #fdeccf;
-  color: #9a6206;
+
+/* ---- buttons ---- */
+.atco .atco-btn {
+  margin: 0;
+  min-width: 96px;
+  height: 38px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.atco .atco-btn-primary {
+  --mdc-filled-button-container-color: var(--atco-accent);
+  --mdc-filled-button-label-text-color: #fff;
+}
+.atco .atco-btn-primary:hover {
+  --mdc-filled-button-container-color: var(--atco-accent-hover);
+}
+.atco .atco-btn-ghost {
+  --mdc-filled-button-container-color: #fff;
+  --mdc-filled-button-label-text-color: var(--atco-ink);
+  border: 1px solid var(--atco-border2);
+}
+/* "Start fresh": the main way out of the dialog — filled primary, centred, with an icon */
+.atco .atco-btn-fresh {
+  --mdc-filled-button-container-color: var(--atco-accent);
+  --mdc-filled-button-label-text-color: #fff;
+  min-width: 200px;
+  height: 42px;
+  padding: 0 22px;
+  box-shadow: 0 6px 16px -8px rgba(37, 99, 235, 0.55);
+}
+.atco .atco-btn-fresh:hover {
+  --mdc-filled-button-container-color: var(--atco-accent-hover);
+}
+.atco .atco-btn-fresh mat-icon {
+  margin-right: 6px;
+}
+.atco .atco-icon-btn {
+  color: var(--atco-muted);
+}
+.atco .atco-icon-btn:hover {
+  color: var(--atco-danger);
+  background: var(--atco-danger-soft);
+}
+
+/* ---- narrow screens ---- */
+@media (max-width: 560px) {
+  .atco-head { padding: 16px 16px 12px; }
+  .atco-body { padding: 12px 16px 6px; }
+  .atco-foot { padding: 12px 16px 14px; }
+  .atco-card { flex-wrap: wrap; }
+  .atco-card-actions { width: 100%; justify-content: flex-end; }
+  .atco-foot .atco-btn { flex: 1; }
 }

@@ -12,72 +12,130 @@
     </mat-form-field>
   </div>
   
-  <div class="atc-edit-container" [class.has-status-bar]="(!isonline || reportATC.atcData != null) && !hideDraftBanner">
+  <div class="atc-edit-container" [class.has-status-bar]="!isonline && !hideDraftBanner">
     <!-- Offline/Online status bar -->
     <nav class="navbar navbar-light justify-content-end status-bar" *ngIf="!isonline && !hideDraftBanner">
       <span class="status-message">You're offline — changes are saved on this device and will sync when you reconnect.</span>
     </nav>
 
-    <nav class="navbar navbar-light justify-content-end status-bar autosave-bar" *ngIf="reportATC.atcData != null && isonline && !hideDraftBanner">
-      <div class="status-row">
-        <span class="icon-text-container" (click)="autoSave()">
-          <mat-icon [ngClass]="draftStatus.code == 1 ? 'text-success' : draftStatus.code == 0 ? 'text-warning' : 'text-danger'">sync</mat-icon>
-          <span data-testid="eatc-draft-status">{{draftStatus.message}}</span>
-          <span class="ml-2 text-secondary" *ngIf="draftStatus.code == 1 && lastDraftSavedOn">({{lastDraftSavedOn | date: 'medium'}})</span>
-        </span>
-        <!-- explicit retry shown only when a save failed -->
-        <button *ngIf="draftStatus.code == -1" type="button" class="retry-button" (click)="autoSave()">Retry</button>
-      </div>
-      <!-- <div *ngIf="autosaveonprogress">
-        <span class="icon-text-container">
-          <mat-icon>sync</mat-icon>
-          <span>saving to draft...</span>
-        </span>
-      </div>
-      <div *ngIf="!autosaveonprogress">
-        <span class="icon-text-container">
-          <mat-icon>sync</mat-icon>
-          <span>ATC Saved to draft.</span>
-        </span>
-      </div> -->
-    </nav>
-  
-    <header class="atc-header">
-      <h1 class="header-title">Edit Prescribed ATC</h1>
-    </header>
-  
     <main class="atc-main">
-      <!-- Client Information Section -->
-      <section class="content-section">
-        <h2 class="section-heading">ATC Data</h2>
-        <div class="info-grid">
-          <div class="info-box">
-            <span class="info-label">Participant's Name</span>
-            <span data-testid="eatc-participant" class="info-value">{{reportATC.profile_name}}</span>
-  
-            <div *ngIf="selectedParticipant['profileimg'] || selectedParticipant['profile']" class="profile-image-container">
-              <img class="profile-image" [src]="selectedParticipant['profileimg'] || selectedParticipant['profile']">
-            </div>
+      <!-- Prototype layout (2026-10-23): the ATC on the left, draft status + "Update changes in ATC" on the right -->
+      <div class="atc-layout">
+      <div class="atc-col-main">
+
+      <header class="atc-header edit-header">
+        <button data-testid="eatc-back" type="button" class="back-link" (click)="backToPrescribed()">← Prescribed ATC</button>
+        <h1 class="header-title">Edit prescribed ATC</h1>
+      </header>
+
+      <!-- Participant · Product · Prescribed date — as saved on the ATC (not editable here) -->
+      <section class="content-section atc-top-card edit-top-card">
+        <div class="edit-top-grid">
+          <img *ngIf="selectedParticipant['profileimg'] || selectedParticipant['profile']" class="side-avatar" [src]="selectedParticipant['profileimg'] || selectedParticipant['profile']" alt="Participant photo">
+          <span *ngIf="!(selectedParticipant['profileimg'] || selectedParticipant['profile'])" class="side-avatar side-avatar-empty" aria-hidden="true"><mat-icon>person</mat-icon></span>
+          <div class="atc-top-field">
+            <span class="atc-top-label">Participant</span>
+            <span data-testid="eatc-participant" class="edit-top-value">{{reportATC.profile_name}}</span>
           </div>
-          <div class="info-box">
-            <span class="info-label">Product</span>
-            <span data-testid="eatc-product" class="info-value">{{reportATC.product}}</span>
+          <div class="atc-top-field">
+            <span class="atc-top-label">Product</span>
+            <span data-testid="eatc-product" class="edit-top-value">{{reportATC.product}}</span>
           </div>
-          <div class="info-box">
-            <span class="info-label">Prescribed Date</span>
-            <span class="info-value">{{reportATC.date | date: 'medium'}}</span>
+          <div class="atc-top-field">
+            <span class="atc-top-label">Prescribed date</span>
+            <span class="edit-top-value">{{reportATC.date | date: 'medium'}}</span>
           </div>
         </div>
       </section>
-  
-      <!-- ATC Directive Section -->
-      <section class="content-section">
-        <h2 class="section-heading">ATC DIRECTIVE</h2>
+
+      <!-- ATC Directive Section (first) — WiSH shows it as "Immediate outcome expected from WiSH"; same editor -->
+      <section class="content-section" id="atcfield-directive">
+        <h2 class="section-heading" *ngIf="!isWiSH">ATC DIRECTIVE</h2>
+        <div class="section-heading wish-directive-heading" *ngIf="isWiSH">
+          <h2 class="wish-directive-title">IMMEDIATE OUTCOME EXPECTED FROM WiSH</h2>
+          <p class="section-note">Elaborate with the participant's life situation.</p>
+        </div>
         <div class="directive-container">
-          <div class="directive-text">
-            <label data-testid="eatc-directive-text">{{reportATC.directive == null ? "Directive not provided" : reportATC.directive}}</label>
+          <!-- clicking the directive opens the same editor as the button -->
+          <div class="directive-text directive-text-editable" *ngIf="reportATC.directive" (click)="editDirective()">
+            <label data-testid="eatc-directive-text">{{reportATC.directive}}</label>
           </div>
-          <button data-testid="eatc-directive-btn" class="edit-button primary-button" mat-button (click)="editDirective()">Update Directive</button>
+          <div class="directive-text directive-text-editable directive-placeholder" data-testid="eatc-directive-placeholder" *ngIf="!reportATC.directive" (click)="editDirective()">
+            {{ isWiSH ? 'Overcome worry and irritability; think about the future with optimism' : 'Directive not provided' }}
+          </div>
+          <button data-testid="eatc-directive-btn" class="edit-button primary-button" mat-button (click)="editDirective()">{{ isWiSH ? (reportATC.directive ? 'Edit Immediate Outcome' : 'Add Immediate Outcome') : 'Update Directive' }}</button>
+        </div>
+      </section>
+
+      <!-- Ask · area of focus — EI Solution only (at least one complete ask is required) -->
+      <section class="content-section" id="atcfield-asks" data-testid="eatc-ask-card" *ngIf="isEISolution">
+        <div class="section-heading ask-heading">
+          <div>
+            <h2 class="wish-directive-title">ASK · AREA OF FOCUS</h2>
+            <p class="section-note">At least one complete ask is required.</p>
+          </div>
+          <span class="ask-count" data-testid="eatc-ask-count">{{ completeAsks.length }} complete</span>
+        </div>
+        <div class="personnel-container">
+          <div class="ask-grid field-header">
+            <div></div>
+            <div>Asked by</div>
+            <div>Asked for</div>
+            <div></div>
+          </div>
+          <div *ngFor="let ask of askRows; let k = index" class="ask-grid">
+            <span class="ask-number">{{ k + 1 }}</span>
+            <mat-form-field appearance="outline" class="flat-field">
+              <mat-select data-testid="eatc-ask-by" placeholder="Choose" [(ngModel)]="ask.askedby" (selectionChange)="autoSave()">
+                <mat-option *ngFor="let option of askedByOptions" [value]="option.value">{{ option.label }}</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="flat-field">
+              <input data-testid="eatc-ask-for" matInput placeholder="What they asked for" [(ngModel)]="ask.askedfor" (focusout)="autoSave()">
+            </mat-form-field>
+            <button data-testid="eatc-ask-remove" class="action-button remove-button" mat-icon-button aria-label="Remove ask" (click)="removeAsk(k)">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+          <div class="empty-activities ask-add-row">
+            <button data-testid="eatc-ask-add" class="primary-button" mat-button (click)="addAsk()">+ Add New Ask</button>
+          </div>
+          <span class="required-text" *ngIf="submitAttempted && askError()">{{ askError() }}</span>
+        </div>
+      </section>
+
+      <!-- WiSH outcomes — WiSH only (at least one complete row is required) -->
+      <section class="content-section" id="atcfield-outcomes" data-testid="eatc-outcome-card" *ngIf="isWiSH">
+        <div class="section-heading ask-heading">
+          <div>
+            <h2 class="wish-directive-title">WiSH OUTCOMES</h2>
+            <p class="section-note">At least one complete row is required.</p>
+          </div>
+          <span class="ask-count" data-testid="eatc-outcome-count">{{ completeOutcomes.length }} filled</span>
+        </div>
+        <div class="personnel-container">
+          <div class="outcome-grid field-header">
+            <div></div>
+            <div>Outcome area</div>
+            <div>Outcomes expected</div>
+            <div></div>
+          </div>
+          <div *ngFor="let outcome of outcomeRows; let k = index" class="outcome-grid">
+            <span class="ask-number">{{ outcomeNumber(k) }}</span>
+            <mat-form-field appearance="outline" class="flat-field">
+              <input data-testid="eatc-outcome-area" matInput placeholder="Area to cover" [(ngModel)]="outcome.outcomearea" (focusout)="autoSave()">
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="flat-field">
+              <input data-testid="eatc-outcome-expected" matInput placeholder="What the participant expects, with dates" [(ngModel)]="outcome.outcomeexpected" (focusout)="autoSave()">
+            </mat-form-field>
+            <button data-testid="eatc-outcome-remove" class="action-button remove-button" mat-icon-button aria-label="Remove outcome row" (click)="removeOutcome(k)">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+          <div class="empty-activities ask-add-row">
+            <button data-testid="eatc-outcome-add" class="primary-button" mat-button (click)="addOutcome()">+ Add outcome area</button>
+          </div>
+          <span class="required-text" *ngIf="submitAttempted && outcomeError()">{{ outcomeError() }}</span>
         </div>
       </section>
   
@@ -381,7 +439,7 @@
                 <span class="procedure-marker">*</span>
                 <mat-form-field appearance="outline" class="procedure-field">
                   <mat-label>Procedure</mat-label>
-                  <mat-select data-testid="eatc-proc-name" [(ngModel)]="procedure.name" (selectionChange)="autoSave()" [required]="true" [errorStateMatcher]="requiredMatcher">
+                  <mat-select data-testid="eatc-proc-name" [(ngModel)]="procedure.name" (selectionChange)="onNewProcedureSelect(i, j)" [required]="true" [errorStateMatcher]="requiredMatcher">
                     <mat-option *ngFor="let pro of procedureList" [value]="pro.path">{{pro.name}}</mat-option>
                   </mat-select>
                   <mat-error>This field is required</mat-error>
@@ -430,6 +488,8 @@
         </div>
       </section>
   
+      <!-- Changework brief + Images side by side (prototype); they stack on narrow screens -->
+      <div class="media-pair">
       <!-- Audio Section -->
       <section class="content-section" id="atcfield-changework">
         <h2 class="section-heading">CHANGEWORK BRIEF</h2>
@@ -486,6 +546,7 @@
           </div>
         </div>
       </section>
+      </div>
   
       <!-- Notes Section -->
       <section class="content-section">
@@ -513,41 +574,52 @@
           </div>
         </div>
       </section>
-        <section class="content-section"
-          *ngIf="
-            reportATC['atcData'] &&
-            reportATC['atcData']['areastoexplore'] &&
-            reportATC['atcData']['aiatcsummary']
-          ">
-        <h2 class="section-heading">Areas to explore</h2>
-        <div class="notes-container">
-          <h4>{{reportATC['atcData']['areastoexplore'] ?? ''}}</h4>
-        </div>
-        <h2 class="section-heading">A&H AI Summary (Beta)</h2>
-        <div class="notes-container">
-          <markdown [data]="reportATC['atcData']['aiatcsummary'] ?? ''" class="markdown-content"></markdown>
-        </div>
-      </section> 
-      
-      <!-- <section class="content-section"
-        *ngIf="reportATC?.atcData?.areastoexplore && reportATC?.atcData?.aiatcsummary">
-        <h2 class="section-heading">Areas to explore</h2>
-        <div class="notes-container">
-          <h4>{{reportATC?.atcData?.areastoexplore ?? ''}}</h4>
-        </div>
-        <h2 class="section-heading">A&H AI Summary (Beta)</h2>
-        <div class="notes-container">
-          <markdown [data]="reportATC?.atcData?.aiatcsummary ?? ''" class="markdown-content"></markdown>
-        </div>
+      <!-- AI section — only the parts the AI actually gave (same rule as Prescribe) -->
+      <section class="content-section" data-testid="eatc-ai-section" *ngIf="hasAiAreas || hasAiSummary">
+        <ng-container *ngIf="hasAiAreas">
+          <h2 class="section-heading">Areas to explore</h2>
+          <div class="notes-container">
+            <h4 data-testid="eatc-ai-areas">{{reportATC['atcData']['areastoexplore']}}</h4>
+          </div>
+        </ng-container>
+        <ng-container *ngIf="hasAiSummary">
+          <h2 class="section-heading">A&H AI Summary (Beta)</h2>
+          <div class="notes-container">
+            <markdown data-testid="eatc-ai-summary" [data]="reportATC['atcData']['aiatcsummary']" class="markdown-content"></markdown>
+          </div>
+        </ng-container>
       </section>
- -->
-      
-      <!-- Submit Section -->
-      <section class="submit-section">
-        <button data-testid="eatc-submit" *ngIf="!uploading" mat-raised-button class="submit-button" (click)="submit()">
-          Update Changes in ATC
-        </button>
-        <mat-progress-spinner *ngIf="uploading" mode="indeterminate"></mat-progress-spinner>
-      </section>
+      </div>
+
+      <!-- Right panel: draft status, then "Update changes in ATC" (prototype) -->
+      <aside class="atc-col-side" [class.side-offline]="!isonline">
+        <section class="side-card side-draft" *ngIf="isonline && reportATC.atcData != null">
+          <button type="button" class="side-draft-status" (click)="autoSave()">
+            <mat-icon class="side-draft-icon" [ngClass]="draftStatus.code == 1 ? 'text-success' : draftStatus.code == 0 ? 'text-warning' : 'text-danger'">{{ draftStatus.code == 1 ? 'cloud_done' : draftStatus.code == 0 ? 'sync' : 'error_outline' }}</mat-icon>
+            <span class="side-draft-text">
+              <span data-testid="eatc-draft-status">{{draftStatus.message}}</span>
+              <span class="side-draft-time" *ngIf="draftStatus.code == 1 && lastDraftSavedOn">{{lastDraftSavedOn | date: 'medium'}}</span>
+            </span>
+          </button>
+          <button *ngIf="draftStatus.code == -1" type="button" class="retry-button" (click)="autoSave()">Retry</button>
+        </section>
+
+        <section class="side-card submit-section update-card">
+          <div class="ready-head">
+            <h2 class="ready-title">Update changes in ATC</h2>
+          </div>
+          <div class="update-lines">
+            <span data-testid="eatc-summary-line">{{ editSummaryLine }}</span>
+            <span data-testid="eatc-version-line">{{ versionLine }}</span>
+          </div>
+          <div class="panel-error" data-testid="eatc-panel-error" role="alert" *ngIf="panelError">{{ panelError }}</div>
+          <button data-testid="eatc-submit" *ngIf="!uploading" mat-raised-button class="submit-button" (click)="submit()">
+            Review and update
+          </button>
+          <div *ngIf="uploading" class="loading"><mat-progress-spinner mode="indeterminate" diameter="32"></mat-progress-spinner></div>
+          <button data-testid="eatc-cancel" *ngIf="!uploading" mat-button type="button" class="cancel-button" (click)="backToPrescribed()">Cancel</button>
+        </section>
+      </aside>
+      </div>
     </main>
   </div>

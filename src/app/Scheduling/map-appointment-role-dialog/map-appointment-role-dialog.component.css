@@ -1,131 +1,243 @@
-.mainscreen{
-  padding: 20px;
-  width: 100%;
-}
+/* StarLabs Operations look (Geist + Electric Blue). Material tokens are declared on `html` by the prebuilt
+   themes, so the overrides below only reach the controls inside this dialog. */
+.mard {
+  --mard-ink: #0f172a;
+  --mard-ink2: #475569;
+  --mard-muted: #64748b;
+  --mard-border: #e2e8f0;
+  --mard-border2: #cbd5e1;
+  --mard-soft: #f8fafc;
+  --mard-accent: #2563eb;
+  --mard-accent-hover: #1d4ed8;
+  --mard-accent-soft: #dbeafe;
+  --mard-danger: #dc2626;
+  --mard-danger-soft: #fee2e2;
 
-.heading{
-  font-size: 18px;
-  font-weight: bold;
-  text-align: center;
-  margin-bottom: 20px;
-  color: rgb(0, 50, 67);
-}
+  --mdc-outlined-text-field-container-shape: 10px;
+  --mdc-outlined-text-field-outline-color: var(--mard-border2);
+  --mdc-outlined-text-field-hover-outline-color: #94a3b8;
+  --mdc-outlined-text-field-focus-outline-color: var(--mard-accent);
+  --mdc-outlined-text-field-focus-label-text-color: var(--mard-accent);
+  --mdc-outlined-text-field-caret-color: var(--mard-accent);
+  --mdc-outlined-text-field-label-text-font: inherit;
+  --mat-form-field-container-text-font: inherit;
+  --mat-select-trigger-text-font: inherit;
+  --mat-select-focused-arrow-color: var(--mard-accent);
 
-mat-form-field{
-  width: 400px;
-}
-
-button {
-  margin: 5px;
-}
-
-.atc-card{
-  width: 560px;
-  max-width: 100%;
-  margin-top: 8px;
-  border: 1px solid #e3e6ec;
-  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+  font-family: 'Geist', 'Segoe UI', system-ui, sans-serif;
+  color: var(--mard-ink);
   background: #fff;
 }
 
-.atc-head{
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 14px 16px;
-  border-bottom: 1px solid #e3e6ec;
+/* ---- header (fixed) ---- */
+.mard-head {
+  flex: none;
+  padding: 20px 24px 14px;
+  border-bottom: 1px solid var(--mard-border);
 }
-
-.atc-title{
-  font-size: 15px;
-  font-weight: 600;
-  color: rgb(0, 50, 67);
+.mard .mard-title {
+  margin: 0;
+  padding: 0;
+  font: 600 18px/24px 'Geist', 'Segoe UI', system-ui, sans-serif;
+  letter-spacing: -0.015em;
+  color: var(--mard-ink);
 }
-
-.atc-subtitle{
-  font-size: 12px;
-  color: #5f6b7a;
-  margin-top: 2px;
-}
-
-.atc-badge{
-  font-size: 11px;
-  padding: 2px 10px;
-  border-radius: 10px;
-  background: #dcf5e3;
-  color: #1e7a3c;
-  white-space: nowrap;
-}
-
-.atc-body{
-  padding: 10px 16px 6px;
-}
-
-.atc-hint{
-  font-size: 12px;
-  color: #5f6b7a;
-  padding: 8px 0 10px;
-}
-
-.atc-grid{
-  display: grid;
-  grid-template-columns: 180px 1fr;
-  gap: 12px;
-  align-items: center;
-}
-
-.atc-colhead{
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: #5f6b7a;
-  padding: 10px 0 6px;
-  border-bottom: 1px solid #e3e6ec;
-}
-
-.atc-colsub{
-  font-weight: 500;
-}
-
-.atc-row{
-  padding-top: 10px;
-  border-bottom: 1px solid #f0f2f5;
-}
-
-.atc-row:last-child{
-  border-bottom: none;
-}
-
-.atc-role{
+.mard .mard-title::before { display: none; }
+.mard-sub {
+  margin: 4px 0 0;
   font-size: 13px;
-  padding-bottom: 20px;
+  line-height: 18px;
+  color: var(--mard-ink2);
 }
 
-mat-form-field.atc-field{
-  width: 100%;
+/* ---- body (the only part that scrolls) ---- */
+.mard .mard-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+  padding: 18px 24px 8px;
+  color: var(--mard-ink);
+  font-family: inherit;
 }
+.mard-section { margin-bottom: 6px; }
+.mard-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mard-ink2);
+  margin-bottom: 8px;
+}
+.mard-two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 14px;
+}
+mat-form-field.mard-field { width: 100%; }
 
-.matOption{
+.matOption {
   overflow: visible;
   line-height: initial;
   word-wrap: break-word;
   white-space: pre-wrap;
 }
 
-mat-form-field.atc-model{
-  width: 100%;
-  margin-top: 10px;
+/* ---- ATC card ---- */
+.atc-card {
+  margin: 4px 0 12px;
+  border: 1px solid var(--mard-border);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
+.atc-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--mard-border);
+}
+.atc-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--mard-ink);
+}
+.atc-subtitle {
+  font-size: 12.5px;
+  line-height: 17px;
+  color: var(--mard-ink2);
+  margin-top: 2px;
+}
+.atc-badge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--mard-accent-soft);
+  color: #1e40af;
+  white-space: nowrap;
+}
+.atc-body { padding: 10px 16px 6px; }
 
-.atc-role-tag{
+mat-checkbox.mard-check {
+  --mdc-checkbox-selected-icon-color: var(--mard-accent);
+  --mdc-checkbox-selected-hover-icon-color: var(--mard-accent);
+  --mdc-checkbox-selected-focus-icon-color: var(--mard-accent);
+  --mdc-checkbox-selected-pressed-icon-color: var(--mard-accent);
+  --mat-checkbox-label-text-font: inherit;
+  --mat-checkbox-label-text-size: 13.5px;
+  margin-left: -8px;
+}
+mat-form-field.atc-model { margin-top: 10px; }
+
+.atc-hint {
+  font-size: 12.5px;
+  color: var(--mard-muted);
+  padding: 4px 0 12px;
+}
+.atc-grid {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+.atc-colhead {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--mard-ink2);
+  padding: 6px 0;
+  border-bottom: 1px solid var(--mard-border);
+}
+.atc-row {
+  padding-top: 12px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.atc-row:last-child { border-bottom: none; }
+.atc-role {
+  font-size: 13.5px;
+  font-weight: 500;
+  padding-bottom: 20px;
+}
+.atc-role-tag {
   display: inline-block;
   margin-left: 6px;
-  padding: 0 6px;
-  border-radius: 8px;
-  font-size: 10px;
-  line-height: 16px;
-  background: #eceff1;
-  color: #5f6b7a;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 18px;
+  background: #f1f5f9;
+  color: var(--mard-ink2);
   vertical-align: middle;
+}
+
+/* ---- footer (fixed) ---- */
+.mard .mard-foot {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  min-height: 0;
+  padding: 14px 24px 18px;
+  border-top: 1px solid var(--mard-border);
+  background: var(--mard-soft);
+}
+.mard-error {
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--mard-danger-soft);
+  color: var(--mard-danger);
+  font-size: 12.5px;
+  line-height: 17px;
+  font-weight: 500;
+}
+.mard-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.mard .mard-btn {
+  margin: 0;
+  min-width: 96px;
+  height: 40px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.mard .mard-btn-ghost {
+  --mdc-outlined-button-outline-color: var(--mard-border2);
+  --mdc-outlined-button-label-text-color: var(--mard-ink);
+  background: #fff;
+}
+.mard .mard-btn-primary {
+  --mdc-filled-button-container-color: var(--mard-accent);
+  --mdc-filled-button-label-text-color: #fff;
+}
+.mard .mard-btn-primary:hover:not(:disabled) {
+  --mdc-filled-button-container-color: var(--mard-accent-hover);
+}
+.mard .mard-btn-primary:disabled {
+  --mdc-filled-button-disabled-container-color: #93c5fd;
+  --mdc-filled-button-disabled-label-text-color: #fff;
+}
+
+/* ---- narrow screens: stack the role columns and the ATC rows ---- */
+@media (max-width: 560px) {
+  .mard-head { padding: 16px 16px 12px; }
+  .mard .mard-body { padding: 14px 16px 6px; }
+  .mard .mard-foot { padding: 12px 16px 14px; }
+  .mard-two { grid-template-columns: minmax(0, 1fr); }
+  .atc-grid { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .atc-colhead { display: none; }
+  .atc-role { padding-bottom: 6px; }
+  .mard-actions .mard-btn { flex: 1; }
 }

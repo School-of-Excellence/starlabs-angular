@@ -27,6 +27,7 @@ import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 import { UpdateDialogComponent } from '../../DialogBox/update-dialog/update-dialog.component';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MarkdownModule } from 'ngx-markdown';
+import { MAT_FORM_FIELD_DEFAULT_OPTIONS } from '@angular/material/form-field';
 
 @Component({
   selector: 'app-edit-atc',
@@ -45,7 +46,9 @@ import { MarkdownModule } from 'ngx-markdown';
     MatSnackBarModule
   ],
   templateUrl: './edit-atc.component.html',
-  styleUrl: './edit-atc.component.css'
+  styleUrl: './edit-atc.component.css',
+  // same field behaviour as Prescribe: the error line takes space only when an error shows
+  providers: [{ provide: MAT_FORM_FIELD_DEFAULT_OPTIONS, useValue: { subscriptSizing: 'dynamic' } }]
 })
 export class EditAtcComponent {
   // private firestore = inject(Firestore);
@@ -202,6 +205,150 @@ export class EditAtcComponent {
 
   areasstring: any = null;
   summarystring: any = null;
+
+  // ---- 2026-10-23: same template sections as Prescribe (EI Solution Ask, WiSH outcomes) -------------------------
+  // Loaded from the ATC (ask / outcomes), kept in the edit draft (every row), saved on the new version (complete rows).
+  askedByOptions = [
+    { value: "self", label: "Self" },
+    { value: "spouse", label: "Spouse" },
+    { value: "family", label: "Family" },
+    { value: "friends", label: "Friends" },
+    { value: "sponsors", label: "Sponsors" },
+  ]
+  askRows: { askedby: string | null, askedfor: string }[] = []
+  outcomeRows: { outcomearea: string, outcomeexpected: string }[] = []
+  // change agents last applied "for all procedures" — a new-adjustment procedure chosen later inherits them
+  bulkAppliedSelection = {}
+  // versions before this one (the editedfrom chain, counted like View Prescribed); null = not known (offline)
+  previousVersionCount: number | null = null
+  // the last save-check message, shown in the right panel (also scrolled to + snackbar)
+  panelError: string | null = null
+
+  get isEISolution(): boolean {
+    return (this.reportATC?.product ?? "").toString().toLowerCase() == "ei solution"
+  }
+  get isWiSH(): boolean {
+    return (this.reportATC?.product ?? "").toString().toLowerCase() == "wish"
+  }
+
+  // EI Solution always shows at least one (empty) ask row
+  ensureAskRow() {
+    if (this.isEISolution && this.askRows.length == 0) this.askRows.push({ askedby: null, askedfor: "" })
+  }
+  addAsk() {
+    this.askRows.push({ askedby: null, askedfor: "" })
+  }
+  // removing the last row clears it instead (one row always stays)
+  removeAsk(index: number) {
+    this.askRows.splice(index, 1)
+    this.ensureAskRow()
+    this.autoSave()
+  }
+  get completeAsks(): { askedby: string, askedfor: string }[] {
+    return this.askRows
+      .filter(row => !!row.askedby && (row.askedfor ?? "").trim().length != 0)
+      .map(row => ({ askedby: row.askedby, askedfor: row.askedfor.trim() }))
+  }
+  // null when the asks are ready to save; otherwise what is missing
+  askError(): string | null {
+    var partial = this.askRows.some(row => !!row.askedby != ((row.askedfor ?? "").trim().length != 0))
+    if (partial) return "Fill both asked by and asked for, or remove the row"
+    if (this.completeAsks.length == 0) return "At least one complete ask is required (asked by and asked for)"
+    return null
+  }
+
+  // WiSH: five empty outcome rows when the ATC has none yet (as in Prescribe)
+  ensureOutcomeRows() {
+    if (this.isWiSH && this.outcomeRows.length == 0) {
+      for (let i = 0; i < 5; i++) this.outcomeRows.push({ outcomearea: "", outcomeexpected: "" })
+    }
+  }
+  addOutcome() {
+    this.outcomeRows.push({ outcomearea: "", outcomeexpected: "" })
+  }
+  // removing the last row clears it instead (one row always stays, like Ask)
+  removeOutcome(index: number) {
+    this.outcomeRows.splice(index, 1)
+    if (this.isWiSH && this.outcomeRows.length == 0) this.outcomeRows.push({ outcomearea: "", outcomeexpected: "" })
+    this.autoSave()
+  }
+  get completeOutcomes(): { outcomearea: string, outcomeexpected: string }[] {
+    return this.outcomeRows
+      .filter(row => (row.outcomearea ?? "").trim().length != 0 && (row.outcomeexpected ?? "").trim().length != 0)
+      .map(row => ({ outcomearea: row.outcomearea.trim(), outcomeexpected: row.outcomeexpected.trim() }))
+  }
+  outcomeError(): string | null {
+    var partial = this.outcomeRows.some(row => ((row.outcomearea ?? "").trim().length != 0) != ((row.outcomeexpected ?? "").trim().length != 0))
+    if (partial) return "Fill both outcome area and outcomes expected, or clear the row"
+    if (this.completeOutcomes.length == 0) return "Keep at least one WiSH outcome (outcome area and outcomes expected)"
+    return null
+  }
+  outcomeNumber(index: number): string {
+    return (index + 1 < 10 ? "0" : "") + (index + 1)
+  }
+
+  // AI section: shown only for the parts the AI actually gave (same rule as Prescribe)
+  get hasAiAreas(): boolean {
+    var areas = this.reportATC?.atcData?.["areastoexplore"]
+    return Array.isArray(areas) ? areas.some(e => (e ?? "").toString().trim().length != 0) : (areas ?? "").toString().trim().length != 0
+  }
+  get hasAiSummary(): boolean {
+    return (this.reportATC?.atcData?.["aiatcsummary"] ?? "").toString().trim().length != 0
+  }
+
+  // "Update changes in ATC" panel: what this edit changes (prototype wording)
+  get editSummaryLine(): string {
+    var rows = this.reportATC?.transcription ?? []
+    var edited = rows.filter(a => !a.adjustmentdelete && (a.adjustmentedit ?? "").trim() != (a.adjustment ?? "").trim()).length
+    var deleted = rows.filter(a => a.adjustmentdelete && !a.originalADJvalue).length
+    var added = (this.newTranscription ?? []).filter(a => (a.adjustment ?? "").trim().length != 0).length
+    var agents = Array.from(new Set(Object.values(this.bulkAppliedSelection ?? {}).flat() as string[]))
+      .map(path => this.authorList.find(e => e.authorpath == path)?.authorname ?? path)
+    return `${edited} edited, ${deleted} deleted and ${added} new adjustments. Change agents: ${agents.length ? agents.join(", ") : "none"}.`
+  }
+  get versionLine(): string {
+    return this.previousVersionCount == null
+      ? "Saving creates a new version. The current version is kept and hidden from the participant."
+      : `Saving creates version ${this.previousVersionCount + 2}. The current version is kept and hidden from the participant.`
+  }
+
+  // walk the editedfrom chain exactly as View Prescribed does (oldest = Version 1); unreadable → plain wording
+  private async countPreviousVersions(editedFrom: any) {
+    var count = 0
+    var current = editedFrom
+    try {
+      while (current) {
+        const snap = await getDoc(doc(this.firestoreATC, current.path))
+        if (!snap || !snap.exists()) break
+        count = count + 1
+        current = snap.data()?.["editedfrom"] ?? null
+      }
+      this.previousVersionCount = count
+    } catch (error) {
+      console.error("Could not read the ATC version chain", error)
+      this.previousVersionCount = null
+    }
+  }
+
+  // A procedure was chosen in a NEW adjustment: every change-agent activity set for all procedures (Apply) fills it
+  // too — only where it has nobody yet, so a manual per-procedure pick is kept (same as Prescribe)
+  onNewProcedureSelect(i: number, j: number) {
+    var procedure = this.newTranscription?.[i]?.procedure?.[j]
+    if (procedure?.name) {
+      procedure.bigactivity = procedure.bigactivity ?? {}
+      Object.keys(this.bulkAppliedSelection ?? {}).forEach(activityId => {
+        var applied = this.bulkAppliedSelection[activityId] ?? []
+        if (applied.length != 0 && (procedure.bigactivity[activityId] ?? []).length == 0) {
+          procedure.bigactivity[activityId] = [...applied]
+        }
+      })
+    }
+    this.autoSave()
+  }
+
+  backToPrescribed() {
+    this.router.navigate(['/viewprescribedATC'])
+  }
   
   constructor(
     public storage: Storage,
@@ -410,6 +557,8 @@ export class EditAtcComponent {
           procedure.bigactivity[assigned.docid] = [...selected]
         })
       })
+      // remember what was applied: new-adjustment procedures chosen from now on get these agents too
+      this.bulkAppliedSelection[assigned.docid] = [...selected]
       this.autoSave()
     }
   }
@@ -445,6 +594,14 @@ export class EditAtcComponent {
       this.reportATC.date = atcDocData['prescription_date'].toDate()
       this.reportATC.atceducation = atcDocData["atceducation"] != null ? atcDocData["atceducation"] : []
       this.reportATC.validator = atcDocData["validator"]?.map(e => e.id)
+      // template sections, as saved on the ATC (a draft opened below replaces them with what was typed)
+      this.askRows = (Array.isArray(atcDocData["ask"]) ? atcDocData["ask"] : [])
+        .map(row => ({ askedby: row?.askedby ?? null, askedfor: row?.askedfor ?? "" }))
+      this.ensureAskRow()
+      this.outcomeRows = (Array.isArray(atcDocData["outcomes"]) ? atcDocData["outcomes"] : [])
+        .map(row => ({ outcomearea: row?.outcomearea ?? "", outcomeexpected: row?.outcomeexpected ?? "" }))
+      this.ensureOutcomeRows()
+      this.countPreviousVersions(atcDocData["editedfrom"] ?? null)
 
 
       var atcActivity = Object.keys(atcDocData["bigactivity"] ?? {})
@@ -637,6 +794,11 @@ export class EditAtcComponent {
           consultationpoint: this.editNotes.consultationpoint ?? null,
           notes: this.editNotes.notes ?? null,
           notesedited: this.editNotes.notesedited ?? false,
+          // template sections — every row, half-filled ones too — and the "set for all procedures" agents
+          ask: this.isEISolution ? this.askRows.map(row => ({ askedby: row.askedby ?? null, askedfor: row.askedfor ?? "" })) : [],
+          outcomes: this.isWiSH ? this.outcomeRows.map(row => ({ outcomearea: row.outcomearea ?? "", outcomeexpected: row.outcomeexpected ?? "" })) : [],
+          bulkassigned: this.bulkAssignedSelection ?? {},
+          bulkapplied: this.bulkAppliedSelection ?? {},
           delete: false,
           lastupdated: new Date()        // client time (was serverTimestamp) so the draft is durable in the local outbox + REST fallback
         }
@@ -691,6 +853,17 @@ export class EditAtcComponent {
     this.editNotes.consultationpoint = value["consultationpoint"] ?? null
     this.editNotes.notes = value["notes"] ?? null
     this.editNotes.notesedited = value["notesedited"] ?? false
+    // template sections + bulk agents as typed (an older draft without them keeps what the ATC holds)
+    if (Array.isArray(value["ask"])) {
+      this.askRows = value["ask"].map(row => ({ askedby: row?.askedby ?? null, askedfor: row?.askedfor ?? "" }))
+      this.ensureAskRow()
+    }
+    if (Array.isArray(value["outcomes"])) {
+      this.outcomeRows = value["outcomes"].map(row => ({ outcomearea: row?.outcomearea ?? "", outcomeexpected: row?.outcomeexpected ?? "" }))
+      this.ensureOutcomeRows()
+    }
+    this.bulkAssignedSelection = value["bulkassigned"] ?? this.bulkAssignedSelection ?? {}
+    this.bulkAppliedSelection = value["bulkapplied"] ?? this.bulkAppliedSelection ?? {}
     if (value["lastupdated"]) {
       // lastupdated may be a Firestore Timestamp (server read) or a JS Date (local cache) — handle both
       this.lastDraftSavedOn = this.toJsDate(value["lastupdated"])
@@ -1210,6 +1383,7 @@ export class EditAtcComponent {
         setTimeout(() => el?.classList.remove('atc-field-invalid-flash'), 2500);
       }
     } catch {}
+    this.panelError = message
     this.snackbar.open(message, 'Dismiss', {
       duration: 4000,
       horizontalPosition: 'center',
@@ -1245,6 +1419,25 @@ export class EditAtcComponent {
     }
     // flush any in-flight save so the latest edits are included and the draft can't re-appear after submit
     await this.autoSave()
+    this.panelError = null
+    // prototype order: author → directive → ask / outcomes → then the existing adjustment / procedure checks
+    var hasAuthor = this.authorActivity.some(activity => (this.reportATC.bigactivity?.[activity.docid] ?? []).length != 0)
+    if (!this.bigActivity() && !hasAuthor) {
+      this.focusMissingField('atcfield-author', 'Choose the author names')
+      return
+    }
+    if ((this.reportATC.directive ?? "").trim().length == 0) {
+      this.focusMissingField('atcfield-directive', this.isWiSH ? 'Write the immediate outcome' : 'Provide ATC directive')
+      return
+    }
+    if (this.isEISolution && this.askError() != null) {
+      this.focusMissingField('atcfield-asks', this.askError())
+      return
+    }
+    if (this.isWiSH && this.outcomeError() != null) {
+      this.focusMissingField('atcfield-outcomes', this.outcomeError())
+      return
+    }
     var validation1: boolean = this.validateExistingPrescription()
     var validation2: boolean = this.validateNewPrescription()
     var validation3: boolean = this.collectionName == "atc_alpha" ? this.changeworkBriefValidation() : true
@@ -1293,6 +1486,10 @@ export class EditAtcComponent {
         product: this.reportATC.product,
         specialist: specialistData,
         directive: this.reportATC.directive,
+        // what the new version will hold for the template sections (complete rows only)
+        directivelabel: this.isWiSH ? "Immediate outcome" : "Directive",
+        asks: this.isEISolution ? this.completeAsks.map(row => ({ askedby: this.askedByOptions.find(o => o.value == row.askedby)?.label ?? row.askedby, askedfor: row.askedfor })) : [],
+        outcomes: this.isWiSH ? this.completeOutcomes : [],
         adjustmentlist: [...this.reportATC.transcription, ...this.newTranscription.filter(adj => adj.adjustment.trim().length != 0)],
         mapprocedure: this.procedureMap,
         confirmationmessage: confirmationMessage
@@ -1455,6 +1652,9 @@ export class EditAtcComponent {
     console.log(atcImageURL);
     newData["prescription_image"] = [...(newData["prescription_image"] ?? []), ...atcImageURL];
     newData["directive"] = this.reportATC.directive ?? null;
+    // template sections: complete rows only (other models keep whatever the original carried — nothing)
+    if (this.isEISolution) newData["ask"] = this.completeAsks;
+    if (this.isWiSH) newData["outcomes"] = this.completeOutcomes;
 
     this.reportATC.bigactivity = this.reportATC.bigactivity ?? {};
     const newBigActivity: any = {};

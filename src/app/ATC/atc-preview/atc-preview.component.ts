@@ -401,4 +401,16 @@ export class AtcPreviewComponent {
       console.log('else');
     }
   }
+
+  // ---- 2026-10-23: template sections on a saved ATC (EI Solution ask / WiSH outcomes) ----
+  askLabel(value: string): string {
+    var labels = { self: "Self", spouse: "Spouse", family: "Family", friends: "Friends", sponsors: "Sponsors" }
+    return labels[value] ?? value
+  }
+  outcomeNumber(index: number): string {
+    return (index + 1 < 10 ? "0" : "") + (index + 1)
+  }
+  isWiSHModel(product: any): boolean {
+    return (product ?? "").toString().toLowerCase() == "wish"
+  }
 }

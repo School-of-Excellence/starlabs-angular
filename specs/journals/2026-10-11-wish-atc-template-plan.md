@@ -137,7 +137,7 @@ Hard constraints that shaped everything:
    - These are the same `bigactivity` entries WiSH uses. Because the Shadow role also fills the
      implementation activity, Ishara Ahmed is the change agent in the prototypes.
 2. **What EI Solution drops:** awareness, potential years and Directives for Micro ATC.
-3. **Ask (area of focus):** a new list on the ATC, `eiask: [{ askedby, askedfor }]`.
+3. **Ask (area of focus):** a new list on the ATC, `ask: [{ askedby, askedfor }]` (named `eiask` until 2026-10-23).
    - `askedby` is a fixed option: self, spouse, family or friends.
    - `askedfor` is free text.
    - The list opens with one row, more can be added, and at least one complete row is required.
@@ -173,13 +173,13 @@ firestore-atc
   atc_alpha|atc_to_validate/{atcid}
     + appointmentid, widgets[] (copy at submit)           both templates
     + wishoutcome[{outcomearea, outcomeexpected}]         WiSH
-    + eiask[{askedby, askedfor}]                          EI Solution
+    + ask[{askedby, askedfor}]                            EI Solution
     + reviewlog[{note, date, profileid, isdelete}]        EI Solution
     corrections/{adjustment NN}     WiSH: name = adjustment + "\n\nOutcome - " + outcome
                                     awareness · awarenessdetail · potentialyears = null for WiSH and EI
     procedures/{adjustment NN - n}  WiSH: assigned_to = overall CA, mandatory true, recommended_to null
                                     EI: per-procedure assigned_to, mandatory and recommended_to, as today
-  temporary_ATC / temporary_edit_ATC  + the template's fields (wishoutcome, eiask, appointmentid, outcome per row, …)
+  temporary_ATC / temporary_edit_ATC  + the template's fields (wishoutcome, ask, appointmentid, outcome per row, …)
 firestore-forms
   formsByClient/{id}            + atcid, appointmentid, filledby
 ```

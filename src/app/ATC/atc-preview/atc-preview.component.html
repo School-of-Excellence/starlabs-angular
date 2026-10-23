@@ -39,10 +39,36 @@
     <section class="preview-card" *ngIf="reportATC.directive">
       <div class="card-header">
         <mat-icon class="header-icon">description</mat-icon>
-        <h2 class="card-title">ATC Directive</h2>
+        <h2 class="card-title">{{ isWiSHModel(reportATC.product) ? 'Immediate outcome' : 'ATC Directive' }}</h2>
       </div>
       <div class="card-body">
         <p data-testid="pva-directive" class="directive-text">{{reportATC.directive}}</p>
+      </div>
+    </section>
+
+    <!-- Ask · area of focus (EI Solution) — only when the ATC has asks -->
+    <section class="preview-card" data-testid="pva-ask-card" *ngIf="(reportATC.atcData?.['ask'] || []).length != 0">
+      <div class="card-header">
+        <mat-icon class="header-icon">record_voice_over</mat-icon>
+        <h2 class="card-title">Ask · area of focus</h2>
+      </div>
+      <div class="card-body">
+        <div class="template-row" data-testid="pva-ask-row" *ngFor="let ask of reportATC.atcData['ask']; let k = index">
+          <span class="template-no">{{ k + 1 }}</span><span class="template-key">{{ askLabel(ask.askedby) }}</span><span>{{ ask.askedfor }}</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- WiSH outcomes — only when the ATC has them -->
+    <section class="preview-card" data-testid="pva-outcome-card" *ngIf="(reportATC.atcData?.['outcomes'] || []).length != 0">
+      <div class="card-header">
+        <mat-icon class="header-icon">flag</mat-icon>
+        <h2 class="card-title">WiSH outcomes</h2>
+      </div>
+      <div class="card-body">
+        <div class="template-row" data-testid="pva-outcome-row" *ngFor="let outcome of reportATC.atcData['outcomes']; let k = index">
+          <span class="template-no">{{ outcomeNumber(k) }}</span><span class="template-key">{{ outcome.outcomearea }}</span><span>{{ outcome.outcomeexpected }}</span>
+        </div>
       </div>
     </section>
 

@@ -2,100 +2,54 @@
     <mat-progress-spinner mode="indeterminate" class="loading-bar"></mat-progress-spinner>
   </div>
   
-  <div class="atc-edit-container" [class.has-status-bar]="!isonline || autoSaveID != null">
+  <div class="atc-edit-container" [class.has-status-bar]="!isonline">
     <!-- Offline/Online status bar -->
     <nav class="navbar navbar-light justify-content-end status-bar" *ngIf="!isonline">
       <span class="status-message">You're offline — changes are saved on this device and will sync when you reconnect.</span>
     </nav>
-    
-    <nav class="navbar navbar-light justify-content-end status-bar autosave-bar" *ngIf="autoSaveID != null && isonline">
-      <div class="status-row">
-        <span class="icon-text-container" (click)="autoSave()">
-          <mat-icon [ngClass]="draftStatus.code == 1 ? 'text-success' : draftStatus.code == 0 ? 'text-warning' : 'text-danger'">sync</mat-icon>
-          <span data-testid="patc-draft-status">{{draftStatus.message}}</span>
-          <span class="ml-2 text-secondary" *ngIf="draftStatus.code == 1 && lastDraftSavedOn">({{lastDraftSavedOn | date: 'medium'}})</span>
-        </span>
-        <!-- explicit retry shown only when a save failed -->
-        <button *ngIf="draftStatus.code == -1" type="button" class="retry-button" (click)="autoSave()">Retry</button>
-      </div>
-      <!-- <div *ngIf="autosaveonprogress">
-        <span class="icon-text-container">
-          <mat-icon>sync</mat-icon>
-          <span>saving to draft...</span>
-        </span>
-      </div>
-      <div *ngIf="!autosaveonprogress">
-        <span class="icon-text-container">
-          <mat-icon>sync</mat-icon>
-          <span>ATC Saved to draft.</span>
-        </span>
-      </div> -->
-    </nav>
-    
-    <header class="atc-header">
-      <h1 class="header-title">Prescribe ATC</h1>
-    </header>
-  
+    <!-- The draft-save status lives at the top of the right panel (see aside below) -->
+
     <main class="atc-main">
-      <!-- Participant selection — always first; the full screen unlocks once a participant is chosen -->
-      <section class="content-section">
-        <h2 class="section-heading">Participant</h2>
-        <div class="info-box">
-          <mat-form-field appearance="outline" class="flat-field">
-            <mat-label>Participant's Name</mat-label>
-            <!-- lock the participant name once a draft context exists; switch participant via "Create New ATC" -->
-            <mat-select data-testid="patc-participant" [(ngModel)]="participantProfileid" (selectionChange)="onProfileSelect()" [disabled]="settingup || this.assignmentInitiated || this.bigActivity() || autoSaveID != null" [required]="true">
-              <mat-option>
-                <ngx-mat-select-search [(ngModel)]="filteredProfile" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
-              </mat-option>
-              <mat-option *ngFor="let profile of availableProfileList()" [value]="profile.profileid">{{profile.name}}</mat-option>
-            </mat-select>
-          </mat-form-field>
+      <!-- Two columns (prototype): the ATC on the left, participant + "Ready to submit" docked on the right -->
+      <div class="atc-layout">
+      <div class="atc-col-main">
 
-          <div *ngIf="participantProfileid !== null && (selectedParticipantProfile['profileimg'] || selectedParticipantProfile['profile'])" class="profile-image-container">
-            <img class="profile-image" [src]="selectedParticipantProfile['profileimg'] || selectedParticipantProfile['profile']">
-          </div>
+      <header class="atc-header">
+        <h1 class="header-title">Prescribe ATC</h1>
+      </header>
 
-          <!-- draft / new-atc actions, shown once a participant is selected -->
-          <div class="participant-actions" *ngIf="autoSaveID != null">
-            <!-- only when this participant has a draft other than the current one -->
-            <button *ngIf="!aigeneratedEntry && hasOtherDrafts" mat-button class="share-button" (click)="openAnotherDraft()">
-              Open & Continue Another Draft
-              <mat-icon>folder_open</mat-icon>
-            </button>
-            <!-- start a brand new ATC in a new tab -->
-            <button mat-button class="share-button" (click)="createNewATC()">
-              Create New ATC
-              <mat-icon>note_add</mat-icon>
-            </button>
-            <!-- share the draft link with collaborators -->
-            <button mat-button class="share-button" (click)="copyToClipboard()">
-              Copy Link For Collaborators
-              <mat-icon>content_copy</mat-icon>
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <!-- The full ATC screen is shown only after a participant is selected -->
-      <ng-container *ngIf="autoSaveID != null">
-      <!-- ATC Data Section -->
-      <section class="content-section">
-        <h2 class="section-heading">ATC Data</h2>
-        <div class="info-grid">
-          <div class="info-box">
+      <!-- Participant · ATC given for · Prescribed date — one card; the full screen unlocks once a participant is chosen -->
+      <section class="content-section atc-top-card">
+        <div class="atc-top-grid">
+          <div class="atc-top-field" id="atcfield-profile">
+            <span class="atc-top-label">Participant</span>
             <mat-form-field appearance="outline" class="flat-field">
-              <mat-label>What is the ATC given for?</mat-label>
-              <mat-select data-testid="patc-product" [(ngModel)]="product" (selectionChange)="onProductSelect(); autoSave()" [required]="true" [errorStateMatcher]="requiredMatcher">
+              <!-- lock the participant name once a draft context exists; switch participant via "Create New ATC" -->
+              <mat-select data-testid="patc-participant" placeholder="Search participant" [(ngModel)]="participantProfileid" (selectionChange)="onProfileSelect()" [disabled]="settingup || this.assignmentInitiated || this.bigActivity() || autoSaveID != null" [required]="true">
+                <mat-option>
+                  <ngx-mat-select-search [(ngModel)]="filteredProfile" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+                </mat-option>
+                <mat-option *ngFor="let profile of availableProfileList()" [value]="profile.profileid">{{profile.name}}</mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+
+          <div class="atc-top-field" id="atcfield-product">
+            <span class="atc-top-label">ATC given for</span>
+            <div class="atc-top-placeholder" *ngIf="autoSaveID == null">Choose a participant first</div>
+            <mat-form-field appearance="outline" class="flat-field" *ngIf="autoSaveID != null">
+              <!-- locks once chosen, like the participant name; the specialist check runs on this pick -->
+              <mat-select data-testid="patc-product" placeholder="Choose ATC model" [(ngModel)]="product" (selectionChange)="onProductSelect(); autoSave()" [disabled]="product != null" [required]="true" [errorStateMatcher]="requiredMatcher">
                 <mat-option *ngFor="let productName of productLists" [value]="productName.atcmodel">{{productName.atcmodel}}</mat-option>
               </mat-select>
               <mat-error>This field is required</mat-error>
             </mat-form-field>
           </div>
 
-          <div class="info-box">
-            <mat-form-field appearance="outline" class="flat-field">
-              <mat-label>Prescribed Date</mat-label>
+          <div class="atc-top-field" id="atcfield-date">
+            <span class="atc-top-label">Prescribed date</span>
+            <div class="atc-top-placeholder" *ngIf="autoSaveID == null">Choose a participant first</div>
+            <mat-form-field appearance="outline" class="flat-field" *ngIf="autoSaveID != null">
               <input matInput [(ngModel)]="date" [matDatepicker]="picker" (click)="picker.open()" placeholder="MM-DD-YYYY" (dateChange)="autoSave()" [disabled]="!transcriber || this.assignmentInitiated" [required]="true" [errorStateMatcher]="requiredMatcher">
               <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
               <mat-datepicker #picker></mat-datepicker>
@@ -105,48 +59,97 @@
         </div>
       </section>
 
-      <!-- ATC Directive Section -->
+      <!-- The full ATC screen is shown only after a participant is selected -->
+      <ng-container *ngIf="autoSaveID != null">
+
+      <!-- The rest of the ATC shows only once the participant AND the product are chosen -->
+      <ng-container *ngIf="product != null">
+
+      <!-- ATC Directive Section (first) — WiSH shows it as "Immediate outcome expected from WiSH"; same editor, same `directive` field -->
       <section class="content-section" id="atcfield-directive" *ngIf="product != null">
-        <h2 class="section-heading">ATC DIRECTIVE</h2>
+        <h2 class="section-heading" *ngIf="!isWiSH">ATC DIRECTIVE</h2>
+        <div class="section-heading wish-directive-heading" *ngIf="isWiSH">
+          <h2 class="wish-directive-title">IMMEDIATE OUTCOME EXPECTED FROM WiSH</h2>
+          <p class="section-note">Elaborate with the participant's life situation.</p>
+        </div>
         <div class="directive-container">
-          <div class="directive-text" *ngIf="atcdirective">
+          <!-- clicking the directive opens the same editor as Edit Directive (not for a directive assignment) -->
+          <div class="directive-text" [class.directive-text-editable]="!assignmentInitiated" *ngIf="atcdirective" (click)="!assignmentInitiated && editDirective()">
             <label data-testid="patc-directive-text">{{atcdirective}}</label>
           </div>
-          <button data-testid="patc-directive-btn" class="edit-button primary-button" mat-button (click)="editDirective()" [disabled]="assignmentInitiated">{{ atcdirective ? 'Edit Directive' : 'Add Directive' }}</button>
+          <!-- WiSH, nothing written yet: the prototype's example text, opening the same editor -->
+          <div class="directive-text directive-placeholder" [class.directive-text-editable]="!assignmentInitiated" data-testid="patc-directive-placeholder" *ngIf="isWiSH && !atcdirective" (click)="!assignmentInitiated && editDirective()">
+            Elaborate in as much detail as possible along with the client’s life situation
+          </div>
+          <button data-testid="patc-directive-btn" class="edit-button primary-button" mat-button (click)="editDirective()" [disabled]="assignmentInitiated">{{ isWiSH ? (atcdirective ? 'Edit Immediate Outcome' : 'Add Immediate Outcome') : (atcdirective ? 'Edit Directive' : 'Add Directive') }}</button>
         </div>
       </section>
-      
-      <!-- Ask · area of focus — EI Solution ATCs only; saved as asks: [{ <askedby>: <askedfor> }] -->
-      <section class="content-section" id="atcfield-asks" data-testid="patc-asks-card" *ngIf="isEISolution">
-        <h2 class="section-heading">ASK · AREA OF FOCUS*</h2>
+
+      <!-- Ask · area of focus — EI Solution only: who asked and what they asked for (at least one complete ask) -->
+      <section class="content-section" id="atcfield-asks" data-testid="patc-ask-card" *ngIf="isEISolution">
+        <h2 class="section-heading ask-heading">
+          <span>ASK · AREA OF FOCUS</span>
+          <span class="ask-count" data-testid="patc-ask-count">{{ completeAsks.length }} complete</span>
+        </h2>
         <div class="personnel-container">
-          <div class="field-grid field-header">
-            <div class="field-activity">Asked By</div>
-            <div class="field-person">Asked For</div>
+          <div class="ask-grid field-header">
+            <div></div>
+            <div>Asked by</div>
+            <div>Asked for</div>
+            <div></div>
           </div>
-          <div class="field-grid" data-testid="patc-ask-row" *ngFor="let row of askRows; let i = index">
-            <div class="field-activity">
-              <mat-form-field appearance="outline" class="flat-field">
-                <mat-select data-testid="patc-ask-by" placeholder="Choose" [(ngModel)]="row.askedby" (selectionChange)="autoSave()" [disabled]="assignmentInitiated">
-                  <mat-option *ngFor="let o of askedByOptions" [value]="o.value">{{ o.label }}</mat-option>
-                </mat-select>
-              </mat-form-field>
-            </div>
-            <div class="field-person">
-              <mat-form-field appearance="outline" class="flat-field">
-                <input matInput data-testid="patc-ask-for" placeholder="What they asked for" [(ngModel)]="row.askedfor" (focusout)="autoSave()" [disabled]="assignmentInitiated">
-              </mat-form-field>
-            </div>
-            <div class="field-actions">
-              <button class="action-button remove-button" data-testid="patc-ask-remove" mat-icon-button type="button" (click)="removeAsk(i)" [disabled]="assignmentInitiated">
-                <mat-icon>remove</mat-icon>
-              </button>
-            </div>
+          <div *ngFor="let ask of askRows; let k = index" class="ask-grid">
+            <span class="ask-number">{{ k + 1 }}</span>
+            <mat-form-field appearance="outline" class="flat-field">
+              <mat-select data-testid="patc-ask-by" placeholder="Choose" [(ngModel)]="ask.askedby" (selectionChange)="autoSave()">
+                <mat-option *ngFor="let option of askedByOptions" [value]="option.value">{{ option.label }}</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="flat-field">
+              <input data-testid="patc-ask-for" matInput placeholder="What they asked for" [(ngModel)]="ask.askedfor" (focusout)="autoSave()">
+            </mat-form-field>
+            <button data-testid="patc-ask-remove" class="action-button remove-button" mat-icon-button aria-label="Remove ask" (click)="removeAsk(k)">
+              <mat-icon>close</mat-icon>
+            </button>
           </div>
-          <mat-error class="ask-error" *ngIf="submitAttempted && completeAsks.length == 0">At least one complete ask (asked by and asked for) is required</mat-error>
-          <div class="empty-activities">
-            <button class="primary-button" data-testid="patc-ask-add" mat-button type="button" (click)="addAsk()" [disabled]="assignmentInitiated">Add New Ask</button>
+          <div class="empty-activities ask-add-row">
+            <button data-testid="patc-ask-add" class="primary-button" mat-button (click)="addAsk()">+ Add New Ask</button>
           </div>
+          <span class="required-text" *ngIf="submitAttempted && askError()">{{ askError() }}</span>
+        </div>
+      </section>
+      <!-- WiSH outcomes — WiSH only: one row per outcome area (at least one complete row; empty rows are dropped) -->
+      <section class="content-section" id="atcfield-outcomes" data-testid="patc-outcome-card" *ngIf="isWiSH">
+        <div class="section-heading ask-heading">
+          <div>
+            <h2 class="wish-directive-title">WiSH OUTCOMES</h2>
+            <p class="section-note">One row per outcome area. At least one is required; empty rows are dropped.</p>
+          </div>
+          <span class="ask-count" data-testid="patc-outcome-count">{{ completeOutcomes.length }} filled</span>
+        </div>
+        <div class="personnel-container">
+          <div class="outcome-grid field-header">
+            <div></div>
+            <div>Outcome area</div>
+            <div>Outcomes expected</div>
+            <div></div>
+          </div>
+          <div *ngFor="let outcome of outcomeRows; let k = index" class="outcome-grid">
+            <span class="ask-number">{{ outcomeNumber(k) }}</span>
+            <mat-form-field appearance="outline" class="flat-field">
+              <input data-testid="patc-outcome-area" matInput placeholder="Area to cover" [(ngModel)]="outcome.outcomearea" (focusout)="autoSave()">
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="flat-field">
+              <input data-testid="patc-outcome-expected" matInput placeholder="What the participant expects, with dates" [(ngModel)]="outcome.outcomeexpected" (focusout)="autoSave()">
+            </mat-form-field>
+            <button data-testid="patc-outcome-remove" class="action-button remove-button" mat-icon-button aria-label="Remove outcome row" (click)="removeOutcome(k)">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+          <div class="empty-activities ask-add-row">
+            <button data-testid="patc-outcome-add" class="primary-button" mat-button (click)="addOutcome()">+ Add outcome area</button>
+          </div>
+          <span class="required-text" *ngIf="submitAttempted && outcomeError()">{{ outcomeError() }}</span>
         </div>
       </section>
 
@@ -350,7 +353,7 @@
               <div class="awareness-field">
                 <mat-label>{{adjustmentAwarenessDetail.label}}</mat-label>
                 <mat-form-field appearance="outline" class="flat-field">
-                  <mat-select data-testid="patc-adj-awareness" [compareWith]="compareFnc" [(ngModel)]="adjustment.awareness" (selectionChange)="autoSave()" [required]="true" [errorStateMatcher]="requiredMatcher">
+                  <mat-select data-testid="patc-adj-awareness" placeholder="Choose" [compareWith]="compareFnc" [(ngModel)]="adjustment.awareness" (selectionChange)="autoSave()" [required]="true" [errorStateMatcher]="requiredMatcher">
                     <mat-option *ngFor="let item of adjustmentAwarenessDetail.awarenesslist" [value]="item">{{item.value}}</mat-option>
                   </mat-select>
                   <mat-error>This field is required</mat-error>
@@ -373,7 +376,7 @@
                     
                     <mat-form-field appearance="outline" class="procedure-field">
                       <mat-label>Procedure</mat-label>
-                      <mat-select data-testid="patc-proc-name" [(ngModel)]="procedure.name" (selectionChange)="autoSave()" [required]="true" [errorStateMatcher]="requiredMatcher">
+                      <mat-select data-testid="patc-proc-name" [(ngModel)]="procedure.name" (selectionChange)="onProcedureSelect(i, j)" [required]="true" [errorStateMatcher]="requiredMatcher">
                         <mat-option *ngFor="let pro of procedurelist" [value]="pro.procedurepath">{{pro.procedurename}}</mat-option>
                       </mat-select>
                       <mat-error>This field is required</mat-error>
@@ -423,8 +426,8 @@
         </div>
       </section>
       
-      <!-- Directives for Micro ATC Section (if mentor) -->
-      <section class="content-section" *ngIf="mentor">
+      <!-- Directives for Micro ATC Section (if mentor) — not for the EI Solution / WiSH templates -->
+      <section class="content-section" data-testid="patc-micro-section" *ngIf="mentor && !isEISolution && !isWiSH">
         <h2 class="section-heading">DIRECTIVES FOR MICRO ATC</h2>
         <div class="directives-container">
           <div *ngFor="let directive of atcAssignment; let i = index" class="directive-item">
@@ -567,16 +570,20 @@
           </div>
         </div>
       </section>
-      <!-- AI SUmmary Section -->
-      <section class="content-section">
-        <h2 class="section-heading">Areas to explore</h2>
-        <div class="validation-container">
-          <h4>{{areasstring}}</h4>
-        </div>
-        <h2 class="section-heading">A&H AI Summary (Beta)</h2>
-        <div class="validation-container">
-          <markdown [data]="summarystring" class="markdown-content"></markdown>
-        </div>
+      <!-- AI SUmmary Section — only when the AI gave areas and/or a summary -->
+      <section class="content-section" data-testid="patc-ai-section" *ngIf="hasAiAreas || hasAiSummary">
+        <ng-container *ngIf="hasAiAreas">
+          <h2 class="section-heading">Areas to explore</h2>
+          <div class="validation-container">
+            <h4 data-testid="patc-ai-areas">{{areasstring}}</h4>
+          </div>
+        </ng-container>
+        <ng-container *ngIf="hasAiSummary">
+          <h2 class="section-heading">A&H AI Summary (Beta)</h2>
+          <div class="validation-container">
+            <markdown data-testid="patc-ai-summary" [data]="summarystring" class="markdown-content"></markdown>
+          </div>
+        </ng-container>
       </section>      
       <!-- Validation Section -->
       <section class="content-section" *ngIf="!arenamode && !assignmentInitiated && !this.bigActivity()">
@@ -598,17 +605,77 @@
         </div>
       </section>
       
-      <!-- Submit Section -->
-      <section class="submit-section">
-        <div *ngIf="loading" class="loading">
-          <mat-progress-spinner mode="indeterminate"></mat-progress-spinner>
-          <label>Uploading...</label>
-        </div>
-        
-        <button data-testid="patc-submit" *ngIf="!loading" mat-raised-button class="submit-button" [disabled]="loading || uploadProgress.isUploading" (click)="submit()">
-          Submit ATC
-        </button>
-      </section>
       </ng-container>
+      </ng-container>
+      </div>
+
+      <!-- Right panel: who the ATC is for + the three draft actions, then "Ready to submit" -->
+      <aside class="atc-col-side" [class.side-offline]="!isonline" *ngIf="autoSaveID != null">
+        <!-- Draft save status (was the top bar): click to save now; Retry when a save failed -->
+        <section class="side-card side-draft" *ngIf="isonline">
+          <button type="button" class="side-draft-status" (click)="autoSave()">
+            <mat-icon class="side-draft-icon" [ngClass]="draftStatus.code == 1 ? 'text-success' : draftStatus.code == 0 ? 'text-warning' : 'text-danger'">{{ draftStatus.code == 1 ? 'cloud_done' : draftStatus.code == 0 ? 'sync' : 'error_outline' }}</mat-icon>
+            <span class="side-draft-text">
+              <span data-testid="patc-draft-status">{{draftStatus.message}}</span>
+              <span class="side-draft-time" *ngIf="draftStatus.code == 1 && lastDraftSavedOn">{{lastDraftSavedOn | date: 'medium'}}</span>
+            </span>
+          </button>
+          <!-- explicit retry shown only when a save failed -->
+          <button *ngIf="draftStatus.code == -1" type="button" class="retry-button" (click)="autoSave()">Retry</button>
+        </section>
+
+        <section class="side-card">
+          <div class="side-participant">
+            <img *ngIf="selectedParticipantProfile['profileimg'] || selectedParticipantProfile['profile']" class="side-avatar" [src]="selectedParticipantProfile['profileimg'] || selectedParticipantProfile['profile']" alt="Participant photo">
+            <span *ngIf="!(selectedParticipantProfile['profileimg'] || selectedParticipantProfile['profile'])" class="side-avatar side-avatar-empty" aria-hidden="true"><mat-icon>person</mat-icon></span>
+            <div class="side-participant-text">
+              <span class="side-participant-name">{{ mapProfile[participantProfileid]?.['name'] || 'Participant' }}</span>
+              <span class="side-participant-meta">{{ product || 'ATC model not chosen yet' }}</span>
+            </div>
+          </div>
+          <div class="side-actions participant-actions">
+            <!-- only when this participant has a draft other than the current one -->
+            <button *ngIf="!aigeneratedEntry && hasOtherDrafts" mat-button class="share-button side-action" (click)="openAnotherDraft()">
+              <mat-icon>folder_open</mat-icon>
+              Open & Continue Another Draft
+            </button>
+            <!-- start a brand new ATC in a new tab -->
+            <button mat-button class="share-button side-action" (click)="createNewATC()">
+              <mat-icon>note_add</mat-icon>
+              Create New ATC
+            </button>
+            <!-- share the draft link with collaborators -->
+            <button mat-button class="share-button side-action" (click)="copyToClipboard()">
+              <mat-icon>content_copy</mat-icon>
+              Copy Link For Collaborators
+            </button>
+          </div>
+        </section>
+
+        <!-- Ready to submit: the same checks submit() makes, in order; the Submit button lives here -->
+        <section class="side-card submit-section" *ngIf="product != null">
+          <div class="ready-head">
+            <h2 class="ready-title">Ready to submit</h2>
+            <span class="ready-count">{{ submitChecklistDone }} / {{ submitChecklist.length }}</span>
+          </div>
+          <div class="ready-bar"><div class="ready-bar-fill" [style.width.%]="submitChecklist.length ? (submitChecklistDone * 100 / submitChecklist.length) : 0"></div></div>
+          <ul class="ready-list">
+            <li *ngFor="let item of submitChecklist; trackBy: trackByLabel" class="ready-item" [class.ready-done]="item.done">
+              <mat-icon class="ready-icon">{{ item.done ? 'check_circle' : 'radio_button_unchecked' }}</mat-icon>
+              <span>{{ item.label }}</span>
+            </li>
+          </ul>
+
+          <div *ngIf="loading" class="loading">
+            <mat-progress-spinner mode="indeterminate"></mat-progress-spinner>
+            <label>Uploading...</label>
+          </div>
+
+          <button data-testid="patc-submit" *ngIf="!loading" mat-raised-button class="submit-button" [disabled]="loading || uploadProgress.isUploading" (click)="submit()">
+            Submit ATC
+          </button>
+        </section>
+      </aside>
+      </div>
     </main>
   </div>

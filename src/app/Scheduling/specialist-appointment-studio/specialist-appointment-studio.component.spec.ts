@@ -26,7 +26,6 @@ function fakeSvc(over: Record<string, any> = {}): any {
     productsFor: () => Promise.resolve([]), teamForAtcModels: () => Promise.resolve({ productIds: [], memberIds: [] }),
     typesFor: () => Promise.resolve([]), futureIntervals: () => Promise.resolve([]), unmarkedLastAppointment: () => Promise.resolve(null),
     jointTypes: () => Promise.resolve(new Map()), mapRoles: {},
-    atcRequiredTypeIds: () => Promise.resolve(new Set<string>()),
     participantsOf: () => Promise.resolve([]), participantSteps: () => Promise.resolve([]), participantBookings: () => Promise.resolve([]),
     roleName(this: any, r: string) { return this.mapRoles[r.split('/').pop()] ?? 'another'; },
     ...over,
@@ -944,21 +943,5 @@ describe('SettingsTab', () => {
     expect(s.shown.length).toBe(0);
     s.q = 'w!sh';
     expect(s.shown.length).toBe(1);
-  });
-});
-
-describe('SpecialistAppointmentStudioComponent · Prescribe ATC', () => {
-  it('is offered only on completed sessions whose type prescribes an ATC', async () => {
-    const { c } = await make(fakeSvc(), { template: '', init: false });
-    c.atcTypeIds = new Set(['a']);
-    const row = (over: any = {}) => ({ appt: {
-      id: 'x', start: new Date(2026, 0, 1, 9), end: new Date(2026, 0, 1, 10), attended: true, cancelled: false,
-      cancelledReason: null, hostIds: ['me'], participantId: 'p', typeId: 'a', productId: null, zoomUrl: null, ...over,
-    } } as any);
-    expect(c.canPrescribeAtc(row())).toBeTrue();
-    expect(c.canPrescribeAtc(row({ attended: false }))).toBeFalse();
-    expect(c.canPrescribeAtc(row({ cancelled: true }))).toBeFalse();
-    expect(c.canPrescribeAtc(row({ typeId: 'b' }))).toBeFalse();
-    expect(c.canPrescribeAtc(row({ participantId: null }))).toBeFalse();
   });
 });

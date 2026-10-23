@@ -71,3 +71,67 @@ when an activity is picked. Reverses the 2026-10-15 "required roles only" decisi
 The Required / Additional mutual-exclusion (4c67aaac) is undone: both pickers list every role again and nothing is
 auto-removed. Only the ATC section dedupes: a role picked in both lists gets ONE row (treated as required) and one
 `atcrolemap` entry.
+
+## 2026-10-22 — "Update Role not working": dialog never scrolled; StarLabs Operations restyle
+**Plan:** `specs/plans/2026-10-22-map-appointment-role-dialog-ui.md` (operator-approved).
+**Reproduced on the Firebase emulator only** (starlabs-cicd, Firestore 8181 / Auth 9097, app on :4300 — never a real
+DB). The save itself was fine: create, edit, removing a role (key really removed from `atcrolemap`) and saving an
+old doc (`atcrequired:false, atcmodel:null, atcrolemap:{}`) all wrote correctly; empty ATC fields block with errors.
+**Root cause:** the component never imported `MatDialogModule`, so `mat-dialog-title` / `mat-dialog-content` were
+inert attributes — no `max-height`, no `overflow`. With two ATC role rows at 1024×768 the dialog was 819px tall and
+Update sat at y=758–794, mostly off-screen; errors could also sit below the edge.
+**Change:** import `MatDialogModule`; fixed header + scrolling body (`max-height: 90vh`) + fixed footer; StarLabs
+Operations look (Geist, `#2563eb`, slate, 14/10px radii) via Material tokens scoped to the dialog; fluid widths,
+stacking under 560px; `try/catch/finally` around the save with an inline message (`mard-save-error-9`) instead of a
+silently stuck button; first invalid field scrolled into view. Opener gets `width 680px / maxWidth 95vw /
+panelClass mard-dialog`; one `.mard-dialog` rule in `styles.css` rounds the surface. Load / validation /
+`mergeFields` save untouched; all existing `mard-*` test ids kept.
+**Verified (emulator):** tsc green; 3-role mapping at 1024×768 → body scrolls, Update visible, real click saves;
+phone width → single column, no sideways overflow, Update visible.
+**Pending:** operator's manual test; e2e spec in the `appointments` suite (ATC section, scroll, save error — also
+covers the `mard-atc-*` gap above) before push; commit (git was blocked in the session).
+**Mistake noted:** one early "save didn't close" result was my own — two dialogs were open and the save ran in the
+hidden one. Lesson: count `.mat-mdc-dialog-container` before concluding a dialog didn't close.
+
+## 2026-10-23 — e2e coverage, and the real "Update does nothing" bug it found
+**Spec:** hub `appointments/map-appointment-role-atc.spec.ts` (hook prefix `mard`, opener `mar`), emulator only:
+MARD-ATC-01 create (ATC model + activities for a required AND an additional role → `atcrolemap` arrays),
+-02 required-field block (nothing written), -03 edit (role removed → its key leaves `atcrolemap`; untick →
+`atcmodel: null`, `atcrolemap: {}`; `mergeFields` keeps foreign fields), -04 600px window: body scrolls, Update on
+screen. Restores ATR2R / deletes the AT2 mapping afterwards (the scheduling suite books on them).
+`mard-save-error-9` is credited only in `scheduling-addressable-dialogs.spec.ts` (the emulator never rejects a write).
+Seed (`seed-appointments.js`): roles carry `id`; ATR2R gets `atcrequired/atcmodel/atcrolemap`; three `bigactivity`
+docs with `atcproperty` (author / observer / assigned_to) + one without (must not be offered); `atc model` EI Solution
++ WiSH.
+
+**MARD-ATC-01 fails — a real app bug, not a test problem (fix not applied; needs operator sign-off).**
+`syncAtcRoles()` removes and re-creates EVERY control in the nested `atcrolemap` group on any role change. Angular
+re-binds a `formControlName` to a replaced control only when the change happens on the ROOT form (FormGroupDirective
+`_updateDomValue` is wired to the root's collection-change hook; a nested group created by FormBuilder keeps a no-op
+hook). So: pick Required role → its row renders bound to control A; pick an Additional role → A is replaced by A′ but
+the row's mat-select stays bound to A; the activities picked go into A; A′ stays `[]` → `required` fails, the form is
+invalid, no field shows an error (the visible control is valid), `scrollToFirstError` finds nothing, Update does
+nothing. Debug dump on the emulator: form + `atcrolemap` invalid, zero `mat-error`s. This is very likely the original
+"submit not working" report; the 10-22 scroll fix was real but it was not the whole story — the operator's manual
+test passed because activities were picked before the second role was chosen.
+**Proposed fix (minimal, one function):** `syncAtcRoles()` keeps the existing control for every role still selected,
+adds controls only for newly picked roles, removes only deselected ones, and switches the `required` validator when a
+role moves between Required and Additional. Load / save / `mergeFields` untouched.
+
+**Shared-emulator leak (hub):** the suites clean their data only BEFORE seeding, never after, and CI runs files
+serially on one emulator. The appointments seed's ATC activities therefore linger; ATC's VATC-07 then maps a legacy
+change agent to `appt_ba_ca` (it sorts first) instead of `atc_act_ca`. Clean after tearing down the appointments
+seed: View Prescribed 9/9. Needs a hub decision (see PROGRESS).
+**Fix applied (operator-approved 2026-10-23):** `syncAtcRoles()` now removes and re-adds the SAME control instance
+for every role still selected (new `FormControl([])` only for a newly picked role), setting `Validators.required`
+for Required roles and clearing it for Additional ones. Rows keep their order (required first) and stay bound to a
+live control. MARD-ATC-01..04 4/4 on the emulator. The spec now compares `atcrolemap` arrays sorted: a multi-select
+stores option-list order, not click order, and the order has no meaning.
+**Scoped cleanup (operator-approved 2026-10-23), instead of suite-wide end-of-run teardown.** Checked first:
+CI runs ONE suite per job on a fresh emulator, so cross-suite leaks happen only locally. Suite-wide end teardown
+would cost post-failure inspection (seeded users + app writes deleted), an extra teardown per spec file under
+run-isolated.sh, wipe manual `SKIP_SEED=1` worlds, still miss cancelled runs, and touch 12 suites' shared factory.
+So only the leaking data moved: `seed-appointments.js` no longer seeds the dialog's ATC world; the spec calls
+`seedDialogAtc()` in beforeAll and `removeDialogAtc()` + ATR2R snapshot restore + AT2-mapping delete in afterAll.
+The ATC suite's own leak into appointments (its same-day appointments) is pre-existing and local-only: clear one
+suite's data before running the other on a shared emulator.

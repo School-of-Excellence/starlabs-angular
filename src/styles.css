@@ -838,3 +838,11 @@ body.eod-scroll-lock .toolbar {
   --mdc-protected-button-label-text-color: #ffffff;
 }
 /* End Journey Coach Dashboard dark-mode overlay block */
+
+/* Map Appointment Role dialog (panelClass 'mard-dialog') — StarLabs Operations surface. The dialog's own
+   body scrolls (max-height 90vh in its component CSS); this only rounds and clips the outer surface. */
+.mard-dialog .mat-mdc-dialog-surface {
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px -20px rgba(15, 23, 42, 0.28), 0 8px 24px -8px rgba(15, 23, 42, 0.14);
+}

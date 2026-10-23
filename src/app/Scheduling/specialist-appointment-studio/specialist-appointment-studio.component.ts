@@ -1450,20 +1450,6 @@ export class SpecialistAppointmentStudioComponent implements OnInit, OnDestroy {
       console.error('Specialist appointment studio: init failed', e);
     }
     this.loading = false;
-    this.atcTypeIds = await this.svc.atcRequiredTypeIds();
-  }
-
-  /* Prescribe ATC: completed sessions whose type prescribes an ATC open prescribeATC in appointment mode,
-     which fills the specialists from who hosted each role (appointments.hostRole). */
-  atcTypeIds = new Set<string>();
-  canPrescribeAtc(r: ApptRow): boolean {
-    return apptStatus(r.appt, this.clock) === 'Completed' && !!r.appt.typeId && this.atcTypeIds.has(r.appt.typeId) && !!r.appt.participantId;
-  }
-  prescribeAtc(r: ApptRow) {
-    const url = this.router.serializeUrl(this.router.createUrlTree(['/prescribeATC'], {
-      queryParams: { profileid: r.appt.participantId, appointmentid: r.appt.id },
-    }));
-    window.open(url, '_blank');
   }
 
   ngOnDestroy() { if (this.clockTimer) clearInterval(this.clockTimer); }

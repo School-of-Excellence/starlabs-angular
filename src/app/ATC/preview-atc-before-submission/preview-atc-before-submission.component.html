@@ -4,8 +4,24 @@
     
     <!-- Directive Section -->
     <div class="directive-section">
-      <h3 class="section-title">Directive</h3>
+      <h3 class="section-title">{{ dialogData["directivelabel"] || "Directive" }}</h3>
       <label class="directive-content">{{dialogData["directive"]}}</label>
+    </div>
+
+    <!-- Ask · area of focus (EI Solution) — as it will be saved -->
+    <div class="directive-section" data-testid="pabs-ask" *ngIf="(dialogData['asks'] || []).length != 0">
+      <h3 class="section-title">Ask · area of focus</h3>
+      <div class="template-row" data-testid="pabs-ask-row" *ngFor="let ask of dialogData['asks']; let k = index">
+        <span class="template-no">{{ k + 1 }}</span><span class="template-key">{{ ask.askedby }}</span><span>{{ ask.askedfor }}</span>
+      </div>
+    </div>
+
+    <!-- WiSH outcomes — as they will be saved -->
+    <div class="directive-section" data-testid="pabs-outcomes" *ngIf="(dialogData['outcomes'] || []).length != 0">
+      <h3 class="section-title">WiSH outcomes</h3>
+      <div class="template-row" data-testid="pabs-outcome-row" *ngFor="let outcome of dialogData['outcomes']; let k = index">
+        <span class="template-no">{{ (k + 1 < 10 ? '0' : '') + (k + 1) }}</span><span class="template-key">{{ outcome.outcomearea }}</span><span>{{ outcome.outcomeexpected }}</span>
+      </div>
     </div>
     
     <!-- Adjustment Section -->

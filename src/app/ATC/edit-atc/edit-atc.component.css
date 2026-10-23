@@ -690,3 +690,874 @@
       grid-template-columns: 1fr;
     }
   }
+/* =============================================================================================================
+   2026-10-23 — Edit ATC takes the Prescribe ATC design: the block below is copied verbatim from
+   prescribe-atc.component.css (StarLabs Operations theme → layout → spacing → Ask/WiSH → tweaks), then Edit-only rules.
+   ============================================================================================================= */
+/* =============================================================================================================
+   StarLabs Operations theme (Geist + Electric Blue) — same tokens as the Map Appointment Role and draft dialogs.
+   Appended on top of the rules above: colours, type, radii and Material tokens only. Layout, behaviour and
+   markup are unchanged; delete this block to return to the previous look.
+   ============================================================================================================= */
+.atc-edit-container {
+  --so-ink: #0f172a;
+  --so-ink2: #475569;
+  --so-muted: #64748b;
+  --so-border: #e2e8f0;
+  --so-border2: #cbd5e1;
+  --so-soft: #f8fafc;
+  --so-soft2: #f1f5f9;
+  --so-accent: #2563eb;
+  --so-accent-hover: #1d4ed8;
+  --so-accent-soft: #dbeafe;
+  --so-danger: #dc2626;
+  --so-danger-hover: #b91c1c;
+
+  /* Material fields, selects and checkboxes inside this screen (overlay panels keep the app theme) */
+  --mdc-outlined-text-field-container-shape: 10px;
+  --mdc-outlined-text-field-outline-color: var(--so-border2);
+  --mdc-outlined-text-field-hover-outline-color: #94a3b8;
+  --mdc-outlined-text-field-focus-outline-color: var(--so-accent);
+  --mdc-outlined-text-field-focus-label-text-color: var(--so-accent);
+  --mdc-outlined-text-field-caret-color: var(--so-accent);
+  --mdc-outlined-text-field-label-text-font: inherit;
+  --mat-form-field-container-text-font: inherit;
+  --mat-select-trigger-text-font: inherit;
+  --mat-select-focused-arrow-color: var(--so-accent);
+  --mdc-checkbox-selected-icon-color: var(--so-accent);
+  --mdc-checkbox-selected-hover-icon-color: var(--so-accent);
+  --mdc-checkbox-selected-focus-icon-color: var(--so-accent);
+  --mdc-checkbox-selected-pressed-icon-color: var(--so-accent);
+  --mat-checkbox-label-text-font: inherit;
+
+  font-family: 'Geist', 'Segoe UI', system-ui, sans-serif;
+  color: var(--so-ink);
+  background: var(--so-soft);
+  min-height: 100%;
+}
+
+/* status bars */
+.autosave-bar {
+  background-color: rgba(248, 250, 252, 0.96);
+  border-bottom: 1px solid var(--so-border);
+  font-weight: 500;
+  color: var(--so-ink2);
+}
+.status-bar:not(.autosave-bar) {
+  background-color: #fef3c7;
+  color: #b45309;
+  font-weight: 500;
+}
+.retry-button {
+  background-color: var(--so-danger);
+  border-radius: 8px;
+  box-shadow: none;
+}
+.retry-button:hover { background-color: var(--so-danger-hover); }
+
+/* header + page column */
+.atc-header {
+  background-color: transparent;
+  color: var(--so-ink);
+  padding: 24px 20px 8px;
+}
+.atc-main {
+  background-color: transparent;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 4px 24px;
+}
+
+/* sections → white cards */
+.content-section {
+  background-color: #fff;
+  border: 1px solid var(--so-border);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  margin: 16px 20px;
+}
+.section-heading {
+  background-color: transparent;
+  color: var(--so-ink);
+  font-weight: 600;
+  padding: 16px 24px 10px;
+}
+.subsection-heading,
+.field-header,
+.mentor-label,
+.field-label {
+  color: var(--so-ink);
+}
+
+.info-box {
+  border: 1px solid var(--so-border);
+  border-radius: 12px;
+  box-shadow: none;
+}
+.directive-text {
+  background-color: var(--so-soft);
+  border: 1px solid var(--so-border);
+  border-radius: 10px;
+  box-shadow: none;
+  line-height: 1.5;
+}
+.profile-image { border-color: var(--so-border); }
+.share-button { color: var(--so-accent); }
+
+/* adjustments + procedures */
+.adjustment-item {
+  border: 1px solid var(--so-border);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.adjustment-number { color: var(--so-accent); }
+.adjustment-textarea,
+.directive-textarea {
+  border: 1px solid var(--so-border2);
+  border-radius: 10px;
+  color: var(--so-ink);
+}
+.adjustment-textarea:focus,
+.directive-textarea:focus {
+  outline: 2px solid var(--so-accent);
+  outline-offset: -1px;
+  border-color: var(--so-accent);
+}
+.procedure-form {
+  background-color: var(--so-soft);
+  border: 1px solid var(--so-border);
+  border-radius: 12px;
+  box-shadow: none;
+}
+.directive-item {
+  border: 1px solid var(--so-border);
+  border-radius: 12px;
+  box-shadow: none;
+}
+.bulk-assign-section {
+  background-color: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+}
+.bulk-assign-title { color: #1e40af; }
+.reorder-button {
+  background-color: var(--so-soft2);
+  border-radius: 8px;
+}
+
+/* hover outline (was Material blue) */
+.info-box:hover,
+.directive-text:hover,
+.adjustment-textarea:hover,
+.procedure-form:hover {
+  border-color: #93c5fd;
+}
+
+/* media */
+.file-input {
+  border: 1px solid var(--so-border2);
+  border-radius: 10px;
+}
+.preview-img {
+  border-color: var(--so-border);
+  border-radius: 8px;
+}
+.remove-image { color: var(--so-danger); }
+.upload-progress-container {
+  background: var(--so-soft2);
+  border-radius: 12px;
+}
+
+/* buttons — Electric Blue primary, red for destructive / recording */
+.primary-button,
+.edit-button,
+.add-button,
+.upload-button {
+  background-color: var(--so-accent) !important;
+  border-color: var(--so-accent) !important;
+  color: #fff !important;
+  border-radius: 8px !important;
+  font-family: inherit;
+  letter-spacing: 0;
+}
+.primary-button:hover,
+.edit-button:hover,
+.add-button:hover,
+.upload-button:hover {
+  background-color: var(--so-accent-hover) !important;
+  box-shadow: none !important;
+}
+.bulk-assign-apply:disabled {
+  background-color: var(--so-accent) !important;
+}
+.remove-button,
+.record-button,
+.stop-button {
+  background-color: var(--so-danger) !important;
+  border-color: var(--so-danger) !important;
+  color: #fff !important;
+}
+.record-button,
+.stop-button,
+.upload-button {
+  border-radius: 8px !important;
+}
+.timer {
+  background-color: var(--so-danger);
+  border-radius: 8px;
+}
+
+/* submit */
+.submit-section {
+  background-color: transparent;
+  border-top: none;
+  padding: 24px 20px 40px;
+}
+.submit-button {
+  background-color: var(--so-accent) !important;
+  border-radius: 10px !important;
+  min-width: 260px !important;
+  font-family: inherit !important;
+  letter-spacing: 0 !important;
+  box-shadow: 0 8px 20px -10px rgba(37, 99, 235, 0.6) !important;
+}
+.submit-button:hover {
+  background-color: var(--so-accent-hover) !important;
+  box-shadow: 0 8px 20px -10px rgba(29, 78, 216, 0.7) !important;
+}
+.required-text { color: var(--so-danger); }
+
+@media (max-width: 768px) {
+  .content-section { margin: 12px; }
+  .section-heading { padding: 14px 16px 8px; }
+}
+
+/* ---- Prototype layout: ATC on the left, participant + "Ready to submit" panel on the right ---- */
+.atc-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 4px 20px;
+  align-items: start;
+  padding: 0 20px;
+}
+.atc-col-main { min-width: 0; }
+.atc-col-main .content-section { margin: 16px 0; }
+.atc-col-side {
+  position: sticky;
+  top: 112px; /* below the app toolbar + the draft status bar */
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+/* top card: Participant · ATC given for · Prescribed date */
+.atc-top-card { padding: 16px 20px 4px; }
+.atc-top-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.atc-top-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.atc-top-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--so-ink2);
+}
+.atc-top-placeholder {
+  height: 56px;
+  margin-bottom: 22px; /* lines up with the Material field + its hint space */
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  border: 1px solid var(--so-border);
+  border-radius: 10px;
+  background: var(--so-soft2);
+  color: var(--so-muted);
+  font-size: 14px;
+}
+
+/* right-panel cards */
+.side-card {
+  background: #fff;
+  border: 1px solid var(--so-border);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
+}
+.side-participant {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--so-border);
+}
+.side-avatar {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--so-border);
+}
+.side-avatar-empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--so-soft2);
+  color: var(--so-muted);
+}
+.side-participant-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.side-participant-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--so-ink);
+  overflow-wrap: anywhere;
+}
+.side-participant-meta {
+  font-size: 12.5px;
+  color: var(--so-muted);
+}
+.side-actions {
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+}
+.side-card .side-action {
+  justify-content: flex-start;
+  width: 100%;
+  height: 40px;
+  padding: 0 10px;
+  border-radius: 8px;
+  color: var(--so-accent);
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.side-card .side-action:hover { background: #eff6ff; }
+.side-card .side-action mat-icon {
+  margin-right: 10px;
+  margin-left: 0;
+}
+
+/* Ready to submit */
+.side-card.submit-section {
+  display: block;
+  padding: 0;
+  border-top: 1px solid var(--so-border);
+  background: #fff;
+}
+.ready-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px 12px;
+}
+.ready-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--so-ink);
+}
+.ready-count {
+  font-family: 'Geist Mono', ui-monospace, Menlo, monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--so-ink2);
+}
+.ready-bar {
+  height: 4px;
+  background: #e9eef5;
+}
+.ready-bar-fill {
+  height: 4px;
+  background: #10b981;
+  transition: width 200ms ease;
+}
+.ready-list {
+  list-style: none;
+  margin: 0;
+  padding: 14px 18px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ready-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--so-ink);
+  font-weight: 500;
+}
+.ready-item.ready-done {
+  color: var(--so-ink2);
+  font-weight: 400;
+}
+.ready-icon {
+  flex: none;
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  color: #94a3b8;
+}
+.ready-done .ready-icon { color: #047857; }
+.side-card.submit-section .loading { padding: 8px 18px; }
+.side-card.submit-section .submit-button {
+  display: flex;
+  width: calc(100% - 36px) !important;
+  min-width: 0 !important;
+  margin: 10px 18px 18px;
+  justify-content: center;
+}
+
+/* narrow screens: the panel moves under the ATC */
+@media (max-width: 1100px) {
+  .atc-layout { grid-template-columns: minmax(0, 1fr); padding: 0 12px; }
+  .atc-col-side { position: static; margin-top: 0; }
+  .atc-top-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---- Full width + docked right panel (like the side nav) ---- */
+.atc-main {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+.atc-layout {
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 0;
+  padding: 0;
+}
+.atc-col-main {
+  padding: 0 28px 32px;
+}
+.atc-header {
+  align-items: flex-start;
+  text-align: left;
+  padding: 24px 0 4px;
+}
+/* The app's content area scrolls (below the toolbar); the draft status bar is fixed at 64px–104px from the window top.
+   The panel sticks right under that bar and fills the rest of the window height, scrolling on its own if needed. */
+.atc-col-side {
+  position: sticky;
+  top: calc(104px - clamp(40px, 7.4vh, 64px));
+  height: calc(100vh - 104px);
+  margin-top: 0;
+  gap: 0;
+  overflow-y: auto;
+  background: #fff;
+  border-left: 1px solid var(--so-border);
+}
+.atc-col-side .side-card {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  border-bottom: 1px solid var(--so-border);
+  overflow: visible;
+}
+.atc-col-side .side-card:last-child { border-bottom: none; }
+.atc-col-side .side-card.submit-section { border-top: none; }
+
+@media (max-width: 1100px) {
+  .atc-layout { grid-template-columns: minmax(0, 1fr); }
+  .atc-col-main { padding: 0 12px 16px; }
+  .atc-col-side {
+    position: static;
+    height: auto;
+    overflow: visible;
+    border-left: none;
+    border-top: 1px solid var(--so-border);
+  }
+}
+
+/* ---- Prototype spacing: 40px fields, 13.5px text, 16×20px card padding, 20px between cards ---- */
+.atc-edit-container {
+  --mat-form-field-container-height: 40px;
+  --mat-form-field-container-vertical-padding: 8px;
+}
+
+/* page column + title */
+.atc-col-main { padding: 0 28px 40px; }
+.atc-header { padding: 24px 0 16px; }
+
+/* cards */
+.atc-col-main .content-section { margin: 0 0 20px; }
+.section-heading {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--so-border);
+  color: var(--so-ink);
+}
+.personnel-container,
+.directive-container,
+.adjustment-container,
+.directives-container,
+.notes-container,
+.audio-container,
+.image-section,
+.validation-container,
+.captures-container {
+  padding: 16px 20px;
+}
+.info-grid { padding: 16px 20px; gap: 16px; }
+.info-box { padding: 12px; }
+
+/* top card */
+.atc-top-card { padding: 16px 20px; }
+.atc-top-field { gap: 6px; }
+.atc-top-label { font-size: 10.5px; }
+.atc-top-placeholder {
+  height: 40px;
+  margin-bottom: 0;
+  padding: 0 10px;
+}
+
+/* activity / specialist rows */
+.field-grid {
+  gap: 12px;
+  margin-bottom: 8px;
+  align-items: center;
+}
+.field-header {
+  padding: 0;
+  margin-bottom: 6px;
+}
+.empty-activities { margin: 4px 0 0; }
+
+/* directive */
+.directive-text {
+  padding: 8px 12px;
+  margin-bottom: 12px;
+}
+
+/* adjustments + procedures */
+.adjustment-item { margin-bottom: 12px; }
+.adjustment-content { padding: 16px 20px; }
+.adjustment-text { margin-bottom: 12px; }
+.adjustment-number { padding-top: 8px; }
+.adjustment-textarea,
+.directive-textarea {
+  min-height: 72px;
+  padding: 8px 10px;
+  line-height: 20px;
+}
+.awareness-field,
+.potential-years { margin-bottom: 8px; }
+.procedure-list { margin-top: 12px; }
+.procedure-item { margin-bottom: 8px; }
+.procedure-form {
+  padding: 8px 12px;
+  gap: 8px;
+}
+.procedure-field { margin-right: 4px !important; }
+.bulk-assign-section {
+  margin: 16px 20px 0;
+  padding: 10px 14px;
+}
+.bulk-assign-title { margin-bottom: 8px; }
+.add-adjustment { padding: 4px 20px 16px; }
+.directive-item { padding: 16px; margin-bottom: 12px; }
+
+/* notes, media */
+.note-field { margin-bottom: 12px; }
+.field-label {
+  margin-bottom: 6px;
+}
+.subsection-heading { margin: 0 0 8px; }
+.audio-controls { margin-top: 12px; gap: 8px; }
+.audio-item { margin-bottom: 8px; }
+.file-input { padding: 6px; margin-bottom: 8px; }
+.image-previews { margin-top: 8px; gap: 8px; }
+
+/* buttons: prototype sizes (36px, 12.5–13.5px) */
+.primary-button,
+.edit-button {
+  height: 36px;
+  padding: 0 14px !important;
+}
+.record-button, .upload-button, .stop-button { height: 36px !important; }
+.action-button {
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  line-height: 32px !important;
+}
+
+/* right panel: draft status block at the top */
+.side-draft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
+}
+.side-draft-status {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--so-ink2);
+}
+.side-draft-icon { flex: none; font-size: 18px; width: 18px; height: 18px; }
+.side-draft-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 12.5px;
+  line-height: 17px;
+}
+.side-draft-time { font-size: 11.5px; color: var(--so-muted); }
+.side-participant { padding: 14px 18px; }
+.ready-head { padding: 14px 18px 10px; }
+.ready-list { padding: 12px 18px 4px; }
+.side-card.submit-section .submit-button {
+  height: 44px !important;
+  margin: 12px 18px 18px;
+}
+
+/* the panel now sits at the top of the content area; it moves below the offline banner only while offline */
+.atc-col-side {
+  top: 0;
+  height: calc(100vh - clamp(40px, 7.4vh, 64px));
+}
+.atc-col-side.side-offline {
+  top: calc(104px - clamp(40px, 7.4vh, 64px));
+  height: calc(100vh - 104px);
+}
+@media (max-width: 1100px) {
+  .atc-col-main { padding: 0 16px 24px; }
+  .atc-col-side, .atc-col-side.side-offline { height: auto; }
+}
+
+/* ---- Text sizes (operator: spacing only; keep the original text sizes) ----
+   The rules above no longer change any existing element's font size. The new elements below (top-card labels,
+   right panel) are sized to sit with the screen's original text, not smaller. */
+.atc-top-label { font-size: 12px; color: var(--so-ink); }
+.atc-top-placeholder { font-size: inherit; }
+.side-participant-name { font-size: 16px; }
+.side-participant-meta { font-size: 14px; color: var(--so-ink2); }
+.side-card .side-action { font-size: 14px; }
+.ready-title { font-size: 16px; }
+.ready-count { font-size: 14px; }
+.ready-item { font-size: 14px; line-height: 20px; color: var(--so-ink); }
+.ready-item.ready-done { color: var(--so-ink2); }
+.ready-icon { font-size: 18px; width: 18px; height: 18px; }
+
+/* Locked fields (participant and product once chosen, date for non-transcribers) read in black, not faded grey */
+.atc-edit-container {
+  --mat-select-disabled-trigger-text-color: var(--so-ink);
+  --mdc-outlined-text-field-disabled-input-text-color: var(--so-ink);
+  --mdc-outlined-text-field-disabled-label-text-color: var(--so-ink2);
+  --mat-select-disabled-arrow-color: var(--so-muted);
+}
+
+/* Draft status: bold, with a clear icon, so it isn't missed */
+.side-draft { background: var(--so-soft); }
+.side-draft-status { color: var(--so-ink); }
+.side-draft-icon { font-size: 22px; width: 22px; height: 22px; }
+.side-draft-text { font-size: 14px; line-height: 20px; font-weight: 700; }
+.side-draft-time { font-size: 13px; font-weight: 500; }
+
+/* ---- Ask · area of focus (EI Solution) ---- */
+.ask-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ask-count {
+  font-family: 'Geist Mono', ui-monospace, Menlo, monospace;
+  font-weight: 500;
+  color: var(--so-muted);
+  letter-spacing: 0;
+  text-transform: none;
+}
+.ask-grid {
+  display: grid;
+  grid-template-columns: 28px 220px minmax(0, 1fr) 32px;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.ask-number {
+  font-family: 'Geist Mono', ui-monospace, Menlo, monospace;
+  color: var(--so-muted);
+}
+@media (max-width: 768px) {
+  .ask-grid { grid-template-columns: 24px minmax(0, 1fr) 32px; }
+  .ask-grid > :nth-child(3) { grid-column: 2 / 3; }
+  .ask-grid.field-header { display: none; }
+}
+
+/* ---- Locked participant / product: not-allowed cursor on hover ---- */
+.atc-top-field ::ng-deep .mat-form-field-disabled,
+.atc-top-field ::ng-deep .mat-form-field-disabled * {
+  cursor: not-allowed !important;
+}
+
+/* ---- Breathing room above the add / directive buttons ---- */
+.empty-activities { margin-top: 12px; }   /* + Add New Ask, Add New Activity */
+.directive-container .edit-button { margin-top: 8px; }
+
+/* the directive text opens the editor on click */
+.directive-text-editable { cursor: pointer; }
+.directive-text-editable label { cursor: pointer; }
+
+/* ---- 2026-10-23 tweaks: spacing only ---- */
+/* more room above "+ Add New Ask" */
+.ask-add-row { margin-top: 20px; }
+/* authors / observers / mentors / additional activities: space between activity rows */
+.personnel-container .field-grid:not(.field-header) { margin-bottom: 16px; }
+/* awareness → potential years: same 12px gap as the prototype */
+.awareness-field .potential-years { margin-top: 12px; }
+/* round icon buttons (ask, additional activity, procedure): icon centred inside the button */
+.action-button {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  --mdc-icon-button-state-layer-size: 32px;
+}
+.action-button .mat-icon {
+  margin: 0;
+  line-height: 24px;
+}
+
+/* ---- WiSH (2026-10-23): immediate-outcome heading + outcomes table — text sizes inherited, none new ---- */
+.wish-directive-title {
+  margin: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+}
+.section-note {
+  margin: 4px 0 0;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--so-muted);
+}
+.directive-placeholder { color: var(--so-muted); }
+.outcome-grid {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) minmax(0, 2fr) 32px;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+@media (max-width: 768px) {
+  .outcome-grid { grid-template-columns: 24px minmax(0, 1fr) 32px; }
+  .outcome-grid > :nth-child(3) { grid-column: 2 / 3; }
+  .outcome-grid.field-header { display: none; }
+}
+
+/* ---- Ask + WiSH outcomes: same room between rows as the activity rows (spacing only) ---- */
+.ask-grid:not(.field-header),
+.outcome-grid:not(.field-header) { margin-bottom: 16px; }
+
+/* ---- Edit ATC only (prototype pieces Prescribe doesn't have) — no font sizes set ---- */
+.edit-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.back-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--so-accent);
+  cursor: pointer;
+}
+.back-link:hover { text-decoration: underline; }
+.edit-top-grid {
+  display: grid;
+  grid-template-columns: auto repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  align-items: center;
+}
+.edit-top-value {
+  color: var(--so-ink);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.update-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 18px 4px;
+  color: var(--so-ink2);
+}
+.panel-error {
+  margin: 12px 18px 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #fee2e2;
+  color: var(--so-danger);
+}
+.update-card .loading {
+  display: flex;
+  justify-content: center;
+  padding: 12px 18px;
+}
+.cancel-button {
+  display: flex !important;
+  width: calc(100% - 36px);
+  margin: -6px 18px 18px !important;
+  justify-content: center;
+  color: var(--so-ink2) !important;
+}
+/* changework brief + images side by side */
+.media-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+.atc-col-main .media-pair .content-section { margin: 0 0 20px; }
+/* existing + new adjustments in the same card look as Prescribe */
+.adjustment-table,
+.new-adjustments { padding: 16px 20px; }
+.table-row,
+.new-adjustment-item {
+  border: 1px solid var(--so-border);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  margin-bottom: 12px;
+}
+.table-header { color: var(--so-ink2); }
+.existing-procedure,
+.new-procedure-form {
+  background: var(--so-soft);
+  border: 1px solid var(--so-border);
+  border-radius: 12px;
+}
+.add-procedure-button { margin-top: 8px; }
+@media (max-width: 1100px) {
+  .media-pair { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .edit-top-grid { grid-template-columns: auto minmax(0, 1fr); }
+}
+@media (max-width: 1100px) {
+  .edit-top-grid > .side-avatar { grid-row: span 3; align-self: start; }
+}
