@@ -57,7 +57,7 @@
         </div>
         <div class="directive-container">
           <!-- clicking the directive opens the same editor as the button -->
-          <div class="directive-text directive-text-editable" *ngIf="reportATC.directive" (click)="editDirective()">
+          <div class="directive-text directive-text-editable" data-testid="eatc-directive-open" *ngIf="reportATC.directive" (click)="editDirective()">
             <label data-testid="eatc-directive-text">{{reportATC.directive}}</label>
           </div>
           <div class="directive-text directive-text-editable directive-placeholder" data-testid="eatc-directive-placeholder" *ngIf="!reportATC.directive" (click)="editDirective()">

@@ -74,7 +74,7 @@
         </div>
         <div class="directive-container">
           <!-- clicking the directive opens the same editor as Edit Directive (not for a directive assignment) -->
-          <div class="directive-text" [class.directive-text-editable]="!assignmentInitiated" *ngIf="atcdirective" (click)="!assignmentInitiated && editDirective()">
+          <div class="directive-text" data-testid="patc-directive-open" [class.directive-text-editable]="!assignmentInitiated" *ngIf="atcdirective" (click)="!assignmentInitiated && editDirective()">
             <label data-testid="patc-directive-text">{{atcdirective}}</label>
           </div>
           <!-- WiSH, nothing written yet: the prototype's example text, opening the same editor -->

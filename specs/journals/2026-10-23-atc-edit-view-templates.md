@@ -92,3 +92,13 @@ Seed: `seed-atc.js` phase 4 adds the tpw/tea/tel/tew/teb/tvv participants and ei
   - full atc suite 93/93;
   - readiness 566 selectors;
   - production build exit 0.
+
+## After the push — readiness gate "missing test cases"
+- The branch-wide gate (`--base origin/development`) counts clickable elements without a `data-testid` per component.
+  Prescribe and Edit each had ONE more than development: the clickable directive text (the div that opens the
+  editor). The side-panel draft-status button only replaced the old clickable status span, so it nets out. The
+  per-file checks I ran before (`--files`) didn't surface it.
+- Fix: hooks `patc-directive-open` / `eatc-directive-open`; PTPL-01 opens the editor through it, EATT-01 opens Edit's
+  editor through it and cancels. Gate now: 8348 selectors, all present. (The same diff also carries auth guard files
+  from the development merge, which makes every suite apply.)
+- Lesson: run the gate exactly as CI does — `--base origin/development --head HEAD` — not just over the changed files.
