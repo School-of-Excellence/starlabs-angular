@@ -68,3 +68,13 @@ The scenarios behind each choice (versioning, privacy, list load, concurrency, c
   same retired-checked transaction as add/delete; disabled on a retired version in Edit.
 - e2e: VATT-03 (undelete after reload: back in the log, "2 reviews", "Show deleted (1)", fields null) and EATT-06
   (undelete in Edit: back, "1 reviews carry over.", fields null). Full atc 98/98; readiness 8382 selectors.
+
+## 2026-10-25 — branch suites run 40211706962
+- 14 / 15 suites green (the ubuntu-24.04 pin worked — every Playwright suite installed its browser). `atc` failed
+  BEFORE any test: "Install Cloud Functions deps" — the Cloud Functions repo's `onnxruntime-node` postinstall downloads
+  its CUDA binaries from api.nuget.org and that download timed out (ETIMEDOUT) on that runner only.
+- Re-ran the failed job (`gh run rerun --failed`, operator-approved).
+- Fix (operator-approved): `ONNXRUNTIME_NODE_INSTALL: skip` on the CF install step in the hub's `web-e2e.yml` and
+  `cf-e2e.yml`. Verified in onnxruntime v1.30.0 `js/node/script/install.js` + `install-utils.js`: the flag (env
+  `ONNXRUNTIME_NODE_INSTALL` or npm config) makes the script exit early, skipping only the non-bundled files (the CUDA
+  EP); the CPU runtime ships in the npm package. The e2e never uses a GPU.
