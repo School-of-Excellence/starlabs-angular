@@ -1561,3 +1561,39 @@
 @media (max-width: 1100px) {
   .edit-top-grid > .side-avatar { grid-row: span 3; align-self: start; }
 }
+
+/* ---- Review log + retired banner (2026-10-24) — no font sizes set ---- */
+.review-tag { flex: none; padding: 2px 10px; border-radius: 999px; background: var(--so-soft2); color: var(--so-ink2); line-height: 20px; text-transform: none; letter-spacing: 0; font-weight: 400; }
+.review-composer { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 12px; padding-bottom: 12px; }
+.review-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--so-soft2); color: var(--so-ink2);
+  display: inline-flex; align-items: center; justify-content: center; font-weight: 600;
+}
+.review-textarea {
+  width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--so-border2); border-radius: 10px;
+  font: inherit; color: var(--so-ink); resize: vertical;
+}
+.review-textarea:focus { outline: 2px solid var(--so-accent); outline-offset: -1px; border-color: var(--so-accent); }
+.review-compose-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 8px; }
+.review-saved-as, .review-muted { color: var(--so-muted); }
+.review-muted { margin: 8px 0; }
+.review-row { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 12px 0; border-top: 1px solid var(--so-border); }
+.review-row.review-deleted { background: var(--so-soft); }
+.review-row.review-deleted .review-text { text-decoration: line-through; color: var(--so-muted); }
+.review-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.review-name { font-weight: 600; color: var(--so-ink); }
+.review-date { color: var(--so-muted); font-family: 'Geist Mono', ui-monospace, Menlo, monospace; }
+.review-deleted-tag { padding: 0 8px; border-radius: 999px; background: #fee2e2; color: var(--so-danger); }
+.review-text { display: block; margin-top: 4px; color: var(--so-ink); white-space: pre-wrap; }
+.review-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; color: var(--so-ink2); }
+.review-delete-link { color: var(--so-ink2) !important; }
+.review-show-deleted { padding-top: 8px; border-top: 1px solid var(--so-border); }
+.retired-banner {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 14px 18px; background: #fef3c7 !important; color: #92400e;
+}
+.retired-icon { flex: none; color: #b45309; }
+.retired-body { display: flex; flex-direction: column; gap: 10px; }
+.retired-open-btn { align-self: flex-start; background-color: var(--so-accent) !important; color: #fff !important; border-radius: 8px !important; }
+.side-card.submit-section .submit-button:disabled { opacity: 0.5; }

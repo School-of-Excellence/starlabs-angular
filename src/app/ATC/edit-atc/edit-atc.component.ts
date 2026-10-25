@@ -1,6 +1,6 @@
 import { Component, Injectable, inject } from '@angular/core';
 import { CommonModule, DatePipe, Location } from "@angular/common";
-import { collection, collectionSnapshots, doc, DocumentReference, Firestore, getDoc, getDocs, getFirestore, orderBy, query, serverTimestamp, setDoc, Timestamp, updateDoc, writeBatch } from '@angular/fire/firestore';
+import { collection, collectionSnapshots, doc, docSnapshots, DocumentReference, Firestore, getDoc, getDocs, getFirestore, orderBy, query, serverTimestamp, setDoc, Timestamp, updateDoc, writeBatch } from '@angular/fire/firestore';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthguardService } from '../../authguard.service';
 import { Subject, Subscription, takeUntil, timer } from 'rxjs';
@@ -28,6 +28,7 @@ import { UpdateDialogComponent } from '../../DialogBox/update-dialog/update-dial
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MarkdownModule } from 'ngx-markdown';
 import { MAT_FORM_FIELD_DEFAULT_OPTIONS } from '@angular/material/form-field';
+import { AtcReview, AtcReviewLogService } from '../shared/atc-review-log.service';
 
 @Component({
   selector: 'app-edit-atc',
@@ -349,6 +350,137 @@ export class EditAtcComponent {
   backToPrescribed() {
     this.router.navigate(['/viewprescribedATC'])
   }
+
+  // ---- 2026-10-24: live ATC + EI Solution Review log (plan specs/plans/2026-10-24-review-log.md) ----
+  reviewLog = inject(AtcReviewLogService)
+  private atcLiveSub: Subscription | null = null
+  // the ATC as it is NOW (live subscription); the new version is built on it, not on the copy loaded at open
+  latestAtcData: any = null
+  // this version was retired elsewhere while editing: 'upgraded' (someone saved an edit) or 'deleted'
+  atcRetired: 'upgraded' | 'deleted' | null = null
+  atcRetiredOn: Date | null = null
+  atcUpgradedTo: string | null = null
+  reviewRowsList: AtcReview[] = []
+  reviewActive = 0
+  reviewDeleted = 0
+  reviewShowDeleted = false
+  reviewDraft = ""
+  reviewError: string | null = null
+  reviewConfirm: string | null = null
+  reviewBusy = false
+
+  // follows the ATC being edited for as long as the screen is open
+  private startAtcSubscription(path: string) {
+    this.atcLiveSub?.unsubscribe()
+    this.atcLiveSub = docSnapshots(doc(this.firestoreATC, path)).subscribe(snap => {
+      // our own save retires this version on purpose — that is not "someone else"
+      if (this.uploading) return
+      var data = snap.exists() ? snap.data() : null
+      if (data == null) {
+        this.markRetired('deleted', null)
+        return
+      }
+      this.latestAtcData = data
+      if (data["upgradedto"] != null || data["status"] == "upgraded") this.markRetired('upgraded', data["upgradedto"]?.id ?? null)
+      else if (data["isdelete"] === true) this.markRetired('deleted', null)
+      this.refreshReviewRows()
+    })
+  }
+  private markRetired(kind: 'upgraded' | 'deleted', upgradedTo: string | null) {
+    if (this.atcRetired == null) this.atcRetiredOn = new Date()
+    this.atcRetired = kind
+    this.atcUpgradedTo = upgradedTo
+    this.reviewConfirm = null
+  }
+  get retiredMessage(): string {
+    if (this.atcRetired == 'deleted') return "This ATC was deleted. Your changes can't be saved."
+    var when = this.atcRetiredOn ? this.datepipe.transform(this.atcRetiredOn, 'medium') : ''
+    return `This ATC was updated by someone else on ${when}. Your changes can't be saved on this version. Open the latest version to continue.`
+  }
+  openLatestVersion() {
+    if (!this.atcUpgradedTo) return
+    var type = this.collectionName == "atc_alpha" ? "alpha" : "validation"
+    // full load: the screen state belongs to the retired version
+    window.location.assign(this.router.serializeUrl(this.router.createUrlTree(['/editATC', this.atcUpgradedTo, type])))
+  }
+
+  refreshReviewRows() {
+    var log = (this.latestAtcData ?? this.reportATC?.atcData)?.["reviewlog"]
+    this.reviewRowsList = this.reviewLog.rows(log, this.reviewShowDeleted)
+    this.reviewActive = this.reviewLog.activeCount(log)
+    this.reviewDeleted = (Array.isArray(log) ? log.length : 0) - this.reviewActive
+  }
+  toggleReviewShowDeleted(show: boolean) {
+    this.reviewShowDeleted = show
+    this.refreshReviewRows()
+  }
+  // involved (author / implementation agent) or mentor / admin / developer — and never on a retired version
+  get canWriteReview(): boolean {
+    return this.atcRetired == null &&
+      this.reviewLog.canWrite(this.loggedProfileID, this.roles, this.latestAtcData ?? this.reportATC?.atcData, this.reportATC?.transcription ?? [])
+  }
+  reviewerName(profileid: string): string { return this.profileMap[profileid] ?? profileid }
+  reviewLogDate(value: any): Date | null { return this.reviewLog.toDate(value) }
+  trackByReviewId(index: number, review: AtcReview): string { return review?.id ?? String(index) }
+  initialsOf(name: any): string {
+    var words = (name ?? "").toString().replace(/@.*/, "").split(/[\s._+-]+/).filter(w => w.length != 0)
+    return words.slice(0, 2).map(w => w[0].toUpperCase()).join("") || "?"
+  }
+  private reviewMessage(result: string): string | null {
+    return result == 'retired' ? "This ATC was updated — reload to see the latest version."
+      : result == 'missing' ? "This ATC or review no longer exists — reload the page." : null
+  }
+  // reviews are written straight to the ATC (not the edit draft / save), like View Prescribed
+  async addReview() {
+    if (!this.canWriteReview) return
+    if (this.reviewDraft.trim().length == 0) { this.reviewError = "Write the review first."; return }
+    this.reviewBusy = true
+    try {
+      var result = await this.reviewLog.add(this.firestoreATC, this.reportATC.atcpath, this.reviewDraft, this.loggedProfileID)
+      if (result == 'ok') {
+        this.reviewDraft = ""
+        this.reviewError = null
+        this.snackbar.open("Review added.", "Dismiss", { duration: 3000 })
+      } else {
+        this.reviewError = this.reviewMessage(result) ?? "Write the review first."
+      }
+    } catch (error) {
+      console.error("Could not add the review", error)
+      this.reviewError = "Could not save the review — check your connection and try again."
+    } finally {
+      this.reviewBusy = false
+    }
+  }
+  // undelete: straight back into the log, no confirmation (operator 2026-10-25)
+  async restoreReview(review: AtcReview) {
+    if (!this.canWriteReview) return
+    this.reviewBusy = true
+    try {
+      var result = await this.reviewLog.restore(this.firestoreATC, this.reportATC.atcpath, review.id)
+      if (result == 'ok') this.snackbar.open("Review restored.", "Dismiss", { duration: 3000 })
+      else this.reviewError = this.reviewMessage(result)
+    } catch (error) {
+      console.error("Could not restore the review", error)
+      this.reviewError = "Could not restore the review — check your connection and try again."
+    } finally {
+      this.reviewBusy = false
+    }
+  }
+  async confirmDeleteReview(review: AtcReview) {
+    if (!this.canWriteReview) return
+    this.reviewBusy = true
+    try {
+      var result = await this.reviewLog.softDelete(this.firestoreATC, this.reportATC.atcpath, review.id, this.loggedProfileID)
+      this.reviewConfirm = null
+      if (result == 'ok') this.snackbar.open("Review deleted. It stays on the ATC, hidden from the log.", "Dismiss", { duration: 3000 })
+      else this.reviewError = this.reviewMessage(result)
+    } catch (error) {
+      console.error("Could not delete the review", error)
+      this.reviewError = "Could not delete the review — check your connection and try again."
+    } finally {
+      this.reviewBusy = false
+    }
+  }
   
   constructor(
     public storage: Storage,
@@ -467,6 +599,7 @@ export class EditAtcComponent {
   ngOnDestroy() {
     this.procedureSubscription?.unsubscribe()
     this.userroleSubscription?.unsubscribe()
+    this.atcLiveSub?.unsubscribe()
   }
 
   onLogInAsBigPariticipant(value: string) {
@@ -589,6 +722,9 @@ export class EditAtcComponent {
       this.reportATC.profile_name = this.profileMap[atcDocData['profileid']]
       this.reportATC.directive = atcDocData["directive"] ?? null
       this.reportATC.atcpath = atcData.ref.path
+      this.latestAtcData = atcDocData
+      this.refreshReviewRows()
+      this.startAtcSubscription(atcData.ref.path)
       this.reportATC.product = atcDocData['product'] != null ? atcDocData['product'] : null
       this.reportATC.notesid = atcDocData['notesid'] != null ? atcDocData['notesid'] : null
       this.reportATC.date = atcDocData['prescription_date'].toDate()
@@ -1420,6 +1556,10 @@ export class EditAtcComponent {
     // flush any in-flight save so the latest edits are included and the draft can't re-appear after submit
     await this.autoSave()
     this.panelError = null
+    if (this.atcRetired != null) {
+      this.panelError = this.retiredMessage
+      return
+    }
     // prototype order: author → directive → ask / outcomes → then the existing adjustment / procedure checks
     var hasAuthor = this.authorActivity.some(activity => (this.reportATC.bigactivity?.[activity.docid] ?? []).length != 0)
     if (!this.bigActivity() && !hasAuthor) {
@@ -1619,8 +1759,10 @@ export class EditAtcComponent {
 
   async replicateATC(finalCollection: string, newid: string, noteid: string) {
     const atcDocRef = doc(this.firestoreATC, this.reportATC.atcpath);
+    // built on the ATC as it is NOW (live subscription) so fields Edit doesn't set — review log, status, validator,
+    // product … — keep any change made while this screen was open; Edit's own fields are overlaid below
     const newData = {
-      ...this.reportATC.atcData,
+      ...(this.latestAtcData ?? this.reportATC.atcData),
       atcid: newid,
       lasteditedon: new Date(),
       editedfrom: atcDocRef

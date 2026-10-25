@@ -1,8 +1,10 @@
 import { CommonModule, DatePipe } from '@angular/common';
-import { Component, ViewChild } from '@angular/core';
+import { Component, ViewChild, inject } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatPaginator, MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { AuthguardService } from '../../authguard.service';
+import { AtcReview, AtcReviewLogService } from '../shared/atc-review-log.service';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
 import { collection, writeBatch, collectionChanges, collectionData, CollectionReference, collectionSnapshots, doc, docSnapshots, Firestore, and, getDoc, getDocs, limit, or, orderBy, Query, query, QueryDocumentSnapshot, QueryFieldFilterConstraint, QueryLimitConstraint, QueryOrderByConstraint, updateDoc, where, DocumentSnapshot, QueryConstraint, QueryFilterConstraint, DocumentReference, getFirestore } from '@angular/fire/firestore';
 import { BehaviorSubject, combineLatestWith, debounceTime, firstValueFrom, map, Subject, Subscription, takeUntil } from 'rxjs';
@@ -496,8 +498,11 @@ export class ViewPrescribedATCComponent {
         const totalProcedurePending = this.sourceReportATC.reduce((sum, doc: any) => sum + (doc.data()['totalprocedurepending'] || 0), 0);
         const totalProcedureCompleted = this.sourceReportATC.reduce((sum, doc: any) => sum + (doc.data()['totalprocedurecompleted'] || 0), 0);
 
+        // EI Solution reviews (not deleted) across the listed ATCs
+        const totalReviews = this.sourceReportATC.reduce((sum, doc: any) => sum + (this.reviewLog.isEISolution(doc.data()['product']) ? this.reviewLog.activeCount(doc.data()['reviewlog']) : 0), 0);
         this.reportSummary = {
           total,
+          totalReviews,
           validated,
           unvalidated,
           totalAdjustment,
@@ -1338,6 +1343,95 @@ export class ViewPrescribedATCComponent {
   }
   trackByIndex(index: number): number {
     return index
+  }
+
+  // ---- 2026-10-24: EI Solution Review log (plan specs/plans/2026-10-24-review-log.md) ----
+  reviewLog = inject(AtcReviewLogService)
+  private reviewSnack = inject(MatSnackBar)
+  reviewDraft: { [atcId: string]: string } = {}
+  reviewError: { [atcId: string]: string | null } = {}
+  reviewConfirm: { [atcId: string]: string | null } = {}
+  reviewShowDeleted: { [atcId: string]: boolean } = {}
+  reviewBusy: { [atcId: string]: boolean } = {}
+  // per SNAPSHOT (atc.data() builds a new object every change detection — the freeze lesson); a new snapshot after an
+  // add / delete is a new key, so the list refreshes by itself
+  private reviewCache = new WeakMap<any, { show: boolean, rows: AtcReview[], active: number, deleted: number }>()
+  private reviewEntry(atc: any) {
+    var show = !!this.reviewShowDeleted[atc.id]
+    var entry = this.reviewCache.get(atc)
+    if (!entry || entry.show != show) {
+      var log = atc.data()?.["reviewlog"]
+      var active = this.reviewLog.activeCount(log)
+      entry = { show: show, rows: this.reviewLog.rows(log, show), active: active, deleted: (Array.isArray(log) ? log.length : 0) - active }
+      this.reviewCache.set(atc, entry)
+    }
+    return entry
+  }
+  reviewRows(atc: any): AtcReview[] { return this.reviewEntry(atc).rows }
+  reviewActiveCount(atc: any): number { return this.reviewEntry(atc).active }
+  reviewDeletedCount(atc: any): number { return this.reviewEntry(atc).deleted }
+  isEIModel(product: any): boolean { return this.reviewLog.isEISolution(product) }
+  reviewerName(profileid: string): string { return (this.profileMap[profileid] || {})["name"] ?? profileid }
+  get myReviewerName(): string { return this.reviewerName(this.profileID) }
+  reviewLogDate(value: any): Date | null { return this.reviewLog.toDate(value) }
+  trackByReviewId(index: number, review: AtcReview): string { return review?.id ?? String(index) }
+  // involved (author / implementation agent) or mentor / admin / developer — adjustments are loaded when the ATC is open
+  canWriteReview(atc: any): boolean {
+    var adjustments = ((this.mapATCtranscription[atc.id] || {})["transcription"] ?? []).map(t => t?.adjustment?.data?.() ?? {})
+    return this.reviewLog.canWrite(this.profileID, this.profileRoles, atc.data(), adjustments)
+  }
+  private reviewMessage(result: string): string | null {
+    return result == 'retired' ? "This ATC was updated — reload to see the latest version."
+      : result == 'missing' ? "This ATC or review no longer exists — reload the page." : null
+  }
+  async addReview(atc: any) {
+    if (!this.canWriteReview(atc)) return
+    if ((this.reviewDraft[atc.id] ?? "").trim().length == 0) { this.reviewError[atc.id] = "Write the review first."; return }
+    this.reviewBusy[atc.id] = true
+    try {
+      var result = await this.reviewLog.add(this.firestoreATC, atc.ref.path, this.reviewDraft[atc.id], this.profileID)
+      if (result == 'ok') {
+        this.reviewDraft[atc.id] = ""
+        this.reviewSnack.open("Review added.", "Dismiss", { duration: 3000 })
+      } else {
+        this.reviewError[atc.id] = this.reviewMessage(result) ?? "Write the review first."
+      }
+    } catch (error) {
+      console.error("Could not add the review", error)
+      this.reviewError[atc.id] = "Could not save the review — check your connection and try again."
+    } finally {
+      this.reviewBusy[atc.id] = false
+    }
+  }
+  // undelete: straight back into the log, no confirmation (operator 2026-10-25)
+  async restoreReview(atc: any, review: AtcReview) {
+    if (!this.canWriteReview(atc)) return
+    this.reviewBusy[atc.id] = true
+    try {
+      var result = await this.reviewLog.restore(this.firestoreATC, atc.ref.path, review.id)
+      if (result == 'ok') this.reviewSnack.open("Review restored.", "Dismiss", { duration: 3000 })
+      else this.reviewError[atc.id] = this.reviewMessage(result)
+    } catch (error) {
+      console.error("Could not restore the review", error)
+      this.reviewError[atc.id] = "Could not restore the review — check your connection and try again."
+    } finally {
+      this.reviewBusy[atc.id] = false
+    }
+  }
+  async confirmDeleteReview(atc: any, review: AtcReview) {
+    if (!this.canWriteReview(atc)) return
+    this.reviewBusy[atc.id] = true
+    try {
+      var result = await this.reviewLog.softDelete(this.firestoreATC, atc.ref.path, review.id, this.profileID)
+      this.reviewConfirm[atc.id] = null
+      if (result == 'ok') this.reviewSnack.open("Review deleted. It stays on the ATC, hidden from the log.", "Dismiss", { duration: 3000 })
+      else this.reviewError[atc.id] = this.reviewMessage(result)
+    } catch (error) {
+      console.error("Could not delete the review", error)
+      this.reviewError[atc.id] = "Could not delete the review — check your connection and try again."
+    } finally {
+      this.reviewBusy[atc.id] = false
+    }
   }
   // prototype ATC card: the model tag colour and the initials shown when a participant has no photo
   modelTagClass(product: any): string {

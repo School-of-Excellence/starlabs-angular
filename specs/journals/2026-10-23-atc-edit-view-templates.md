@@ -102,3 +102,11 @@ Seed: `seed-atc.js` phase 4 adds the tpw/tea/tel/tew/teb/tvv participants and ei
   editor through it and cancels. Gate now: 8348 selectors, all present. (The same diff also carries auth guard files
   from the development merge, which makes every suite apply.)
 - Lesson: run the gate exactly as CI does — `--base origin/development --head HEAD` — not just over the changed files.
+
+## 2026-10-24 — "branch suites" failed before any test ran (CI runner image)
+- Run 40070806984: every Playwright suite failed at "Install Playwright chromium" with "Playwright does not support
+  chromium on ubuntu26.04-x64"; only the unit suite (no browser) passed. GitHub's `ubuntu-latest` moved to Ubuntu
+  26.04 between 10-22 (last green run) and 10-24; the hub's @playwright/test 1.60 has no Chromium for it.
+- Operator chose option A: pin `runs-on: ubuntu-24.04` in the hub's `web-e2e.yml` and `cf-e2e.yml` (the two that
+  install Playwright; flutter-e2e / suites-deploy don't, left as they are). Comment in each says when to unpin
+  (after upgrading @playwright/test to a version that supports 26.04 — a separate change, needs every suite re-run).

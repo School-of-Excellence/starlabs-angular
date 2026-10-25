@@ -156,6 +156,15 @@
         <span class="summary-label">CW Completed</span>
       </div>
     </div>
+
+    <div class="group-divider"></div>
+
+    <div class="summary-group">
+      <div class="summary-item">
+        <span data-testid="vatc-sum-reviews" class="summary-value neutral">{{ reportSummary.totalReviews }}</span>
+        <span class="summary-label">Reviews</span>
+      </div>
+    </div>
   </div>
 
   <div class="mat-elevation-z3">
@@ -206,6 +215,8 @@
                   </label>
                   <label data-testid="vatc-status-visible" class="status-tag status-visible" *ngIf="!atcData['status'] && atc.ref.parent.id == 'atc_alpha'">This ATC is directly visible to the Participant.</label>
                 </span>
+                <!-- EI Solution: reviews not deleted (prototype) -->
+                <span class="atc-tag tag-model nonprintable" data-testid="vatc-review-count" *ngIf="isEIModel(atcData['product'])">{{ reviewActiveCount(atc) }} reviews</span>
                 <label *ngIf="atcData['lasteditedon']" class="lastedittext nonprintable">
                   (Last Edit : {{(atcData['lasteditedon'] ? (atcData['lasteditedon']?.toDate() | date:'medium') : '')}})
                 </label>
@@ -288,6 +299,54 @@
             <!-- Loading Adjustment -->
             <div *ngIf="mapATCtranscription[atc.id]['transcription'].length == 0" class="loading-atc">
               Loading Full ATC...
+            </div>
+
+            <!-- Review log — EI Solution only (plan 2026-10-24): internal notes; add + soft delete for the involved
+                 specialists (author / implementation agent) and mentor / admin / developer roles -->
+            <div class="vp-card review-card nonprintable" data-testid="vatc-review-card" *ngIf="isEIModel(atcData['product'])">
+              <div class="review-head">
+                <div>
+                  <div class="vp-card-title">Review log</div>
+                  <p class="review-note">Internal notes after any appointment. Reviews can't be edited; a deleted review is hidden, not erased.</p>
+                </div>
+                <span class="review-tag">Hidden in the participant app</span>
+              </div>
+              <div class="review-composer" *ngIf="canWriteReview(atc); else reviewReadOnly">
+                <span class="review-avatar">{{ initialsOf(myReviewerName) }}</span>
+                <div class="review-compose-body">
+                  <textarea data-testid="vatc-review-text" class="review-textarea" rows="3" placeholder="What happened since the last review? Progress, blockers, next focus" [(ngModel)]="reviewDraft[atc.id]" (ngModelChange)="reviewError[atc.id] = null"></textarea>
+                  <div class="review-compose-actions">
+                    <button data-testid="vatc-review-add" mat-flat-button class="review-add-btn" [disabled]="reviewBusy[atc.id]" (click)="addReview(atc)">Add review</button>
+                    <span class="review-saved-as">Saved as {{ myReviewerName }} · today</span>
+                  </div>
+                  <span data-testid="vatc-review-error" class="review-error" *ngIf="reviewError[atc.id]">{{ reviewError[atc.id] }}</span>
+                </div>
+              </div>
+              <ng-template #reviewReadOnly>
+                <p data-testid="vatc-review-readonly" class="review-readonly">Only this ATC's authors, change agents, mentors and admins can add or delete reviews.</p>
+              </ng-template>
+              <p data-testid="vatc-review-empty" class="review-empty" *ngIf="reviewRows(atc).length == 0">No reviews yet. Add the first one after the next appointment.</p>
+              <div class="review-row" data-testid="vatc-review-row" [class.review-deleted]="review.isdelete" *ngFor="let review of reviewRows(atc); trackBy: trackByReviewId">
+                <span class="review-avatar">{{ initialsOf(reviewerName(review.createdby)) }}</span>
+                <div class="review-body">
+                  <div class="review-meta">
+                    <span class="review-name">{{ reviewerName(review.createdby) }}</span>
+                    <span class="review-date">{{ reviewLogDate(review.createdon) | date:'medium' }}</span>
+                    <span class="review-deleted-tag" *ngIf="review.isdelete">Deleted</span>
+                  </div>
+                  <span class="review-text" data-testid="vatc-review-note">{{ review.note }}</span>
+                  <div class="review-confirm" data-testid="vatc-review-confirm" *ngIf="reviewConfirm[atc.id] == review.id">
+                    <span>Delete this review? It's hidden from the log but kept on the ATC.</span>
+                    <button data-testid="vatc-review-cancel" mat-stroked-button (click)="reviewConfirm[atc.id] = null">Cancel</button>
+                    <button data-testid="vatc-review-confirm-delete" mat-flat-button class="review-delete-btn" [disabled]="reviewBusy[atc.id]" (click)="confirmDeleteReview(atc, review)">Delete</button>
+                  </div>
+                </div>
+                <button data-testid="vatc-review-delete" mat-button class="review-delete-link" *ngIf="!review.isdelete && canWriteReview(atc) && reviewConfirm[atc.id] != review.id" (click)="reviewConfirm[atc.id] = review.id">Delete</button>
+                <button data-testid="vatc-review-undelete" mat-button class="review-delete-link" *ngIf="review.isdelete && canWriteReview(atc)" [disabled]="reviewBusy[atc.id]" (click)="restoreReview(atc, review)">Undelete</button>
+              </div>
+              <div class="review-show-deleted" *ngIf="reviewDeletedCount(atc) > 0">
+                <mat-checkbox data-testid="vatc-review-show-deleted" [(ngModel)]="reviewShowDeleted[atc.id]">Show deleted ({{ reviewDeletedCount(atc) }})</mat-checkbox>
+              </div>
             </div>
 
             <!-- Ask · area of focus (EI Solution) / WiSH outcomes — only when the ATC has them (prototype) -->

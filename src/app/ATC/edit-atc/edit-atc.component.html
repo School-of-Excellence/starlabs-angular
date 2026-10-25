@@ -488,6 +488,56 @@
         </div>
       </section>
   
+      <!-- Review log — EI Solution only (plan 2026-10-24): live from the ATC; add + soft delete write straight to the
+           ATC (not this edit's draft / save) -->
+      <section class="content-section review-card" data-testid="eatc-review-card" *ngIf="isEISolution">
+        <div class="section-heading ask-heading">
+          <div>
+            <h2 class="wish-directive-title">REVIEW LOG</h2>
+            <p class="section-note">Internal notes after any appointment. Reviews can't be edited; a deleted review is hidden, not erased. They carry over to the new version.</p>
+          </div>
+          <span class="review-tag">Hidden in the participant app</span>
+        </div>
+        <div class="personnel-container">
+          <div class="review-composer" *ngIf="canWriteReview; else reviewReadOnly">
+            <span class="review-avatar">{{ initialsOf(reviewerName(loggedProfileID)) }}</span>
+            <div class="review-compose-body">
+              <textarea data-testid="eatc-review-text" class="review-textarea" rows="3" placeholder="What happened since the last review? Progress, blockers, next focus" [(ngModel)]="reviewDraft" (ngModelChange)="reviewError = null"></textarea>
+              <div class="review-compose-actions">
+                <button data-testid="eatc-review-add" mat-flat-button class="primary-button" [disabled]="reviewBusy" (click)="addReview()">Add review</button>
+                <span class="review-saved-as">Saved as {{ reviewerName(loggedProfileID) }} · today</span>
+              </div>
+              <span data-testid="eatc-review-error" class="required-text" *ngIf="reviewError">{{ reviewError }}</span>
+            </div>
+          </div>
+          <ng-template #reviewReadOnly>
+            <p data-testid="eatc-review-readonly" class="review-muted">{{ atcRetired ? 'This version can no longer be changed.' : "Only this ATC's authors, change agents, mentors and admins can add or delete reviews." }}</p>
+          </ng-template>
+          <p data-testid="eatc-review-empty" class="review-muted" *ngIf="reviewRowsList.length == 0">No reviews yet.</p>
+          <div class="review-row" data-testid="eatc-review-row" [class.review-deleted]="review.isdelete" *ngFor="let review of reviewRowsList; trackBy: trackByReviewId">
+            <span class="review-avatar">{{ initialsOf(reviewerName(review.createdby)) }}</span>
+            <div class="review-body">
+              <div class="review-meta">
+                <span class="review-name">{{ reviewerName(review.createdby) }}</span>
+                <span class="review-date">{{ reviewLogDate(review.createdon) | date:'medium' }}</span>
+                <span class="review-deleted-tag" *ngIf="review.isdelete">Deleted</span>
+              </div>
+              <span class="review-text" data-testid="eatc-review-note">{{ review.note }}</span>
+              <div class="review-confirm" data-testid="eatc-review-confirm" *ngIf="reviewConfirm == review.id">
+                <span>Delete this review? It's hidden from the log but kept on the ATC.</span>
+                <button data-testid="eatc-review-cancel" mat-stroked-button (click)="reviewConfirm = null">Cancel</button>
+                <button data-testid="eatc-review-confirm-delete" mat-flat-button class="remove-button" [disabled]="reviewBusy" (click)="confirmDeleteReview(review)">Delete</button>
+              </div>
+            </div>
+            <button data-testid="eatc-review-delete" mat-button class="review-delete-link" *ngIf="!review.isdelete && canWriteReview && reviewConfirm != review.id" (click)="reviewConfirm = review.id">Delete</button>
+            <button data-testid="eatc-review-undelete" mat-button class="review-delete-link" *ngIf="review.isdelete && canWriteReview" [disabled]="reviewBusy" (click)="restoreReview(review)">Undelete</button>
+          </div>
+          <div class="review-show-deleted" *ngIf="reviewDeleted > 0">
+            <mat-checkbox data-testid="eatc-review-show-deleted" [ngModel]="reviewShowDeleted" (ngModelChange)="toggleReviewShowDeleted($event)">Show deleted ({{ reviewDeleted }})</mat-checkbox>
+          </div>
+        </div>
+      </section>
+
       <!-- Changework brief + Images side by side (prototype); they stack on narrow screens -->
       <div class="media-pair">
       <!-- Audio Section -->
@@ -593,6 +643,14 @@
 
       <!-- Right panel: draft status, then "Update changes in ATC" (prototype) -->
       <aside class="atc-col-side" [class.side-offline]="!isonline">
+        <!-- this version was edited or deleted elsewhere while open (live subscription): nothing can be saved here -->
+        <section class="side-card retired-banner" data-testid="eatc-retired-banner" role="alert" *ngIf="atcRetired">
+          <mat-icon class="retired-icon">warning_amber</mat-icon>
+          <div class="retired-body">
+            <span data-testid="eatc-retired-text">{{ retiredMessage }}</span>
+            <button data-testid="eatc-open-latest" *ngIf="atcRetired == 'upgraded' && atcUpgradedTo" mat-flat-button class="retired-open-btn" (click)="openLatestVersion()">Open latest version</button>
+          </div>
+        </section>
         <section class="side-card side-draft" *ngIf="isonline && reportATC.atcData != null">
           <button type="button" class="side-draft-status" (click)="autoSave()">
             <mat-icon class="side-draft-icon" [ngClass]="draftStatus.code == 1 ? 'text-success' : draftStatus.code == 0 ? 'text-warning' : 'text-danger'">{{ draftStatus.code == 1 ? 'cloud_done' : draftStatus.code == 0 ? 'sync' : 'error_outline' }}</mat-icon>
@@ -611,9 +669,10 @@
           <div class="update-lines">
             <span data-testid="eatc-summary-line">{{ editSummaryLine }}</span>
             <span data-testid="eatc-version-line">{{ versionLine }}</span>
+            <span data-testid="eatc-review-carry" *ngIf="isEISolution">{{ reviewActive }} reviews carry over.</span>
           </div>
           <div class="panel-error" data-testid="eatc-panel-error" role="alert" *ngIf="panelError">{{ panelError }}</div>
-          <button data-testid="eatc-submit" *ngIf="!uploading" mat-raised-button class="submit-button" (click)="submit()">
+          <button data-testid="eatc-submit" *ngIf="!uploading" mat-raised-button class="submit-button" [disabled]="atcRetired != null" (click)="submit()">
             Review and update
           </button>
           <div *ngIf="uploading" class="loading"><mat-progress-spinner mode="indeterminate" diameter="32"></mat-progress-spinner></div>
