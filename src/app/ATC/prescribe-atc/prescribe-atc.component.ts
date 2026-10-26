@@ -404,7 +404,7 @@ export class PrescribeATCComponent {
     guardservice.getuid().then(uid=>{
       this.loggedinUser = uid
       console.log(uid)
-      getDocs(query(collection(this.firestoreDefault, "profile_data"),where("user_ref", "==", doc(this.firestoreDefault, 'user_data', uid)))).then(async profileData=>{
+      getDocs(query(collection(this.firestoreDefault, "profile_data"),where("user_ref", "==", doc(this.firestoreDefault, 'user_data', this.loggedinUser)))).then(async profileData=>{
         this.loggedinProfileid = profileData.docs[0].id
         getDoc(doc(this.firestoreDefault, profileData.docs[0].data()['role_ref']['path'])).then(async roleDoc=>{
           var roleData = roleDoc.data()
@@ -1165,6 +1165,7 @@ export class PrescribeATCComponent {
   // (Apply) fills this procedure too — only where it has nobody yet, so a manual per-procedure edit is kept.
   onProcedureSelect(i, j){
     var procedure = this.transcript?.[i]?.procedure?.[j]
+    procedure.mandatory = this.isWiSH
     if(procedure?.name){
       procedure.assignedMap = procedure.assignedMap ?? {}
       Object.keys(this.bulkAppliedSelection).forEach(activityId => {

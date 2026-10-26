@@ -78,10 +78,12 @@ export class ViewAtcmodelComponent {
     this.dialog.open(CreateAtcmodelComponent,{
       data:{
         type:'add',
-        doc : null
+        doc : null,
+        existing : this.atcmodelData
       },
-      width:'90%',
-      height: '90%',
+      width:'540px',
+      maxWidth: '95vw',
+      maxHeight: '90vh',
       disableClose:true
     })
   }
@@ -90,11 +92,12 @@ export class ViewAtcmodelComponent {
     this.dialog.open(CreateAtcmodelComponent,{
       data:{
         type:'edit',
-        doc : doc
+        doc : doc,
+        existing : this.atcmodelData
       },
-      maxWidth: '90vw',
+      width:'540px',
+      maxWidth: '95vw',
       maxHeight: '90vh',
-      width:'100vw',
       disableClose:true
     })
   }

@@ -78,3 +78,16 @@ The scenarios behind each choice (versioning, privacy, list load, concurrency, c
   `cf-e2e.yml`. Verified in onnxruntime v1.30.0 `js/node/script/install.js` + `install-utils.js`: the flag (env
   `ONNXRUNTIME_NODE_INSTALL` or npm config) makes the script exit early, skipping only the non-bundled files (the CUDA
   EP); the CPU runtime ships in the npm package. The e2e never uses a GPU.
+
+## 2026-10-26 — branch suites run 40215649769: PATC-09 flake (test timing, not the app)
+- Run 40211706962 attempt 2 (the re-run) went fully green. The NEXT run, 40215649769, had 14/15 green and atc 97/98:
+  PATC-09 (untouched by this work) failed on both tries: the directive read "Alpha directive atc" + "PATC-09 directive
+  atc". Cause: UpdateDialogComponent pre-fills its textarea through ngModel, which writes the value a moment after the
+  textarea appears; on the slower CI runner Playwright's `fill` landed in that gap, so the late pre-fill put the old
+  text in front of the typed text. The dialog is unchanged on this branch (last touched at "first commit" + test-hooks).
+- Fix (hub, test side): `fillEditorDialog(page, text)` in atc/support/atc.ts — fill, wait 300 ms, check the textarea
+  holds exactly the text, refill if not (toPass). Used at all 7 `dbu-textarea` fills (PATC-09, TRE-01/02, EATC-09 ×2,
+  EATT-02, PTPL-01). Locally: the 5 affected files 45/45.
+- The onnxruntime skip worked: the atc job got past "Install Cloud Functions deps" this time.
+- 2026-10-26: re-run (attempt 2) of 40215649769 with the PATC-09 fix → **all 15 suites green; atc 98/98, 0 failed**.
+  Local full atc on a fresh emulator, same code as pushed (app 6f510c73, hub 4db2c27): 98/98.

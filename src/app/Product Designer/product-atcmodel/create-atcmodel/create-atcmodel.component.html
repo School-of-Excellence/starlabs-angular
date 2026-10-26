@@ -1,63 +1,106 @@
-<div class="mainscreen">
-  <div class="d-flex flex-row justify-content-center mt-4 mb-2">
-    <h4>Create ATC Model</h4>
+<div class="ca-dialog">
+  <div class="ca-header">
+    <h4 class="ca-title">{{ isEdit ? 'Edit ATC model' : 'Create ATC model' }}</h4>
+    <button data-testid="ca-close" mat-icon-button type="button" aria-label="Close" (click)="onCancel()">
+      <mat-icon>close</mat-icon>
+    </button>
   </div>
-  <div>
-    <form [formGroup]="form">
 
-      <app-text
-        label="ATC Model"
-        controlName="atcmodel"
-        [form]="form">
-      </app-text>
+  <form [formGroup]="form" class="ca-body">
 
-      <app-auto-complete-with-chip
-        label="Evolution Type"
-        [form]="form"
-        controlName="evolutiontype"
-        [data]="['full','specialised']"
-        datatype="arrayofstring"
-        displayname=""
-        valuetype=""
-        valuelabel=""
-        [multiple]="false">
-      </app-auto-complete-with-chip>
+    <div class="ca-top">
+      <div class="ca-image">
+        <input #imageInput data-testid="ca-image-input" type="file" accept="image/png,image/jpeg,image/webp" hidden (change)="onImagePicked($event)">
 
-      <app-mat-chip
-        label="Category"
-        controlName="category"
-        [form]="form">
-      </app-mat-chip>
+        <button *ngIf="!previewUrl" data-testid="ca-image-pick" type="button" class="ca-image-well" [class.ca-image-well-error]="imageError" (click)="imageInput.click()">
+          <mat-icon>{{ imageError ? 'hide_image' : 'add_photo_alternate' }}</mat-icon>
+          <span class="ca-image-well-title">Upload image</span>
+          <span class="ca-hint">1:1 · max 200 KB<br>PNG, JPG, WebP</span>
+        </button>
 
-      <app-text-area
-        label="Description"
-        controlName="description"
-        [form]="form">
-      </app-text-area>
+        <img *ngIf="previewUrl" data-testid="ca-image-preview" class="ca-image-preview" [src]="previewUrl" alt="ATC model image">
 
-      <app-text-area
-        label="ATC Directive"
-        controlName="directive"
-        [form]="form">
-      </app-text-area>
-
-      <app-auto-complete-with-chip
-        label="Video URL"
-        [form]="form"
-        controlName="videourl"
-        [data]="contentData"
-        datatype="arrayofmap"
-        displayname="title"
-        valuetype="ref"
-        valuelabel="ref"
-        [multiple]="true">
-      </app-auto-complete-with-chip>
-
-      <div style="display: flex; justify-content: center; align-items: center; margin-top: 16px;">
-        <button data-testid="ca-dialog-ref-1" mat-stroked-button type="button" (click)="dialogRef.close()">Cancel</button> &nbsp;&nbsp;&nbsp;
-        <button data-testid="ca-on-submit-2" mat-stroked-button type="button" (click)="onSubmit()" [disabled]="form.invalid">Submit</button>
+        <div *ngIf="previewUrl" class="ca-image-actions">
+          <button data-testid="ca-image-replace" mat-button type="button" (click)="imageInput.click()">Replace</button>
+          <button data-testid="ca-image-remove" mat-button type="button" class="ca-danger" (click)="onImageRemove()">Remove</button>
+        </div>
       </div>
 
-    </form>
+      <div class="ca-top-fields">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>ATC model</mat-label>
+          <input data-testid="ca-name-input" type="text" matInput formControlName="atcmodel" required>
+          <mat-error *ngIf="form.get('atcmodel').hasError('required')">ATC model is required</mat-error>
+          <mat-error *ngIf="form.get('atcmodel').hasError('duplicate')">
+            <span data-testid="ca-name-duplicate">"{{ typedName }}" already exists. Use a different name.</span>
+          </mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Evolution type</mat-label>
+          <mat-select data-testid="ca-evolution-type" formControlName="evolutiontype" required>
+            <mat-option value="full">Full</mat-option>
+            <mat-option value="specialised">Specialised</mat-option>
+          </mat-select>
+          <mat-error>Evolution type is required</mat-error>
+        </mat-form-field>
+      </div>
+    </div>
+
+    <div *ngIf="imageError" data-testid="ca-image-error" class="ca-error ca-image-error">{{ imageError }}</div>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Category</mat-label>
+      <mat-chip-grid #categoryGrid>
+        <mat-chip-row *ngFor="let item of form.value.category || []; let i = index" (removed)="removeCategory(i)">
+          {{ item }}
+          <button data-testid="ca-category-remove" matChipRemove type="button" aria-label="Remove category">
+            <mat-icon>cancel</mat-icon>
+          </button>
+        </mat-chip-row>
+        <input data-testid="ca-category-input" placeholder="Type and press Enter"
+          [matChipInputFor]="categoryGrid"
+          [matChipInputSeparatorKeyCodes]="separatorKeys"
+          (matChipInputTokenEnd)="addCategory($event)">
+      </mat-chip-grid>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Description</mat-label>
+      <textarea data-testid="ca-description" matInput formControlName="description" cdkTextareaAutosize cdkAutosizeMinRows="2" cdkAutosizeMaxRows="6"></textarea>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>ATC directive</mat-label>
+      <textarea data-testid="ca-directive" matInput formControlName="directive" cdkTextareaAutosize cdkAutosizeMinRows="2" cdkAutosizeMaxRows="6"></textarea>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Content videos</mat-label>
+      <mat-chip-grid #videoGrid>
+        <mat-chip-row *ngFor="let item of form.value.videourl || []; let i = index" (removed)="removeVideo(i)">
+          {{ videoTitle(item) }}
+          <button data-testid="ca-video-remove" matChipRemove type="button" aria-label="Remove video">
+            <mat-icon>cancel</mat-icon>
+          </button>
+        </mat-chip-row>
+        <input #videoInput data-testid="ca-video-input" placeholder="Search videos"
+          [matChipInputFor]="videoGrid"
+          [matAutocomplete]="videoAuto"
+          (input)="videoSearch = videoInput.value">
+      </mat-chip-grid>
+      <mat-autocomplete #videoAuto="matAutocomplete" (optionSelected)="addVideo($event.option.value); videoInput.value = ''; videoSearch = ''">
+        <mat-option *ngFor="let option of videoOptions()" [value]="option">{{ option.title }}</mat-option>
+      </mat-autocomplete>
+    </mat-form-field>
+
+    <div *ngIf="saveError" data-testid="ca-save-error" class="ca-error">{{ saveError }}</div>
+  </form>
+
+  <div class="ca-footer">
+    <button data-testid="ca-dialog-ref-1" mat-stroked-button type="button" (click)="onCancel()">Cancel</button>
+    <button data-testid="ca-on-submit-2" mat-flat-button color="primary" type="button" (click)="onSubmit()" [disabled]="form.invalid || saving">
+      {{ saving ? 'Saving…' : (isEdit ? 'Save changes' : 'Create') }}
+    </button>
   </div>
 </div>
