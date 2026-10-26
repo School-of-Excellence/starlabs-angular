@@ -173,13 +173,14 @@ export class QueuePlanningCloneComponent implements OnInit, OnDestroy {
         queueQuery = query(queueCollection, where("queueadmin", "array-contains", this.profileid), orderBy("queuename"));
       }
 
+      // soft-deleted (isdeleted, set by Participant Intelligence) counts as deleted
       const segmentsSub = collectionData(collection(this.firestore, 'segments'), { idField: 'id' }).subscribe(segments => {
-        this.segmentList = segments;
+        this.segmentList = segments.filter(s => s['isdeleted'] !== true);
       });
       this.subscriptions.push(segmentsSub);
 
       const participantListsSub = collectionData(collection(this.firestore, 'participant list'), { idField: 'id' }).subscribe(lists => {
-        this.participantLists = lists;
+        this.participantLists = lists.filter(l => l['isdeleted'] !== true);
       });
 
       getDocs(queueQuery).then(queue => {

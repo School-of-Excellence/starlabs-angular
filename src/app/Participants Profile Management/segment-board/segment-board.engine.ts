@@ -1,0 +1,2244 @@
+// @ts-nocheck
+// Segment Board engine: the standalone prototype's script, run against the component's root element.
+// Ported as-is from "Segment Board (standalone).html"; all data below is the prototype's sample data.
+// Type checking is off for this file on purpose: it is the prototype verbatim, to be replaced when
+// the board is wired to Firestore (segment_sets / segment_membership).
+// Master segment configuration is read from and written to Firestore through `store`
+// (collection segmentboardconfig, one doc per segment). Participants are still sample data.
+export interface SegmentBoardStore {
+  load(): Promise<any[]>;                                   // every doc in segmentboardconfig, archived included
+  // Every write carries its history: one entry per changed segment, written in the same batch to
+  // segmentboardconfig/{segmentid}/segmenthistory/{auto id} (the store adds `at` and `by`). See HistoryEntry.
+  saveSegment(doc: any, opts: { isNew: boolean; orderUpdates: OrderUpdate[]; history: HistoryEntry[]; groupHistory: GroupHistoryEntry[] }): Promise<void>;
+  // segment groups (reference labels): segmentboardgroups/{autoId}, soft delete only; history in segmentboardgroups/{id}/grouphistory
+  loadGroups(): Promise<SegmentGroup[]>;                    // every group, deleted included (old history still names them)
+  createGroup(name: string, order: number): Promise<SegmentGroup>;
+  renameGroup(id: string, from: string, to: string): Promise<void>;
+  deleteGroup(id: string, name: string, segments: { id: string; name: string }[]): Promise<void>;   // soft delete + groupid removed from those segments
+  loadGroupHistory(groupId: string): Promise<any[]>;
+  historyNeedsBackfill(): Promise<boolean>;                 // any segment history entry still on the old at / by fields
+  saveDisplayOrder(updates: OrderUpdate[], history: HistoryEntry[]): Promise<void>;   // card order = sequence
+  archiveSegment(id: string, history: HistoryEntry[]): Promise<void>;
+  unarchiveSegment(id: string, place: { sequence?: number; displayIndex: number }, history: HistoryEntry[]): Promise<void>;
+  loadHistory(segmentId: string): Promise<any[]>;           // one segment's history, newest first
+  newSegmentId(): string;                                   // a Firestore auto id for a new segmentboardconfig doc
+  profileNames(profileIds: string[]): Promise<Record<string, string>>;   // profile_data name per profile id (history "by")
+  // one-time move of text-id segments to auto ids (+ who fields email -> profile id); see MigrationRow
+  migrationPreview(): Promise<{ rows: MigrationRow[]; history: { count: number; unresolved: number } }>;
+  runMigration(rows: MigrationRow[], progress: (done: number, total: number) => void): Promise<MigrationResult>;
+  loadAllHistory(limit: number): Promise<any[]>;            // every segment's history (collection group), newest first
+  loadParticipants(): Promise<any[]>;                      // participant metadata docs, already mapped (segment-board.facts.ts)
+  loadLists(): Promise<{ segmentid: string; profilelist: string[]; lastupdated: Date | null }[]>;   // segmentboardlist
+  saveLists(lists: { segmentid: string; segmentname: string; profilelist: string[] }[]): Promise<void>;
+  // journeys from `journey`, products from `products` (ids + names); countDefaults = products counted as uP! / CPM events
+  readTable(file: File): Promise<string[][]>;               // rows x cells of an uploaded CSV / Excel file
+  // the B!G Cohorts dialogs (app notification, email, WhatsApp, recommended playlist) for these profile ids;
+  // resolves with a short line for the activity log, or null when the dialog was closed without sending
+  communicate(channel: 'app' | 'email' | 'whatsapp', profileIds: string[]): Promise<string | null>;
+  recommendPlaylist(profileIds: string[]): Promise<string | null>;
+  // active + approved `queue_token` docs: who is in which queue, at which stage
+  loadQueueTokens(): Promise<{ profileId: string; queueId: string; stage: string }[]>;
+  // approved `event participation request` docs for these events: eventId -> profile ids (confirmed, not yet attended)
+  loadConfirmed(eventIds: string[]): Promise<Record<string, string[]>>;
+  loadCatalog(): Promise<{ journeys: { id: string; name: string }[]; products: { id: string; name: string }[]; modes?: { id: string; name: string }[];
+    events?: { id: string; name: string; date: Date | null }[]; queues?: { id: string; name: string; stages: string[] }[]; countDefaults: { upCount: string[]; cpmCount: string[] } }>;
+}
+// one board position: displayIndex for every card, sequence (rank among automated cards) for automated ones
+export interface OrderUpdate { id: string; displayIndex: number; sequence?: number }
+// a change to one segment; only the fields that changed, as { from, to } in the config doc's own shapes
+export interface HistoryEntry {
+  segmentid: string; segmentname: string;
+  action: 'create' | 'edit' | 'archive' | 'unarchive' | 'reorder' | 'migrate';
+  changedfields: string[]; changes: Record<string, { from: unknown; to: unknown }>; summary: string;
+}
+export interface MigrationRow {
+  oldId: string; newId: string | null;          // newId null = keeps its id (only the who fields change)
+  name: string; archived: boolean; listSize: number | null; historyCount: number;
+  who: Record<string, { from: string; to: string | null }>;   // createdBy / updatedBy / archivedBy email -> profile id
+}
+export interface MigrationResult { moved: number; whoFixed: number; filtersRemapped: number; historyUpdated: number; failed: { id: string; error: string }[] }
+export interface SegmentGroup { id: string; name: string; order: number; deleted: boolean }
+// one group event: create / rename / delete, or a segment added to or removed from the group
+export interface GroupHistoryEntry {
+  groupid: string; action: 'create' | 'rename' | 'delete' | 'segment-added' | 'segment-removed';
+  segmentid?: string; segmentname?: string; changes: Record<string, unknown>; summary: string;
+}
+export function mountSegmentBoard(root: HTMLElement, store: SegmentBoardStore): () => void {
+const cleanups: Array<() => void> = [];
+const listen = (target, type, fn, opts?) => { target.addEventListener(type, fn, opts); cleanups.push(() => target.removeEventListener(type, fn, opts)); };
+
+const CFG = {"set":"master","version":6,"notes":"Automated segments are evaluated in ascending 'sequence'; the first match wins. Manual segments have no sequence: a participant placed there is pinned, and 'eligibility' only drives the 'no longer eligible' warning. Ongoing products are listed explicitly per segment (no product category field). Ongoing-product segments apply to Onboarded AND Yet-to-Onboard participants and to ACTIVE customers only; a non-active participant cannot have a product ongoing, so they fall to Ecosystem Non Active or DFU Non Active. A non-active participant must have no ongoing product: if one is ongoing, they fall to Unsegmented with reason NON_ACTIVE_WITH_PRODUCT so the data can be fixed. Segments are a flat list: there are no segment groups.","journeyGroups":{"UP":["uP!","uP! Continuity","uP! Lite"],"CPM":["CPM","CPM Upgrade","CPM Continuity"],"FTM_LYL":["FTM","FTM with SLDCI","FTM Continuity","LYL"],"BIG":["B!G","B!G with SLDCI","B!G Continuity"],"DI":["CTD D&I","SMP D&I","EISP","EI Solution","W!SH"],"ARENA":["DEEE","Winning Heart","CTD Live Event"]},"fragments":{"financeOk":{"field":"financeStatus","op":"in","value":["REGULAR","DEFAULTED","LOCKED"]},"onboarded":{"field":"onboardingStatus","op":"eq","value":"ONBOARDED"},"active":{"field":"customerStatus","op":"eq","value":"ACTIVE"},"nonActive":{"field":"customerStatus","op":"eq","value":"NON_ACTIVE"},"activeOrNon":{"field":"customerStatus","op":"in","value":["ACTIVE","NON_ACTIVE"]},"ecosystem":{"field":"journeyGroup","op":"in","value":["UP","CPM","FTM_LYL","BIG"]},"prodigyJourney":{"field":"journeyGroup","op":"in","value":["UP","CPM","FTM_LYL"]},"adult":{"field":"age","op":"gte","value":22},"minor":{"field":"age","op":"between","value":[0,21]},"noProduct":{"field":"ongoingProducts","op":"isEmpty"}},"segments":[{"id":"DNU_LATE","name":"Do Not Use – Late","mode":"auto","sequence":1,"rule":{"any":[{"field":"customerStatus","op":"eq","value":"LATE"},{"field":"financeStatus","op":"eq","value":"LATE"}]}},{"id":"DNU_BANNED","name":"Do Not Use – Banned","mode":"auto","sequence":2,"rule":{"any":[{"field":"customerStatus","op":"eq","value":"BANNED"},{"field":"financeStatus","op":"eq","value":"BANNED"}]}},{"id":"DNU_DISCONTINUED","name":"Do Not Use – Discontinued","mode":"auto","sequence":3,"rule":{"any":[{"field":"customerStatus","op":"eq","value":"DISCONTINUED"},{"field":"financeStatus","op":"eq","value":"DISCONTINUED"}]}},{"id":"ECO_LIVE_ARENA","name":"Live Arena Events","mode":"auto","sequence":4,"rule":{"all":["@ecosystem","@active","@financeOk",{"field":"ongoingProducts","op":"hasAny","value":["BIG_ARENA","CTD_LIVE","DEEE_ARENA","WINNING_HEART"]}]}},{"id":"ECO_DFU_QUEUE","name":"DFU (Queue)","mode":"auto","sequence":5,"rule":{"all":["@ecosystem","@active","@financeOk",{"field":"ongoingProducts","op":"hasAny","value":["WISH_DI","SMP_DI","CTD_DI"]}]}},{"id":"ECO_DFU_APPT","name":"DFU (Appointment)","mode":"auto","sequence":6,"rule":{"all":["@ecosystem","@active","@financeOk",{"field":"ongoingProducts","op":"hasAny","value":["DFU_APPT","EI_CONSULT"]}]}},{"id":"DI_ONGOING","name":"DFU Ongoing","mode":"auto","sequence":7,"rule":{"all":[{"field":"journeyGroup","op":"eq","value":"DI"},"@active","@financeOk",{"field":"ongoingProducts","op":"hasAny","value":["WISH_DI","SMP_DI","CTD_DI","DFU_APPT","EI_CONSULT"]}]}},{"id":"ARENA_LIVE","name":"Live Arena Events","mode":"auto","sequence":8,"rule":{"all":[{"field":"journeyGroup","op":"eq","value":"ARENA"},"@active","@financeOk",{"field":"ongoingProducts","op":"hasAny","value":["BIG_ARENA","CTD_LIVE","DEEE_ARENA","WINNING_HEART"]}]}},{"id":"UP_IN_QUEUE","name":"uP! – In Queue","mode":"auto","sequence":9,"rule":{"all":[{"field":"journeyGroup","op":"eq","value":"UP"},"@adult","@active","@financeOk",{"field":"ongoingProducts","op":"hasAny","value":["UP_LIVE","CPM_LIVE","LEGACY_CONSULT","MOMENTUM_CALL"]}]}},{"id":"PROD_IN_QUEUE","name":"uP! for Prodigies – In Queue","mode":"auto","sequence":10,"rule":{"all":["@prodigyJourney","@minor","@active","@financeOk",{"field":"ongoingProducts","op":"hasAny","value":["UP_LIVE","CPM_LIVE","LEGACY_CONSULT","MOMENTUM_CALL"]}]}},{"id":"CPM_IN_QUEUE","name":"CPM – In Queue","mode":"auto","sequence":11,"rule":{"all":[{"field":"journeyGroup","op":"eq","value":"CPM"},"@adult","@active","@financeOk",{"field":"ongoingProducts","op":"hasAny","value":["UP_LIVE","CPM_LIVE","LEGACY_CONSULT","MOMENTUM_CALL"]}]}},{"id":"LYL_IN_QUEUE","name":"LYL – In Queue","mode":"auto","sequence":12,"rule":{"all":[{"field":"journeyGroup","op":"eq","value":"FTM_LYL"},"@adult","@active","@financeOk",{"field":"ongoingProducts","op":"hasAny","value":["UP_LIVE","CPM_LIVE","LEGACY_CONSULT","MOMENTUM_CALL"]}]}},{"id":"BIG_IN_QUEUE","name":"B!G – In Queue","mode":"auto","sequence":13,"rule":{"all":[{"field":"journeyGroup","op":"eq","value":"BIG"},"@active","@financeOk",{"field":"ongoingProducts","op":"hasAny","value":["UP_LIVE","CPM_LIVE","LEGACY_CONSULT","MOMENTUM_CALL"]}]}},{"id":"YTO_NEW","name":"New Journey – Yet to be Onboard","mode":"auto","sequence":14,"rule":{"all":[{"field":"onboardingStatus","op":"eq","value":"YTO_NEW"},{"field":"upCount","op":"eq","value":0},{"field":"cpmCount","op":"eq","value":0},"@active","@financeOk","@noProduct"]}},{"id":"YTO_UPDOWN","name":"Upgraded / Downgraded – Yet to be Onboard","mode":"auto","sequence":15,"rule":{"all":[{"field":"onboardingStatus","op":"in","value":["YTO_UPGRADE","YTO_DOWNGRADE"]},"@active","@financeOk","@noProduct"]}},{"id":"YTO_ADDON","name":"Addon Purchased – Yet to be Onboard","mode":"auto","sequence":16,"rule":{"all":[{"field":"onboardingStatus","op":"eq","value":"YTO_ADDON"},"@active","@financeOk","@noProduct"]}},{"id":"DI_PRE","name":"Pre DFU","mode":"auto","sequence":17,"rule":{"all":[{"field":"journeyGroup","op":"eq","value":"DI"},"@onboarded","@active","@financeOk","@noProduct",{"field":"unconsumedProducts","op":"notEmpty"}]}},{"id":"DI_POST","name":"Post DFU","mode":"auto","sequence":18,"rule":{"all":[{"field":"journeyGroup","op":"eq","value":"DI"},"@onboarded","@active","@financeOk","@noProduct",{"field":"unconsumedProducts","op":"isEmpty"}]}},{"id":"ARENA_PRE","name":"Pre Arena Events","mode":"auto","sequence":19,"rule":{"all":[{"field":"journeyGroup","op":"eq","value":"ARENA"},"@onboarded","@active","@financeOk","@noProduct",{"field":"unconsumedProducts","op":"notEmpty"}]}},{"id":"ARENA_POST","name":"Post Arena Events","mode":"auto","sequence":20,"rule":{"all":[{"field":"journeyGroup","op":"eq","value":"ARENA"},"@onboarded","@active","@financeOk","@noProduct",{"field":"unconsumedProducts","op":"isEmpty"}]}},{"id":"ECO_NON_ACTIVE","name":"Ecosystem Non Active","mode":"auto","sequence":21,"rule":{"all":["@ecosystem","@onboarded","@nonActive","@financeOk","@noProduct"]}},{"id":"DFU_NON_ACTIVE","name":"DFU Non Active","mode":"auto","sequence":22,"rule":{"all":[{"field":"journeyGroup","op":"in","value":["DI","ARENA"]},"@onboarded","@nonActive","@financeOk","@noProduct"]}},{"id":"BIG_PRE_UP","name":"B!G – Pre uP!","mode":"auto","sequence":23,"rule":{"all":[{"field":"journeyGroup","op":"eq","value":"BIG"},"@onboarded","@active","@financeOk","@noProduct",{"field":"upCount","op":"eq","value":0},{"field":"cpmCount","op":"eq","value":0}]}},{"id":"BIG_PRE_CPM","name":"B!G – Pre CPM","mode":"auto","sequence":24,"rule":{"all":[{"field":"journeyGroup","op":"eq","value":"BIG"},"@onboarded","@active","@financeOk","@noProduct",{"field":"upCount","op":"gte","value":1},{"field":"cpmCount","op":"eq","value":0}]}},{"id":"BIG_CPM_1","name":"B!G – 1 CPM Event","mode":"auto","sequence":25,"rule":{"all":[{"field":"journeyGroup","op":"eq","value":"BIG"},"@onboarded","@active","@financeOk","@noProduct",{"field":"cpmCount","op":"eq","value":1}]}},{"id":"BIG_CPM_2","name":"B!G – 2 CPM Events","mode":"auto","sequence":26,"rule":{"all":[{"field":"journeyGroup","op":"eq","value":"BIG"},"@onboarded","@active","@financeOk","@noProduct",{"field":"cpmCount","op":"eq","value":2}]}},{"id":"BIG_CPM_3P","name":"B!G – 3+ CPM Events","mode":"auto","sequence":27,"rule":{"all":[{"field":"journeyGroup","op":"eq","value":"BIG"},"@onboarded","@active","@financeOk","@noProduct",{"field":"cpmCount","op":"gte","value":3}]}},{"id":"LYL_PRE_UP","name":"FTM / LYL – Pre uP!","mode":"auto","sequence":28,"rule":{"all":[{"field":"journeyGroup","op":"eq","value":"FTM_LYL"},"@adult","@onboarded","@active","@financeOk","@noProduct",{"field":"upCount","op":"eq","value":0},{"field":"cpmCount","op":"eq","value":0}]}},{"id":"LYL_PRE_CPM","name":"FTM / LYL – Pre CPM","mode":"auto","sequence":29,"rule":{"all":[{"field":"journeyGroup","op":"eq","value":"FTM_LYL"},"@adult","@onboarded","@active","@financeOk","@noProduct",{"field":"upCount","op":"gte","value":1},{"field":"cpmCount","op":"eq","value":0}]}},{"id":"LYL_CPM_1","name":"FTM / LYL – 1 CPM Event","mode":"auto","sequence":30,"rule":{"all":[{"field":"journeyGroup","op":"eq","value":"FTM_LYL"},"@adult","@onboarded","@active","@financeOk","@noProduct",{"field":"cpmCount","op":"eq","value":1}]}},{"id":"LYL_CPM_2","name":"FTM / LYL – 2 CPM Events","mode":"auto","sequence":31,"rule":{"all":[{"field":"journeyGroup","op":"eq","value":"FTM_LYL"},"@adult","@onboarded","@active","@financeOk","@noProduct",{"field":"cpmCount","op":"eq","value":2}]}},{"id":"LYL_CPM_3P","name":"FTM / LYL – 3+ CPM Events","mode":"auto","sequence":32,"rule":{"all":[{"field":"journeyGroup","op":"eq","value":"FTM_LYL"},"@adult","@onboarded","@active","@financeOk","@noProduct",{"field":"cpmCount","op":"gte","value":3}]}},{"id":"CPM_PRE_UP","name":"CPM – Pre uP!","mode":"auto","sequence":33,"rule":{"all":[{"field":"journeyGroup","op":"eq","value":"CPM"},"@adult","@onboarded","@active","@financeOk","@noProduct",{"field":"upCount","op":"eq","value":0},{"field":"cpmCount","op":"eq","value":0}]}},{"id":"CPM_PRE_CPM","name":"CPM – Pre CPM","mode":"auto","sequence":34,"rule":{"all":[{"field":"journeyGroup","op":"eq","value":"CPM"},"@adult","@onboarded","@active","@financeOk","@noProduct",{"field":"upCount","op":"gte","value":1},{"field":"cpmCount","op":"eq","value":0}]}},{"id":"CPM_CPM_1","name":"CPM – 1 CPM Event","mode":"auto","sequence":35,"rule":{"all":[{"field":"journeyGroup","op":"eq","value":"CPM"},"@adult","@onboarded","@active","@financeOk","@noProduct",{"field":"cpmCount","op":"eq","value":1}]}},{"id":"CPM_CPM_2","name":"CPM – 2 CPM Events","mode":"auto","sequence":36,"rule":{"all":[{"field":"journeyGroup","op":"eq","value":"CPM"},"@adult","@onboarded","@active","@financeOk","@noProduct",{"field":"cpmCount","op":"eq","value":2}]}},{"id":"CPM_CPM_3P","name":"CPM – 3+ CPM Events","mode":"auto","sequence":37,"rule":{"all":[{"field":"journeyGroup","op":"eq","value":"CPM"},"@adult","@onboarded","@active","@financeOk","@noProduct",{"field":"cpmCount","op":"gte","value":3}]}},{"id":"UP_PRE","name":"Pre uP!","mode":"auto","sequence":38,"rule":{"all":[{"field":"journeyGroup","op":"eq","value":"UP"},"@adult","@onboarded","@active","@financeOk","@noProduct",{"field":"upCount","op":"eq","value":0}]}},{"id":"UP_1","name":"1 uP! Event","mode":"auto","sequence":39,"rule":{"all":[{"field":"journeyGroup","op":"eq","value":"UP"},"@adult","@onboarded","@active","@financeOk","@noProduct",{"field":"upCount","op":"eq","value":1}]}},{"id":"UP_2","name":"2 uP! Events","mode":"auto","sequence":40,"rule":{"all":[{"field":"journeyGroup","op":"eq","value":"UP"},"@adult","@onboarded","@active","@financeOk","@noProduct",{"field":"upCount","op":"eq","value":2}]}},{"id":"UP_3P","name":"3+ uP! Events","mode":"auto","sequence":41,"rule":{"all":[{"field":"journeyGroup","op":"eq","value":"UP"},"@adult","@onboarded","@active","@financeOk","@noProduct",{"field":"upCount","op":"gte","value":3}]}},{"id":"PROD_PRE","name":"Pre uP! for Prodigies","mode":"auto","sequence":42,"rule":{"all":["@prodigyJourney","@minor","@onboarded","@active","@financeOk","@noProduct",{"field":"upCount","op":"eq","value":0}]}},{"id":"PROD_1","name":"Prodigies – 1 uP! Event","mode":"auto","sequence":43,"rule":{"all":["@prodigyJourney","@minor","@onboarded","@active","@financeOk","@noProduct",{"field":"upCount","op":"eq","value":1}]}},{"id":"PROD_2","name":"Prodigies – 2 uP! Events","mode":"auto","sequence":44,"rule":{"all":["@prodigyJourney","@minor","@onboarded","@active","@financeOk","@noProduct",{"field":"upCount","op":"eq","value":2}]}},{"id":"PROD_3P","name":"Prodigies – 3+ uP! Events","mode":"auto","sequence":45,"rule":{"all":["@prodigyJourney","@minor","@onboarded","@active","@financeOk","@noProduct",{"field":"upCount","op":"gte","value":3}]}},{"id":"BIG_L_PRE_CW","name":"Pre CW Mastery – Field Preparation","mode":"manual","eligibility":{"all":[{"field":"journeyGroup","op":"eq","value":"BIG"},"@onboarded","@active","@financeOk"]}},{"id":"BIG_L_SHOW","name":"Showmanship (CW Mastery + Scope Enhancement)","mode":"manual","eligibility":{"all":[{"field":"journeyGroup","op":"eq","value":"BIG"},"@onboarded","@active","@financeOk"]}},{"id":"BIG_L_CW","name":"CW Mastery","mode":"manual","eligibility":{"all":[{"field":"journeyGroup","op":"eq","value":"BIG"},"@onboarded","@active","@financeOk"]}},{"id":"BIG_L_IA","name":"IA","mode":"manual","eligibility":{"all":[{"field":"journeyGroup","op":"eq","value":"BIG"},"@onboarded","@active","@financeOk"]}},{"id":"BIG_L_IB","name":"IB","mode":"manual","eligibility":{"all":[{"field":"journeyGroup","op":"eq","value":"BIG"},"@onboarded","@active","@financeOk"]}},{"id":"BIG_L_IC","name":"IC","mode":"manual","eligibility":{"all":[{"field":"journeyGroup","op":"eq","value":"BIG"},"@onboarded","@active","@financeOk"]}},{"id":"BIG_L_ID","name":"ID","mode":"manual","eligibility":{"all":[{"field":"journeyGroup","op":"eq","value":"BIG"},"@onboarded","@active","@financeOk"]}}],"products":[{"id":"UP_LIVE","name":"uP! Live Event"},{"id":"CPM_LIVE","name":"CPM Live Event"},{"id":"LEGACY_CONSULT","name":"Legacy Consultation"},{"id":"MOMENTUM_CALL","name":"Momentum Call"},{"id":"BIG_ARENA","name":"B!G Accelerator Arena"},{"id":"CTD_LIVE","name":"CTD Live Event"},{"id":"DEEE_ARENA","name":"DEEE Arena"},{"id":"WINNING_HEART","name":"Winning Heart Arena"},{"id":"WISH_DI","name":"W!SH Diagnostics and Implementation"},{"id":"SMP_DI","name":"SMP D&I Implementation"},{"id":"CTD_DI","name":"CTD D&I Implementation"},{"id":"DFU_APPT","name":"DFU Appointment Session"},{"id":"EI_CONSULT","name":"EI Solution Consultation"}]};
+const FRAG = CFG.fragments;
+
+// ---------- vocabulary ----------
+const VAL = {
+  journeyGroup:{UP:'uP!',CPM:'CPM',FTM_LYL:'FTM / LYL',BIG:'B!G',DI:'D&I DFU',ARENA:'Installation Arena'},
+  onboardingStatus:{ONBOARDED:'Onboarded',YTO_NEW:'Yet to onboard',YTO_UPGRADE:'Yet to Onboard (Upgrade)',YTO_DOWNGRADE:'Yet to Onboard (Downgrade)',YTO_ADDON:'Yet to Onboard (Addon)'},
+  customerStatus:{ACTIVE:'Active',NON_ACTIVE:'Non active',DISCONTINUED:'Discontinued',LATE:'Late',BANNED:'Banned',NO_STATUS:'No status'},
+  participantMode:{NO_MODE:'No mode'},   // filled from the `modes` collection in setCatalog()
+  financeStatus:{REGULAR:'Regular',FULLY_PAID:'Fully paid',DEFAULTED:'Defaulted',LOCKED:'Locked',DISCONTINUED:'Discontinued',LATE:'Late',BANNED:'Banned',NO_STATUS:'No status'}
+};
+// catalogue from Firestore, filled by setCatalog() in load(): products (`products`) and journeys (`journey`)
+let PRODUCTS=[];
+let PROD={};
+let JOURNEYS=[];
+const QUEUE_STAGES=['Registered','Invited','Ready','In studio','Completed'];
+// names as they are created in the events, queue and workshop screens
+const EVENTS=[
+  {id:'E_UP_AUG25',name:'uP! Live Aug 2025',product:'UP_LIVE'},
+  {id:'E_UP_FEB26',name:'uP! Live Feb 2026',product:'UP_LIVE'},
+  {id:'E_UP_MAY26',name:'uP! Live May 2026',product:'UP_LIVE'},
+  {id:'E_CPM_SEP25',name:'CPM Live Sep 2025',product:'CPM_LIVE'},
+  {id:'E_CPM_MAR26',name:'CPM Live Mar 2026',product:'CPM_LIVE'},
+  {id:'E_BIG_NOV25',name:'B!G Accelerator Nov 2025',product:'BIG_ARENA'},
+  {id:'E_CTD_JUN25',name:'CTD Live Jun 2025',product:'CTD_LIVE'},
+  {id:'E_DEEE_MAR26',name:'DEEE Arena Mar 2026',product:'DEEE_ARENA'},
+  {id:'E_WH_JAN26',name:'Winning Heart Jan 2026',product:'WINNING_HEART'}
+];
+const QUEUES=['uP!/LYL D&I','Walk in Clinic','CTD D&I','B!G Studio','SMP D&I'];
+const WORKSHOPS=['CTD Workshop','SMP Workshop','Scope Enhancement Workshop','W!SH Workshop'];
+const BIG_LEVELS=['SE Solo','SE Shadow','Diagnostics Shadow','Diagnostics Collaborator','Diagnostics Solo'];
+// Live events: `event collection` (id -> "name · Mon YYYY", names repeat). Queues: `queue generation` (id -> queuename, stages).
+// QTOK: profile id -> [{q, stage}] from active + approved queue_token. CONFIRMED: event id -> Set(profile id) with an approved
+// participation request, loaded only for the events picked in the filter (same split as Participant Intelligence).
+let EVENT_NAME={}, QUEUE_NAME={}, QSTAGES={};
+const QTOK=new Map(), CONFIRMED=new Map();
+// queue tokens are read on demand, once per visit: 'none' -> 'loading' -> 'loaded' (or 'error', retried on the next use)
+let tokState='none';
+let confirmedLoading=false;
+const EVENT_MONTH=new Intl.DateTimeFormat('en-IN',{month:'short',year:'numeric'});
+const asMap=a=>Object.fromEntries(a.map(x=>[x,x]));
+const FIELDS = [
+  {key:'journeyGroup',label:'Journey',type:'enum'},
+  {key:'journeyId',label:'Journey',type:'enum'},   // segment-level Journey setting (journey doc ids)
+  {key:'onboardingStatus',label:'Onboarding status',type:'enum'},
+  {key:'customerStatus',label:'Customer status',type:'enum'},
+  {key:'participantMode',label:'Participant mode',type:'enum'},   // participant metadata.participantmode, names from `modes`
+  {key:'financeStatus',label:'Finance status',type:'enum'},
+  {key:'upCount',label:'uP! events attended',type:'number'},
+  {key:'cpmCount',label:'CPM events attended',type:'number'},
+  {key:'age',label:'Age',type:'number'},
+  {key:'ongoingProducts',label:'Ongoing product',type:'productList'},
+  {key:'consumedProducts',label:'Consumed product',type:'products'},
+  {key:'unconsumedProducts',label:'Unconsumed product',type:'products'}
+];
+const FIELD = Object.fromEntries(FIELDS.map(f=>[f.key,f]));
+const OPS_FOR = {
+  enum:[],
+  number:[['eq','is exactly'],['gte','is at least'],['lte','is at most'],['between','is between']],
+  enumList:[['hasAny','is'],['isEmpty','is empty (none)']],
+  productList:[['hasAny','any of these'],['equals','equals'],['isEmpty','none (nothing ongoing)']],   // ongoing product
+  products:[['counts','products with a count']],   // fixed: the builder shows no operator dropdown
+  list:[['notEmpty','has at least one'],['isEmpty','is empty']]
+};
+const CMP_WORDS={gte:'is at least',eq:'is exactly',lte:'is at most'};
+// uP! / CPM attended: the count is the total consumed across the picked products (condition.products)
+let COUNT_DEFAULT={upCount:[],cpmCount:[]};   // set from the catalogue in setCatalog()
+const sameSet=(a,b)=>a.length===b.length&&a.every(x=>b.includes(x));
+const sumConsumed=(f,ids)=>ids.reduce((a,id)=>a+((f.consumedProducts||{})[id]||0),0);
+// onboarding is a two-way choice in the builder: Onboarded, or Yet to onboard (all four YTO statuses)
+const YTO=['YTO_NEW','YTO_UPGRADE','YTO_DOWNGRADE','YTO_ADDON'];
+const obKind=v=>{const a=Array.isArray(v)?v:[v];
+  return a.length===1&&a[0]==='ONBOARDED'?'ONBOARDED':a.length===YTO.length&&YTO.every(x=>a.includes(x))?'YTO':null;};
+const DESC_MAX=280;   // segment description length limit
+const REASONS = {
+  JOURNEY_UNMAPPED:'No journey on the participant', STATUS_MISSING:'Customer or finance status missing',
+  YTO_NON_ACTIVE:'Yet to Onboard and Non active', YTO_NEW_WITH_EVENTS:'New journey but has uP!/CPM events',
+  PRODUCT_NOT_IN_ANY_SEGMENT:'Ongoing product not listed in any segment', AGE_MISSING:'Date of birth missing',
+  NON_ACTIVE_WITH_PRODUCT:'Non active but has an ongoing product',
+  PRODUCT_NOT_VALID_FOR_JOURNEY:'Ongoing product not valid for journey', NO_RULE_MATCH:'Matches no segment',
+  LIST_NOT_REFRESHED:'No segment list refreshed yet'
+};
+
+// ---------- evaluator (same logic as rules/evaluate.mjs) ----------
+const OPS = {
+  eq:(v,x)=>v===x, in:(v,x)=>x.includes(v),
+  gte:(v,x)=>typeof v==='number'&&v>=x, lte:(v,x)=>typeof v==='number'&&v<=x,
+  between:(v,x)=>typeof v==='number'&&v>=x[0]&&v<=x[1],
+  isEmpty:v=>!v||keysOf(v).length===0, notEmpty:v=>!!v&&keysOf(v).length>0,
+  hasAny:(v,x)=>!!v&&keysOf(v).some(i=>x.includes(i)),
+  equals:(v,x)=>{const k=keysOf(v); return k.length===x.length&&x.every(i=>k.includes(i));},   // exactly these, nothing else
+  countFor:(v,x)=>cmpCount(v,x),
+  counts:(v,x)=>x.mode==='any'?x.items.some(i=>cmpCount(v,i)):x.items.every(i=>cmpCount(v,i))
+};
+function cmpCount(v,x){const n=(v&&v[x.product])||0;return x.op==='eq'?n===x.n:x.op==='lte'?n<=x.n:n>=x.n;}
+function keysOf(v){return Array.isArray(v)?v:Object.keys(v||{}).filter(k=>v[k]>0);}
+function matches(n,f){
+  if(typeof n==='string') return matches(FRAG[n.slice(1)],f);
+  if(n.all) return n.all.every(c=>matches(c,f));
+  if(n.any) return n.any.some(c=>matches(c,f));
+  return OPS[n.op](n.products?sumConsumed(f,n.products):f[n.field],n.value);
+}
+function expand(n){
+  if(typeof n==='string') return expand(FRAG[n.slice(1)]);
+  if(n.all) return {all:n.all.flatMap(c=>{const e=expand(c);return e.all?e.all:[e];})};
+  if(n.any) return {any:n.any.map(expand)};
+  return {...n};
+}
+function describe(n){   // products note only when it differs from the default for that count
+  const pc=n.products&&COUNT_DEFAULT[n.field]&&!sameSet(n.products,COUNT_DEFAULT[n.field])?` · counting ${n.products.map(id=>PROD[id]||id).join(', ')}`:'';
+  return describeLeaf(n)+pc;
+}
+function describeLeaf(n){
+  const f=FIELD[n.field], L=(f&&/^product/.test(f.type))?PROD:(VAL[n.field]||{}), lab=f?f.label:n.field;
+  const list=a=>a.map(v=>L[v]||v).join(', ').replace(/, ([^,]*)$/,' or $1');
+  const cword=n.field==='unconsumedProducts'?'unconsumed':'consumed';
+  const one=i=>`${PROD[i.product]||i.product} ${cword} ${CMP_WORDS[i.op]} ${i.n}`;
+  if(n.op==='countFor') return one(n.value);
+  if(n.op==='counts') return n.value.items.map(one).join(n.value.mode==='any'?' or ':' and ');
+  switch(n.op){
+    case 'eq': return typeof n.value==='number'?`${lab} is ${n.value}`:`${lab} is ${L[n.value]||n.value}`;
+    case 'in': if(n.field==='onboardingStatus'&&obKind(n.value)==='YTO') return `${lab} is Yet to onboard`;
+      return `${lab} is ${list(n.value)}`;
+    case 'gte': return `${lab} is ${n.value} or more`;
+    case 'lte': return `${lab} is ${n.value} or less`;
+    case 'between': return `${lab} is ${n.value[0]}–${n.value[1]}`;
+    case 'isEmpty': return n.field==='ongoingProducts'?'No ongoing product':`No ${lab.toLowerCase()}`;
+    case 'notEmpty': return `Has ${lab.toLowerCase()}`;
+    case 'hasAny': return `${lab} includes ${list(n.value)}`;
+    case 'equals': return `${lab} is exactly ${n.value.map(v=>L[v]||v).join(', ').replace(/, ([^,]*)$/,' and $1')}`;
+  }
+  return JSON.stringify(n);
+}
+function diagnose(set,f){
+  if(set.type!=='master') return (f.customerStatus==null||f.financeStatus==null)?'STATUS_MISSING':'NO_RULE_MATCH';
+  if(f.journeyGroup==null) return 'JOURNEY_UNMAPPED';
+  if(f.customerStatus==null||f.financeStatus==null) return 'STATUS_MISSING';
+  if(f.customerStatus==='NON_ACTIVE'&&f.ongoingProducts.length) return 'NON_ACTIVE_WITH_PRODUCT';
+  if(f.onboardingStatus!=='ONBOARDED'&&f.customerStatus==='NON_ACTIVE') return 'YTO_NON_ACTIVE';
+  if(f.onboardingStatus==='YTO_NEW'&&(f.upCount>0||f.cpmCount>0)) return 'YTO_NEW_WITH_EVENTS';
+  if(f.ongoingProducts.length&&!PROD[f.ongoingProducts[0]]) return 'PRODUCT_NOT_IN_ANY_SEGMENT';
+  if(f.age==null&&['UP','CPM','FTM_LYL'].includes(f.journeyGroup)) return 'AGE_MISSING';
+  if(['DI','ARENA'].includes(f.journeyGroup)&&f.ongoingProducts.length) return 'PRODUCT_NOT_VALID_FOR_JOURNEY';
+  return 'NO_RULE_MATCH';
+}
+
+// ---------- scope: the segment-level journey setting, not a condition ----------
+// stored as segment.journeys = [journey ids]; empty = all journeys. (B.scope is the dialog's working copy.)
+const SCOPE_FIELDS=['journeyGroup','journeyId'];
+const SCOPE={
+  journey:{label:'Journey',plural:'journeys',field:'journeyId',opts:()=>JOURNEYS.map(j=>[j.id,j.name])}
+};
+const fragOf=n=>typeof n==='string'?FRAG[n.slice(1)]:n;
+function liftJourney(rule){   // seeded rules: move a top-level journey condition out of the rule
+  if(!rule||!rule.all) return {journeys:[],rule};
+  const j=rule.all.find(n=>fragOf(n)?.field==='journeyGroup'); if(!j) return {journeys:[],rule};
+  const e=fragOf(j);
+  return {journeys:e.op==='eq'?[e.value]:[...e.value], rule:{all:rule.all.filter(n=>n!==j)}};
+}
+const withScope=(sc,rule)=>sc&&sc.ids.length?{all:[{field:SCOPE[sc.type].field,op:'in',value:sc.ids},...(rule?(rule.all||[rule]):[])]}:rule;
+const jScope=ids=>({type:'journey',ids:ids||[]});
+const segRule=s=>withScope(jScope(s.journeys),s.rule);
+const segElig=s=>withScope(jScope(s.journeys),s.eligibility);
+const scopeLabel_=sc=>SCOPE[sc?.type||'journey'].label;
+const scopeText=sc=>{const t=sc?.type||'journey', map=Object.fromEntries(SCOPE[t].opts());
+  return sc&&sc.ids.length?sc.ids.map(v=>map[v]||v).join(', '):`All ${SCOPE[t].plural}`;};
+const scopeKey=sc=>sc&&sc.ids.length?sc.type+':'+sc.ids.join(','):'';
+
+// ---------- example data ----------
+function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+const R=rng(20260922);
+const pickW=o=>{const e=Object.entries(o);let r=R()*e.reduce((a,x)=>a+x[1],0);for(const [k,w] of e){if((r-=w)<0)return k;}return e[e.length-1][0];};
+const ri=(a,b)=>a+Math.floor(R()*(b-a+1));
+const pick=a=>a[Math.floor(R()*a.length)];
+const FIRST=['Aarav','Diya','Ishaan','Ananya','Vihaan','Saanvi','Arjun','Meera','Kabir','Nila','Rohan','Priya','Karthik','Lakshmi','Aditya','Kavya','Siddharth','Divya','Rahul','Sneha','Vikram','Pooja','Naveen','Keerthana','Harish','Janani','Suresh','Revathi','Ganesh','Anjali','Farhan','Zara','Joseph','Mary','Deepak','Nandini','Arun','Bhavya','Manoj','Swathi','Nikhil','Tara','Varun','Ishita'];
+const LAST=['Sharma','Iyer','Reddy','Nair','Menon','Patel','Krishnan','Rao','Gupta','Pillai','Subramanian','Das','Joshi','Kumar','Chandran','Varma','Bose','Mehta','Raman','Thomas','Fernandes','Khan','Srinivasan','Ganesan','Balaji','Shetty','Kapoor'];
+// participants = participant metadata docs, loaded in load() (mapping: segment-board.facts.ts)
+let P=[];
+let PI=new Map();
+// segment lists (segmentboardlist): segmentId -> { ids: Set<profileid>, lastupdated }
+const LISTS=new Map();
+const MEMBERSHIP_EDIT=false;   // lists come from conditions; moving people by hand is off for now
+
+// ---------- sets & membership ----------
+const clone=o=>JSON.parse(JSON.stringify(o));
+const MEM={};
+function refresh(set){
+  // checked in sequence order; inactive segments place no one
+  set._auto=set.segments.filter(s=>s.mode==='auto'&&s.status!=='inactive').sort((a,b)=>a.sequence-b.sequence);
+  set._members=[...set._auto,...set.segments.filter(s=>s.mode==='manual'&&s.status!=='inactive')];   // every segment with a list
+  set._pinned=new Set();   // everyone in an active manual segment
+  for(const s of set._members) if(s.mode==='manual') for(const id of LISTS.get(s.id)?.ids||[]) set._pinned.add(id);
+  set._by=new Map(set.segments.map(s=>[s.id,s]));
+}
+function assign(set,p,m){
+  // every active segment whose refreshed list holds this participant (overlaps allowed: sequence orders, it never excludes)
+  m.segs=set._members.filter(s=>LISTS.get(s.id)?.ids.has(p.pid)).map(s=>s.id);
+  // someone placed in a manual segment is only in that segment, whatever the automated conditions say
+  if(set._pinned?.has(p.pid)) m.segs=m.segs.filter(id=>set._by.get(id)?.mode==='manual');
+  m.matched=m.segs; m.pinned=false; m.warning=null;
+  m.segmentId=m.segs[0]||null;
+  m.reason=m.segmentId?null:!set._members.some(s=>LISTS.has(s.id))?'LIST_NOT_REFRESHED'
+    :p.f.journeyId==null?'JOURNEY_UNMAPPED':(p.f.customerStatus==null||p.f.customerStatus==='NO_STATUS'||p.f.financeStatus==null||p.f.financeStatus==='NO_STATUS')?'STATUS_MISSING':'NO_RULE_MATCH';
+}
+function computeSet(set){
+  refresh(set);
+  const mm=MEM[set.id]=new Map();
+  for(const p of P){const m={pinned:false,segmentId:null,segs:[]}; mm.set(p.pid,m); assign(set,p,m);}
+}
+function rank(s){return /IN_QUEUE/.test(s.id)?900:/NON_ACTIVE/.test(s.id)?950:(s.sequence??1000);}
+function defaultOrder(segs){ return segs.slice().sort((a,b)=>rank(a)-rank(b)).map(s=>s.id); }
+// master segments are loaded from segmentboardconfig in load() below; the board starts empty
+const master={id:'master',type:'master',name:'Master Segments',segments:[],displayOrder:[],defaultDisplayOrder:[]};
+const SETS=[master];
+const ARCHIVED_IDS=new Set();   // archived docs keep their id reserved
+let ARCHIVED=[];                // archived segments, for the Archived view
+// Firestore auto ids: 20 letters/digits. Older segments used a slug of the name; MIG_NEEDED counts docs still to migrate.
+const AUTO_ID_RE=/^[A-Za-z0-9]{20}$/;
+let MIG_NEEDED=0, HIST_BACKFILL=false;
+// segment groups: id -> group (deleted ones kept so history and old labels still resolve)
+let GROUPS=[]; const GROUP_BY=new Map();
+const liveGroups=()=>GROUPS.filter(g=>!g.deleted).sort((a,b)=>(a.order??0)-(b.order??0)||a.name.localeCompare(b.name));
+const groupName=id=>{ const g=id&&GROUP_BY.get(id); return g?g.name+(g.deleted?' (deleted)':''):''; };
+const liveGroupOf=x=>{ const g=x.groupid&&GROUP_BY.get(x.groupid); return g&&!g.deleted?g:null; };
+const GROUP_OPTS=()=>Object.fromEntries([...liveGroups().map(g=>[g.id,g.name]),['__NONE__','No group']]);
+function setGroups(list){ GROUPS=list.slice(); GROUP_BY.clear(); for(const g of GROUPS) GROUP_BY.set(g.id,g); }
+computeSet(master);
+const AUDIT=[];                 // in-session notes only; the stored history is segmentboardconfig/{id}/segmenthistory
+
+// ---------- one order: card order on the board is the sequence ----------
+// an automated segment's sequence is its rank among the automated cards in board order; manual cards have none
+function applyOrder(set){
+  const by=new Map(set.segments.map(x=>[x.id,x])); let n=0;
+  for(const id of set.displayOrder){ const x=by.get(id); if(!x) continue; if(x.mode==='auto') x.sequence=++n; else delete x.sequence; }
+}
+// a new board order -> the writes it needs (only values Firestore doesn't already hold) and one history entry per
+// segment whose position moved. `skip` is a segment that carries its own place (the one being created).
+function orderPlan(set,ids,skip,skipAuto){
+  const by=new Map(set.segments.map(x=>[x.id,x])), before=new Map(set.displayOrder.map((id,i)=>[id,i+1]));
+  const updates=[], history=[]; let n=0;
+  ids.forEach((id,i)=>{
+    const x=by.get(id); if(!x){ if(id===skip&&skipAuto) n++; return; }
+    const seq=x.mode==='auto'?++n:undefined;
+    if(x._stored?.displayIndex!==i||(seq!==undefined&&x._stored?.sequence!==seq)) updates.push({id,displayIndex:i,...(seq!==undefined?{sequence:seq}:{})});
+    const from=before.get(id), to=i+1;
+    if(from!==to){
+      const changes={position:{from,to}}; if(seq!==undefined&&x.sequence!==seq) changes.sequence={from:x.sequence??null,to:seq};
+      history.push(hEntry(x,'reorder',changes,`Moved from position ${from} to ${to}${changes.sequence?` (sequence ${changes.sequence.from??'—'} → ${seq})`:''}`));
+    }
+  });
+  return {updates,history};
+}
+// after a successful write: the board and the stored copy follow the new order
+function commitOrder(set,ids,updates){
+  set.displayOrder=ids.slice();
+  const by=new Map(set.segments.map(x=>[x.id,x]));
+  for(const u of updates){ const x=by.get(u.id); if(x){ x._stored={displayIndex:u.displayIndex,sequence:u.sequence??x._stored?.sequence??null}; } }
+  applyOrder(set);
+}
+
+// ---------- history entries ----------
+// the config fields history tracks, in the stored doc's shapes (rule = plain condition list; {any:[…]} kept)
+const HIST_FIELDS=['name','description','status','journeys','groupid','rule','eligibility'];
+function storedFields(x){
+  const out={name:x.name, description:x.description||'', status:x.status||'active', journeys:[...(x.journeys||[])], groupid:x.groupid||null};
+  if(x.mode==='auto'){ const r=x.rule; out.rule=Array.isArray(r)?r:(r?.all||r||[]); } else out.eligibility=x.eligibility||null;
+  return out;
+}
+function diffFields(a,b){
+  const changes={};
+  for(const f of HIST_FIELDS){ if(!(f in a)&&!(f in b)) continue; if(JSON.stringify(a[f]??null)!==JSON.stringify(b[f]??null)) changes[f]={from:a[f]??null,to:b[f]??null}; }
+  return changes;
+}
+function hEntry(x,action,changes,summary){
+  return {segmentid:x.id, segmentname:x.name, action, changedfields:Object.keys(changes), changes, summary};
+}
+// history views: per segment (side panel tab) and board-wide (Change history), read on demand and cached
+const HIST=new Map(); let ALLHIST=null;
+function forgetHistory(ids){ for(const id of ids) HIST.delete(id); ALLHIST=null; }
+
+// a stored doc -> the board's in-memory segment
+function fromDoc(d){
+  const seg={...d, journeys:d.journeys||[], status:d.status||'active'};
+  seg._stored={displayIndex:d.displayIndex??null, sequence:d.sequence??null};   // what Firestore holds, to write only real changes
+  if(seg.mode==='auto') seg.rule=Array.isArray(d.rule)?{all:d.rule}:(d.rule||{all:[]});   // stored rule = plain condition list
+  return seg;
+}
+function setCatalog(cat){
+  const byName=(a,b)=>a.name.localeCompare(b.name);
+  PRODUCTS=cat.products.slice().sort(byName); PROD=Object.fromEntries(PRODUCTS.map(p=>[p.id,p.name]));
+  JOURNEYS=cat.journeys.slice().sort(byName); VAL.journeyId=Object.fromEntries(JOURNEYS.map(j=>[j.id,j.name]));
+  COUNT_DEFAULT={upCount:cat.countDefaults.upCount.filter(id=>PROD[id]),cpmCount:cat.countDefaults.cpmCount.filter(id=>PROD[id])};
+  VAL.participantMode=Object.fromEntries([...(cat.modes||[]).map(m=>[m.name,m.name]),['NO_MODE','No mode']]);   // `modes` sequence order
+  // every event, newest first; the month tells repeated names apart
+  const ev=(cat.events||[]).slice().sort((a,b)=>(b.date?.getTime?.()||0)-(a.date?.getTime?.()||0)||a.name.localeCompare(b.name));
+  EVENT_NAME=Object.fromEntries(ev.map(e=>[e.id,e.date?`${e.name} · ${EVENT_MONTH.format(e.date)}`:e.name]));
+  const qs=(cat.queues||[]).slice().sort(byName);
+  QUEUE_NAME=Object.fromEntries(qs.map(q=>[q.id,q.name])); QSTAGES=Object.fromEntries(qs.map(q=>[q.id,q.stages||[]]));
+}
+// stages of the picked queues (catalogue order, then any stage only seen on a token); nothing picked → no stage list
+function stageOptions(){
+  const F=S.filters, out=[];
+  for(const q of F.queues) for(const st of QSTAGES[q]||[]) if(!out.includes(st)) out.push(st);
+  for(const toks of QTOK.values()) for(const t of toks) if(F.queues.includes(t.q)&&t.stage&&!out.includes(t.stage)) out.push(t.stage);
+  return Object.fromEntries(out.map(x=>[x,x]));
+}
+// queue members: read the first time a queue (or stage) is picked in the Queue filter, then kept for the visit
+function ensureTokens(){
+  const F=S.filters; if(!(F.queues.length||F.queueStages.length)||tokState==='loaded'||tokState==='loading') return;
+  tokState='loading'; reRender();
+  store.loadQueueTokens().then(toks=>{
+    QTOK.clear();
+    for(const t of toks){ if(!t.profileId||!t.queueId) continue; if(!QTOK.has(t.profileId)) QTOK.set(t.profileId,[]); QTOK.get(t.profileId).push({q:t.queueId,stage:t.stage||''}); }
+    tokState='loaded';
+  }).catch(e=>{ tokState='error'; toast(`Couldn’t load queue members: ${e?.message||e}`); })
+    .finally(()=>{ refreshFilter(); reRender(); });
+}
+// confirmed = approved requests, read only for the picked events that aren't loaded yet
+function ensureConfirmed(){
+  const F=S.filters; if(F.eventsMode==='attended'||confirmedLoading) return;
+  const missing=F.events.filter(id=>!CONFIRMED.has(id)); if(!missing.length) return;
+  confirmedLoading=true; reRender();
+  store.loadConfirmed(missing).then(m=>{ for(const id of missing) CONFIRMED.set(id,new Set(m[id]||[])); })
+    .catch(e=>toast(`Couldn’t load confirmed registrations: ${e?.message||e}`))
+    .finally(()=>{ confirmedLoading=false; refreshFilter(); reRender(); ensureConfirmed(); });
+}
+// re-render and keep the open filter panel (and its search text) open
+function reRender(){
+  const d=$('.filters .fdrop[open]'), key=d?.dataset.drop, fq=d?.querySelector('.ms-q')?.value||'';
+  render();
+  const n=key&&$(`.filters .fdrop[data-drop="${key}"]`); if(n){ n.open=true; const q=n.querySelector('.ms-q'); if(q&&fq){ q.value=fq; q.dispatchEvent(new Event('input',{bubbles:true})); } }
+}
+// participant metadata.participantmode → the `modes` name it means (ignoring case, spaces and a missing " Mode");
+// empty → NO_MODE; a value not in the catalogue is kept and added as its own option so it can still be picked
+function canonModes(){
+  const key=v=>String(v).trim().toLowerCase().replace(/\s+/g,' ').replace(/ mode$/,'');
+  const byKey=new Map(Object.keys(VAL.participantMode).filter(k=>k!=='NO_MODE').map(n=>[key(n),n]));
+  for(const p of P){
+    const raw=p.f.participantMode; if(raw==null||!String(raw).trim()){ p.f.participantMode='NO_MODE'; continue; }
+    const hit=byKey.get(key(raw)); if(hit){ p.f.participantMode=hit; continue; }
+    const name=String(raw).trim(); p.f.participantMode=name;
+    if(!VAL.participantMode[name]){ const {NO_MODE,...rest}=VAL.participantMode; VAL.participantMode={...rest,[name]:name,NO_MODE}; }
+  }
+}
+async function load(){
+  S.loading=true; S.loadError=null; render();
+  try{
+    // queue_token is not read here: it is fetched the first time the Queue filter is used (ensureTokens)
+    const [docs,parts,lists,cat,groups,backfill]=await Promise.all([store.load(),store.loadParticipants(),store.loadLists(),store.loadCatalog(),
+      store.loadGroups().catch(()=>[]),store.historyNeedsBackfill().catch(()=>false)]);
+    setGroups(groups); HIST_BACKFILL=!!backfill;
+    setCatalog(cat);
+    QTOK.clear(); CONFIRMED.clear(); tokState='none';
+    // A–Z by name (then profile id): every list on the board walks P, so they all come out in this order
+    P=parts.slice().sort((x,y)=>x.name.localeCompare(y.name,undefined,{sensitivity:'base',numeric:true})||x.pid.localeCompare(y.pid)); PI=new Map(P.map(p=>[p.pid,p]));
+    canonModes();
+    LISTS.clear(); for(const l of lists) LISTS.set(l.segmentid,{ids:new Set(l.profilelist||[]),lastupdated:l.lastupdated||null});
+    ARCHIVED_IDS.clear();
+    const live=[];
+    ARCHIVED=[];
+    MIG_NEEDED=0;
+    for(const d of docs){
+      if(d.migratedto) continue;   // retired by the id migration: its copy lives at migratedto
+      if(!AUTO_ID_RE.test(d.id)||['createdBy','updatedBy','archivedBy'].some(k=>String(d[k]??'').includes('@'))) MIG_NEEDED++;
+      if(d.archived){ ARCHIVED_IDS.add(d.id); ARCHIVED.push(fromDoc(d)); } else live.push(fromDoc(d));
+    }
+    master.segments=live;
+    master.defaultDisplayOrder=defaultOrder(live);
+    master.displayOrder=live.slice().sort((a,b)=>(a.displayIndex??1e9)-(b.displayIndex??1e9)||master.defaultDisplayOrder.indexOf(a.id)-master.defaultDisplayOrder.indexOf(b.id)).map(x=>x.id);
+    applyOrder(master);   // card order IS the sequence: automated cards are numbered in board order
+    computeSet(master);
+  }catch(e){ S.loadError=e?.message||String(e); }
+  S.loading=false; render();
+  ensureTokens();   // a Queue filter kept across a reload needs its members again
+}
+
+// ---------- helpers ----------
+const $=(s,r=root)=>r.querySelector(s), $$=(s,r=root)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=n=>Number(n).toLocaleString('en-IN');
+const pct=(a,b)=>b?(a/b*100).toFixed(1)+'%':'—';
+const plural=(n,w)=>`${fmt(n)} ${w}${n===1?'':'s'}`;
+const TIME=new Intl.DateTimeFormat('en-IN',{timeZone:'Asia/Kolkata',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+const Sortable=window.Sortable; const sortableOk=typeof Sortable!=='undefined';
+const LOCK='<svg class="lock" width="12" height="12" viewBox="0 0 16 16" aria-label="Placed by hand" role="img"><title>Placed by hand</title><path fill="currentColor" d="M4 7V5a4 4 0 1 1 8 0v2h1a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h1Zm2 0h4V5a2 2 0 1 0-4 0v2Z"/></svg>';
+// line icons (16px, currentColor) for the toolbar, filters and cards
+const ico=d=>`<svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const IC={
+  search:ico('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>'),
+  filter:ico('<path d="M3 5h18l-7 8v6l-4-2v-4z"/>'),
+  edit:ico('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>'),
+  chev:ico('<path d="m6 9 6 6 6-6"/>'),
+  refresh:ico('<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>'),
+  plus:ico('<path d="M12 5v14M5 12h14"/>'),
+  archive:ico('<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/>'),
+  activity:ico('<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>'),
+  history:ico('<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/>'),
+  arrange:ico('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>'),
+  collapse:ico('<path d="m7 15 5-5 5 5"/><path d="m7 20 5-5 5 5" opacity=".5"/>'),
+  rules:ico('<path d="M9 6h11M9 12h11M9 18h11"/><path d="m3 6 1 1 2-2M3 12l1 1 2-2M3 18l1 1 2-2"/>'),
+  list:ico('<circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M21 20a6 6 0 0 0-4-5.6"/>'),
+  more:ico('<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'),
+  folder:ico('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'),
+  close:ico('<path d="M18 6 6 18M6 6l12 12"/>'),
+  arrowR:ico('<path d="M5 12h14M13 6l6 6-6 6"/>'),
+  grip:ico('<circle cx="9" cy="6" r="1.2"/><circle cx="15" cy="6" r="1.2"/><circle cx="9" cy="12" r="1.2"/><circle cx="15" cy="12" r="1.2"/><circle cx="9" cy="18" r="1.2"/><circle cx="15" cy="18" r="1.2"/>'),
+};
+const LOGO='<svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><g fill="none" stroke-width="5"><circle cx="16" cy="16" r="11" stroke="var(--primary)" stroke-dasharray="20 3.04"/><circle cx="16" cy="16" r="11" stroke="var(--bar)" stroke-dasharray="11 58.1" stroke-dashoffset="-23"/></g></svg>';
+
+// participant metadata.participantmode — the 15-value lifecycle catalog (`modes`), lowest sequence first
+const MODES=['Big','Installation Event','Event','Integration','Priority','Preparation','Performance','Journey Priority Planning','Extended Performance','Early Preparation','Journey Planning','Exploration','After Extended Performance','Snooze','Investment'];
+const WORKSHOP_STATES=[['any','Any'],['enrollednotstarted','Enrolled, not started'],['inprogress','In progress'],['completed','Completed'],['attended','Attended a live session'],['missed','Missed the last live session'],['none','Never enrolled']];
+const emptyFilters=()=>({journey:[],customer:[],finance:[],mode:[],product:'',
+  events:[],eventsMode:'any', queues:[],queueStages:[], workshops:[],workshopState:'any',
+  ongoing:[], ageMin:'', ageMax:'', bigLevel:[],
+  // uP! / CPM attended: count of the picked products in consumedproducts, compared like the conditions
+  upProducts:[], upOp:'gte', upN:'', upN2:'', cpmProducts:[], cpmOp:'gte', cpmN:'', cpmN2:'', groups:[]});
+const COUNT_OPS=[['gte','at least'],['lte','at most'],['eq','exactly'],['between','between']];
+const countOn=(F,k)=>F[k+'Products'].length>0&&F[k+'N']!==''&&(F[k+'Op']!=='between'||F[k+'N2']!=='');
+function countOk(F,k,f){
+  const c=sumConsumed(f,F[k+'Products']), n=+F[k+'N'], n2=+F[k+'N2'];
+  return F[k+'Op']==='gte'?c>=n:F[k+'Op']==='lte'?c<=n:F[k+'Op']==='eq'?c===n:c>=Math.min(n,n2)&&c<=Math.max(n,n2);
+}
+const OPTS={journey:()=>VAL.journeyId, customer:()=>VAL.customerStatus, finance:()=>VAL.financeStatus,
+  mode:()=>VAL.participantMode, events:()=>EVENT_NAME, queues:()=>QUEUE_NAME, queueStages:()=>stageOptions(), workshops:()=>asMap(WORKSHOPS),
+  ongoing:()=>PROD, groups:()=>GROUP_OPTS(), bigLevel:()=>asMap(BIG_LEVELS), upProducts:()=>PROD, cpmProducts:()=>PROD};
+const S={q:'',qRaw:'',showArchived:false,stale:new Set(),refreshing:null,role:'admin',setId:'master',teamId:null,arranging:false,drawer:null,sel:new Set(),dq:'',limit:150,dev:false,dragPids:null,cardView:{},filters:emptyFilters(),fids:null,collapsed:new Set(),prevCollapsed:null,cardSel:new Set()};
+// board search (name or email) narrows like a filter: cards keep only matching rows; empty cards hide
+const qMatch=(p,q)=>p.name.toLowerCase().includes(q)||(p.email||'').toLowerCase().includes(q);
+function filtersOn(){ return filtersActive()||!!S.q; }
+function filtersActive(){const F=S.filters;
+  return !!(countOn(F,'up')||countOn(F,'cpm')||F.journey.length||F.customer.length||F.finance.length||F.mode.length||F.product||F.events.length
+    ||F.queues.length||F.queueStages.length||F.groups.length||F.workshops.length||F.workshopState!=='any'||F.ongoing.length
+    ||F.ageMin!==''||F.ageMax!==''||F.bigLevel.length);}
+function matchFilter(p){
+  const F=S.filters, f=p.f;
+  if(F.journey.length&&!F.journey.includes(f.journeyId)) return false;
+  if(F.customer.length&&!F.customer.includes(f.customerStatus)) return false;
+  if(F.finance.length&&!F.finance.includes(f.financeStatus)) return false;
+  if(F.mode.length&&!F.mode.includes(p.f.participantMode)) return false;
+  if(F.product&&!(p.ongoingProducts.includes(F.product)||(f.consumedProducts[F.product]||0)>0||(f.unconsumedProducts[F.product]||0)>0)) return false;
+  if(F.ongoing.length&&!p.ongoingProducts.some(id=>F.ongoing.includes(id))) return false;
+  // Live events: attended = participant metadata.productevent; confirmed = an approved participation request
+  if(F.events.length){
+    const hit=F.events.some(id=>{const att=p.attendedEvents.includes(id), conf=!!CONFIRMED.get(id)?.has(p.pid);
+      return F.eventsMode==='attended'?att:F.eventsMode==='confirmed'?conf:att||conf;});
+    if(!hit) return false;
+  }
+  // Queue: an active + approved token in a picked queue (and, if stages are picked, at one of those stages)
+  if(F.queues.length||F.queueStages.length){
+    const toks=QTOK.get(p.pid)||[];
+    if(!toks.some(t=>(!F.queues.length||F.queues.includes(t.q))&&(!F.queueStages.length||F.queueStages.includes(t.stage)))) return false;
+  }
+  if(F.workshops.length&&!F.workshops.includes(p.workshop.name)) return false;
+  if(F.workshopState!=='any'){const w=p.workshop;
+    if(F.workshopState==='attended'&&!w.attendedSession) return false;
+    if(F.workshopState==='missed'&&!w.missedLast) return false;
+    if(F.workshopState==='none'&&w.status) return false;
+    if(['enrollednotstarted','inprogress','completed'].includes(F.workshopState)&&w.status!==F.workshopState) return false;}
+  if(F.ageMin!==''&&!(typeof f.age==='number'&&f.age>=+F.ageMin)) return false;
+  if(F.ageMax!==''&&!(typeof f.age==='number'&&f.age<=+F.ageMax)) return false;
+  if(F.bigLevel.length&&!F.bigLevel.includes(p.bigLevel)) return false;
+  if(countOn(F,'up')&&!countOk(F,'up',f)) return false;
+  if(countOn(F,'cpm')&&!countOk(F,'cpm',f)) return false;
+  return true;
+}
+function refreshFilter(){
+  const fa=filtersActive(), q=S.q;
+  S.fids=fa||q?new Set(P.filter(p=>(!fa||matchFilter(p))&&(!q||qMatch(p,q))).map(p=>p.pid)):null;
+}
+const inFilter=pid=>!S.fids||S.fids.has(pid);
+const curSet=()=>SETS.find(s=>s.id===S.setId);
+const canEdit=()=>S.role==='admin';                       // master segments
+const canEditTeam=()=>S.role==='admin'||S.role==='team';  // grouped segments
+// Teams group MASTER segments. They never move participants and never create segments.
+const TEAMS=[{id:'t1',name:'Content Team',groups:[
+  {id:'G_ONBOARD',name:'New & onboarding',segmentIds:['YTO_NEW','YTO_UPDOWN','YTO_ADDON']},
+  {id:'G_UP',name:'uP! journey',segmentIds:['UP_PRE','UP_1','UP_2','UP_3P','UP_IN_QUEUE']},
+  {id:'G_REENGAGE',name:'Needs re-engagement',segmentIds:['ECO_NON_ACTIVE','DFU_NON_ACTIVE']},
+  {id:'G_DFU',name:'DFU in progress',segmentIds:['ECO_LIVE_ARENA','ECO_DFU_QUEUE','ECO_DFU_APPT','DI_ONGOING','ARENA_LIVE']}]}];
+const curTeam=()=>TEAMS.find(t=>t.id===S.teamId);
+const groupPids=g=>{const mm=MEM.master,set=master,out=[];
+  for(const p of P){const m=mm.get(p.pid); if(m.segmentId&&g.segmentIds.includes(m.segmentId)&&inFilter(p.pid)) out.push(p);} return out;};
+const groupCount=(g,t)=>g.segmentIds.reduce((a,id)=>a+((filtersOn()?t.fby[id]:t.by[id])||0),0);
+function teamTabs(){ return ''; }   // master segments tab only; teams are out of scope for now
+const who=()=>S.role==='admin'?'You (Admin)':'You (AH Member)';
+const segName=(set,id)=>!id||id==='__UNSEG__'?'Unsegmented':(set._by.get(id)?.name||id);
+function tally(set){
+  const t={by:{},fby:{},lost:{},warn:{},reasons:{},unseg:0,funseg:0,pinned:0,warns:0,dups:0,fdups:0,total:P.length,ftotal:0,max:1};
+  for(const [pid,m] of MEM[set.id]){
+    const inF=inFilter(pid); if(inF) t.ftotal++;
+    for(const id of m.segs){ t.by[id]=(t.by[id]||0)+1; if(inF) t.fby[id]=(t.fby[id]||0)+1; }
+    if(!m.segs.length){ t.unseg++; t.reasons[m.reason]=(t.reasons[m.reason]||0)+1; if(inF) t.funseg++; }
+    if(m.segs.length>1){ t.dups++; if(inF) t.fdups++; }
+  }
+  t.max=Math.max(1,...Object.values(t.by));
+  return t;
+}
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove('show'),4200);}
+
+// ---------- render: main ----------
+function groupCard(team,g,t){
+  const n=groupCount(g,t), edit=canEditTeam()&&!S.arranging, collapsed=S.collapsed.has(g.id);
+  const view=S.cardView[g.id]||'people';
+  const segs=g.segmentIds.map(id=>master._by.get(id)).filter(Boolean);
+  let body;
+  if(view==='rules'){
+    body=`<div style="padding:4px 6px"><h4>Segments in this group</h4><ul class="rules">${segs.map(s=>`<li>${esc(s.name)} <span class="subtle small">${fmt(t.by[s.id]||0)} participants</span></li>`).join('')}</ul>
+      <p class="subtle small">A participant is in this group when they are in one of these master segments. Membership follows the master segments and updates with them.</p></div>`;
+  } else {
+    const rows=groupPids(g).slice(0,25).map(p=>prow(master,p,MEM.master.get(p.pid),false));
+    body=rows.length?rows.join('')+(n>rows.length?`<div class="card-empty">${plural(n-rows.length,'more participant')}</div>`:'')
+      :`<div class="card-empty">${filtersOn()?'No one here matches the filters.':'No participants in these segments right now.'}</div>`;
+  }
+  const chips=[`<span class="chip">${plural(segs.length,'segment')}</span>`,
+    ...segs.slice(0,2).map(s=>`<span class="chip">${esc(s.name)}</span>`),
+    segs.length>2?`<span class="chip">+${segs.length-2} more</span>`:'',
+    `<span class="dev-note">${g.id}</span>`].filter(Boolean);
+  return `<article class="card ${n?'':'zero'} ${collapsed?'collapsed':''} ${S.cardSel.has(g.id)?'picked':''}" style="--icon:${colorFor(g.name)}" data-group-id="${g.id}">
+    <div class="card-h" ${S.arranging?'':`tabindex="0" role="button" aria-label="Open ${esc(g.name)}"`}>
+      ${S.arranging?'':`<input type="checkbox" class="cardsel" data-cardsel="${g.id}" ${S.cardSel.has(g.id)?'checked':''} aria-label="Select ${esc(g.name)} for an action">`}
+      <div class="card-icon" aria-hidden="true">${esc(g.name.replace(/[^A-Za-z0-9]/g,'')[0]||'G')}</div>
+      <div class="card-info"><div class="card-title">${esc(g.name)}</div><div class="card-sub">${esc(team.name)}</div>
+        <button class="card-count" data-cardtab="${g.id}">${filtersOn()?`${fmt(n)} match`:plural(n,'participant')} · ${view==='people'?'segments':'list'}</button></div>
+      <div class="card-acts">${edit?`<button class="icon-btn" data-act="edit-group" data-group="${g.id}" title="Edit group" aria-label="Edit ${esc(g.name)}">✎</button>`:''}
+        <button class="icon-btn collapse-btn" data-collapse="${g.id}" aria-expanded="${!collapsed}" aria-label="${collapsed?'Expand':'Collapse'} ${esc(g.name)}">⌄</button></div>
+    </div>
+    <div class="card-chips">${chips.join('')}</div>
+    <div class="card-body">${body}</div>
+    <div class="card-f">
+      <button class="btn" data-opengroup="${g.id}">View all</button>
+      <details class="fdrop menu"><summary class="btn">Actions</summary><div class="fpanel menu-panel">
+        <div class="subtle small" style="padding:2px 6px 6px">Applies to the ${fmt(n)} participants in this group</div>
+        <button class="menu-item" data-act="comm" data-group="${g.id}">Send communication</button>
+        <button class="menu-item" data-act="content" data-group="${g.id}">Recommend content</button>
+        <button class="menu-item" data-act="appaction" data-group="${g.id}">Assign app action</button>
+      </div></details>
+    </div></article>`;
+}
+function renderTeamMain(){
+  const team=curTeam(), t=tally(master), edit=canEditTeam();
+  const covered=new Set(); for(const g of team.groups) for(const p of groupPids(g)) covered.add(p.pid);
+  const pool=filtersOn()?t.ftotal:t.total;
+  let h=`<div class="freeze">${teamTabs()}<header class="top">
+    <div><div class="eyebrow">Team · grouped segments</div><h1>${esc(team.name)}</h1><p class="sub">Groups built from the master segments. This team can group segments and act on them, but cannot move participants or create segments.</p></div>
+    <div class="controls">
+      <label class="ctl" for="roleSel">Preview as <select id="roleSel"><option value="admin">Admin (can edit)</option><option value="team">Team member</option><option value="viewer">Other roles (view only)</option></select></label>
+      <label class="ctl" for="devToggle"><input type="checkbox" id="devToggle" ${S.dev?'checked':''}> Developer notes</label>
+    </div></header>
+  <section class="stats" aria-label="Summary">
+    <div class="stat"><b>${fmt(team.groups.length)}</b><span>Groups</span></div>
+    <div class="stat"><b>${fmt(covered.size)}</b><span>Participants in a group</span></div>
+    <button class="stat ${pool-covered.size?'':'ok'}" data-open="ungrouped"><b>${fmt(Math.max(0,pool-covered.size))}</b><span>Not in any group</span></button>
+    ${filtersOn()?`<div class="stat"><b>${fmt(t.ftotal)}</b><span>Match the filters</span></div>`:''}
+    <span class="dev-note">counts come from the master stats doc: a group's count is the sum of its segments</span>
+  </section>
+  <div class="toolbar">
+    <div class="search"><input id="q" type="search" placeholder="Find a participant by name or ID" autocomplete="off" aria-label="Find a participant"><div id="qres" class="qres" hidden></div></div>
+    <div class="spacer"></div>
+    <button class="btn" data-act="collapse-all">${team.groups.length&&team.groups.every(g=>S.collapsed.has(g.id))?'Expand all':'Collapse all'}</button>
+    <button class="btn" data-act="activity">Activity</button>
+    <button class="btn" data-act="arrange" ${!edit||!sortableOk||S.arranging?'disabled':''}>Arrange</button>
+    <button class="btn primary" data-act="new-group" ${!edit||S.arranging?'disabled':''}>New group</button>
+  </div>`;
+  h+=filterBar(t)+'</div><div class="board-scroll">';
+  if(!edit) h+=`<div class="banner"><div><b>View only.</b> Team members and Admins can create groups here.</div></div>`;
+  h+=`<div class="banner"><div><b>Grouped segments.</b> A group is a selection of master segments. Membership follows the master segments and updates with them, so nobody is moved between segments here.<span class="dev-note">group = { name, segmentIds[] }; members = segment_membership where segmentId in segmentIds</span></div></div>`;
+  if(S.arranging) h+=`<div class="banner arrange"><div><b>Arrange groups</b><p>Drag a group by its card header. This only changes the layout for ${esc(team.name)}.</p></div>
+    <div class="acts"><button class="btn" data-act="arr-cancel">Cancel</button><button class="btn primary" data-act="arr-save">Save arrangement</button></div></div>`;
+  h+=!team.groups.length
+    ? `<div class="empty"><h3>No groups yet</h3><p class="subtle">Build a group by choosing the master segments it covers.</p>${edit?'<button class="btn primary" data-act="new-group">Create the first group</button>':''}</div>`
+    : `<div class="${S.arranging?'arranging':''}" id="groups"><section class="gsec" data-group="${esc(team.name)}"><div class="cards">${team.groups.map(g=>groupCard(team,g,t)).join('')}</div></section></div>`;
+  $('#main').innerHTML=h+'</div>';
+  $('#roleSel').value=S.role;
+}
+function renderMain(){
+  if(S.loading||S.loadError){
+    $('#main').innerHTML=`<div class="empty ${S.loading?'is-loading':''}">${S.loading?'<div class="sb-spinner" role="status" aria-label="Loading segments"></div><h3>Loading segments…</h3>'
+      :`<h3>Couldn’t load the segments</h3><p class="subtle">${esc(S.loadError)}</p><button class="btn primary" data-act="reload">Try again</button>`}</div>`;
+    return;
+  }
+  if(S.teamId) return renderTeamMain();
+  const set=curSet(), t=tally(set), edit=canEdit(set), inSeg=t.total-t.unseg;
+  // header is the screen name plus its actions (no eyebrow or description, operator 2026-10-12); the summary sits under it,
+  // and only the search + filter toolbar stays pinned while the board scrolls
+  const inPct=t.total?inSeg/t.total*100:0, allCollapsed=set.segments.length&&set.segments.every(s=>S.collapsed.has(s.id));
+  let h=`${teamTabs()}<header class="top">
+    <h1>${esc(set.name)}</h1>
+    <div class="top-actions">
+      <div class="tgroup" role="group" aria-label="Records">
+        <button class="btn quiet" data-act="activity" title="Recent activity">${IC.activity}<span>Activity</span></button>
+        ${set.type==='master'?`<button class="btn quiet" data-act="history" title="Change history">${IC.history}<span>Change history</span></button>`:''}
+        <button class="btn quiet" data-testid="sgb-show-archived" data-act="show-archived" aria-pressed="${S.showArchived}" title="Archived segments">${IC.archive}<span>${S.showArchived?'Back to segments':`Archived (${fmt(ARCHIVED.length)})`}</span></button>
+      </div>
+      <button class="btn ${S.refreshing&&S.refreshing.size>1?'is-busy':''}" data-testid="sgb-refresh-all" data-act="refresh-all" ${!edit||S.arranging||S.refreshing||!set._auto.length?'disabled':''} title="Rebuild every active automated list from its conditions">${IC.refresh}<span>${S.refreshing&&S.refreshing.size>1?'Refreshing…':'Refresh all lists'}</span></button>
+      <button class="btn primary" data-testid="sgb-new-seg" data-act="new-seg" ${!edit||S.arranging?'disabled':''}>${IC.plus}<span>New segment</span></button>
+    </div></header>
+  <section class="stats" aria-label="Summary">
+    <div class="stat" data-testid="sgb-stat-total" title="Documents in participant metadata"><span class="stat-l">Participants</span><b class="stat-v">${fmt(t.total)}</b><span class="stat-s">across ${plural(set.segments.length,'segment')}</span></div>
+    <div class="stat" data-testid="sgb-stat-inseg"><span class="stat-l">In a segment</span><b class="stat-v">${fmt(inSeg)}</b><span class="stat-s"><span class="meter" style="--p:${inPct.toFixed(1)}%" aria-hidden="true"></span>${pct(inSeg,t.total)} coverage</span></div>
+    <button class="stat ${t.unseg?'bad':''}" data-testid="sgb-stat-unseg" data-open="unseg"><span class="stat-l"><i class="dot" aria-hidden="true"></i>Not in a segment</span><b class="stat-v">${fmt(t.unseg)}</b><span class="stat-s">${pct(t.unseg,t.total)} of participants<span class="go">View${IC.arrowR}</span></span></button>
+    <button class="stat ${t.dups?'warn':''}" data-testid="sgb-stat-dups" data-open="dups"><span class="stat-l"><i class="dot" aria-hidden="true"></i>In more than one segment</span><b class="stat-v">${fmt(t.dups)}</b><span class="stat-s">${t.dups?'':'No overlaps'}<span class="go">View${IC.arrowR}</span></span></button>
+    <span class="dev-note">participants = participant metadata docs · lists = segmentboardlist</span>
+  </section>
+  <div class="freeze">
+  <div class="toolbar">
+    <div class="search">${IC.search}<input id="q" data-testid="sgb-search" type="search" placeholder="Search participants by name or email" autocomplete="off" aria-label="Search participants" value="${esc(S.qRaw)}"></div>
+    ${filterBar(t)}
+    <div class="spacer"></div>
+    <div class="tgroup" role="group" aria-label="Layout">
+      <button class="btn quiet" data-act="collapse-all" title="${allCollapsed?'Open every card to show its list':'Fold every card down to its title'}">${IC.collapse}<span>${allCollapsed?'Expand all':'Collapse all'}</span></button>
+      <button class="btn quiet" data-act="arrange" ${!edit||!sortableOk||S.arranging?'disabled':''} title="${sortableOk?'Drag cards into the order everyone sees':'Drag-and-drop library did not load'}">${IC.arrange}<span>${S.arranging?'Arranging…':'Arrange cards'}</span></button>
+    </div>
+  </div>
+  ${appliedBar(t)}
+  </div><div class="board-scroll">`;
+  if(edit&&(MIG_NEEDED||HIST_BACKFILL)&&!S.showArchived) h+=`<div class="banner mig"><div><b>${MIG_NEEDED?`${plural(MIG_NEEDED,'segment')} still use${MIG_NEEDED===1?'s':''} the old id format`:''}${MIG_NEEDED&&HIST_BACKFILL?' · ':''}${HIST_BACKFILL?'Older history entries use the old field names':''}.</b>
+    <p>New segments get random ids and record who changed them by profile id. Migrate the existing ones once: you’ll see a preview before anything is written.</p></div>
+    <div class="acts"><button class="btn primary" data-testid="sgb-mig-open" data-act="migrate">Migrate segment ids…</button></div></div>`;
+  if(!edit) h+=`<div class="banner"><div><b>View only.</b> Master segments can be changed by Admins. Everyone else can look, filter and export.</div></div>`;
+  if(S.arranging) h+=`<div class="banner arrange"><div><b>Arrange cards</b><p>Cards are folded so they are easy to move. Grab a card anywhere on its title row and drop it where you want it, then <b>Save arrangement</b>. Everyone sees the new order, and it is also the sequence of the automated segments. Nobody changes segment.</p><span class="dev-note">seg_saveDisplayOrder → segment_sets/${set.id}.displayOrder</span></div>
+    <div class="acts"><button class="btn" data-act="arr-cancel">Cancel</button><button class="btn primary" data-act="arr-save">Save arrangement</button></div></div>`;
+  // the "Not in a segment" / "In more than one segment" row is gone; the same two numbers open from the stats tiles above
+  const boardAt=h.length;   // the Archived view replaces everything from here on
+  if(!set.segments.length){
+    h+=`<div class="empty"><h3>No segments yet</h3><p class="subtle">Everyone is Unsegmented until you add segments.</p>${edit?'<button class="btn primary" data-act="new-seg">Create the first segment</button>':''}</div>`;
+  } else {
+    let segs=set.displayOrder.map(id=>set._by.get(id)).filter(Boolean);
+    if(S.q) segs=segs.filter(x=>(t.fby[x.id]||0)>0);   // search: only segments holding a matching participant
+    if(S.filters.groups.length) segs=segs.filter(x=>S.filters.groups.includes(liveGroupOf(x)?.id||'__NONE__'));   // Group filter: cards only
+    h+=!segs.length?`<div class="empty"><h3>No segment has a participant matching “${esc(S.qRaw)}”</h3><p class="subtle">Search looks at names and emails in the saved segment lists.</p></div>`
+      :`<div class="${S.arranging?'arranging':''}" id="groups"><div class="cards">${segs.map(x=>segCard(set,x,t)).join('')}</div></div>`;
+  }
+  if(S.showArchived) h=h.slice(0,boardAt)+archivedHtml();
+  $('#main').innerHTML=h+'</div>';
+}
+function checkList(key,map){
+  const picked=S.filters[key], n=Object.keys(map).length;
+  // long lists (journeys, products, modes) get a search box; the existing .ms-q handler hides labels that don't match
+  return `${n>8?`<input type="search" class="ms-q" placeholder="Search" aria-label="Search options" autocomplete="off">`:''}
+    <div class="ms-tools"><button type="button" data-fall="${key}:1">Select all</button><button type="button" data-fall="${key}:0">Clear</button>
+      <span class="subtle small">${picked.length} of ${n}</span></div>
+    <div class="checks">${Object.entries(map).map(([v,l])=>`<label data-name="${esc(String(l).toLowerCase())}"><input type="checkbox" data-fk="${key}" value="${v}" ${picked.includes(v)?'checked':''}>${esc(l)}</label>`).join('')}</div>`;
+}
+function countDrop(k,title){   // uP! / CPM attended filter: pick products, then at least / at most / exactly / between
+  const F=S.filters, op=F[k+'Op'], on=countOn(F,k), W=Object.fromEntries(COUNT_OPS), id=k==='up'?'fUp':'fCpm';
+  const label=`${title}: ${on?(op==='between'?`${F[k+'N']}–${F[k+'N2']}`:`${W[op]} ${F[k+'N']}`):'Any'}`;
+  return fdrop(k+'Cnt',label,on,`<label class="f" for="${id}Op">Count</label>
+    <div class="cnt-row"><select id="${id}Op" ${k==='up'?'data-testid="sgb-filter-up-op"':'data-testid="sgb-filter-cpm-op"'} data-fk="${k}Op">${COUNT_OPS.map(([v,l])=>`<option value="${v}" ${v===op?'selected':''}>${l}</option>`).join('')}</select>
+      <input id="${id}N" ${k==='up'?'data-testid="sgb-filter-up-n"':'data-testid="sgb-filter-cpm-n"'} type="number" min="0" data-fk="${k}N" value="${esc(F[k+'N'])}" placeholder="0" aria-label="Count">
+      ${op==='between'?`<span>and</span><input id="${id}N2" type="number" min="0" data-fk="${k}N2" value="${esc(F[k+'N2'])}" placeholder="0" aria-label="Up to">`:''}</div>
+    <label class="f">Counting these products</label>${checkList(k+'Products',PROD)}
+    ${F[k+'Products'].length?'':'<p class="subtle small" style="margin:8px 0 0">Pick at least one product to count.</p>'}`);
+}
+function fdrop(key,label,on,panel){
+  // "Journey: uP!" renders as a muted name and a value; a filter with nothing picked reads "Any"
+  const i=label.indexOf(': '), name=i<0?label:label.slice(0,i), val=i<0?'Any':label.slice(i+2);
+  return `<details class="fdrop" data-on="${on?1:0}" data-drop="${key}"><summary><span class="fl-n">${esc(name)}</span><span class="fl-v">${esc(val)}</span></summary><div class="fpanel">${panel}</div></details>`;
+}
+// which filter fields each control owns, so one applied filter can be removed on its own
+const FILTER_KEYS={journey:['journey'],customer:['customer'],finance:['finance'],product:['product','mode'],ongoing:['ongoing'],age:['ageMin','ageMax'],
+  upCnt:['upProducts','upOp','upN','upN2'],cpmCnt:['cpmProducts','cpmOp','cpmN','cpmN2'],groups:['groups'],events:['events','eventsMode'],queues:['queues','queueStages']};
+const PARSE=html=>{const d=document.createElement('div'); d.innerHTML=html; return d;};
+// the applied filters, each removable, under the toolbar; only shown while something narrows the board
+function appliedBar(t){
+  if(!filtersOn()) return '';
+  const chips=$$('.fdrop[data-on="1"]',PARSE(filterBar(t))).map(d=>{const n=d.querySelector('.fl-n').textContent, v=d.querySelector('.fl-v').textContent;
+    return `<span class="achip"><span class="fl-n">${esc(n)}</span><span class="fl-v">${esc(v)}</span><button class="achip-x" data-fclear="${d.dataset.drop}" aria-label="Remove the ${esc(n)} filter" title="Remove">${IC.close}</button></span>`;});
+  return `<div class="applied" aria-live="polite"><span class="applied-n">Showing <b>${fmt(t.ftotal)}</b> of ${fmt(t.total)} participants</span>${chips.join('')}
+    ${filtersActive()?'<button class="btn link" data-testid="sgb-clear-filters" data-act="clear-filters">Clear all</button>':''}</div>`;
+}
+function filterBar(t){
+  // a chip names what is picked: "Journey: uP!" or "Journey: uP! +2"
+  const F=S.filters, sel=(a,all,map)=>!a.length?all:`${map&&map[a[0]]||a[0]}${a.length>1?` +${a.length-1}`:''}`;
+  const bar=[
+    fdrop('groups',`Group: ${sel(F.groups,'All',GROUP_OPTS())}`,F.groups.length,checkList('groups',GROUP_OPTS())+'<p class="subtle small" style="margin:8px 6px 0">Shows only the segments in these groups.</p>'),
+    fdrop('journey',`Journey: ${sel(F.journey,'All',VAL.journeyId)}`,F.journey.length,checkList('journey',VAL.journeyId)),
+    fdrop('customer',`Customer status: ${sel(F.customer,'All',VAL.customerStatus)}`,F.customer.length,checkList('customer',VAL.customerStatus)),
+    fdrop('finance',`Finance status: ${sel(F.finance,'All',VAL.financeStatus)}`,F.finance.length,checkList('finance',VAL.financeStatus)),
+    fdrop('product',`Product + Mode${F.product?': '+PROD[F.product]:''}${F.mode.length?' · '+sel(F.mode,'',VAL.participantMode):''}`,F.product||F.mode.length,
+      `<label class="f" for="fProd">Product</label><select id="fProd" data-fk="product"><option value="">Any product</option>${PRODUCTS.map(p=>`<option value="${p.id}" ${p.id===F.product?'selected':''}>${esc(p.name)}</option>`).join('')}</select>
+       <label class="f">Participant mode</label>${checkList('mode',VAL.participantMode)}
+       <p class="subtle small" style="margin:8px 0 0">Combines a product with the participant's current mode, like the participants product screen.</p>`),
+    fdrop('ongoing',`Ongoing product: ${sel(F.ongoing,'Any',PROD)}`,F.ongoing.length,
+      checkList('ongoing',PROD)+`<p class="subtle small" style="margin:8px 0 0">Products that are ongoing or initiated right now.</p>`),
+    fdrop('age',`Age: ${F.ageMin===''&&F.ageMax===''?'Any':`${F.ageMin===''?'0':F.ageMin}–${F.ageMax===''?'∞':F.ageMax}`}`,F.ageMin!==''||F.ageMax!=='',
+      `<label class="f" for="fAgeMin">From</label><input id="fAgeMin" type="number" min="0" data-fk="ageMin" value="${F.ageMin}" placeholder="0">
+       <label class="f" for="fAgeMax">To</label><input id="fAgeMax" type="number" min="0" data-fk="ageMax" value="${F.ageMax}" placeholder="99">`),
+    fdrop('events',`Live events: ${sel(F.events,'Any',EVENT_NAME)}${F.events.length&&F.eventsMode!=='any'?` · ${F.eventsMode==='attended'?'attended':'confirmed'}`:''}`,F.events.length,
+      `<label class="f">Status</label>
+       <div class="seg-toggle ev-mode" role="radiogroup" aria-label="Participation status">${[['any','Confirmed or attended'],['confirmed','Confirmed'],['attended','Attended']].map(([v,l])=>
+         `<label><input type="radio" name="fEvMode" data-fk="eventsMode" value="${v}" ${F.eventsMode===v?'checked':''}>${l}</label>`).join('')}</div>
+       ${confirmedLoading?'<p class="subtle small" style="margin:8px 6px 0">Loading confirmed registrations…</p>':''}
+       <label class="f">Events</label>${checkList('events',EVENT_NAME)}
+       <p class="subtle small" style="margin:8px 6px 0">Attended comes from the participant’s attended events; confirmed is an approved participation request.</p>`),
+    fdrop('queues',`Queue: ${sel(F.queues,'Any',QUEUE_NAME)}${F.queueStages.length?` · ${sel(F.queueStages,'')}`:''}`,F.queues.length||F.queueStages.length,
+      `<label class="f">Queues</label>${checkList('queues',QUEUE_NAME)}
+       ${F.queues.length?`<label class="f">Stage <span class="opt">optional</span></label>${checkList('queueStages',stageOptions())}`:'<p class="subtle small" style="margin:8px 6px 0">Pick a queue to narrow by its stage.</p>'}
+       <p class="subtle small" style="margin:8px 6px 0">${tokState==='loading'?'Loading queue members…':'Active, approved queue tokens, read when you pick a queue.'}</p>`),
+    countDrop('up','uP! events'),
+    countDrop('cpm','CPM events')
+  ].join('');
+  return `<section class="filters" aria-label="Filters"><span class="flabel">${IC.filter}<span>Filter</span></span>${bar}</section>`;
+}
+const ICON_COLORS=['#4c769d','#6a4c9d','#1a7a6d','#9d6a4c','#4c9d68','#9d4c78','#3f5ea8','#7a6a1a'];
+const colorFor=g=>ICON_COLORS[[...g].reduce((a,c)=>a+c.charCodeAt(0),0)%ICON_COLORS.length];
+const initials=n=>String(n).split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase()||'?';
+function prow(set,p,m,edit){
+  return `<div class="prow" data-pid="${p.pid}" ${edit?'draggable="true"':''}><span class="pav" style="--av:${colorFor(p.name)}">${esc(initials(p.name))}</span>
+    <span class="nm"><div>${esc(p.name)}${m.pinned?LOCK:''}</div><div class="subtle small">${esc(p.journey)}</div></span>
+    ${m.warning?'<span class="chip warn">Not eligible</span>':''}</div>`;
+}
+function segCard(set,s,t){
+  const n=t.by[s.id]||0, fn=filtersOn()?(t.fby[s.id]||0):n, lost=t.lost[s.id]||0, w=t.warn[s.id]||0, edit=canEdit(set)&&!S.arranging;
+  const view=S.cardView[s.id]||'people', collapsed=S.collapsed.has(s.id), chips=[];
+  chips.push(`<span class="chip ${s.mode}">${s.mode==='auto'?'Automated':'Manual'}</span>`);
+  if(s.status==='inactive') chips.push('<span class="chip">Inactive</span>');
+  if(s.mode==='auto'){const L=LISTS.get(s.id);
+    chips.push(S.stale.has(s.id)?'<span class="chip warn" title="Conditions changed after the last refresh">Out of date: refresh</span>'
+      :L?`<span class="chip" title="Last refreshed">Updated ${L.lastupdated?esc(TIME.format(L.lastupdated)):''}</span>`:'<span class="chip warn">List not refreshed</span>');}
+  else{const L=LISTS.get(s.id); if(L?.lastupdated) chips.push(`<span class="chip" title="Last changed">Updated ${esc(TIME.format(L.lastupdated))}</span>`);}
+  if(w) chips.push(`<span class="chip warn">${fmt(w)} not eligible</span>`);
+  if(lost&&s.mode==='auto') chips.push(`<span class="chip" title="Match this segment’s conditions but are placed in a manual segment">+${fmt(lost)} placed elsewhere</span>`);
+  if(s.sourceSegmentId) chips.push('<span class="chip">From master</span>');
+  if(s.contentRules&&s.contentRules.length) chips.push(`<span class="chip" title="${esc(s.contentRules.join(' · '))}">${plural(s.contentRules.length,'content rule')}</span>`);
+  chips.push(`<span class="dev-note">${s.id}${s.mode==='auto'?' · sequence '+s.sequence:''}</span>`);
+  let body;
+  // conditions open as a panel inside the card with its own close button; the header toggle closes it too
+  if(view==='rules') body=`<div class="cond-view"><div class="cond-head"><b>Conditions</b><button class="icon-btn" data-cardtab="${s.id}" aria-label="Close conditions" title="Close conditions">${IC.close}</button></div>${conditionsHtml(set,s,true)}</div>`;
+  else{
+    const mm=MEM[set.id], rows=[];
+    for(const p of P){const m=mm.get(p.pid); if(m.segs.includes(s.id)&&inFilter(p.pid)){rows.push(prow(set,p,m,edit&&MEMBERSHIP_EDIT)); if(rows.length>=25) break;}}
+    body=rows.length?rows.join('')+(fn>rows.length?`<div class="card-empty">${plural(fn-rows.length,'more participant')}</div>`:'')
+      :`<div class="card-empty">${s.mode==='auto'&&!LISTS.has(s.id)?'List not built yet. Use <b>Refresh list</b> to build it from the conditions.':filtersOn()?'No one here matches the filters.':s.mode==='manual'?'No one added yet. Use <b>Add</b> to pick participants.':'No participant matches these conditions right now.'}</div>`;
+  }
+  return `<article class="card ${n?'':'zero'} ${collapsed?'collapsed':''} ${S.cardSel.has(s.id)?'picked':''} ${s.status==='inactive'?'inactive':''}" style="--icon:${s.mode==='manual'?'var(--manual)':'var(--accent)'}" data-testid="sgb-card" data-seg="${s.id}" data-drop="${s.id}">
+    <div class="card-h" ${S.arranging?'':`tabindex="0" role="button" aria-label="Open ${esc(s.name)}"`}>
+      ${S.arranging?`<span class="handle c-handle" title="Drag to move" aria-hidden="true">${IC.grip}</span>`:`<input type="checkbox" class="cardsel" data-cardsel="${s.id}" ${S.cardSel.has(s.id)?'checked':''} aria-label="Select ${esc(s.name)} for an action">`}
+      <div class="card-icon" aria-hidden="true">${esc(s.name.replace(/[^A-Za-z0-9]/g,'')[0]||'S')}</div>
+      <div class="card-info"><div class="card-title" data-testid="sgb-card-title" title="${esc(s.name)}">${esc(s.name)}</div>
+        <div class="card-meta"><span class="card-n">${filtersOn()?`<b>${fmt(fn)}</b> of ${fmt(n)} match`:`<b>${fmt(n)}</b> participant${n===1?'':'s'}`}</span>${liveGroupOf(s)?`<span class="card-grp" data-testid="sgb-card-group" title="Group">${IC.folder}${esc(liveGroupOf(s).name)}</span>`:''}</div></div>
+      <div class="card-acts"><button class="icon-btn card-count" data-cardtab="${s.id}" aria-pressed="${view!=='people'}" aria-label="${view==='people'?'Show':'Hide'} the conditions of ${esc(s.name)}" title="${view==='people'?'Show conditions':'Hide conditions'}">${IC.rules}</button>${edit?`<button class="icon-btn" data-testid="sgb-card-edit" data-act="edit-seg" data-seg="${s.id}" title="Edit segment" aria-label="Edit ${esc(s.name)}">${IC.edit}</button>`:''}
+        <button class="icon-btn collapse-btn" data-collapse="${s.id}" aria-expanded="${!collapsed}" aria-label="${collapsed?'Expand':'Collapse'} ${esc(s.name)}" title="${collapsed?'Expand':'Collapse'}">${IC.chev}</button></div>
+    </div>
+    ${s.description?`<div class="card-desc" title="${esc(s.description)}">${esc(s.description)}</div>`:''}
+    <div class="card-chips">${chips.join('')}</div>
+    <div class="card-body">${body}</div>
+    <div class="card-f">
+      <button class="btn secondary" data-testid="sgb-card-viewall" data-openseg="${s.id}"><span>View all</span>${IC.arrowR}</button>
+      ${s.mode==='auto'?`<button class="btn tertiary ${S.refreshing?.has(s.id)?'is-busy':''}" data-testid="sgb-card-refresh" data-act="refresh-list" data-seg="${s.id}" ${!canEdit(set)||S.arranging||S.refreshing||s.status==='inactive'?'disabled':''} title="${s.status==='inactive'?'Inactive segments place no one':'Build this list from the conditions and store it'}">${IC.refresh}<span>${S.refreshing?.has(s.id)?'Refreshing…':'Refresh list'}</span></button>`:''}
+      ${s.mode==='manual'?`<button class="btn tertiary" data-testid="sgb-card-add" data-act="add-people" data-seg="${s.id}" ${!edit||S.arranging||s.status==='inactive'?'disabled':''} title="${s.status==='inactive'?'Inactive segments place no one':'Pick participants to add to this segment'}">${IC.plus}<span>Add</span></button>`:''}
+    </div></article>`;
+}
+
+// ---------- drawer ----------
+function openDrawer(d){S.drawer=d;S.sel.clear();S.dq='';S.limit=150;renderDrawer(true);$('#drawer').classList.add('open');$('#app').classList.add('drawer-open');}
+function closeDrawer(){S.drawer=null;S.sel.clear();$('#drawer').classList.remove('open');$('#app').classList.remove('drawer-open');}
+function drawerRows(set,d){
+  const mm=MEM[set.id], out=[];
+  for(const p of P){const m=mm.get(p.pid);
+    if(!inFilter(p.pid)) continue;
+    if(d.kind==='seg'){ if(d.live?d.live.has(p.pid):m.segs.includes(d.id)) out.push([p,m]); }
+    else if(d.kind==='dups'){ if(m.segs.length>1) out.push([p,m]); }
+    else if(d.kind==='unseg'){ if(!m.segmentId&&(!d.reason||m.reason===d.reason)) out.push([p,m]); }
+    else if(d.kind==='attention'){ if(m.warning) out.push([p,m]); }
+  }
+  let rows=out;
+  if(S.dq){const q=S.dq.toLowerCase(); rows=rows.filter(([p])=>qMatch(p,q));}
+  if(d.hl) rows.sort((a,b)=>(b[0].pid===d.hl)-(a[0].pid===d.hl));
+  return rows;
+}
+function statusCell(p){
+  const f=p.f, bad=v=>['DISCONTINUED','LATE','BANNED'].includes(v);
+  const c=f.customerStatus&&f.customerStatus!=='NO_STATUS'?`<span class="${bad(f.customerStatus)?'chip bad':''}">${VAL.customerStatus[f.customerStatus]}</span>`:'<span class="chip bad">No status</span>';
+  const fi=f.financeStatus&&f.financeStatus!=='NO_STATUS'?`<span class="${bad(f.financeStatus)?'chip bad':''}">${VAL.financeStatus[f.financeStatus]}</span>`:'<span class="chip bad">No status</span>';
+  const prod=f.ongoingProducts.length?`<div class="subtle small">Ongoing: ${esc(f.ongoingProducts.map(x=>PROD[x]||x).join(', '))}</div>`:'';
+  return `${c} · ${fi}${prod}`;
+}
+// ---------- export: the rows shown in the side panel (search applied) as a CSV download ----------
+const localDate=(d=new Date())=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+function exportList(){
+  const set=curSet(), d=S.drawer; if(!d) return;
+  const rows=drawerRows(set,d); if(!rows.length) return toast('Nothing to export.');
+  const cp=countProducts(set,d), cnt=(p,k)=>cp[k]?sumConsumed(p.f,cp[k]):'';
+  const seg=d.kind==='seg'?set._by.get(d.id):null, L=seg?LISTS.get(seg.id):null;
+  const title=seg?seg.name:d.kind==='dups'?'In more than one segment':'Not in a segment';
+  const extra=seg&&seg.mode==='auto'?['In list',(p)=>L?.ids.has(p.pid)?'Yes':'Not in list yet']
+    :d.kind==='dups'?['In segments',(p,m)=>m.segs.map(id=>segName(set,id)).join('; ')]
+    :d.kind==='unseg'?['Why',(p,m)=>REASONS[m.reason]||'']:null;
+  const head=['Profile ID','Name','Journey','Participant mode','Customer status','Finance status','Onboarding','uP! events','CPM events','Age',...(extra?[extra[0]]:[])];
+  const lines=rows.map(([p,m])=>[p.pid,p.name,p.journey,VAL.participantMode[p.f.participantMode]||'',VAL.customerStatus[p.f.customerStatus]||'',VAL.financeStatus[p.f.financeStatus]||'',
+    VAL.onboardingStatus[p.f.onboardingStatus]||'',cnt(p,'upCount'),cnt(p,'cpmCount'),p.f.age??'',...(extra?[extra[1](p,m)]:[])]);
+  downloadCsv(title,head,lines);
+  toast(`Exported ${plural(rows.length,'participant')}.`);
+}
+function downloadCsv(title,head,lines){
+  const cell=v=>{const t=String(v??''); return /[",\n\r]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t;};
+  const csv='\ufeff'+[head,...lines].map(r=>r.map(cell).join(',')).join('\r\n');   // BOM so Excel reads UTF-8 names
+  const a=document.createElement('a'), url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.href=url; a.download=`${title.replace(/[^A-Za-z0-9]+/g,'-').replace(/^-|-$/g,'').toLowerCase()||'segment'}-${localDate()}.csv`;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
+// ---------- archived segments: view, unarchive (no hard delete: archiving is the only delete) ----------
+function archivedHtml(){
+  const rows=ARCHIVED.slice().sort((a,b)=>a.name.localeCompare(b.name));
+  return `<div class="banner"><div><b>Archived segments.</b> They place no one. Restore one to put it back at the end of the board. Segments are never deleted, so their history stays.</div></div>
+    ${rows.length?`<div class="cards">${rows.map(x=>`<article class="card arch" data-testid="sgb-arch-card" data-arch="${x.id}">
+      <div class="card-h"><div class="card-icon" aria-hidden="true">${esc(x.name.replace(/[^A-Za-z0-9]/g,'')[0]||'S')}</div>
+        <div class="card-info"><div class="card-title">${esc(x.name)}</div><div class="card-sub">${x.mode==='auto'?'Automated':'Manual'}${x.archivedAt?.toDate?` · archived ${esc(TIME.format(x.archivedAt.toDate()))}`:''}</div></div></div>
+      ${x.description?`<div class="card-desc">${esc(x.description)}</div>`:''}
+      <div class="card-f">${canEdit(curSet())?`<button class="btn" data-testid="sgb-arch-unarchive" data-act="unarchive" data-seg="${x.id}">Unarchive</button>`:''}</div></article>`).join('')}</div>`
+      :'<div class="empty"><h3>No archived segments</h3></div>'}`;
+}
+async function unarchiveSeg(id){
+  const set=curSet(), x=ARCHIVED.find(a=>a.id===id); if(!x) return;
+  // back at the end of the board (after the highest stored index, so it never collides with a gap left by an archive)
+  const top=Math.max(-1,...set.segments.map(s=>s._stored?.displayIndex??-1));
+  const seq=x.mode==='auto'?set.segments.filter(s=>s.mode==='auto').length+1:undefined;
+  const place={displayIndex:top+1,...(seq?{sequence:seq}:{})};
+  const ch={archived:{from:true,to:false},position:{from:null,to:set.displayOrder.length+1},...(seq&&x.sequence!==seq?{sequence:{from:x.sequence??null,to:seq}}:{})};
+  try{ await store.unarchiveSegment(id,place,[hEntry(x,'unarchive',ch,`Restored from the archive at position ${set.displayOrder.length+1}`)]); }catch(e){ return toast(`Couldn’t unarchive: ${e?.message||e}`); }
+  forgetHistory([id]);
+  const seg={...x,...place,_stored:{displayIndex:place.displayIndex,sequence:place.sequence??null}}; delete seg.archived; delete seg.archivedAt; delete seg.archivedBy;
+  ARCHIVED=ARCHIVED.filter(a=>a.id!==id); ARCHIVED_IDS.delete(id);
+  set.segments.push(seg); set.displayOrder.push(id); set.defaultDisplayOrder.push(id); applyOrder(set); computeSet(set);
+  AUDIT.unshift({at:Date.now(),by:who(),type:'RULE_CHANGE',text:`${seg.name}: restored from the archive`});
+  render(); toast(`Restored “${seg.name}”.`);
+  if(seg.mode==='auto'&&seg.status!=='inactive') await refreshLists([id]); else if(seg.mode==='manual') { await syncAutoLists(); render(); }
+}
+// ---------- segment groups (reference labels): Manage groups dialog + the dialog's Group field ----------
+let GRP=null;            // { histOpen: groupId|null, err }
+const GHIST=new Map();   // groupId -> { loading | rows | error }
+const segsInGroup=id=>[...master.segments,...ARCHIVED].filter(x=>x.groupid===id);
+function groupFieldHtml(){
+  const gs=liveGroups();
+  return `<label class="f" for="sGroup">Group <span class="opt">optional · for reference only</span></label>
+    <select id="sGroup" data-testid="sgb-dlg-group"><option value="">No group</option>${gs.map(g=>`<option value="${esc(g.id)}" ${g.id===B.groupid?'selected':''}>${esc(g.name)}</option>`).join('')}<option value="__new__">+ New group…</option></select>
+    <div id="sGroupNewBox" class="grp-new" hidden><input id="sGroupNew" data-testid="sgb-dlg-group-new" type="text" placeholder="Group name" autocomplete="off"><button type="button" class="btn" data-b="grp-add" data-testid="sgb-dlg-group-add">Add</button></div>`;
+}
+async function addGroup(name){
+  name=String(name||'').trim();
+  if(name.length<2) throw new Error('Give the group a name of at least 2 characters.');
+  if(liveGroups().some(g=>g.name.toLowerCase()===name.toLowerCase())) throw new Error('A group with that name already exists.');
+  const g=await store.createGroup(name,Math.max(0,...GROUPS.map(x=>x.order||0))+1);
+  setGroups([...GROUPS,g]); return g;
+}
+function openGroups(){ if(!canEdit(curSet())) return; GRP={histOpen:null,err:''}; renderGrp(); $('#grpDlg').showModal(); }
+function renderGrp(){
+  const box=$('#grpDlg .dlg'); if(!box||!GRP) return; const gs=liveGroups();
+  const rows=gs.map(g=>{ const n=segsInGroup(g.id).length, st=GHIST.get(g.id);
+    return `<li class="grp-row" data-testid="sgb-grp-row" data-gid="${esc(g.id)}">
+      <div class="grp-line"><input type="text" class="grp-name" data-testid="sgb-grp-name" data-gname="${esc(g.id)}" value="${esc(g.name)}" aria-label="Group name">
+        <span class="subtle small grp-n">${plural(n,'segment')}</span>
+        <button class="btn tertiary" data-testid="sgb-grp-rename" data-grp="rename" data-gid="${esc(g.id)}">Rename</button>
+        <button class="btn tertiary" data-testid="sgb-grp-hist" data-grp="hist" data-gid="${esc(g.id)}" aria-pressed="${GRP.histOpen===g.id}">History</button>
+        <button class="btn danger" data-testid="sgb-grp-delete" data-grp="delete" data-gid="${esc(g.id)}">Delete</button></div>
+      ${GRP.histOpen===g.id?`<div class="grp-hist">${historyListHtml(st,true)}</div>`:''}</li>`; }).join('');
+  box.innerHTML=`<div class="dlg-h"><h2 id="grpTitle">Segment groups</h2><p class="subtle">For reference only: a group labels what its segments are for. It never changes lists or order.</p></div>
+    <div class="dlg-b">
+      <div class="grp-new"><input id="gNew" data-testid="sgb-grp-new-name" type="text" placeholder="New group name" autocomplete="off"><button class="btn primary" data-testid="sgb-grp-create" data-grp="create">${IC.plus}<span>Add group</span></button></div>
+      ${GRP.err?`<div class="info warn">${esc(GRP.err)}</div>`:''}
+      ${gs.length?`<ul class="grp-list">${rows}</ul>`:'<div class="h-empty">No groups yet. Add one above, then pick it in a segment’s Group field.</div>'}
+    </div>
+    <div class="dlg-f"><button class="btn" data-dlg="cancel">Close</button></div>`;
+}
+async function grpAction(kind,gid){
+  const g=gid&&GROUP_BY.get(gid); GRP.err='';
+  try{
+    if(kind==='create'){ await addGroup($('#gNew').value); }
+    else if(kind==='rename'){
+      const to=String($(`input[data-gname="${gid}"]`).value||'').trim();
+      if(to===g.name) return;
+      if(to.length<2) throw new Error('Give the group a name of at least 2 characters.');
+      if(liveGroups().some(x=>x.id!==gid&&x.name.toLowerCase()===to.toLowerCase())) throw new Error('A group with that name already exists.');
+      await store.renameGroup(gid,g.name,to); g.name=to; GHIST.delete(gid);
+    } else if(kind==='delete'){
+      const segs=segsInGroup(gid);
+      if(!confirm(`Delete the group “${g.name}”?\n\n${segs.length?`It is removed from ${plural(segs.length,'segment')}; the segments themselves stay.`:'No segments are in it.'}`)) return;
+      await store.deleteGroup(gid,g.name,segs.map(x=>({id:x.id,name:x.name})));
+      g.deleted=true; for(const x of segs) delete x.groupid; forgetHistory(segs.map(x=>x.id)); GHIST.delete(gid);
+      if(S.filters.groups.includes(gid)){ S.filters.groups=S.filters.groups.filter(x=>x!==gid); refreshFilter(); }
+    } else if(kind==='hist'){
+      GRP.histOpen=GRP.histOpen===gid?null:gid;
+      if(GRP.histOpen&&!GHIST.has(gid)){ GHIST.set(gid,{loading:true});
+        store.loadGroupHistory(gid).then(rows=>{ GHIST.set(gid,{rows}); loadNames(rows); }).catch(e=>GHIST.set(gid,{rows:[],error:e?.message||String(e)})).finally(renderGrp); }
+    }
+  }catch(e){ GRP.err=e?.message||String(e); }
+  renderGrp(); render();
+}
+
+// ---------- groups side panel ----------
+// segments of a group on the board (archived left out); '__NONE__' = segments with no live group
+const boardSegsOf=gid=>master.segments.filter(x=>(liveGroupOf(x)?.id||'__NONE__')===gid);
+const sendableSegsOf=gid=>boardSegsOf(gid).filter(x=>x.status!=='inactive');
+// unique participants across these segments, following the active filters (as the send would)
+function uniquePeople(segIds){ if(!segIds.length) return 0; return actionTargets({segs:segIds}).length; }
+// always-visible left panel: All segments, every live group, Not grouped. A click shows only that group's cards
+// (the Group filter); Select puts its active segments in the send bar.
+function renderNav(){
+  const nav=$('#gnav'); if(!nav) return;
+  if(S.loading||S.loadError||S.teamId){ nav.hidden=true; return; }
+  nav.hidden=false;
+  const set=curSet(), edit=canEdit(set), cur=S.filters.groups.length===1?S.filters.groups[0]:(S.filters.groups.length?'__MULTI__':'');
+  const item=(id,name,attr,none)=>{
+    const segs=id?boardSegsOf(id):set.segments, send=id?sendableSegsOf(id):[], people=id?uniquePeople(send.map(x=>x.id)):tally(set).total-tally(set).unseg;
+    const on=id===cur||(!id&&!cur);
+    return `<li class="gn-item ${on?'on':''} ${none?'none':''}" ${attr}>
+      <button class="gn-link" data-act="gnav" data-gnav="${esc(id)}" aria-current="${on}" title="${esc(name)}">${none||!id?'':IC.folder}<span class="gn-name">${esc(name)}</span>
+        <span class="gn-n" data-testid="sgb-gnav-count">${fmt(segs.length)}</span></button>
+      ${id?`<div class="gn-sub"><span>${fmt(people)} participant${people===1?'':'s'}</span>${edit&&send.length?`<button class="btn link" data-testid="sgb-gnav-select" data-act="select-group" data-gsel="${esc(id)}" ${S.arranging?'disabled':''} title="Select this group's active segments to send">Select</button>`:''}</div>`:''}
+    </li>`;
+  };
+  nav.innerHTML=`<div class="gn-h"><span>Groups</span>${edit?`<button class="icon-btn" data-testid="sgb-groups-manage" data-act="manage-groups" title="Manage groups" aria-label="Manage groups">${IC.edit}</button>`:''}</div>
+    <ul class="gn-list">
+      ${item('','All segments','data-testid="sgb-gnav-all"')}
+      ${liveGroups().map(g=>item(g.id,g.name,'data-testid="sgb-gnav-item"')).join('')}
+      ${item('__NONE__','Not grouped','data-testid="sgb-gnav-none"',true)}
+    </ul>
+    ${!liveGroups().length&&edit?'<p class="gn-empty">No groups yet. Use the pencil to add one, then pick it in a segment’s Group field.</p>':''}`;
+}
+// select every active segment of a group, as if their cards were ticked; the bar then sends to them
+function selectGroup(gid){
+  if(!canEdit(curSet())||S.arranging) return;
+  const ids=sendableSegsOf(gid).map(x=>x.id); if(!ids.length) return toast('No active segments in this group.');
+  S.sel.clear(); S.cardSel=new Set(ids); S.selGroup=gid;
+  render(); renderSelBar();
+}
+
+// ---------- one-time id migration (text ids -> auto ids; who fields email -> profile id) ----------
+let MIG=null;
+function openMigrate(){
+  if(!canEdit(curSet())) return;
+  MIG={state:'loading'}; renderMig(); $('#migDlg').showModal();
+  store.migrationPreview().then(({rows,history})=>{ MIG={state:'preview',rows,hist:history}; renderMig(); })
+    .catch(e=>{ MIG={state:'error',error:e?.message||String(e)}; renderMig(); });
+}
+function renderMig(){
+  const box=$('#migDlg .dlg'); if(!box||!MIG) return;
+  let body='', foot='<button class="btn" data-dlg="cancel">Close</button>';
+  if(MIG.state==='loading') body='<div class="h-empty"><div class="sb-spinner" role="status" aria-label="Reading"></div>Reading segments, lists and history…</div>';
+  else if(MIG.state==='error') body=`<div class="info warn">Couldn’t prepare the migration: ${esc(MIG.error)}</div>`;
+  else if(MIG.state==='preview'||MIG.state==='running'){
+    const rows=MIG.rows, moves=rows.filter(r=>r.newId), unresolved=rows.flatMap(r=>Object.values(r.who).filter(w=>!w.to).map(w=>w.from)), hc=MIG.hist?.count||0;
+    const histLine=hc?`<div class="mig-sum"><b>${fmt(hc)} history ${hc===1?'entry':'entries'}</b> get <code>updatedat</code> / <code>updatedby</code> (profile id) in place of <code>at</code> / <code>by</code>${MIG.hist.unresolved?` · <span class="chip warn">${fmt(MIG.hist.unresolved)} ${MIG.hist.unresolved===1?'entry':'entries'}: editor not found, keeps its old “by”</span>`:''}</div>`:'';
+    body=!rows.length&&!hc?'<div class="info">Nothing to migrate: every segment already uses a random id and profile ids.</div>'
+      :!rows.length?histLine+(MIG.state==='running'?`<div class="info" id="migProg">Updating history…</div>`:'<div class="info warn">Make sure nobody edits segments while this runs.</div>')
+      :`<p class="subtle small" style="margin:0 0 10px">Each segment moves in one batch: a new config doc with a random id (the old id kept as <code>legacyid</code>), its list under the new id, its history copied, and the old doc archived with a pointer to the new one. Nothing is hard-deleted. Saved Participant Intelligence filters that pick these segments are updated too.</p>
+      <div class="mig-sum"><b>${plural(moves.length,'segment')}</b> get a new id · <b>${plural(rows.filter(r=>Object.keys(r.who).length).length,'segment')}</b> get profile ids for who changed them${unresolved.length?` · <span class="chip warn">${plural(new Set(unresolved).size,'email')} not found in profile_data (left as is)</span>`:''}</div>
+      <div class="tbl-wrap mig-tbl"><table class="pt"><thead><tr><th>Segment</th><th>Id</th><th class="num">List</th><th class="num">History</th><th>Who fields</th></tr></thead><tbody>
+      ${rows.map(r=>`<tr data-testid="sgb-mig-row"><td><b>${esc(r.name)}</b>${r.archived?' <span class="chip">archived</span>':''}</td>
+        <td class="mono small">${r.newId?`${esc(r.oldId)}<br>→ ${esc(r.newId)}`:`<span class="subtle">keeps ${esc(r.oldId)}</span>`}</td>
+        <td class="num">${r.listSize==null?'—':fmt(r.listSize)}</td><td class="num">${fmt(r.historyCount)}</td>
+        <td class="small">${Object.entries(r.who).map(([k,w])=>`${k}: ${esc(w.from)} → ${w.to?esc(w.to):'<span class="chip warn">not found</span>'}`).join('<br>')||'<span class="subtle">—</span>'}</td></tr>`).join('')}
+      </tbody></table></div>
+      ${histLine}
+      ${MIG.state==='running'?`<div class="info" id="migProg">Migrating… ${MIG.done||0} of ${rows.length}</div>`:'<div class="info warn">Back up segmentboardconfig and segmentboardlist first, and make sure nobody edits segments while this runs.</div>'}`;
+    if(rows.length||hc) foot=`<button class="btn" data-dlg="cancel" ${MIG.state==='running'?'disabled':''}>Cancel</button><button class="btn primary" data-testid="sgb-mig-run" data-act="mig-run" ${MIG.state==='running'?'disabled':''}>${MIG.state==='running'?'Migrating…':rows.length?`Migrate ${plural(rows.length,'segment')}`:'Update history'}</button>`;
+  } else if(MIG.state==='done'){
+    const r=MIG.result;
+    body=`<div class="info ${r.failed.length?'warn':''}"><b>Done.</b> ${plural(r.moved,'segment')} moved to new ids · ${plural(r.whoFixed,'segment')} updated to profile ids · ${plural(r.filtersRemapped,'saved filter')} updated · ${fmt(r.historyUpdated)} history ${r.historyUpdated===1?'entry':'entries'} updated.${r.failed.length?`<br>${plural(r.failed.length,'segment')} failed and can be retried: ${r.failed.map(f=>`${esc(f.id)} (${esc(f.error)})`).join(', ')}`:''}</div>`;
+    foot='<button class="btn primary" data-testid="sgb-mig-done" data-act="mig-done">Reload the board</button>';
+  }
+  box.innerHTML=`<div class="dlg-h"><h2 id="migTitle">Migrate segment ids</h2><p class="subtle">One time${MIG.rows?' · '+plural(MIG.rows.length,'segment'):''}</p></div><div class="dlg-b">${body}</div><div class="dlg-f">${foot}</div>`;
+}
+async function runMigrate(){
+  if(!MIG||MIG.state!=='preview') return;
+  MIG.state='running'; MIG.done=0; renderMig();
+  try{
+    const result=await store.runMigration(MIG.rows,(done)=>{ MIG.done=done; const p=$('#migProg'); if(p) p.textContent=`Migrating… ${done} of ${MIG.rows.length}`; });
+    MIG={state:'done',result,rows:MIG.rows}; HIST.clear(); ALLHIST=null;
+  }catch(e){ MIG={state:'error',error:e?.message||String(e)}; }
+  renderMig();
+}
+
+// ---------- import & compare: an uploaded / pasted list vs the segment's View all list ----------
+let CMP=null;
+const normEmail=v=>String(v??'').trim().toLowerCase();
+const normName=v=>String(v??'').trim().toLowerCase().replace(/\s+/g,' ');
+const cmpKey=(by,v)=>by==='email'?normEmail(v):normName(v);
+function openCompare(){
+  const set=curSet(), d=S.drawer; if(!d||d.kind!=='seg') return;
+  CMP={segId:d.id,by:'email',table:null,fileName:'',col:0,header:true,paste:'',result:null,tab:'matched',busy:false};
+  renderCmp(); $('#cmpDlg').showModal();
+}
+function cmpDetect(){   // pick the column that looks like email / name; row 1 is a header if it has a label-like cell
+  const T=CMP.table; if(!T||!T.length) return;
+  const first=T[0], want=CMP.by==='email'?/e-?mail/i:/name/i;
+  let col=first.findIndex(c=>want.test(c));
+  CMP.header=first.some(c=>/e-?mail|name|profile|phone|id/i.test(c)&&!c.includes('@'));
+  if(col<0&&CMP.by==='email'){ const probe=T.slice(0,20); const w=Math.max(...T.map(r=>r.length)); for(let i=0;i<w&&col<0;i++) if(probe.some(r=>String(r[i]||'').includes('@'))) col=i; }
+  CMP.col=Math.max(0,col);
+}
+function cmpValues(){   // pasted lines win over the file; blanks dropped
+  if(CMP.paste.trim()) return CMP.paste.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+  if(!CMP.table) return [];
+  return CMP.table.slice(CMP.header?1:0).map(r=>String(r[CMP.col]??'').trim()).filter(Boolean);
+}
+function cmpCurrentRows(){   // the View all list, without the search box
+  const set=curSet(), d=S.drawer, dq=S.dq; S.dq=''; const rows=drawerRows(set,d); S.dq=dq; return rows;
+}
+function runCompare(){
+  const by=CMP.by, vals=cmpValues(), cur=cmpCurrentRows();
+  const imported=new Map(); let dupImports=0;
+  for(const v of vals){ const k=cmpKey(by,v); if(!k) continue; if(imported.has(k)) dupImports++; else imported.set(k,v); }
+  const curKeys=new Set(), matched=[], onlyCurrent=[];
+  for(const [p] of cur){ const k=cmpKey(by,by==='email'?p.email:p.name); if(k) curKeys.add(k); (k&&imported.has(k)?matched:onlyCurrent).push({p,value:k?imported.get(k)||'':''}); }
+  const everyone=new Map(); for(const p of P){ const k=cmpKey(by,by==='email'?p.email:p.name); if(!k) continue; if(!everyone.has(k)) everyone.set(k,[]); everyone.get(k).push(p); }
+  const onlyImported=[...imported].filter(([k])=>!curKeys.has(k)).map(([k,v])=>({value:v,found:everyone.get(k)||[]}));
+  CMP.result={by,matched,onlyCurrent,onlyImported,imported:imported.size,dupImports,current:cur.length}; CMP.tab='matched';
+}
+const CMP_TABS=[['matched','Matched','In both lists'],['onlyCurrent','Only in current list','In View all, missing from the import'],['onlyImported','Only in imported list','In the import, not in View all']];
+function cmpRowsFor(tab){
+  const R=CMP.result, res=CMP_TABS.find(x=>x[0]===tab)[1];
+  if(tab!=='onlyImported') return R[tab].map(({p,value})=>[res,value,p.pid,p.name,p.email,p.journey,VAL.customerStatus[p.f.customerStatus]||'','']);
+  return R.onlyImported.map(({value,found})=>{const p=found[0];
+    return [res,value,p?.pid||'',p?.name||'',p?.email||'',p?.journey||'',p?VAL.customerStatus[p.f.customerStatus]||'':'',
+      found.length?`In participant metadata but not in this list${found.length>1?` (${found.length} people share this ${CMP.result.by})`:''}`:'Not found in participant metadata'];});
+}
+const CMP_HEAD=['Result','Imported value','Profile ID','Name','Email','Journey','Customer status','Note'];
+function renderCmp(){
+  const set=curSet(), s=set._by.get(CMP.segId), R=CMP.result;
+  let body='', foot='';
+  if(!R){
+    const vals=cmpValues(), T=CMP.table, w=T?Math.max(0,...T.map(r=>r.length)):0;
+    body=`<label class="f">Match by</label><div class="seg-toggle" role="radiogroup" aria-label="Match by">${[['email','Email'],['name','Name']].map(([v,l])=>`<label><input type="radio" name="cmpBy" value="${v}" ${CMP.by===v?'checked':''}>${l}</label>`).join('')}</div>
+      <p class="subtle small" style="margin:6px 0 0">${CMP.by==='email'?'Emails are compared ignoring case and spaces.':'Names are compared ignoring case and extra spaces. People who share a name all count as a match.'}</p>
+      <label class="f" for="cmpFile">Upload a list <span class="opt">CSV or Excel</span></label><input id="cmpFile" data-testid="sgb-cmp-file" type="file" accept=".csv,.txt,.xlsx,.xls">
+      ${T?`<div class="cmp-col"><label class="f" for="cmpCol">Column in ${esc(CMP.fileName)}</label><select id="cmpCol">${Array.from({length:w},(_,i)=>`<option value="${i}" ${i===CMP.col?'selected':''}>${esc(CMP.header&&T[0][i]?T[0][i]:'Column '+String.fromCharCode(65+i%26))}</option>`).join('')}</select>
+        <label class="f" style="font-weight:400"><input type="checkbox" id="cmpHead" ${CMP.header?'checked':''}> First row is a header</label></div>`:''}
+      <label class="f" for="cmpPaste">…or paste ${CMP.by==='email'?'emails':'names'}, one per line <span class="opt">used instead of the file</span></label>
+      <textarea id="cmpPaste" data-testid="sgb-cmp-paste" rows="4" placeholder="${CMP.by==='email'?'someone@example.com':'Full name'}">${esc(CMP.paste)}</textarea>
+      <div class="info" id="cmpInfo">${vals.length?`${plural(vals.length,'value')} to compare against the ${plural(cmpCurrentRows().length,'participant')} in View all.`:'Upload a file or paste a list to compare.'}</div>`;
+    foot=`<span class="err" id="cmpErr"></span><button class="btn" data-dlg="cancel">Cancel</button><button class="btn primary" id="cmpGo" data-testid="sgb-cmp-go" ${vals.length&&!CMP.busy?'':'disabled'}>Compare</button>`;
+  } else {
+    const n={matched:R.matched.length,onlyCurrent:R.onlyCurrent.length,onlyImported:R.onlyImported.length}, rows=cmpRowsFor(CMP.tab), shown=rows.slice(0,200);
+    body=`<div class="cmp-tiles">${CMP_TABS.map(([k,l,sub])=>`<button class="cmp-tile ${k}" data-testid="sgb-cmp-tile" data-cmptab="${k}" aria-pressed="${CMP.tab===k}"><b>${fmt(n[k])}</b><span>${l}</span><small>${sub}</small></button>`).join('')}</div>
+      <p class="subtle small" style="margin:8px 0">Matched by ${R.by} · ${plural(R.imported,'unique imported value')}${R.dupImports?` (${fmt(R.dupImports)} repeated ${R.dupImports===1?'value':'values'} ignored)`:''} · ${plural(R.current,'participant')} in View all.</p>
+      ${rows.length?`<div class="tbl-wrap"><table class="pt"><thead><tr><th>${CMP.tab==='onlyImported'?'Imported value':'Participant'}</th><th>${CMP.tab==='onlyImported'?'Found in participant metadata':'Email'}</th><th>Journey</th></tr></thead><tbody>
+        ${shown.map(r=>CMP.tab==='onlyImported'?`<tr><td>${esc(r[1])}</td><td>${r[2]?`${esc(r[3])}<div class="subtle small">${esc(r[7])}</div>`:'<span class="chip bad">Not found</span>'}</td><td>${esc(r[5])}</td></tr>`
+          :`<tr><td><div class="pn">${esc(r[3])}</div></td><td>${esc(r[4])||'<span class="subtle">—</span>'}</td><td>${esc(r[5])}</td></tr>`).join('')}
+      </tbody></table></div>${rows.length>shown.length?`<p class="subtle small">Showing 200 of ${fmt(rows.length)}. Export for the full list.</p>`:''}`:'<p class="subtle" style="padding:12px 0">Nobody in this group.</p>'}`;
+    foot=`<button class="btn" data-act="cmp-back" style="margin-right:auto">← Compare another list</button><button class="btn" data-testid="sgb-cmp-export" data-act="cmp-export" ${rows.length?'':'disabled'}>Export this group</button><button class="btn primary" data-testid="sgb-cmp-export-all" data-act="cmp-export-all">Export all three</button>`;
+  }
+  $('#cmpDlg .dlg').innerHTML=`<div class="dlg-h"><h2 id="cmpTitle">Import &amp; compare</h2><p class="subtle">${esc(s.name)} · compare an outside list with who is in View all</p></div>
+    <div class="dlg-b">${body}</div><div class="dlg-f">${foot}</div>`;
+}
+function cmpExport(all){
+  const s=curSet()._by.get(CMP.segId), tabs=all?CMP_TABS.map(x=>x[0]):[CMP.tab];
+  const lines=tabs.flatMap(cmpRowsFor);
+  downloadCsv(`${s.name} compare ${all?'all':CMP_TABS.find(x=>x[0]===CMP.tab)[1]}`,CMP_HEAD,lines);
+  toast(`Exported ${plural(lines.length,'row')}.`);
+}
+// uP! / CPM column: counted with the products picked in this segment's own uP! / CPM attended conditions
+// (the operator configures those per condition); no such condition, or not a segment list → "—"
+function countProducts(set,d){
+  const s=d.kind==='seg'?set._by.get(d.id):null, out={upCount:null,cpmCount:null};
+  if(!s||s.mode!=='auto') return out;
+  const leaves=expand(s.rule); for(const n of (leaves.all||leaves.any||[])) if(n.products&&n.field in out) out[n.field]=n.products;
+  return out;
+}
+function tableHtml(set,d,rows,extra){
+  const cp=countProducts(set,d), cnt=(p,k)=>cp[k]?fmt(sumConsumed(p.f,cp[k])):'—';
+  const edit=canEdit(set)&&!['group','ungrouped'].includes(d.kind), shown=rows.slice(0,S.limit);
+  if(!rows.length) return `<p class="subtle" style="padding:16px 0">${S.dq?'No participants match your search.':'No participants here.'}</p>`;
+  return `<div class="tbl-wrap"><table class="pt"><thead><tr>${edit?'<th class="c"><input type="checkbox" id="selAll" aria-label="Select all shown"></th>':''}<th>Participant</th><th>Journey</th><th>Customer · Finance</th><th class="num">uP! / CPM</th><th class="num">Age</th>${extra?`<th>${extra.h}</th>`:''}</tr></thead><tbody>
+  ${shown.map(([p,m])=>`<tr data-testid="sgb-drawer-row" data-pid="${p.pid}" ${edit&&MEMBERSHIP_EDIT?'draggable="true"':''} class="${S.sel.has(p.pid)?'sel':''} ${d.hl===p.pid?'hl':''}">
+    ${edit?`<td class="c"><input type="checkbox" data-testid="sgb-drawer-row-select" data-selpid="${p.pid}" ${S.sel.has(p.pid)?'checked':''} aria-label="Select ${esc(p.name)}"></td>`:''}
+    <td><div class="pn">${esc(p.name)}${m.pinned?LOCK:''}</div>${p.email?`<div class="pid">${esc(p.email)}</div>`:''}</td>
+    <td>${esc(p.journey)}<div class="subtle small">${esc(p.mode)}${p.queue.inQueue?` · ${esc(p.queue.name)} #${p.queue.position}`:''}${p.workshop.name?` · ${esc(p.workshop.name)}`:''}${p.pending.length?` · ${plural(p.pending.length,'action')} pending`:''}</div>${p.f.onboardingStatus!=='ONBOARDED'?`<div class="subtle small">${VAL.onboardingStatus[p.f.onboardingStatus]}</div>`:''}</td>
+    <td>${statusCell(p)}</td><td class="num" title="Counted from consumedproducts with the products picked in this segment's uP! / CPM conditions">${cnt(p,'upCount')} / ${cnt(p,'cpmCount')}</td><td class="num">${p.f.age??'<span class="chip bad">—</span>'}</td>
+    ${extra?`<td>${extra.cell(p,m)}</td>`:''}</tr>`).join('')}
+  </tbody></table></div>${rows.length>shown.length?`<button class="btn more" data-act="more">Show ${fmt(Math.min(150,rows.length-shown.length))} more of ${fmt(rows.length-shown.length)}</button>`:''}`;
+}
+function conditionsHtml(set,s,compact){
+  const edit=canEdit(set);
+  const js=jScope(s.journeys), jline=`<p class="seg-journey"><b>Journey:</b> ${esc(scopeText(js))}</p>`;
+  if(s.mode==='manual'){
+    const el=s.eligibility?expand(s.eligibility).all:[];
+    return `<div class="info">Manual segment. People are placed here by hand and stay until someone moves them. Automatic updates never move them out.</div>
+      ${jline}
+      ${el.length||js.ids.length?`<h4>Shows a “No longer eligible” warning when any of these stops being true</h4><ul class="rules">${[...(js.ids.length?[`Journey is ${scopeText(js)}`]:[]),...el.map(describe)].map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'<p class="subtle small">No eligibility conditions, so no warnings are shown.</p>'}
+      ${compact?'':`<pre class="dev-note block">${esc(JSON.stringify({journeys:js.ids,eligibility:s.eligibility||null},null,2))}</pre>`}`;
+  }
+  const ex=expand(s.rule), any=!!ex.any, items=ex.any||ex.all;
+  return `${jline}${items.length?`<h4>Placed here when ${any?'<em>any</em>':'<em>all</em>'} of these are true</h4>
+    <ul class="rules">${items.map(n=>`<li>${esc(describe(n))}</li>`).join('')}</ul>`:'<p class="subtle small">No other conditions: everyone in this journey is placed here.</p>'}
+    <p class="subtle small">${s.sequence?`Sequence ${s.sequence}. `:''}Everyone who matches these conditions is in this list, even if they also match another segment. People placed in a manual segment are left out.</p>
+    ${!compact&&edit?`<button class="btn" data-act="edit-seg" data-seg="${s.id}">Edit segment</button>`:''}
+    ${compact?'':`<pre class="dev-note block">${esc(JSON.stringify({journeys:js.ids,rule:s.rule},null,2))}</pre>`}`;
+}
+const H_ACTION={create:'Created',edit:'Edited',archive:'Archived',unarchive:'Unarchived',reorder:'Moved',migrate:'New id',rename:'Renamed',delete:'Deleted','segment-added':'Segment added','segment-removed':'Segment removed'};
+const H_FIELD={id:'Segment id',groupid:'Group',segments:'Segments',deleted:'Deleted',name:'Name',description:'Description',status:'Status',journeys:'Journey',rule:'Conditions',eligibility:'Eligibility',position:'Board position',sequence:'Sequence',archived:'Archived'};
+function hVal(f,v){
+  if(v===null||v===undefined||v===''||(Array.isArray(v)&&!v.length)) return '<span class="subtle">—</span>';
+  if(f==='rule'||f==='eligibility'){ const r=Array.isArray(v)?{all:v}:v; try{ const ex=expand(r); return `<ul class="h-rules">${(ex.all||ex.any).map(n=>`<li>${esc(describe(n))}</li>`).join('')}</ul>${ex.any?'<span class="subtle small">any of these</span>':''}`; }catch(e){ return `<code>${esc(JSON.stringify(v))}</code>`; } }
+  if(f==='journeys') return esc(v.map(id=>VAL.journeyId[id]||id).join(', '));
+  if(f==='status') return v==='inactive'?'Inactive':'Active';
+  if(f==='groupid') return esc(groupName(v)||v);
+  if(f==='segments'&&typeof v==='object') return esc([...(v.added||[]).map(id=>'+ '+segName(curSet(),id)),...(v.removed||[]).map(id=>'− '+segName(curSet(),id))].join(', ')||'—');
+  if(f==='deleted') return v?'Yes':'No';
+  if(f==='archived') return v?'Yes':'No';
+  return esc(String(v));
+}
+function historyListHtml(state,showSeg){
+  if(!state||state.loading) return '<div class="h-empty"><div class="sb-spinner" role="status" aria-label="Loading history"></div>Loading history…</div>';
+  if(state.error) return `<div class="h-empty">Couldn’t load the history: ${esc(state.error)}</div>`;
+  if(!state.rows.length) return '<div class="h-empty">No changes recorded yet. Every create, edit, archive, restore and move is recorded from now on.</div>';
+  return `<ul class="h-list">${state.rows.map(a=>`<li class="h-item" data-testid="sgb-history-item">
+    <div class="h-top"><span><span class="h-act h-${esc(a.action)}">${esc(H_ACTION[a.action]||a.action)}</span>${showSeg?` <b>${esc(a.segmentname||a.segmentid)}</b>`:''}</span><time>${a.at?esc(TIME.format(a.at)):'just now'}</time></div>
+    <div class="h-sum">${esc(a.summary||'')}</div>
+    ${Object.keys(a.changes||{}).length?`<details class="h-diff"><summary>${plural((a.changedfields||Object.keys(a.changes)).length,'field')} changed</summary>
+      <table>${Object.entries(a.changes).map(([f,c])=>`<tr><th>${esc(H_FIELD[f]||f)}</th><td>${hVal(f,c?.from)}</td><td class="h-arrow">→</td><td>${hVal(f,c?.to)}</td></tr>`).join('')}</table></details>`:''}
+    <div class="subtle small">by ${esc(byName(a.by))}</div></li>`).join('')}</ul>`;
+}
+// history "by" holds { profileid }; names come from profile_data once per person (older entries carry name / email)
+const PNAMES=new Map(); let pnLoading=false;
+function byName(by){
+  if(!by) return '—';
+  if(by.profileid) return PNAMES.get(by.profileid)||(PNAMES.has(by.profileid)?by.profileid:'…');
+  return by.name||by.email||'—';
+}
+function loadNames(rows){
+  const ids=[...new Set((rows||[]).map(a=>a.by?.profileid).filter(id=>id&&!PNAMES.has(id)))];
+  if(!ids.length||pnLoading) return; pnLoading=true;
+  store.profileNames(ids).then(m=>{ for(const id of ids) PNAMES.set(id,m[id]||''); })
+    .catch(()=>{ for(const id of ids) PNAMES.set(id,''); })
+    .finally(()=>{ pnLoading=false; if(S.drawer&&(S.drawer.kind==='history'||S.drawer.tab==='history')) renderDrawer(); if(GRP) renderGrp(); });
+}
+function loadSegHistory(id){
+  if(HIST.has(id)) return; HIST.set(id,{loading:true});
+  store.loadHistory(id).then(rows=>HIST.set(id,{rows})).catch(e=>HIST.set(id,{rows:[],error:e?.message||String(e)}))
+    .finally(()=>{ if(S.drawer?.kind==='seg'&&S.drawer.id===id&&S.drawer.tab==='history') renderDrawer(); });
+}
+function loadAllHistory(){
+  if(ALLHIST) return; ALLHIST={loading:true};
+  store.loadAllHistory(200).then(rows=>ALLHIST={rows}).catch(e=>ALLHIST={rows:[],error:e?.message||String(e)})
+    .finally(()=>{ if(S.drawer?.kind==='history') renderDrawer(); });
+}
+function historyHtml(set){
+  return `<ul class="h-list">${AUDIT.map(a=>{
+    let title,detail='';
+    if(a.type==='MANUAL_MOVE'){const p=PI.get(a.pid);title='Participant moved';
+      detail=`${esc(p.name)} from <b>${esc(segName(set,a.from))}</b> to <b>${esc(segName(set,a.to))}</b>${a.landed!==a.to?`. The rules then placed them in <b>${esc(segName(set,a.landed))}</b>`:''}.`;}
+    else if(a.type==='SEGMENT_CREATE'){title='Segment created';detail=esc(a.text);}
+    else if(a.type==='RULE_CHANGE'){title='Segment changed';detail=esc(a.text);}
+    else if(a.type==='SEGMENT_ARCHIVE'){title='Segment archived';detail=esc(a.text);}
+    return `<li class="h-item"><div class="h-top"><b>${title}</b><time>${TIME.format(a.at)}</time></div><div>${detail}</div>${a.reason?`<div class="h-reason">${esc(a.reason)}</div>`:''}<div class="subtle small">by ${esc(a.by)}</div></li>`;
+  }).join('')}</ul>`;
+}
+function renderDrawer(fresh){
+  const set=curSet(), d=S.drawer, t=tally(set);
+  const edit=canEdit(set)&&!['group','ungrouped'].includes(d.kind);
+  const body=$('#drawer .d-body'), keep=!fresh&&body?body.scrollTop:0;
+  let eyebrow='',title='',desc='',chips='',tabs='',tools='',content='';
+  if(d.kind==='seg'){
+    const s=set._by.get(d.id); eyebrow='Master segment'; title=s.name; desc=s.description||'';
+    // automated: evaluate the conditions over every participant now, so View all never depends on the last refresh
+    const auto=s.mode==='auto', L=LISTS.get(s.id);
+    const hit=auto?P.filter(p=>matches(segRule(s),p.f)):[];
+    d.live=auto?new Set(hit.filter(p=>!set._pinned.has(p.pid)).map(p=>p.pid)):null;
+    const pinnedOut=auto?hit.length-d.live.size:0;   // match, but sit in a manual segment
+    const n=auto?d.live.size:(t.by[s.id]||0);
+    const saved=L?L.ids.size:0, inBoth=auto&&L?[...d.live].filter(id=>L.ids.has(id)).length:0;
+    chips=`${liveGroupOf(s)?`<span class="chip grp">${IC.folder}${esc(liveGroupOf(s).name)}</span>`:''}<span class="chip ${s.mode}">${auto?'Automated':'Manual'}</span><span class="chip">${plural(n,'participant')}${auto?' match now':''}</span>${s.sourceSegmentId?'<span class="chip">Copied from master</span>':''}`;
+    const tb=[['people',`Participants · ${fmt(n)}`],['rules','Conditions'],['history','History']];
+    tabs=`<div class="tabs" role="tablist">${tb.map(([k,l])=>`<button class="tab" role="tab" ${k==='history'?'data-testid="sgb-drawer-tab-history"':''} data-tab="${k}" aria-selected="${d.tab===k}">${l}</button>`).join('')}</div>`;
+    if(d.tab==='rules') content=conditionsHtml(set,s);
+    else if(d.tab==='history'){ loadSegHistory(s.id); loadNames(HIST.get(s.id)?.rows); content=historyListHtml(HIST.get(s.id),false); }
+    else if(d.tab==='elsewhere'){ tools=`<p class="subtle small" style="margin:0">These participants match this segment’s conditions, but sit in a segment that ranks higher or were placed by hand.</p>`; content=tableHtml(set,d,drawerRows(set,d),{h:'Placed in',cell:(p,m)=>esc(segName(set,m.segmentId))}); }
+    else if(auto){
+      const sync=!L?'The list hasn’t been refreshed yet.':(saved===n&&inBoth===n)?`The stored list matches (updated ${L.lastupdated?esc(TIME.format(L.lastupdated)):'just now'}).`
+        :`The stored list has ${fmt(saved)} (updated ${L.lastupdated?esc(TIME.format(L.lastupdated)):'—'}): ${fmt(n-inBoth)} new match${n-inBoth===1?'':'es'} not in it, ${fmt(saved-inBoth)} in it that no longer match.`;
+      tools=`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><p class="subtle small" style="margin:0;flex:1;min-width:220px">Everyone who matches the conditions right now. ${sync}${pinnedOut?` ${plural(pinnedOut,'more participant')} match${pinnedOut===1?'es':''} but ${pinnedOut===1?'is':'are'} in a manual segment, so ${pinnedOut===1?'is':'are'} left out.`:''}</p>
+        ${canEdit(set)&&s.status!=='inactive'?`<button class="btn ${S.refreshing?.has(s.id)?'is-busy':''}" data-testid="sgb-drawer-save-list" data-act="refresh-list" data-seg="${s.id}" ${S.refreshing?'disabled':''} title="Build this list from the conditions and store it">${IC.refresh}<span>${S.refreshing?.has(s.id)?'Refreshing…':'Refresh list'}</span></button>`:''}</div>`;
+      content=tableHtml(set,d,drawerRows(set,d),{h:'In list',cell:(p)=>L?.ids.has(p.pid)?'In list':'<span class="chip warn">Not in list yet</span>'});
+    }
+    else content=tableHtml(set,d,drawerRows(set,d));
+  } else if(d.kind==='group'){
+    const team=curTeam(), g=team.groups.find(x=>x.id===d.id), n=groupCount(g,t);
+    eyebrow=team.name; title=g.name;
+    chips=`<span class="chip">${plural(n,'participant')}</span><span class="chip">${plural(g.segmentIds.length,'segment')}</span>`;
+    tabs=`<div class="tabs" role="tablist">${[['people',`Participants · ${fmt(n)}`],['rules','Segments']].map(([k,l])=>`<button class="tab" role="tab" data-tab="${k}" aria-selected="${d.tab===k}">${l}</button>`).join('')}</div>`;
+    if(d.tab==='rules'){
+      content=`<h4>Master segments in this group</h4><ul class="rules">${g.segmentIds.map(id=>master._by.get(id)).filter(Boolean)
+        .map(s=>`<li>${esc(s.name)} <span class="subtle small">${fmt(t.by[s.id]||0)} participants</span></li>`).join('')}</ul>
+        <p class="subtle small">Membership follows the master segments. Nobody can be moved between segments from here, and the group has no segments of its own.</p>
+        ${canEditTeam()?`<button class="btn" data-act="edit-group" data-group="${g.id}">Edit group</button>`:''}`;
+    } else {
+      const rows=groupPids(g).filter(p=>!S.dq||p.name.toLowerCase().includes(S.dq.toLowerCase())||p.pid.toLowerCase().includes(S.dq.toLowerCase()))
+        .map(p=>[p,MEM.master.get(p.pid)]);
+      content=tableHtml(master,d,rows,{h:'Master segment',cell:(p,m)=>esc(segName(master,m.segmentId))});
+    }
+  } else if(d.kind==='ungrouped'){
+    const team=curTeam(), inAny=new Set(); for(const g of team.groups) for(const p of groupPids(g)) inAny.add(p.pid);
+    eyebrow=team.name; title='Not in any group';
+    chips='<span class="chip">Participants no group of this team covers</span>';
+    tools='<p class="subtle small" style="margin:0">These participants are in a master segment (or Unsegmented) that none of this team’s groups includes. Add the segment to a group to cover them.</p>';
+    const rows=P.filter(p=>!inAny.has(p.pid)&&inFilter(p.pid)&&(!S.dq||p.name.toLowerCase().includes(S.dq.toLowerCase())||p.pid.toLowerCase().includes(S.dq.toLowerCase())))
+      .map(p=>[p,MEM.master.get(p.pid)]);
+    content=tableHtml(master,d,rows,{h:'Master segment',cell:(p,m)=>m.segmentId?esc(segName(master,m.segmentId)):'<span class="chip bad">Unsegmented</span>'});
+  } else if(d.kind==='unseg'){
+    eyebrow=set.name; title='Not in a segment'; chips=`<span class="chip bad">${plural(t.unseg,'participant')}</span>`;
+    tools=`<p class="subtle small" style="margin:0">No segment matched these participants. Each one shows why. Most reasons point to data to fix at the source.</p>
+      <div class="rchips">${['',...Object.keys(t.reasons).sort((a,b)=>t.reasons[b]-t.reasons[a])].map(r=>`<button class="rchip" data-reason="${r}" aria-pressed="${(d.reason||'')===r}">${r?`${esc(REASONS[r])} · ${fmt(t.reasons[r])}`:`All · ${fmt(t.unseg)}`}</button>`).join('')}</div>`;
+    content=tableHtml(set,d,drawerRows(set,d),{h:'Why',cell:(p,m)=>esc(REASONS[m.reason])});
+  } else if(d.kind==='attention'){
+    eyebrow=set.name; title='No longer eligible'; chips=`<span class="chip warn">${plural(t.warns,'participant')}</span>`;
+    tools=`<p class="subtle small" style="margin:0">These participants were placed in a manual segment by hand. Their data has since changed, so they no longer meet its conditions. They stay put until someone moves them.</p>`;
+    content=tableHtml(set,d,drawerRows(set,d),{h:'Placed in · no longer true',cell:(p,m)=>{const s=set._by.get(m.segmentId);const fail=expand(segElig(s)).all.filter(n=>!matches(n,p.f)).map(describe);return `<b>${esc(s.name)}</b><div class="subtle small">${esc(fail.join('; '))}</div>`;}});
+  } else if(d.kind==='dups'){
+    eyebrow=set.name; title='In more than one segment'; chips=`<span class="chip warn">${plural(t.dups,'participant')}</span>`;
+    tools='<p class="subtle small" style="margin:0">Each segment list is built from its own conditions, so a participant can match more than one. The last column shows every segment they are in.</p>';
+    content=tableHtml(set,d,drawerRows(set,d),{h:'In segments',cell:(p,m)=>m.segs.map(id=>`<div>${esc(segName(set,id))}</div>`).join('')});
+  } else if(d.kind==='activity'){
+    eyebrow=set.name; title='Activity'; chips='<span class="chip">Communications, content and app actions</span>';
+    const rows=ACTIVITY.filter(a=>a.setId===(S.teamId?'team:'+S.teamId:set.id));
+    content=rows.length?`<ul class="h-list">${rows.map(a=>`<li class="h-item"><div class="h-top"><b>${({comm:'Communication sent',content:'Content recommended',appaction:'App action assigned',group:'Group changed'})[a.kind]}</b><time>${TIME.format(a.at)}</time></div>
+      <div>${esc(a.text)}${a.segId?` · <b>${esc(segName(set,a.segId))}</b>`:''}</div><div class="subtle small">by ${esc(a.by)}</div></li>`).join('')}</ul>`
+      :'<p class="subtle" style="padding:16px 0">Nothing sent or assigned yet. Use <b>Actions</b> on a segment card, or select participants and use the actions bar.</p>';
+    content+='<span class="dev-note block">reads the activity log for this set (one doc per send / recommendation / assignment)</span>';
+  } else if(d.kind==='history'){
+    eyebrow='Master segments'; title='Change history'; chips='<span class="chip">Every segment · newest first</span>';
+    loadAllHistory(); loadNames(ALLHIST?.rows); content=historyListHtml(ALLHIST,true);
+  }
+  const showSearch=!['history','activity'].includes(d.kind)&&!(d.kind==='seg'&&['rules','history'].includes(d.tab));
+  const hint=edit&&showSearch&&MEMBERSHIP_EDIT?`<p class="subtle small" style="margin:0">Select participants and use <b>Move to…</b>, or drag rows onto a segment on the board.</p>`:'';
+  $('#drawer').innerHTML=`<div class="d-head"><div><div class="eyebrow">${esc(eyebrow)}</div><h2>${esc(title)}</h2>${desc?`<p class="d-desc">${esc(desc)}</p>`:''}<div class="chips">${chips}</div></div><button class="icon-btn" data-testid="sgb-drawer-close" data-act="close" aria-label="Close">×</button></div>
+    ${tabs}<div class="d-tools">${tools}${showSearch?`<div class="dq-row"><input id="dq" data-testid="sgb-drawer-search" type="search" placeholder="Search in this list" value="${esc(S.dq)}" aria-label="Search in this list">${d.kind==='seg'?'<button class="btn" data-testid="sgb-drawer-compare" data-act="compare" title="Compare an uploaded or pasted list with this list">Import &amp; compare</button>':''}${['seg','dups','unseg'].includes(d.kind)?'<button class="btn" data-testid="sgb-drawer-export" data-act="export-list" title="Download the rows shown as a CSV file">Export CSV</button>':''}</div>`:''}${hint}</div>
+    <div class="d-body">${content}</div>
+    ${edit&&showSearch&&['seg','dups','unseg'].includes(d.kind)?`<div class="bulk" id="bulk" ${S.sel.size?'':'hidden'}><b>${plural(S.sel.size,'participant')} selected</b><button class="btn" data-act="clear-sel">Clear</button>
+      ${d.kind==='seg'&&set._by.get(d.id)?.mode==='manual'?`<button class="btn" data-testid="sgb-bulk-remove" data-act="remove-from-seg" data-seg="${d.id}">Remove from segment</button>`:''}
+      <button class="btn primary" data-testid="sgb-bulk-move-manual" data-act="move-manual" ${set.segments.some(x=>x.mode==='manual'&&x.status!=='inactive'&&x.id!==d.id)?'':'disabled title="Create an active manual segment first"'}>Move to manual segment…</button></div>`:''}
+    ${edit&&showSearch&&MEMBERSHIP_EDIT?`<div class="bulk" id="bulk" ${S.sel.size?'':'hidden'}><b>${plural(S.sel.size,'participant')} selected</b><button class="btn" data-act="clear-sel">Clear</button><button class="btn primary" data-act="move">Move to…</button><span class="dev-note">seg_moveParticipants</span></div>`:''}`;
+  $('#drawer .d-body').scrollTop=keep;
+}
+function updateBulk(){
+  const b=$('#bulk');
+  if(b){b.hidden=!S.sel.size; b.querySelector('b').textContent=`${plural(S.sel.size,'participant')} selected`;}
+  $$('#drawer tr[data-pid]').forEach(tr=>tr.classList.toggle('sel',S.sel.has(tr.dataset.pid)));
+  $$('.prow[data-pid]').forEach(r=>r.classList.toggle('sel',S.sel.has(r.dataset.pid)));
+  renderSelBar();
+}
+const ICON={
+  whatsapp:'<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15.05L2 22l5.1-1.33A10 10 0 1 0 12 2Zm0 18.1a8.1 8.1 0 0 1-4.13-1.13l-.3-.18-3.02.79.8-2.95-.19-.3A8.1 8.1 0 1 1 12 20.1Zm4.46-5.9c-.24-.12-1.44-.71-1.66-.79s-.39-.12-.55.12-.63.79-.77.95-.28.18-.52.06a6.63 6.63 0 0 1-3.3-2.88c-.25-.43.25-.4.71-1.32a.45.45 0 0 0 0-.42c0-.12-.55-1.33-.75-1.81s-.4-.41-.55-.42h-.47a.9.9 0 0 0-.65.3 2.73 2.73 0 0 0-.85 2.03 4.75 4.75 0 0 0 1 2.52 10.85 10.85 0 0 0 4.15 3.66c1.54.6 2.15.65 2.92.54a2.49 2.49 0 0 0 1.64-1.16 2.03 2.03 0 0 0 .14-1.16c-.06-.1-.22-.16-.46-.28Z"/></svg>',
+  email:'<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M3 5h18a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm9 8.13L4.47 7H19.5L12 13.13ZM4 8.9V17h16V8.9l-7.36 6a1 1 0 0 1-1.27 0L4 8.9Z"/></svg>',
+  app:'<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 22a2.2 2.2 0 0 0 2.2-2.2H9.8A2.2 2.2 0 0 0 12 22Zm7-6.3v-4.9a7 7 0 0 0-5.3-6.8V3a1.7 1.7 0 0 0-3.4 0v1a7 7 0 0 0-5.3 6.8v4.9L3 17.5v.9h18v-.9Z"/></svg>',
+  content:'<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-6l-3 3-3-3H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Zm6 3.5v7l6-3.5-6-3.5Z"/></svg>',
+  more:'<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M6 10.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm6 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm6 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z"/></svg>'
+};
+function actionsWidget(scopeAttr){
+  return `<div class="actions-widget">
+    <span class="aw-label">Send</span>
+    <div class="commgrp">
+      <button class="commbtn" data-act="comm" data-ch="WhatsApp" ${scopeAttr} title="WhatsApp">${ICON.whatsapp}<span>WhatsApp</span></button>
+      <button class="commbtn" data-act="comm" data-ch="Email" ${scopeAttr} title="Email">${ICON.email}<span>Email</span></button>
+      <button class="commbtn" data-act="comm" data-ch="App notification" ${scopeAttr} title="App notification">${ICON.app}<span>App</span></button>
+    </div>
+    <button class="btn primary" data-act="content" ${scopeAttr}>${ICON.content} Recommend playlist</button>
+  </div>`;
+}
+function renderSelBar(){
+  const bar=$('#selbar'), t=tally(master), team=S.teamId?curTeam():null;
+  if(S.sel.size){
+    bar.hidden=false;
+    bar.innerHTML=`<b>${plural(S.sel.size,'participant')} selected</b>
+      ${actionsWidget('')}
+      <span class="bar-sep"></span>
+      ${canEdit()&&!S.teamId&&MEMBERSHIP_EDIT?'<button class="btn small" data-act="move">Move…</button>':''}
+      <button class="btn small ghost" data-act="clear-sel">Clear</button>`;
+    return;
+  }
+  if(S.cardSel.size){
+    const ids=[...S.cardSel];
+    // unique people across the selected segments: what a send reaches (someone in two of them counts once)
+    const n=team?ids.reduce((a,id)=>a+groupCount(team.groups.find(g=>g.id===id),t),0):uniquePeople(ids);
+    const sendable=S.selGroup?sendableSegsOf(S.selGroup).map(x=>x.id):[];
+    const whole=S.selGroup&&sendable.length===ids.length&&sendable.every(id=>S.cardSel.has(id));
+    const gname=whole?(S.selGroup==='__NONE__'?'Not grouped':groupName(S.selGroup)):'';
+    bar.hidden=false;
+    bar.innerHTML=`<b data-testid="sgb-selbar-label">${gname?`Group: ${esc(gname)} · ${plural(ids.length,'segment')}`:`${plural(ids.length,team?'group':'segment')} selected`} · ${fmt(n)} participant${n===1?'':'s'}</b>
+      ${actionsWidget('data-multi="1"')}
+      <span class="bar-sep"></span>
+      <button class="btn small ghost" data-act="clear-cardsel">Clear</button>`;
+    return;
+  }
+  bar.hidden=true;
+}
+function toggleSel(pid){S.sel.has(pid)?S.sel.delete(pid):S.sel.add(pid);
+  $$(`[data-pid="${pid}"]`).forEach(el=>{el.classList.toggle('sel',S.sel.has(pid));const c=el.querySelector('input[data-selpid]');if(c)c.checked=S.sel.has(pid);});
+  updateBulk();}
+function toggleCardSel(id){S.cardSel.has(id)?S.cardSel.delete(id):S.cardSel.add(id); if(!S.cardSel.size) S.selGroup=null;
+  $$(`[data-cardsel="${id}"]`).forEach(b=>{b.checked=S.cardSel.has(id);b.closest('.card')?.classList.toggle('picked',S.cardSel.has(id));});
+  renderSelBar();}
+
+// ---------- move ----------
+let MV=null;
+function openMove(pids,pre){
+  const set=curSet(); if(!canEdit(set)) return;
+  MV={pids,target:pre||null};
+  const mm=MEM[set.id], froms=[...new Set(pids.map(id=>mm.get(id).segmentId))];
+  const opts=`<div class="tg">Re-check</div><label><input type="radio" name="tgt" value="__UNSEG__" ${pre==='__UNSEG__'?'checked':''}><span class="grow">Unsegmented: re-check against the rules</span></label>`+
+    '<div class="tg">Segments</div>'+set.displayOrder.map(id=>set._by.get(id)).filter(Boolean).map(s=>`<label data-name="${esc(s.name.toLowerCase())}"><input type="radio" name="tgt" value="${s.id}" ${pre===s.id?'checked':''}><span class="grow">${esc(s.name)}</span><span class="chip ${s.mode}">${s.mode==='auto'?'Automated':'Manual'}</span></label>`).join('');
+  $('#moveDlg .dlg').innerHTML=`<div class="dlg-h"><h2 id="moveTitle">Move ${plural(pids.length,'participant')}</h2><p class="subtle">From ${esc(froms.map(f=>segName(set,f)).slice(0,3).join(', '))}${froms.length>3?` and ${froms.length-3} more`:''}</p></div>
+    <div class="dlg-b"><label class="f" for="tq">Move to</label><input id="tq" type="search" placeholder="Search segments" autocomplete="off">
+      <div class="target-list" id="tlist">${opts}</div><div class="info" id="tinfo">Choose where to move them.</div>
+      ${set.type==='master'?'<label class="f" for="mreason">Reason <span class="req">required for master segments</span></label><textarea id="mreason" rows="2" placeholder="e.g. Cleared IA assessment"></textarea>':''}
+      <span class="dev-note block">seg_moveParticipants({ setId: "${set.id}", profileids, toSegmentId, reason })${set.type==='master'?' → also writes segment_audit':''}</span></div>
+    <div class="dlg-f"><span class="err" id="mErr"></span><button class="btn" data-dlg="cancel">Cancel</button><button class="btn primary" id="mGo">Move</button></div>`;
+  moveInfo(); $('#moveDlg').showModal();
+  const c=$('#tlist input:checked'); if(c) c.closest('label').scrollIntoView({block:'nearest'});
+}
+function moveInfo(){
+  const set=curSet(), el=$('#tinfo'); const t=MV.target;
+  if(!t){el.className='info';el.textContent='Choose where to move them.';return;}
+  const s=t==='__UNSEG__'?null:set._by.get(t);
+  const allAuto=MV.pids.every(id=>!MEM[set.id].get(id).pinned);
+  if(s&&s.mode==='manual'){el.className='info';el.innerHTML=`They’ll be <b>locked in ${esc(s.name)}</b>. Automatic updates won’t move them out. Only a person can.`;}
+  else if(allAuto){el.className='info warn';el.innerHTML='These participants are already placed by the rules. Moving them to an automated segment re-checks them, so they’ll stay where the rules put them.';}
+  else {el.className='info';el.innerHTML=`${s?`They’ll be released from their manual segment and <b>re-checked against the rules</b>. If they don’t meet the conditions for ${esc(s.name)}, they go to the segment they do match, or to Unsegmented.`:'They’ll be released and re-checked against the rules, landing in whichever segment they match, or Unsegmented.'}`;}
+}
+function doMove(){
+  const set=curSet(), mm=MEM[set.id], target=MV.target;
+  if(!target){$('#mErr').textContent='Choose a segment to move them to.';return;}
+  const reasonEl=$('#mreason'), reason=reasonEl?reasonEl.value.trim():'';
+  if(set.type==='master'&&!reason){$('#mErr').textContent='Add a reason. Master moves are recorded in the change history.';reasonEl.focus();return;}
+  const tseg=target==='__UNSEG__'?null:set._by.get(target);
+  const landed=applyMove(set,MV.pids,target,reason);
+  $('#moveDlg').close(); S.sel.clear(); render();
+  if(tseg&&tseg.mode==='manual') toast(`Moved ${plural(MV.pids.length,'participant')} to ${tseg.name}.`);
+  else toast(`Re-checked ${plural(MV.pids.length,'participant')}: `+Object.entries(landed).map(([k,n])=>`${fmt(n)} → ${segName(set,k)}`).join(', '));
+}
+
+// ---------- new / edit segment ----------
+let B=null;
+const defaultRow=field=>{const f=FIELD[field];
+  if(field==='onboardingStatus') return {field,op:'in',value:['ONBOARDED']};
+  if(f.type==='number') return COUNT_DEFAULT[field]?{field,op:'gte',value:1,products:[...COUNT_DEFAULT[field]]}:{field,op:'gte',value:1};
+  if(f.type==='products') return {field,op:'counts',value:{mode:'all',items:[{product:PRODUCTS[0]?.id||'',op:'gte',n:1}]}};
+  if(f.type==='list') return {field,op:'notEmpty',value:null};
+  return {field,op:f.type==='enum'?'in':'hasAny',value:[]};};
+const optsFor=field=>{const f=FIELD[field];
+  return /^product/.test(f.type)?PRODUCTS.map(p=>[p.id,p.name]):Object.entries(VAL[field]||{});};
+function multiSel(r){
+  const opts=optsFor(r.field), map=Object.fromEntries(opts), sel=Array.isArray(r.value)?r.value:[];
+  const label=sel.length?sel.map(v=>map[v]||v).join(', '):'Choose…';
+  return `<details class="fdrop ms"><summary class="ms-sum ${sel.length?'has':''}" data-testid="sgb-dlg-cond-values">${esc(label)}</summary><div class="fpanel">
+    ${opts.length>8?'<input type="search" class="ms-q" placeholder="Search" aria-label="Search options">':''}
+    <div class="ms-tools"><button type="button" data-msall="1">Select all</button><button type="button" data-msall="0">Clear</button>
+      <span class="subtle small ms-count">${sel.length} of ${opts.length}</span></div>
+    <div class="checks">${opts.map(([v,l])=>`<label data-name="${esc(String(l).toLowerCase())}"><input type="checkbox" data-testid="sgb-dlg-cond-option" data-k="v" value="${esc(v)}" ${sel.includes(v)?'checked':''}>${esc(l)}</label>`).join('')}</div></div></details>`;
+}
+function syncMsSummary(scope,r){
+  const map=Object.fromEntries(optsFor(r.field)), sum=scope.querySelector('.ms-sum');
+  if(sum){sum.textContent=r.value.length?r.value.map(v=>map[v]||v).join(', '):'Choose…'; sum.classList.toggle('has',!!r.value.length);}
+  const c=scope.querySelector('.ms-count'); if(c) c.textContent=`${r.value.length} of ${Object.keys(map).length}`;
+}
+function countsHtml(r){
+  const items=r.value.items||[];
+  return `${items.length>1?`<div class="comb">Match <select data-k="cmode"><option value="all" ${r.value.mode==='all'?'selected':''}>all</option><option value="any" ${r.value.mode==='any'?'selected':''}>any</option></select> of these products:</div>`:''}
+    ${items.map((it,k)=>`<div class="citem" data-ci="${k}">
+      <select data-k="cprod" aria-label="Product">${PRODUCTS.map(p=>`<option value="${p.id}" ${p.id===it.product?'selected':''}>${esc(p.name)}</option>`).join('')}</select>
+      <select data-k="ccop" aria-label="Comparison">${Object.entries(CMP_WORDS).map(([v,l])=>`<option value="${v}" ${v===it.op?'selected':''}>${l}</option>`).join('')}</select>
+      <input type="number" min="0" data-k="ccn" value="${it.n}" aria-label="Count">
+      ${items.length>1?'<button type="button" class="icon-btn" data-b="rmi" aria-label="Remove product">×</button>':'<span></span>'}</div>`).join('')}
+    <button type="button" class="btn ghost" data-b="addi">+ Add product</button>`;
+}
+const toRows=list=>list.map(n=>{const f=FIELD[n.field];
+  if(COUNT_DEFAULT[n.field]) return {field:n.field,op:n.op,value:Array.isArray(n.value)?[...n.value]:n.value,products:[...(n.products||COUNT_DEFAULT[n.field])]};if(n.op==='eq'&&f&&f.type==='enum')return {field:n.field,op:'in',value:[n.value]};return {field:n.field,op:n.op,value:Array.isArray(n.value)?[...n.value]:n.value};});
+function openSegDlg(mode,segId){
+  const set=curSet();
+  if(mode==='edit'){
+    const s=set._by.get(segId||S.drawer.id), auto=s.mode==='auto', ex=auto?expand(s.rule):null, comb=ex&&ex.any?'any':'all';
+    B={mode,id:s.id,groupid:liveGroupOf(s)?.id||'',name:s.name,description:s.description||'',scope:jScope([...(s.journeys||[])]),type:s.mode,comb,rows:auto?toRows(ex[comb]):[],sequence:s.sequence,status:s.status||'active',eligibility:s.eligibility||null};}
+  else B={mode:'create',newId:store.newSegmentId(),groupid:'',name:'',description:'',scope:{type:'journey',ids:[]},type:'auto',status:'active',comb:'all',rows:[],eligibility:null,
+    order:[...seqSegs(set).map(x=>x.id),NEW_ID]};   // where the new segment is checked; it starts last
+  renderSegDlg(); $('#segDlg').showModal();
+}
+function rowHtml(r,i){
+  const f=FIELD[r.field], used=new Set(B.rows.map(x=>x.field));
+  const avail=FIELDS.filter(x=>!SCOPE_FIELDS.includes(x.key)&&(x.key===r.field||!used.has(x.key)));
+  const field=`<select data-testid="sgb-dlg-cond-field" data-k="field" aria-label="Field">${avail.map(x=>`<option value="${x.key}" ${x.key===r.field?'selected':''}>${x.label}</option>`).join('')}</select>`;
+  const rm=`<button type="button" class="icon-btn" data-b="rm" aria-label="Remove condition">×</button>`;
+  // onboarding: one choice, Onboarded or Yet to onboard (they can't both be true)
+  if(r.field==='onboardingStatus'){const k=obKind(r.value);
+    // an older rule on specific YTO statuses (e.g. only New) stays as it is, shown read-only
+    if(!k) return `<div class="cond" data-i="${i}">${field}<span class="cond-is">${esc(describe(r))}</span>${rm}</div>`;
+    return `<div class="cond" data-i="${i}">${field}<select data-k="ob" aria-label="Onboarding status">${[['ONBOARDED','Onboarded'],['YTO','Yet to onboard']].map(([v,l])=>`<option value="${v}" ${v===k?'selected':''}>${l}</option>`).join('')}</select>${rm}</div>`;}
+  // older "no ongoing product" rules (isEmpty) stay as they are, shown read-only
+  if(r.field==='ongoingProducts'&&!['hasAny','equals','isEmpty'].includes(r.op)) return `<div class="cond" data-i="${i}">${field}<span class="cond-is">${esc(describe(r))}</span>${rm}</div>`;
+  // no operator to choose: the picker itself sits beside the field
+  if(!OPS_FOR[f.type].length) return `<div class="cond" data-i="${i}">${field}${multiSel(r)}${rm}</div>`;
+  // consumed / unconsumed: no operator dropdown, always a product count list
+  if(f.type==='products'){
+    // older rules written by the backend (isEmpty / notEmpty) stay as they are, shown read-only
+    if(r.op!=='counts') return `<div class="cond" data-i="${i}">${field}<span class="cond-is">${esc(describe(r))}</span>${rm}</div>`;
+    return `<div class="cond" data-i="${i}">${field}<span class="cond-is">product counts</span>${rm}<div class="cond-val">${countsHtml(r)}</div></div>`;
+  }
+  return `<div class="cond" data-i="${i}">${field}
+    <select data-k="op" aria-label="Condition">${OPS_FOR[f.type].map(([k,l])=>`<option value="${k}" ${k===r.op?'selected':''}>${l}</option>`).join('')}</select>
+    ${rm}<div class="cond-val">${valHtml(r,f)}</div></div>`;
+}
+function productsSel(r){   // multi-select of the products whose consumed count adds up to this number
+  const sel=r.products||[], label=sel.length?sel.map(id=>PROD[id]||id).join(', '):'Choose products…';
+  return `<div class="cond-prod"><span class="subtle small">Counting these products</span><details class="fdrop ms pms"><summary class="ms-sum ${sel.length?'has':''}">${esc(label)}</summary><div class="fpanel">
+    <input type="search" class="ms-q" placeholder="Search" aria-label="Search products">
+    <div class="ms-tools"><button type="button" data-psall="1">Select all</button><button type="button" data-psall="0">Clear</button>
+      <span class="subtle small pms-count">${sel.length} of ${PRODUCTS.length}</span></div>
+    <div class="checks">${PRODUCTS.map(p=>`<label data-name="${esc(p.name.toLowerCase())}"><input type="checkbox" data-k="pv" value="${p.id}" ${sel.includes(p.id)?'checked':''}>${esc(p.name)}</label>`).join('')}</div></div></details></div>`;
+}
+function syncPms(row,r){
+  const sum=row.querySelector('.pms .ms-sum');
+  sum.textContent=r.products.length?r.products.map(id=>PROD[id]||id).join(', '):'Choose products…'; sum.classList.toggle('has',!!r.products.length);
+  row.querySelector('.pms-count').textContent=`${r.products.length} of ${PRODUCTS.length}`;
+}
+function valHtml(r,f){ return valHtmlBase(r,f)+(COUNT_DEFAULT[r.field]?productsSel(r):''); }
+function valHtmlBase(r,f){
+  if(r.op==='isEmpty'||r.op==='notEmpty') return '';
+  if(r.op==='counts') return countsHtml(r);
+  if(r.op==='in'||r.op==='hasAny'||r.op==='equals') return multiSel(r);
+  if(r.op==='between') return `<div class="nums"><input type="number" min="0" data-k="n0" value="${r.value[0]}" aria-label="From"> and <input type="number" min="0" data-k="n1" value="${r.value[1]}" aria-label="To"></div>`;
+  return `<input type="number" min="0" class="num-in" data-k="n" value="${r.value}" aria-label="Value">`;
+}
+function renderSegDlg(){
+  const set=curSet(), h=[];
+  h.push(`<div class="dlg-h"><h2>${B.mode==='edit'?'Edit segment':'New segment'}</h2><p class="subtle">${esc(set.name)}${B.mode==='edit'?' · '+(B.type==='auto'?'automated':'manual')+' segment':''}</p></div><div class="dlg-b">`);
+  h.push(`<label class="f" for="sName">Segment name</label><input id="sName" data-testid="sgb-dlg-name" type="text" value="${esc(B.name)}" placeholder="e.g. CPM – ready for Arena" autocomplete="off">`);
+  h.push(`<label class="f" for="sDesc">Description <span class="opt">optional</span></label><textarea id="sDesc" rows="2" maxlength="${DESC_MAX}" placeholder="Who this segment is for and what it is used for">${esc(B.description)}</textarea><div class="char-count" id="sDescN">${B.description.length} / ${DESC_MAX}</div>`);
+  h.push(groupFieldHtml());
+  if(B.mode==='create')
+    h.push(`<label class="f">How participants get in</label><div class="radio-cards"><label><input type="radio" data-testid="sgb-dlg-type-auto" name="sType" value="auto" ${B.type==='auto'?'checked':''}> <b>Automated</b><span>Rules place people here and keep it up to date.</span></label><label><input type="radio" data-testid="sgb-dlg-type-manual" name="sType" value="manual" ${B.type==='manual'?'checked':''}> <b>Manual</b><span>People are placed here by hand and stay until moved.</span></label></div><p class="subtle small">You can’t change this after the segment is created.</p>`);
+  h.push(`<label class="f">Status</label><div class="seg-toggle" role="radiogroup" aria-label="Status">${[['active','Active'],['inactive','Inactive']].map(([v,l])=>`<label><input type="radio" ${v==='active'?'data-testid="sgb-dlg-status-active"':'data-testid="sgb-dlg-status-inactive"'} name="sStatus" value="${v}" ${B.status===v?'checked':''}>${l}</label>`).join('')}</div>
+    <p class="subtle small" id="sStatusHint" style="margin:6px 0 0">${statusHint()}</p>`);
+  h.push(`<label class="f">Journey</label>
+    <div id="sScopeBox">${scopeHtml()}</div>`);
+  if(B.type==='auto'){
+    // no all/any choice: new segments always match ALL conditions; an existing ANY rule keeps its B.comb
+    h.push(`<label class="f">Conditions</label>
+      <div id="conds">${B.rows.map(rowHtml).join('')}</div><button type="button" class="btn ghost" data-testid="sgb-dlg-add-cond" data-b="add">+ Add condition</button>
+      <div class="preview" id="sPrev" aria-live="polite"></div>`);
+    if(B.mode==='create') h.push(`<label class="f">Sequence</label><p class="subtle small" style="margin:0">Sets this segment’s place in the order of automated segments. Each segment’s list holds everyone who matches its conditions, so a participant can be in more than one segment; the order doesn’t move anyone. The sequence is the board order: the new card goes on the board right after the segment above it here. Drag the new segment, or use the arrows, to set its place.</p><div id="seqBox"></div>`);
+  } else h.push(`<div class="info">A manual segment starts empty. Move participants in from any segment, by drag and drop or with “Move to…”.${B.eligibility?' It keeps the copied eligibility conditions, so you’ll see a warning when someone no longer qualifies.':''}</div>`);
+  h.push(`</div><div class="dlg-f"><span class="err" id="sErr"></span>${B.mode==='edit'?'<button class="btn" id="sArchive" data-testid="sgb-dlg-archive">Archive segment</button>':''}<button class="btn" data-dlg="cancel">Cancel</button><button class="btn primary" id="sGo" data-testid="sgb-dlg-save">${B.mode==='edit'?'Save changes':'Create segment'}</button></div>`);
+  $('#segDlg .dlg').innerHTML=h.join('');
+  renderSeq(); updatePreview();
+}
+// ---------- sequence: order of automated segments (create only) ----------
+const NEW_ID='__NEW__';
+const seqSegs=set=>set.segments.filter(x=>x.mode==='auto').sort((a,b)=>a.sequence-b.sequence);
+const statusHint=()=>B.status==='active'?'Active: the segment places participants and can be used for actions.':'Inactive: the segment is kept but places no one. Automated rules skip it.';
+let seqSort=null;
+function renderSeq(){
+  const box=$('#seqBox'); if(seqSort){seqSort.destroy();seqSort=null;} if(!box) return;
+  const set=curSet(), last=B.order.length-1;
+  box.innerHTML=`<ol class="seq-list" id="seqList">${B.order.map((id,i)=>{
+    if(id!==NEW_ID){const x=set._by.get(id); return `<li class="seq-item ${x.status==='inactive'?'off':''}" data-sid="${id}"><span class="seq-n">${i+1}</span><span class="grow">${esc(x.name)}${x.status==='inactive'?' · inactive':''}</span></li>`;}
+    return `<li class="seq-item new" data-sid="${NEW_ID}"><span class="seq-n">${i+1}</span><span class="seq-handle" aria-hidden="true" title="Drag">⠿</span><span class="grow" id="seqNewName">${esc(B.name.trim()||'New segment')}</span>
+      <button type="button" class="icon-btn" data-seqmv="-1" aria-label="Move up" ${i===0?'disabled':''}>↑</button><button type="button" class="icon-btn" data-seqmv="1" aria-label="Move down" ${i===last?'disabled':''}>↓</button></li>`;}).join('')}</ol>`;
+  if(sortableOk) seqSort=new Sortable($('#seqList'),{handle:'.seq-handle',animation:150,onEnd:()=>{B.order=$$('#seqList .seq-item').map(li=>li.dataset.sid);renderSeq();}});
+  const n=$('#seqList .seq-item.new'); if(n) n.scrollIntoView({block:'nearest'});
+}
+const jHint=()=>{const t=SCOPE[B.scope.type];
+  return B.scope.ids.length?`Only participants in ${scopeText(B.scope)} can be in this segment.`:`No ${t.label.toLowerCase()} picked: the segment applies to all ${t.plural}.`;};
+function scopeHtml(){   // the journey dropdown
+  const t=SCOPE[B.scope.type], opts=t.opts(), sel=B.scope.ids;
+  return `<details class="fdrop ms"><summary class="ms-sum ${sel.length?'has':''}" id="sJSum" data-testid="sgb-dlg-journey" aria-label="${t.label}">${esc(scopeText(B.scope))}</summary><div class="fpanel">
+      ${opts.length>8?`<input type="search" class="ms-q" placeholder="Search ${t.plural}" aria-label="Search ${t.plural}">`:''}
+      <div class="ms-tools"><button type="button" data-jall="1">Select all</button><button type="button" data-jall="0">Clear</button><span class="subtle small" id="sJCount">${sel.length} of ${opts.length}</span></div>
+      <div class="checks">${opts.map(([v,l])=>`<label data-name="${esc(l.toLowerCase())}"><input type="checkbox" data-testid="sgb-dlg-journey-option" data-jg="${esc(v)}" ${sel.includes(v)?'checked':''}>${esc(l)}</label>`).join('')}</div></div></details>
+    <p class="subtle small" id="sJText" style="margin:6px 0 0">${jHint()}</p>`;
+}
+function syncJourney(){   // keep the scope dropdown summary, count and hint in step with B.scope
+  const sum=$('#sJSum'); sum.textContent=scopeText(B.scope); sum.classList.toggle('has',!!B.scope.ids.length);
+  $('#sJCount').textContent=`${B.scope.ids.length} of ${SCOPE[B.scope.type].opts().length}`;
+  $('#sJText').textContent=jHint(); updatePreview();
+}
+function renderConds(){$('#conds').innerHTML=B.rows.map(rowHtml).join('');updatePreview();}
+function buildRule(){return {[B.comb]:B.rows.map(r=>({field:r.field,op:r.op,value:r.value,...(r.products?{products:[...r.products]}:{})}))};}
+function validRule(){
+  if(!B.rows.length&&!B.scope.ids.length) return `Pick a ${SCOPE[B.scope.type].label.toLowerCase()} or add at least one condition.`;
+  for(const r of B.rows){const f=FIELD[r.field];
+    if(r.op==='counts'&&(!r.value.items.length||!r.value.items.every(i=>Number.isFinite(i.n)))) return `Enter a count for every product in “${f.label}”.`;
+    if((r.op==='in'||r.op==='hasAny'||r.op==='equals')&&!r.value.length) return `Pick at least one value for “${f.label}”.`;
+    if(COUNT_DEFAULT[r.field]&&!(r.products||[]).length) return `Pick at least one product for “${f.label}”.`;
+    if(f.type==='number'&&(r.op==='between'?!r.value.every(Number.isFinite):!Number.isFinite(r.value))) return `Enter a number for “${f.label}”.`;}
+  return true;
+}
+function newSequence(set){   // create: its position in the sequence list; edit: unchanged
+  if(B.mode==='edit') return B.sequence;
+  return B.order.indexOf(NEW_ID)+1;
+}
+function seqShifts(set){   // existing segments whose sequence changes when the new one is inserted
+  return B.order.filter((id,i)=>id!==NEW_ID&&set._by.get(id).sequence!==i+1).length;
+}
+// no match preview: the box only shows what is still missing, and hides once the conditions are complete
+function buildDoc(){   // the Firestore document this dialog saves
+  const set=curSet(), name=B.name.trim(), desc=B.description.trim(), edit=B.mode==='edit';
+  const doc={id:edit?B.id:B.newId, name};
+  if(desc) doc.description=desc;
+  if(B.groupid) doc.groupid=B.groupid;
+  doc.mode=B.type; doc.status=B.status;
+  doc.journeys=[...B.scope.ids];
+  // rule is stored as a plain list of conditions, all of which must be true (no "all" wrapper);
+  // only an older ANY rule (the Do Not Use segments) keeps its { any: [...] } form
+  if(B.type==='auto'){ if(!edit) doc.sequence=newSequence(set); const r=buildRule(); doc.rule=r.all||r;}
+  else doc.eligibility=B.eligibility||null;
+  if(!edit) doc.displayIndex=set.displayOrder.length;   // new segments go at the end of the board
+  Object.assign(doc,edit?{updatedAt:'<serverTimestamp>',updatedBy:'<your email>'}:{createdAt:'<serverTimestamp>',createdBy:'<your email>'});
+  return doc;
+}
+function updatePreview(){
+  const el=$('#sPrev'); if(!el) return;
+  const v=validRule(); el.hidden=v===true; el.innerHTML=v===true?'':`<span class="subtle">${esc(v)}</span>`;
+}
+// build each segment's list from its conditions over every participant, then store it in segmentboardlist
+// an automated segment's list: everyone matching its journeys + conditions, except people in a manual segment
+function autoList(s){
+  const rule=segRule(s), pin=master._pinned||new Set();
+  return {segmentid:s.id,segmentname:s.name,profilelist:P.filter(p=>!pin.has(p.pid)&&matches(rule,p.f)).map(p=>p.pid)};
+}
+// after a manual change: rebuild every active automated list and store only the ones that changed
+async function syncAutoLists(){
+  computeSet(master);
+  const changed=master._auto.map(autoList).filter(l=>{const L=LISTS.get(l.segmentid); return !L||L.ids.size!==l.profilelist.length||l.profilelist.some(id=>!L.ids.has(id));});
+  if(!changed.length) return 0;
+  try{ await store.saveLists(changed); }catch(e){ toast(`Couldn’t update the automated lists: ${e?.message||e}`); return 0; }
+  const now=new Date(); for(const l of changed) LISTS.set(l.segmentid,{ids:new Set(l.profilelist),lastupdated:now});
+  computeSet(master); return changed.length;
+}
+// place people in one manual segment: out of every other manual segment, then automated lists follow
+async function placeInManual(targetId,pids,btn,errEl){
+  const set=curSet(), add=new Set(pids), writes=[];
+  for(const s of set.segments) if(s.mode==='manual'){
+    const cur=[...(LISTS.get(s.id)?.ids||[])];
+    const next=s.id===targetId?[...cur,...pids.filter(id=>!cur.includes(id))]:cur.filter(id=>!add.has(id));
+    if(s.id===targetId||next.length!==cur.length) writes.push({segmentid:s.id,segmentname:s.name,profilelist:next});
+  }
+  const label=btn?.textContent; if(btn){btn.disabled=true; btn.textContent='Saving…';}
+  try{ await store.saveLists(writes); }
+  catch(e){ if(btn){btn.disabled=false; btn.textContent=label;} const m=`Couldn’t save to segmentboardlist: ${e?.message||e}`; if(errEl) errEl.textContent=m; else toast(m); return null; }
+  const now=new Date(); for(const l of writes) LISTS.set(l.segmentid,{ids:new Set(l.profilelist),lastupdated:now});
+  const moved=writes.filter(w=>w.segmentid!==targetId).length;
+  const autos=await syncAutoLists();
+  return {moved,autos};
+}
+async function refreshLists(ids){
+  const segs=ids.map(id=>master._by.get(id)).filter(s=>s&&s.mode==='auto'&&s.status!=='inactive');
+  if(!segs.length||S.refreshing) return;
+  if(!P.length) return toast('No participants loaded.');
+  S.refreshing=new Set(segs.map(s=>s.id)); render();
+  const lists=segs.map(autoList);
+  try{ await store.saveLists(lists); }
+  catch(e){ S.refreshing=null; render(); return toast(`Couldn’t save to segmentboardlist: ${e?.message||e}`); }
+  const now=new Date();
+  for(const l of lists){ LISTS.set(l.segmentid,{ids:new Set(l.profilelist),lastupdated:now}); S.stale.delete(l.segmentid); }
+  S.refreshing=null; computeSet(master); render();
+  toast(lists.length===1?`${lists[0].segmentname}: ${plural(lists[0].profilelist.length,'participant')}.`:`Refreshed ${plural(lists.length,'segment list')}.`);
+}
+let saving=false;
+async function saveSeg(){
+  if(saving) return;
+  const set=curSet(), err=m=>{$('#sErr').textContent=m;}, go=$('#sGo');
+  if(B.type==='auto'){const v=validRule(); if(v!==true) return err(v);}
+  const name=B.name.trim();
+  if(name.length<3) return err('Give the segment a name of at least 3 characters.');
+  if(set.segments.some(x=>x.id!==(B.mode==='edit'?B.id:null)&&x.name.toLowerCase()===name.toLowerCase())) return err('This set already has a segment with that name.');
+  const doc=buildDoc(), isNew=B.mode!=='edit';
+  let changes=[], plan={updates:[],history:[]}, newOrder=null;
+  if(!isNew){
+    const s=set._by.get(B.id);
+    if((s.status||'active')!==B.status) changes.push(`status changed to ${B.status}`);
+    if(name!==s.name) changes.push(`renamed from “${s.name}” to “${name}”`);
+    const was=jScope(s.journeys); if(scopeKey(was)!==scopeKey(B.scope)) changes.push(`journey changed: ${scopeText(was)} → ${scopeText(B.scope)}`);
+    const desc=B.description.trim(); if(desc!==(s.description||'')) changes.push(desc?'description updated':'description removed');
+    if((liveGroupOf(s)?.id||'')!==(B.groupid||'')) changes.push(`group: ${groupName(liveGroupOf(s)?.id)||'none'} → ${groupName(B.groupid)||'none'}`);
+    if(B.type==='auto'){const before=describeRule(s.rule), after=describeRule(buildRule()); if(before!==after) changes.push(`conditions changed: ${before} → ${after}`);}
+    if(!changes.length){$('#segDlg').close(); toast('No changes to save.'); return;}
+  }
+  const history=[];
+  if(isNew){
+    // one order: a new automated card goes on the board right after the automated card it follows in the
+    // sequence list (or before the first one); a manual card goes last. Everything after it moves down one.
+    newOrder=set.displayOrder.slice();
+    let at=newOrder.length;
+    if(B.type==='auto'){
+      const k=B.order.indexOf(NEW_ID), prev=B.order[k-1], next=B.order[k+1];
+      if(prev&&newOrder.includes(prev)) at=newOrder.indexOf(prev)+1; else if(next&&newOrder.includes(next)) at=newOrder.indexOf(next);
+    }
+    newOrder.splice(at,0,doc.id);
+    plan=orderPlan(set,newOrder,doc.id,B.type==='auto');
+    doc.displayIndex=at;
+    if(B.type==='auto') doc.sequence=newOrder.slice(0,at+1).filter(id=>id===doc.id||set._by.get(id)?.mode==='auto').length;
+    const start=storedFields(fromDoc(doc)), ch={};
+    for(const [f,v] of Object.entries(start)) if(!(f==='description'&&!v)) ch[f]={from:null,to:v};
+    ch.position={from:null,to:at+1}; if(doc.sequence) ch.sequence={from:null,to:doc.sequence};
+    history.push(hEntry({id:doc.id,name},'create',ch,`Created (${B.type==='auto'?`automated, sequence ${doc.sequence}`:'manual'}, position ${at+1}${B.status==='inactive'?', inactive':''})`));
+  } else {
+    const ch=diffFields(storedFields(set._by.get(B.id)),storedFields(fromDoc(doc)));
+    if(Object.keys(ch).length) history.push(hEntry({id:B.id,name},'edit',ch,changes.map(c=>c[0].toUpperCase()+c.slice(1)).join(' · ')));
+  }
+  history.push(...plan.history);
+  // the groups record what joined and left them
+  const groupHistory=[], segId=isNew?doc.id:B.id, oldG=isNew?'':(liveGroupOf(set._by.get(B.id))?.id||''), newG=B.groupid||'';
+  if(oldG!==newG){
+    if(oldG) groupHistory.push({groupid:oldG,action:'segment-removed',segmentid:segId,segmentname:name,changes:{segments:{added:[],removed:[segId]}},summary:`Removed “${name}”`});
+    if(newG) groupHistory.push({groupid:newG,action:'segment-added',segmentid:segId,segmentname:name,changes:{segments:{added:[segId],removed:[]}},summary:`Added “${name}”`});
+  }
+  saving=true; err(''); if(go){go.disabled=true; go.textContent='Saving…';}
+  try{ await store.saveSegment(doc,{isNew,orderUpdates:plan.updates,history,groupHistory}); }
+  catch(e){ saving=false; if(go){go.disabled=false; go.textContent=isNew?'Create segment':'Save changes';} return err(`Couldn’t save to segmentboardconfig: ${e?.message||e}`); }
+  saving=false;
+  if(!isNew&&changes.some(c=>/^(conditions|journey|status)/.test(c))) S.stale.add(B.id);
+  // written: apply the same doc to the board
+  const seg=fromDoc(doc);
+  forgetHistory([seg.id,...plan.updates.map(u=>u.id)]); for(const g of groupHistory) GHIST.delete(g.groupid);
+  if(isNew){
+    set.segments.push(seg); set.defaultDisplayOrder.push(seg.id);
+    commitOrder(set,newOrder,plan.updates);
+  } else {
+    const i=set.segments.findIndex(x=>x.id===seg.id), old=set.segments[i];
+    set.segments[i]={...old,...seg,_stored:old._stored,sequence:old.sequence};
+    if(!doc.groupid) delete set.segments[i].groupid;
+    if(!doc.description) delete set.segments[i].description;
+  }
+  computeSet(set);
+  AUDIT.unshift(isNew
+    ?{at:Date.now(),by:who(),type:'SEGMENT_CREATE',text:`${name} (${seg.mode==='auto'?`automated, sequence ${seg.sequence}`:'manual'}${seg.status==='inactive'?', inactive':''}) created.`}
+    :{at:Date.now(),by:who(),type:'RULE_CHANGE',text:`${name}: ${changes.join('; ')}`});
+  $('#segDlg').close(); render();
+  const n=tally(set).by[seg.id]||0;
+  toast(isNew?(seg.mode==='auto'?`Created “${name}”.`:`Created “${name}”. Move participants in by hand.`):`Saved “${name}”.`);
+  // the list follows the conditions: rebuild and store it now instead of waiting for Refresh list
+  if(seg.mode==='auto'&&seg.status!=='inactive') await refreshLists([seg.id]);
+  else if(seg.mode==='manual') await syncAutoLists();   // a manual segment turned on/off changes who the automated lists may hold
+}
+const describeRule=r=>{const ex=expand(r);return (ex.all||ex.any).map(describe).join(ex.any?' OR ':'; ');};
+async function archiveSeg(){
+  const set=curSet(), s=set._by.get(B.id), n=tally(set).by[s.id]||0;
+  if(!confirm(`Archive “${s.name}”?\n\n${n?`${fmt(n)} participants will be re-checked against the remaining segments.`:'No participants are in it.'}\nArchived segments are kept, never deleted, so anything that points at this segment still resolves.`)) return;
+  try{ await store.archiveSegment(s.id,[hEntry(s,'archive',{archived:{from:false,to:true}},'Archived')]); }catch(e){ $('#sErr').textContent=`Couldn’t archive: ${e?.message||e}`; return; }
+  forgetHistory([s.id]);
+  ARCHIVED_IDS.add(s.id); ARCHIVED.push({...s,archived:true});
+  set.segments=set.segments.filter(x=>x.id!==s.id);
+  set.displayOrder=set.displayOrder.filter(i=>i!==s.id); set.defaultDisplayOrder=set.defaultDisplayOrder.filter(i=>i!==s.id);
+  for(const m of MEM[set.id].values()) if(m.segmentId===s.id&&m.pinned) m.pinned=false;
+  computeSet(set);
+  if(set.type==='master') AUDIT.unshift({at:Date.now(),by:who(),type:'SEGMENT_ARCHIVE',text:`${s.name} archived. ${plural(n,'participant')} re-checked.`});
+  $('#segDlg').close(); if(S.drawer&&S.drawer.id===s.id) closeDrawer(); render();
+  if(s.mode==='manual') await syncAutoLists();   // its people can be in automated segments again
+  render(); toast(`Archived “${s.name}”. It’s under Archived, where it can be restored.`);
+}
+
+// ---------- features: communication, content, app actions ----------
+// content catalogues — three parallel lists on one recommendation, as the app stores them
+const CONTENT={
+  'EI Flix':{key:'eiflix',source:'series',items:['Emotional Agility (series)','Difficult Conversations (series)','Resilience Lab (series)']},
+  'Solar Voice':{key:'solarvoice',source:'solar voice playlist',items:['Morning Charge','Deep Focus','Wind Down']},
+  'General':{key:'generalcontent',source:'content_urls',items:['Breakthrough Basics: Week 1','Momentum Reset','Founder Mindset Series']}
+};
+const ACTION_TYPES={
+  'Form':{field:'formspending',source:'delivery forms',items:['Onboarding form','Journey feedback form','Pre-event questionnaire','Consent & preferences']},
+  'Quiz':{field:'quiz',source:'quiz',items:['Journey readiness quiz','Mode understanding check']},
+  'VideoAsk':{field:'videoaskpending',source:'arenavideoask',items:['Arena reflection','Post-event reflection']},
+  'Mandatory action':{field:'mandatoryaction',source:'fixed list',items:['Monthly Interim Report']}
+};
+const TEMPLATES={
+  WhatsApp:{coll:'wati templates',items:['Event reminder','Queue update','Re-engagement nudge']},
+  Email:{coll:'email templates (Postmark approved)',items:['Weekly digest','Event invitation','Payment reminder']},
+  'App notification':{coll:'notification templates',items:['New content available','Action pending','Event starting soon']}
+};
+const ACTIVITY=[];
+let ACT=null;
+function actionTargets(scope){
+  const mm=MEM.master, uniq=new Set();
+  if(scope.groups){for(const id of scope.groups){const g=curTeam().groups.find(x=>x.id===id); if(g) groupPids(g).forEach(p=>uniq.add(p.pid));} return [...uniq];}
+  if(scope.segs){for(const p of P){const m=mm.get(p.pid); if(m.segs.some(id=>scope.segs.includes(id))&&inFilter(p.pid)) uniq.add(p.pid);} return [...uniq];}
+  if(scope.group){const g=curTeam().groups.find(x=>x.id===scope.group); return groupPids(g).map(p=>p.pid);}
+  if(scope.seg) return P.filter(p=>mm.get(p.pid).segs.includes(scope.seg)&&inFilter(p.pid)).map(p=>p.pid);
+  return [...S.sel];
+}
+function scopeLabel(scope){
+  const set=master, team=S.teamId?curTeam():null;
+  if(scope.groups) return scope.groups.map(id=>team.groups.find(g=>g.id===id)?.name).filter(Boolean).join(', ');
+  if(scope.segs) return scope.segs.map(id=>set._by.get(id)?.name).filter(Boolean).join(', ');
+  if(scope.group) return team.groups.find(g=>g.id===scope.group).name;
+  if(scope.seg) return set._by.get(scope.seg).name;
+  return 'the selected participants';
+}
+function openAction(kind,scope,channel){
+  const set=curSet(), teamScope=!!(scope.group||scope.groups||S.teamId);
+  if(!(teamScope?canEditTeam():canEdit(set))) return;
+  const pids=actionTargets(scope); if(!pids.length) return toast('No participants to act on.');
+  ACT={kind,scope,pids};
+  const multi=(scope.segs&&scope.segs.length>1)||(scope.groups&&scope.groups.length>1);
+  const where=scopeLabel(scope)+(filtersOn()?' (filtered)':'');
+  const head={comm:'Send communication',content:'Recommend content',appaction:'Assign app action'}[kind];
+  let body='';
+  if(kind==='comm'){
+    body=`<label class="f">Channels</label><div class="checks">${Object.keys(TEMPLATES).map(c=>`<label><input type="checkbox" data-ch="${c}" ${(channel?c===channel:c==='App notification')?'checked':''}>${c}</label>`).join('')}</div>
+      <label class="f" for="cTpl">Template</label><select id="cTpl">${Object.entries(TEMPLATES).flatMap(([g,v])=>v.items.map(x=>`<option>${esc(g)}: ${esc(x)}</option>`)).join('')}<option value="">Custom message…</option></select>
+      <label class="f" for="cName">Broadcast name</label><input id="cName" type="text" placeholder="e.g. Sept queue update">
+      <label class="f" for="cMsg">Message</label><textarea id="cMsg" rows="3" placeholder="Hi {{name}}, your next session is ready…"></textarea>
+      <label class="f" for="cLand">App notification lands on</label><select id="cLand"><option>Home</option><option>My journey</option><option>Content library</option><option>Pending actions</option></select>
+      <label class="f" for="cWhen">When</label><select id="cWhen"><option value="now">Send now</option><option value="later">Schedule</option></select>
+      <div class="info">Goes to <b>${plural(pids.length,'participant')}</b> in ${esc(where)}. Only approved templates are listed, and anyone missing a number, email or device token is skipped and reported back.</div>
+      <span class="dev-note block">Email: write \`email archive\` {profileid[], subject, body, templateid, broadcastname} → POST sendBatchEmail {archiveid}
+WhatsApp: write \`wati archive\` {profileid[], templateid, watitemplateid, broadcastname} → POST sendwhatsappbroadcast {archiveid}
+App: saveNotificationRecord → \`notificationrecord\` {title, subtitle, message, landingpage, sticky, notificationtype, profileid[]} → CF fans out to FCM</span>`;
+  } else if(kind==='content'){
+    body=`<label class="f" for="kTitle">Recommendation title</label><input id="kTitle" type="text" placeholder="e.g. Pre-Arena warm up">
+      <label class="f" for="kType">Content type</label><select id="kType">${Object.keys(CONTENT).map(k=>`<option>${esc(k)}</option>`).join('')}</select>
+      <label class="f" for="kItem">Content</label><select id="kItem">${CONTENT['EI Flix'].items.map(x=>`<option>${esc(x)}</option>`).join('')}</select>
+      <label class="f" for="kExp">Expires on</label><input id="kExp" type="text" placeholder="e.g. 31 Oct 2026">
+      <label class="f">How it applies</label><div class="radio-cards"><label><input type="radio" name="kMode" value="once" checked> <b>One time</b><span>Recommend it to these participants now.</span></label>
+        ${scope.seg&&!scope.group&&!scope.segs?`<label><input type="radio" name="kMode" value="standing"> <b>Standing rule</b><span>Everyone who enters this segment gets it, and it is removed when they leave.</span></label>`:''}</div>
+      <div class="info">Applies to <b>${plural(pids.length,'participant')}</b> in ${esc(where)}. Participants whose tier doesn’t include the content are skipped.</div>
+      <span class="dev-note block">one-time: write \`buffermix archive\` {profileid[], eiflix[], solarvoice[], generalcontent[], title, expiredate, recommendedby} → CF fans out to \`recommended mix playlist\`
+standing rule: stored on the segment; the membership trigger writes/removes the recommendation as people enter and leave</span>`;
+  } else {
+    body=`<label class="f" for="aType">Action type</label><select id="aType">${Object.keys(ACTION_TYPES).map(k=>`<option>${esc(k)}</option>`).join('')}</select>
+      <label class="f" for="aItem">Which one</label><select id="aItem">${ACTION_TYPES.Form.items.map(f=>`<option>${esc(f)}</option>`).join('')}</select>
+      <label class="f" for="aDue">Due date</label><input id="aDue" type="text" placeholder="e.g. 30 Sep 2026">
+      <label class="f"><input type="checkbox" id="aRemind" checked> Remind them in the app until it is done</label>
+      <div class="info">Shows as pending for <b>${plural(pids.length,'participant')}</b> in ${esc(where)} until they complete it. It disappears on its own when they do.</div>
+      <span class="dev-note block">merges into \`appactionpending/{profileid}\` — formspending[] / quiz[] / videoaskpending[] / mandatoryaction[]. Pending = the array is not empty; there is no status field.</span>`;
+  }
+  $('#actDlg .dlg').innerHTML=`<div class="dlg-h"><h2 id="actTitle">${head}</h2><p class="subtle">${esc(S.teamId?curTeam().name:set.name)} · ${multi?plural((scope.segs||scope.groups).length,S.teamId?'group':'segment')+': ':''}${esc(where)}</p></div>
+    <div class="dlg-b">${body}</div>
+    <div class="dlg-f"><span class="err" id="actErr"></span><button class="btn" data-dlg="cancel">Cancel</button><button class="btn primary" id="actGo">${kind==='comm'?'Send':kind==='content'?'Recommend':'Assign'}</button></div>`;
+  $('#actDlg').showModal();
+}
+// Send communication / Recommend playlist: the same dialogs as the B!G Cohorts dashboard, opened by the component
+const CHANNEL={'WhatsApp':'whatsapp','Email':'email','App notification':'app'};
+function sendReal(kind,scope,channel){
+  if(!canEdit(curSet())) return;
+  const pids=actionTargets(scope); if(!pids.length) return toast('No participants to act on.');
+  const run=kind==='comm'?store.communicate(CHANNEL[channel]||'app',pids):store.recommendPlaylist(pids);
+  run.then(text=>{ if(!text) return;
+    ACTIVITY.unshift({at:Date.now(),by:who(),setId:curSet().id,kind,segId:scope.seg||null,count:pids.length,text:`${text} · ${scopeLabel(scope)}`});
+    if(S.drawer?.kind==='activity') renderDrawer(); })
+   .catch(e=>toast(`Couldn’t send: ${e?.message||e}`));
+}
+function doAction(){
+  const set=curSet(), k=ACT.kind, n=ACT.pids.length; let text='';
+  if(k==='comm'){
+    const ch=$$('#actDlg input[data-ch]').filter(i=>i.checked).map(i=>i.dataset.ch);
+    if(!ch.length){$('#actErr').textContent='Pick at least one channel.';return;}
+    const msg=$('#cMsg').value.trim(), tpl=$('#cTpl').value;
+    if(!msg&&!tpl){$('#actErr').textContent='Pick a template or write a message.';return;}
+    text=`${ch.join(' + ')} to ${plural(n,'participant')}${tpl?` · ${tpl}`:''}${$('#cWhen').value==='later'?' · scheduled':''}`;
+  } else if(k==='content'){
+    const type=$('#kType').value, item=$('#kItem').value, standing=$('input[name=kMode]:checked')?.value==='standing';
+    text=`${type}: ${item} → ${plural(n,'participant')}${standing?' · standing rule':''}`;
+    if(standing&&ACT.scope.seg){const s=set._by.get(ACT.scope.seg);(s.contentRules=s.contentRules||[]).push(`${type}: ${item}`);}
+  } else {
+    const type=$('#aType').value, item=$('#aItem').value, a=`${type}: ${item}`;
+    text=`${a} → ${plural(n,'participant')}`;
+    for(const pid of ACT.pids){const p=PI.get(pid); if(!p.pending.includes(a)) p.pending.push(a);}
+  }
+  ACTIVITY.unshift({at:Date.now(),by:who(),setId:S.teamId?'team:'+S.teamId:set.id,kind:k,segId:ACT.scope.seg||null,count:n,text:text+` · ${scopeLabel(ACT.scope)}`});
+  $('#actDlg').close(); render();
+  toast({comm:'Sent',content:'Recommended',appaction:'Assigned'}[k]+`: ${text}`);
+}
+
+// ---------- add participants by hand ----------
+let ADD=null;
+// manual segments: participants are added by hand; the list is stored in segmentboardlist like any other
+function openAdd(segId){
+  const set=curSet(), s=set._by.get(segId); if(!canEdit(set)||!s||s.mode!=='manual') return;
+  ADD={segId,sel:new Set(),q:''};
+  $('#addDlg .dlg').innerHTML=`<div class="dlg-h"><h2 id="addTitle">Add participants to ${esc(s.name)}</h2><p class="subtle">They stay in this segment until someone removes them.</p></div>
+    <div class="dlg-b"><label class="f" for="aq">Find participants</label><input id="aq" data-testid="sgb-add-search" type="search" placeholder="Search by name or email" autocomplete="off">
+      <div class="target-list" id="alist"></div>
+      <span class="dev-note block">segmentboardlist/${esc(segId)}.profilelist += picked profile ids</span></div>
+    <div class="dlg-f"><span class="err" id="aErr"></span><button class="btn" data-dlg="cancel">Cancel</button><button class="btn primary" id="aGo" data-testid="sgb-add-go">Add</button></div>`;
+  renderAddList(); $('#addDlg').showModal(); $('#aq').focus();
+}
+function renderAddList(){
+  const set=curSet(), q=ADD.q.trim().toLowerCase(), mm=MEM[set.id], here=LISTS.get(ADD.segId)?.ids;
+  const hits=P.filter(p=>!here?.has(p.pid)&&(!q||qMatch(p,q))).slice(0,60);
+  $('#alist').innerHTML=hits.length?hits.map(p=>{const m=mm.get(p.pid);
+    return `<label><input type="checkbox" data-testid="sgb-add-option" data-addpid="${p.pid}" ${ADD.sel.has(p.pid)?'checked':''}><span class="grow">${esc(p.name)}<div class="subtle small">${p.email?esc(p.email)+' · ':''}${esc(p.journey)} · ${m.segs.length?'In '+esc(m.segs.map(id=>segName(set,id)).join(', ')):'Not in a segment'}</div></span></label>`;}).join('')
+    :`<div class="subtle" style="padding:12px">${q?'No participant found.':'Everyone is already in this segment.'}</div>`;
+  const go=$('#aGo'); go.textContent=ADD.sel.size?`Add ${plural(ADD.sel.size,'participant')}`:'Add'; go.disabled=!ADD.sel.size;
+}
+// write a manual segment's whole list, then show it
+async function saveManualList(segId,ids,btn,errEl){
+  const set=curSet(), s=set._by.get(segId), label=btn?.textContent;
+  if(btn){btn.disabled=true; btn.textContent='Saving…';}
+  try{ await store.saveLists([{segmentid:s.id,segmentname:s.name,profilelist:ids}]); }
+  catch(e){ if(btn){btn.disabled=false; btn.textContent=label;} const m=`Couldn’t save to segmentboardlist: ${e?.message||e}`; if(errEl) errEl.textContent=m; else toast(m); return false; }
+  LISTS.set(s.id,{ids:new Set(ids),lastupdated:new Date()}); computeSet(set); return true;
+}
+async function doAdd(){
+  const s=curSet()._by.get(ADD.segId), before=[...(LISTS.get(s.id)?.ids||[])], added=[...ADD.sel].filter(id=>!before.includes(id));
+  const r=await placeInManual(s.id,added,$('#aGo'),$('#aErr')); if(!r) return;
+  AUDIT.unshift({at:Date.now(),by:who(),type:'RULE_CHANGE',text:`${s.name}: ${plural(added.length,'participant')} added by hand`});
+  $('#addDlg').close(); render(); toast(`Added ${plural(added.length,'participant')} to ${s.name}.${r.autos?` ${plural(r.autos,'automated list')} updated.`:''}`);
+}
+// "Move to manual segment…" from any list side panel
+let MM=null;
+function openManualMove(){
+  const set=curSet(), pids=[...S.sel], here=S.drawer?.kind==='seg'?S.drawer.id:null;
+  const targets=set.displayOrder.map(id=>set._by.get(id)).filter(x=>x&&x.mode==='manual'&&x.status!=='inactive'&&x.id!==here);
+  if(!pids.length||!targets.length) return;
+  MM={pids,target:null};
+  $('#moveDlg .dlg').innerHTML=`<div class="dlg-h"><h2 id="moveTitle">Move ${plural(pids.length,'participant')} to a manual segment</h2>
+      <p class="subtle">They’re taken out of any other manual segment and left out of every automated segment while they’re here.</p></div>
+    <div class="dlg-b"><div class="target-list">${targets.map(x=>`<label><input type="radio" data-testid="sgb-move-target" name="mmTgt" value="${x.id}"><span class="grow">${esc(x.name)}<div class="subtle small">${plural(LISTS.get(x.id)?.ids.size||0,'participant')}</div></span></label>`).join('')}</div></div>
+    <div class="dlg-f"><span class="err" id="mmErr"></span><button class="btn" data-dlg="cancel">Cancel</button><button class="btn primary" id="mmGo" data-testid="sgb-move-go" disabled>Move</button></div>`;
+  $('#moveDlg').showModal();
+}
+async function doManualMove(){
+  const s=curSet()._by.get(MM.target); if(!s) return;
+  const r=await placeInManual(s.id,MM.pids,$('#mmGo'),$('#mmErr')); if(!r) return;
+  AUDIT.unshift({at:Date.now(),by:who(),type:'RULE_CHANGE',text:`${s.name}: ${plural(MM.pids.length,'participant')} moved in by hand`});
+  $('#moveDlg').close(); S.sel.clear(); render();
+  toast(`Moved ${plural(MM.pids.length,'participant')} to ${s.name}.${r.autos?` ${plural(r.autos,'automated list')} updated.`:''}`);
+}
+async function removeFromSeg(segId){
+  const s=curSet()._by.get(segId), gone=new Set(S.sel), keep=[...(LISTS.get(segId)?.ids||[])].filter(id=>!gone.has(id));
+  if(!gone.size||!confirm(`Remove ${plural(gone.size,'participant')} from “${s.name}”?`)) return;
+  if(!(await saveManualList(segId,keep,null,null))) return;
+  const autos=await syncAutoLists();   // they can match automated segments again
+  AUDIT.unshift({at:Date.now(),by:who(),type:'RULE_CHANGE',text:`${s.name}: ${plural(gone.size,'participant')} removed by hand`});
+  S.sel.clear(); render(); toast(`Removed ${plural(gone.size,'participant')} from ${s.name}.${autos?` ${plural(autos,'automated list')} updated.`:''}`);
+}
+function applyMove(set,pids,target,reason){
+  const mm=MEM[set.id], tseg=target==='__UNSEG__'?null:set._by.get(target), landed={};
+  for(const pid of pids){
+    const p=PI.get(pid), m=mm.get(pid), from=m.segmentId;
+    if(tseg&&tseg.mode==='manual'){m.pinned=true;m.segmentId=tseg.id;} else m.pinned=false;
+    assign(set,p,m);
+    const k=m.segmentId||'__UNSEG__'; landed[k]=(landed[k]||0)+1;
+    if(set.type==='master') AUDIT.unshift({at:Date.now(),by:who(),type:'MANUAL_MOVE',pid,from,to:tseg?tseg.id:null,landed:m.segmentId,reason});
+  }
+  return landed;
+}
+
+// ---------- teams: grouped segments ----------
+let GB=null;
+function openGroupDlg(mode,groupId){
+  const team=curTeam(); if(!canEditTeam()) return;
+  const g=groupId?team.groups.find(x=>x.id===groupId):null;
+  GB={mode,id:groupId||null,name:g?g.name:'',segmentIds:g?[...g.segmentIds]:[],q:''};
+  renderGroupDlg(); $('#groupDlg').showModal(); if(mode==='create') $('#gName').focus();
+}
+function groupPreviewText(){
+  const t=tally(master), total=GB.segmentIds.reduce((a,id)=>a+(t.by[id]||0),0);
+  return `<b>${fmt(total)}</b> participants across ${plural(GB.segmentIds.length,'segment')}. Membership follows the master segments: nobody is moved, and the group updates when the segments do.`;
+}
+function updateGroupPreview(){const el=$('#gPrev'); if(el) el.innerHTML=groupPreviewText();}
+function renderGroupDlg(){
+  const t=tally(master), q=GB.q.trim().toLowerCase();
+  const segs=master.displayOrder.map(id=>master._by.get(id)).filter(Boolean).filter(x=>!q||x.name.toLowerCase().includes(q));
+  const list=segs.map(x=>`<label><input type="checkbox" data-gseg="${x.id}" ${GB.segmentIds.includes(x.id)?'checked':''}>
+      <span class="grow">${esc(x.name)}<div class="subtle small">${plural(t.by[x.id]||0,'participant')}${x.mode==='manual'?' · manual segment':''}</div></span></label>`).join('');
+  $('#groupDlg .dlg').innerHTML=`<div class="dlg-h"><h2 id="groupTitle">${GB.mode==='edit'?'Edit group':'New group'}</h2><p class="subtle">${esc(curTeam().name)} · a group is a selection of master segments</p></div>
+    <div class="dlg-b">
+      <label class="f" for="gName">Group name</label><input id="gName" type="text" value="${esc(GB.name)}" placeholder="e.g. Ready for Arena" autocomplete="off">
+      <label class="f" for="gq">Segments in this group</label><input id="gq" type="search" placeholder="Search segments" value="${esc(GB.q)}" autocomplete="off">
+      <div class="target-list">${list||'<div class="subtle" style="padding:12px">No segment matches your search.</div>'}</div>
+      <div class="preview" id="gPrev">${groupPreviewText()}</div>
+      <span class="dev-note block">segment_teams/${curTeam().id}/groups/{id} = { name, segmentIds[] } · members are read from segment_membership</span></div>
+    <div class="dlg-f"><span class="err" id="gErr"></span>${GB.mode==='edit'?'<button class="btn" id="gDelete">Delete group</button>':''}
+      <button class="btn" data-dlg="cancel">Cancel</button><button class="btn primary" id="gGo">${GB.mode==='edit'?'Save group':'Create group'}</button></div>`;
+}
+function saveGroup(){
+  const team=curTeam(), name=GB.name.trim(), err=m=>{$('#gErr').textContent=m;};
+  if(name.length<3) return err('Give the group a name of at least 3 characters.');
+  if(team.groups.some(g=>g.id!==GB.id&&g.name.toLowerCase()===name.toLowerCase())) return err('This team already has a group with that name.');
+  if(!GB.segmentIds.length) return err('Choose at least one segment.');
+  if(GB.mode==='edit'){const g=team.groups.find(x=>x.id===GB.id); g.name=name; g.segmentIds=[...GB.segmentIds];}
+  else {let id='G_'+name.toUpperCase().replace(/[^A-Z0-9]+/g,'_').slice(0,16); while(team.groups.some(g=>g.id===id)) id+='_2';
+    team.groups.push({id,name,segmentIds:[...GB.segmentIds]});}
+  ACTIVITY.unshift({at:Date.now(),by:who(),setId:'team:'+team.id,kind:'group',count:0,text:`${GB.mode==='edit'?'Updated':'Created'} group “${name}” (${plural(GB.segmentIds.length,'segment')})`});
+  $('#groupDlg').close(); render(); toast(`${GB.mode==='edit'?'Saved':'Created'} “${name}”.`);
+}
+function deleteGroup(){
+  const team=curTeam(), g=team.groups.find(x=>x.id===GB.id);
+  if(!confirm(`Delete the group “${g.name}”?\n\nNo participant is affected: a group only points at master segments.`)) return;
+  team.groups=team.groups.filter(x=>x.id!==g.id);
+  ACTIVITY.unshift({at:Date.now(),by:who(),setId:'team:'+team.id,kind:'group',count:0,text:`Deleted group “${g.name}”`});
+  $('#groupDlg').close(); if(S.drawer&&S.drawer.id===g.id) closeDrawer(); render(); toast(`Deleted “${g.name}”.`);
+}
+function openTeamDlg(){
+  $('#teamDlg .dlg').innerHTML=`<div class="dlg-h"><h2 id="teamTitle">New team</h2><p class="subtle">A team groups the master segments for its own work. It cannot create segments or move participants.</p></div>
+    <div class="dlg-b"><label class="f" for="tName">Team name</label><input id="tName" type="text" placeholder="e.g. Delivery Team" autocomplete="off">
+      <div class="info">Team members can create groups, filter, and send communications, content and app actions. Only Admins change the master segments.</div>
+      <span class="dev-note block">segment_teams/{id} = { name, access: { editRoles: ["admin","teammember"] } }</span></div>
+    <div class="dlg-f"><span class="err" id="tErr"></span><button class="btn" data-dlg="cancel">Cancel</button><button class="btn primary" id="tGo">Create team</button></div>`;
+  $('#teamDlg').showModal(); $('#tName').focus();
+}
+function createTeam(){
+  const name=$('#tName').value.trim();
+  if(name.length<3){$('#tErr').textContent='Give the team a name of at least 3 characters.';return;}
+  if(TEAMS.some(t=>t.name.toLowerCase()===name.toLowerCase())){$('#tErr').textContent='A team with this name already exists.';return;}
+  const id='t'+(TEAMS.length+1); TEAMS.push({id,name,groups:[]});
+  S.teamId=id; closeDrawer(); $('#teamDlg').close(); render(); toast(`Created ${name}. Add its first group.`);
+}
+
+// ---------- arrange ----------
+let sortables=[];
+function enableSort(){
+  const g=$('#groups'); if(!g||!sortableOk) return;
+  $$('#groups .cards').forEach(l=>sortables.push(new Sortable(l,{handle:'.card-h',draggable:'.card',animation:150,fallbackOnBody:true})));
+}
+function stopSort(){sortables.forEach(s=>s.destroy());sortables=[];}
+function readOrder(){return $$('#groups .card').map(x=>x.dataset.seg);}
+
+// ---------- render all ----------
+function render(){ stopSort(); renderMain(); renderNav(); if(S.drawer) renderDrawer(); if(S.arranging) enableSort(); }
+
+// ---------- events ----------
+listen(root,'click',e=>{
+  const t=e.target;
+  if(t.closest('dialog')){
+    const dlg=t.closest('dialog');
+    $$('dialog .fdrop[open]').forEach(d=>{if(!d.contains(t)) d.open=false;});
+    if(t.closest('[data-dlg="cancel"]')){dlg.close();return;}
+    if(dlg.id==='moveDlg'&&t.closest('#mGo')) doMove();
+    if(dlg.id==='addDlg'&&t.closest('#aGo')) doAdd();
+    if(dlg.id==='actDlg'&&t.closest('#actGo')) doAction();
+    if(dlg.id==='groupDlg'&&t.closest('#gGo')) saveGroup();
+    if(dlg.id==='groupDlg'&&t.closest('#gDelete')) deleteGroup();
+    if(dlg.id==='teamDlg'&&t.closest('#tGo')) createTeam();
+    if(dlg.id==='moveDlg'&&MM&&t.closest('#mmGo')) doManualMove();
+    if(dlg.id==='cmpDlg'&&CMP){
+      if(t.closest('#cmpGo')){ runCompare(); renderCmp(); }
+      else if(t.closest('[data-cmptab]')){ CMP.tab=t.closest('[data-cmptab]').dataset.cmptab; renderCmp(); }
+      else if(t.closest('[data-act="cmp-back"]')){ CMP.result=null; renderCmp(); }
+      else if(t.closest('[data-act="cmp-export"]')) cmpExport(false);
+      else if(t.closest('[data-act="cmp-export-all"]')) cmpExport(true);
+      return;
+    }
+    if(dlg.id==='grpDlg'&&GRP){ const b=t.closest('[data-grp]'); if(b) grpAction(b.dataset.grp,b.dataset.gid); return; }
+    if(dlg.id==='segDlg'&&t.closest('[data-b="grp-add"]')){
+      addGroup($('#sGroupNew').value).then(g=>{ B.groupid=g.id; const box=$('#sGroupNewBox'); renderSegDlg(); $('#sErr').textContent=''; })
+        .catch(e=>{ $('#sErr').textContent=e?.message||String(e); });
+      return;
+    }
+    if(dlg.id==='migDlg'){
+      if(t.closest('[data-act="mig-run"]')) runMigrate();
+      else if(t.closest('[data-act="mig-done"]')){ dlg.close(); MIG=null; load(); }
+      return;
+    }
+    if(dlg.id==='segDlg'&&t.closest('#sArchive')) archiveSeg();
+    if(dlg.id==='segDlg'){
+      const mv=t.closest('[data-seqmv]');
+      if(mv){const i=B.order.indexOf(NEW_ID), j=i+(+mv.dataset.seqmv);
+        if(j>=0&&j<B.order.length){[B.order[i],B.order[j]]=[B.order[j],B.order[i]]; renderSeq(); $('#seqList .seq-item.new [data-seqmv="'+mv.dataset.seqmv+'"]')?.focus();}
+        return;}
+      const ps=t.closest('[data-psall]');
+      if(ps){const row=ps.closest('.cond'), r=B.rows[+row.dataset.i], on=ps.dataset.psall==='1', picked=new Set(r.products||[]);
+        $$('input[data-k="pv"]',ps.closest('.fpanel')).filter(x=>!x.closest('label').hidden).forEach(x=>{x.checked=on; on?picked.add(x.value):picked.delete(x.value);});
+        r.products=PRODUCTS.map(p=>p.id).filter(id=>picked.has(id)); syncPms(row,r); updatePreview(); return;}
+      const ja=t.closest('[data-jall]');
+      if(ja){const on=ja.dataset.jall==='1', picked=new Set(B.scope.ids);
+        $$('#segDlg input[data-jg]').filter(i=>!i.closest('label').hidden).forEach(i=>{i.checked=on; on?picked.add(i.dataset.jg):picked.delete(i.dataset.jg);});
+        B.scope.ids=SCOPE[B.scope.type].opts().map(o=>o[0]).filter(v=>picked.has(v)); syncJourney(); return;}
+      const b=t.closest('[data-b]'), ms=t.closest('[data-msall]');
+      if(ms){
+        const row=ms.closest('.cond'), r=B.rows[+row.dataset.i], panel=ms.closest('.fpanel');
+        const boxes=$$('input[data-k="v"]',panel).filter(x=>!x.closest('label').hidden);
+        const on=ms.dataset.msall==='1', picked=new Set(r.value||[]);
+        boxes.forEach(x=>{x.checked=on; on?picked.add(x.value):picked.delete(x.value);});
+        r.value=[...picked]; syncMsSummary(row,r); updatePreview(); return;
+      }
+      if(b&&b.dataset.b==='add'){const used=new Set(B.rows.map(r=>r.field));const next=FIELDS.find(f=>!SCOPE_FIELDS.includes(f.key)&&!used.has(f.key));
+        if(!next) toast('Every condition is already used once.'); else {B.rows.push(defaultRow(next.key));renderConds();}}
+      if(b&&b.dataset.b==='rm'){B.rows.splice(+b.closest('.cond').dataset.i,1);renderConds();}
+      if(b&&b.dataset.b==='addi'){const r=B.rows[+b.closest('.cond').dataset.i];
+        const used=new Set(r.value.items.map(x=>x.product));const nextP=(PRODUCTS.find(p=>!used.has(p.id))||PRODUCTS[0])?.id||'';
+        r.value.items.push({product:nextP,op:'gte',n:1});renderConds();}
+      if(b&&b.dataset.b==='rmi'){const r=B.rows[+b.closest('.cond').dataset.i];
+        r.value.items.splice(+b.closest('[data-ci]').dataset.ci,1);renderConds();}
+      if(t.closest('#sGo')) saveSeg();
+    }
+    return;
+  }
+  const qb=t.closest('[data-qpid]'); if(qb){const set=curSet(),m=MEM[set.id].get(qb.dataset.qpid);$('#qres').hidden=true;
+    openDrawer(m.segmentId?{kind:'seg',id:m.segmentId,tab:'people',hl:qb.dataset.qpid}:{kind:'unseg',reason:null,hl:qb.dataset.qpid});return;}
+  const tt=t.closest('[data-team]'); if(tt){if(S.arranging) return toast('Save or cancel the arrangement first.');S.teamId=tt.dataset.team||null;S.sel.clear();closeDrawer();render();return;}
+  const setBtn=t.closest('[data-set]'); if(setBtn){if(S.arranging) return toast('Save or cancel the arrangement first.'); S.setId=setBtn.dataset.set;closeDrawer();render();return;}
+  const tab=t.closest('[data-tab]'); if(tab){S.drawer.tab=tab.dataset.tab;S.sel.clear();S.dq='';S.limit=150;renderDrawer(true);return;}
+  const rc=t.closest('[data-reason]'); if(rc){S.drawer.reason=rc.dataset.reason||null;S.sel.clear();S.limit=150;renderDrawer(true);return;}
+  const op=t.closest('[data-open]'); if(op&&!S.arranging){const k=op.dataset.open;openDrawer(k==='unseg'?{kind:'unseg',reason:null}:k==='dups'?{kind:'dups'}:k==='ungrouped'?{kind:'ungrouped'}:{kind:'attention'});return;}
+  const a=t.closest('[data-act]');
+  if(a&&!a.disabled){
+    const act=a.dataset.act, set=curSet();
+    if(act==='close') closeDrawer();
+    else if(act==='reload') load();
+    else if(act==='export-list') exportList();
+    else if(act==='migrate') openMigrate();
+    else if(act==='gnav'){ const id=a.dataset.gnav; S.filters.groups=id?[id]:[]; S.cardSel.clear(); S.selGroup=null; refreshFilter(); render(); renderSelBar(); }
+    else if(act==='manage-groups') openGroups();
+    else if(act==='select-group') selectGroup(a.dataset.gsel);
+    else if(act==='show-archived'){ S.showArchived=!S.showArchived; render(); }
+    else if(act==='unarchive') unarchiveSeg(a.dataset.seg);
+    else if(act==='move-manual') openManualMove();
+    else if(act==='compare') openCompare();
+    else if(act==='refresh-list') refreshLists([a.dataset.seg]);
+    else if(act==='refresh-all') refreshLists(set._auto.map(x=>x.id));
+    else if(act==='more'){S.limit+=150;renderDrawer();}
+    else if(act==='clear-sel'){S.sel.clear();$$('input[data-selpid]').forEach(i=>i.checked=false);updateBulk();}
+    else if(act==='clear-cardsel'){S.cardSel.clear();S.selGroup=null;render();renderSelBar();}
+    else if(act==='move') openMove([...S.sel]);
+    else if(act==='history'){ ALLHIST=null; openDrawer({kind:'history'}); }
+    else if(act==='new-seg') openSegDlg('create');
+    else if(act==='edit-seg') openSegDlg('edit',a.dataset.seg);
+    else if(act==='add-people') openAdd(a.dataset.seg);
+    else if(act==='remove-from-seg') removeFromSeg(a.dataset.seg);
+    else if(['comm','content','appaction'].includes(act)){$$('.fdrop[open]').forEach(d=>d.open=false);
+      const scope=a.dataset.multi?(S.teamId?{groups:[...S.cardSel]}:{segs:[...S.cardSel]}):{seg:a.dataset.seg||null,group:a.dataset.group||null};
+      if(act==='appaction') openAction(act,scope,a.dataset.ch||null);
+      else sendReal(act,scope,a.dataset.ch||null);}
+    else if(act==='activity') openDrawer({kind:'activity'});
+    else if(act==='new-group') openGroupDlg('create');
+    else if(act==='edit-group') openGroupDlg('edit',a.dataset.group);
+    else if(act==='new-team'){if(S.arranging) return toast('Save or cancel the arrangement first.');openTeamDlg();}
+    else if(act==='clear-filters'){S.filters=emptyFilters();refreshFilter();render();}
+    else if(act==='collapse-all'){const items=S.teamId?curTeam().groups:set.segments; const all=items.every(x=>S.collapsed.has(x.id));
+      items.forEach(x=>all?S.collapsed.delete(x.id):S.collapsed.add(x.id)); render();}
+    else if(act==='arrange'){closeDrawer(); if(S.filters.groups.length||S.q){ S.filters.groups=[]; S.q=''; S.qRaw=''; refreshFilter(); }S.arranging=true;S.prevCollapsed=new Set(S.collapsed);(S.teamId?curTeam().groups:set.segments).forEach(x=>S.collapsed.add(x.id));render();
+      toast('Drag cards by their title row, then Save arrangement.');}
+    else if(act==='arr-cancel'){S.arranging=false;if(S.prevCollapsed){S.collapsed=S.prevCollapsed;S.prevCollapsed=null;}render();}
+    else if(act==='arr-reset'){set.displayOrder=clone(set.defaultDisplayOrder);render();toast('Back to the default layout. Save to keep it.');}
+    else if(act==='arr-save'){if(S.teamId){const ids=$('#groups .card').map(c=>c.dataset.groupId);const team=curTeam();team.groups.sort((a,b)=>ids.indexOf(a.id)-ids.indexOf(b.id));}else{const ids=readOrder(), plan=orderPlan(set,ids); store.saveDisplayOrder(plan.updates,plan.history).then(()=>{forgetHistory(plan.updates.map(u=>u.id));commitOrder(set,ids,plan.updates);computeSet(set);S.arranging=false;if(S.prevCollapsed){S.collapsed=S.prevCollapsed;S.prevCollapsed=null;}render();toast(plan.history.length?`Order saved: ${plural(plan.history.length,'segment')} moved. The sequence follows the board.`:'Order saved.');}).catch(e=>toast(`Couldn’t save the arrangement: ${e?.message||e}`)); return;}S.arranging=false;if(S.prevCollapsed){S.collapsed=S.prevCollapsed;S.prevCollapsed=null;}render();}
+    return;
+  }
+  const fc=t.closest('[data-fclear]');
+  if(fc){const def=emptyFilters(); for(const k of FILTER_KEYS[fc.dataset.fclear]||[]) S.filters[k]=def[k]; refreshFilter(); render(); return;}
+  const fa=t.closest('[data-fall]');
+  if(fa){const [key,on]=fa.dataset.fall.split(':');
+    S.filters[key]= on==='1' ? Object.keys(OPTS[key]()) : [];
+    if(key==='queues'){const ok=stageOptions(); S.filters.queueStages=S.filters.queueStages.filter(x=>ok[x]);}
+    refreshFilter(); render(); if(key==='events') setTimeout(ensureConfirmed); if(key==='queues'||key==='queueStages') setTimeout(ensureTokens); const d=$(`.fdrop[data-drop="${key}"]`); if(d) d.open=true; return;}
+  const ct=t.closest('[data-cardtab]'); if(ct){const id=ct.dataset.cardtab;S.cardView[id]=(S.cardView[id]||'people')==='people'?'rules':'people';renderMain();updateBulk();return;}
+  const cs=t.closest('[data-cardsel]'); if(cs){toggleCardSel(cs.dataset.cardsel);return;}
+  const cb=t.closest('[data-collapse]'); if(cb){const id=cb.dataset.collapse;S.collapsed.has(id)?S.collapsed.delete(id):S.collapsed.add(id);render();updateBulk();return;}
+  const og=t.closest('[data-opengroup]'); if(og){openDrawer({kind:'group',id:og.dataset.opengroup,tab:'people'});return;}
+  const os=t.closest('[data-openseg]'); if(os){openDrawer({kind:'seg',id:os.dataset.openseg,tab:'people'});return;}
+  const row=t.closest('[data-pid]');
+  if(row&&canEdit(curSet())&&!S.arranging&&!t.closest('input')){toggleSel(row.dataset.pid);return;}
+  const gcard=t.closest('[data-group-id]');
+  if(gcard&&!S.arranging&&t.closest('.card-h')){openDrawer({kind:'group',id:gcard.dataset.groupId,tab:'people'});return;}
+  const card=t.closest('.card');
+  if(card&&!S.arranging&&t.closest('.card-h')){
+    openDrawer({kind:'seg',id:card.dataset.seg,tab:'people'});return;
+  }
+  if(!t.closest('.search')) {const r=$('#qres'); if(r) r.hidden=true;}
+  $$('.fdrop[open]').forEach(d=>{if(!d.contains(t)) d.open=false;});
+  // click anywhere outside the side panel closes it
+  if(S.drawer&&!t.closest('#drawer')&&!t.closest('dialog')&&!t.closest('#selbar')) closeDrawer();
+});
+listen(document,'keydown',e=>{
+  if(e.key==='Escape'&&!$('dialog[open]')){ if(S.cardSel.size){S.cardSel.clear();render();renderSelBar();return;} if(S.drawer) closeDrawer(); }
+  if((e.key==='Enter'||e.key===' ')&&e.target.matches('.card-h[role=button]')){e.preventDefault();e.target.click();}
+});
+listen(root,'change',e=>{
+  const t=e.target;
+  if(t.name==='mmTgt'&&MM){ MM.target=t.value; const g=$('#mmGo'); if(g) g.disabled=false; return; }
+  if(CMP&&t.closest&&t.closest('#cmpDlg')){
+    if(t.name==='cmpBy'){ CMP.by=t.value; cmpDetect(); renderCmp(); }
+    else if(t.id==='cmpCol'){ CMP.col=+t.value; renderCmp(); }
+    else if(t.id==='cmpHead'){ CMP.header=t.checked; renderCmp(); }
+    else if(t.id==='cmpFile'&&t.files&&t.files[0]){ const f=t.files[0]; CMP.busy=true;
+      store.readTable(f).then(T=>{ CMP.table=T; CMP.fileName=f.name; CMP.busy=false; cmpDetect(); renderCmp(); if(!cmpValues().length) $('#cmpErr').textContent='No values found in that file.'; })
+        .catch(err=>{ CMP.busy=false; renderCmp(); $('#cmpErr').textContent=`Couldn’t read ${f.name}: ${err?.message||err}`; }); }
+    return;
+  }
+  if(t.dataset.fk){
+    const k=t.dataset.fk, F=S.filters, open=t.closest('.fdrop')?.dataset.drop, fq=t.closest('.fpanel')?.querySelector('.ms-q')?.value||'';
+    if(Array.isArray(F[k])){const set=new Set(F[k]);t.checked?set.add(t.value):set.delete(t.value);F[k]=[...set];}
+    else F[k]=t.value;
+    if(k==='queues'){const ok=stageOptions(); F.queueStages=F.queueStages.filter(x=>ok[x]);}
+    refreshFilter(); render();
+    if(k==='events'||k==='eventsMode') setTimeout(ensureConfirmed);
+    if(k==='queues'||k==='queueStages') setTimeout(ensureTokens);
+    const d=$(`.fdrop[data-drop="${open}"]`); if(d){ d.open=true;
+      // keep the panel's search text across the re-render
+      const q=d.querySelector('.ms-q'); if(q&&fq){ q.value=fq; q.dispatchEvent(new Event('input',{bubbles:true})); } }
+    return;
+  }
+  if(t.id==='kType'){$('#kItem').innerHTML=(CONTENT[t.value]?.items||[]).map(x=>`<option>${esc(x)}</option>`).join('');return;}
+  if(t.id==='aType'){$('#aItem').innerHTML=(ACTION_TYPES[t.value]?.items||[]).map(x=>`<option>${esc(x)}</option>`).join('');return;}
+  if(t.id==='roleSel'){S.role=t.value; if(S.arranging&&!canEdit(curSet())) S.arranging=false; S.sel.clear(); render(); return;}
+  if(t.id==='devToggle'){S.dev=t.checked;root.classList.toggle('dev',S.dev);return;}
+  if(t.dataset.selpid){t.checked?S.sel.add(t.dataset.selpid):S.sel.delete(t.dataset.selpid);updateBulk();return;}
+  if(t.id==='selAll'){$$('#drawer input[data-selpid]').forEach(i=>{i.checked=t.checked;t.checked?S.sel.add(i.dataset.selpid):S.sel.delete(i.dataset.selpid);});updateBulk();return;}
+  if(t.name==='tgt'){MV.target=t.value;$('#mErr').textContent='';moveInfo();return;}
+  if(t.dataset.gseg){const id=t.dataset.gseg, set=new Set(GB.segmentIds);
+    t.checked?set.add(id):set.delete(id); GB.segmentIds=[...set];
+    updateGroupPreview(); $('#gErr').textContent=''; return;}
+  if(t.dataset.addpid){t.checked?ADD.sel.add(t.dataset.addpid):ADD.sel.delete(t.dataset.addpid);const go=$('#aGo');go.textContent=ADD.sel.size?`Add ${plural(ADD.sel.size,'participant')}`:'Add';go.disabled=!ADD.sel.size;$('#aErr').textContent='';return;}
+  if(t.id==='sGroup'){ if(t.value==='__new__'){ $('#sGroupNewBox').hidden=false; $('#sGroupNew').focus(); t.value=B.groupid||''; } else { B.groupid=t.value; $('#sGroupNewBox').hidden=true; } return; }
+  if(t.closest('#segDlg')){
+    if(t.name==='sType'){B.type=t.value;renderSegDlg();return;}
+    if(t.name==='sStatus'){B.status=t.value;$('#sStatusHint').textContent=statusHint();return;}
+    if(t.id==='sComb'){B.comb=t.value;updatePreview();return;}
+    if(t.dataset.jg){const js=new Set(B.scope.ids);t.checked?js.add(t.dataset.jg):js.delete(t.dataset.jg);
+      B.scope.ids=SCOPE[B.scope.type].opts().map(o=>o[0]).filter(v=>js.has(v));syncJourney();return;}
+    const row=t.closest('.cond'); if(!row) return; const i=+row.dataset.i, r=B.rows[i], k=t.dataset.k;
+    if(k==='field'){B.rows[i]=defaultRow(t.value);renderConds();}
+    else if(k==='op'){const f=FIELD[r.field];r.op=t.value;
+      if(f.type==='number') r.value=r.op==='between'?[0,21]:(Array.isArray(r.value)?r.value[0]:r.value);
+      else if(f.type==='products') r.value=r.op==='counts'?{mode:'all',items:[{product:PRODUCTS[0]?.id||'',op:'gte',n:1}]}:(r.op==='hasAny'?[]:null);
+      else if(f.type==='productList') r.value=r.op==='isEmpty'?null:Array.isArray(r.value)?r.value:[];   // keep picks between any/equals
+      renderConds();}
+    else if(k==='v'){const s=new Set(Array.isArray(r.value)?r.value:[]);t.checked?s.add(t.value):s.delete(t.value);r.value=[...s];
+      const ms=t.closest('.ms'); if(ms) syncMsSummary(ms,r);
+      updatePreview();}
+    else if(k==='pv'){const ps=new Set(r.products||[]);t.checked?ps.add(t.value):ps.delete(t.value);
+      r.products=PRODUCTS.map(p=>p.id).filter(id=>ps.has(id));syncPms(row,r);updatePreview();}
+    else if(k==='ob'){r.value=t.value==='ONBOARDED'?['ONBOARDED']:[...YTO];updatePreview();}
+    else if(k==='cmode'){r.value={...r.value,mode:t.value};updatePreview();}
+    else if(k==='cprod'||k==='ccop'){const ci=+t.closest('[data-ci]').dataset.ci;
+      r.value.items[ci]={...r.value.items[ci],[k==='cprod'?'product':'op']:t.value};updatePreview();}
+  }
+});
+listen(root,'input',e=>{
+  const t=e.target;
+  if(t.id==='cmpPaste'&&CMP){ CMP.paste=t.value; const v=cmpValues(), go=$('#cmpGo'), info=$('#cmpInfo');
+    if(go) go.disabled=!v.length; if(info) info.textContent=v.length?`${plural(v.length,'value')} to compare against the ${plural(cmpCurrentRows().length,'participant')} in View all.`:'Upload a file or paste a list to compare.'; return; }
+  if(t.id==='q'){
+    clearTimeout(S.qT); const v=t.value;
+    S.qT=setTimeout(()=>{ S.qRaw=v; S.q=v.trim().toLowerCase(); refreshFilter(); render();
+      const n=$('#q'); if(n){ n.focus(); n.setSelectionRange(n.value.length,n.value.length); } },150);
+    return;
+  }
+  if(t.id==='dq'){S.dq=t.value;S.limit=150;const pos=t.selectionStart;renderDrawer(true);const n=$('#dq');n.focus();n.setSelectionRange(pos,pos);return;}
+  if(t.id==='tq'){const q=t.value.trim().toLowerCase();$$('#tlist label[data-name]').forEach(l=>l.hidden=!!q&&!l.dataset.name.includes(q));return;}
+  if(t.dataset.fk&&(t.type==='number')){S.filters[t.dataset.fk]=t.value;refreshFilter();
+    const drop=t.closest('.fdrop')?.dataset.drop, pos=t.selectionStart, id=t.id;
+    render(); const d=$(`.fdrop[data-drop="${drop}"]`); if(d){d.open=true; const n=$('#'+id); if(n){n.focus(); try{n.setSelectionRange(pos,pos);}catch(e){}}}
+    return;}
+  if(t.id==='aq'){ADD.q=t.value;renderAddList();return;}
+  if(t.id==='gName'){GB.name=t.value;return;}
+  if(t.id==='gq'){GB.q=t.value;const pos=t.selectionStart;renderGroupDlg();const n=$('#gq');n.focus();n.setSelectionRange(pos,pos);return;}
+  if(t.classList.contains('ms-q')){const q=t.value.trim().toLowerCase();
+    t.closest('.fpanel').querySelectorAll('label[data-name]').forEach(l=>l.hidden=!!q&&!l.dataset.name.includes(q));return;}
+  if(t.closest('#segDlg')){
+    if(t.id==='sName'){B.name=t.value;const nn=$('#seqNewName'); if(nn) nn.textContent=B.name.trim()||'New segment';return;}
+    if(t.id==='sDesc'){B.description=t.value;$('#sDescN').textContent=`${t.value.length} / ${DESC_MAX}`;return;}
+    const row=t.closest('.cond'); if(!row) return; const r=B.rows[+row.dataset.i], k=t.dataset.k, v=t.value===''?NaN:+t.value;
+    if(k==='n'){r.value=v;updatePreview();} else if(k==='n0'){r.value=[v,r.value[1]];updatePreview();} else if(k==='n1'){r.value=[r.value[0],v];updatePreview();}
+    else if(k==='ccn'){const ci=+t.closest('[data-ci]').dataset.ci;r.value.items[ci]={...r.value.items[ci],n:v};updatePreview();}
+  }
+});
+// a dropdown opened inside a dialog scrolls the dialog body so its whole list is visible
+listen(root,'toggle',e=>{
+  const d=e.target; if(!d.open||!d.matches||!d.matches('dialog details.fdrop')) return;
+  const panel=d.querySelector('.fpanel'); if(panel) requestAnimationFrame(()=>panel.scrollIntoView({block:'nearest'}));
+},true);
+// drag participants from the drawer onto a segment on the board
+listen(root,'dragstart',e=>{
+  const tr=e.target.closest&&e.target.closest('[data-pid]'); if(!tr) return;
+  const pid=tr.dataset.pid; S.dragPids=S.sel.has(pid)?[...S.sel]:[pid];
+  e.dataTransfer.setData('text/plain',S.dragPids.join(',')); e.dataTransfer.effectAllowed='move';
+  root.classList.add('dragging-people');
+});
+listen(root,'dragend',()=>{S.dragPids=null;root.classList.remove('dragging-people');$$('.drop-ok').forEach(x=>x.classList.remove('drop-ok'));});
+listen(root,'dragover',e=>{
+  if(!S.dragPids) return; const d=e.target.closest&&e.target.closest('[data-drop]'); if(!d) return;
+  e.preventDefault(); e.dataTransfer.dropEffect='move';
+  $$('.drop-ok').forEach(x=>{if(x!==d)x.classList.remove('drop-ok');}); d.classList.add('drop-ok');
+});
+listen(root,'drop',e=>{
+  if(!S.dragPids) return; const d=e.target.closest&&e.target.closest('[data-drop]'); if(!d) return;
+  e.preventDefault(); const pids=S.dragPids; d.classList.remove('drop-ok'); openMove(pids,d.dataset.drop);
+});
+
+load();
+return () => { cleanups.forEach(f => f()); stopSort(); if (seqSort) seqSort.destroy(); clearTimeout(toast._t); };
+}

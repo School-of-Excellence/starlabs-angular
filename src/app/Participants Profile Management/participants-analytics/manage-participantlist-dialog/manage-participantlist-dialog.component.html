@@ -176,25 +176,16 @@
                       <mat-form-field appearance="outline" class="filter-type-field">
                         <mat-label>Filter By</mat-label>
                         <mat-select formControlName="filterType">
-                          <mat-option value="all">
-                            <mat-icon>filter_list</mat-icon>
-                            All Fields
+                          <mat-option>
+                            <ngx-mat-select-search
+                              [formControl]="filterTypeSearchCtrl"
+                              placeholderLabel="Search fields..."
+                              noEntriesFoundLabel="No fields found">
+                            </ngx-mat-select-search>
                           </mat-option>
-                          <mat-option value="profileid">
-                            <mat-icon>fingerprint</mat-icon>
-                            Profile ID
-                          </mat-option>
-                          <mat-option value="name">
-                            <mat-icon>person</mat-icon>
-                            Name
-                          </mat-option>
-                          <mat-option value="email">
-                            <mat-icon>email</mat-icon>
-                            Email
-                          </mat-option>
-                          <mat-option value="phone">
-                            <mat-icon>phone</mat-icon>
-                            Phone
+                          <mat-option *ngFor="let option of filteredFilterTypeOptions" [value]="option.value">
+                            <mat-icon>{{ option.icon }}</mat-icon>
+                            {{ option.label }}
                           </mat-option>
                         </mat-select>
                       </mat-form-field>

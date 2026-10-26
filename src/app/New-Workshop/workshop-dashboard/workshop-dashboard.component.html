@@ -350,6 +350,24 @@
             </mat-card>
           </ng-container>
 
+          <!-- Sale Achieved — live workshops only: enrolled people who bought in Watson between the
+               registration start and one month after the workshop end (Watson read-only). -->
+          <mat-card class="metric-card clickable-metric" data-testid="wdash-sale-card" *ngIf="isLiveWorkshop"
+                    (click)="onMetricClick('saleAchieved')"
+                    matTooltip="Enrolled people who bought between registration start and one month after the workshop ended">
+            <mat-card-content>
+              <div class="metric-content">
+                <mat-icon class="metric-icon-small"><i class="fa-solid fa-indian-rupee-sign"></i></mat-icon>
+                <div class="metric-details">
+                  <!-- The amount is the headline; the number of buyers sits under the label. -->
+                  <h2 class="metric-value sale-highlight" data-testid="wdash-sale-total">{{ saleAmountValue }}</h2>
+                  <p class="metric-label">Sale Achieved</p>
+                  <p class="metric-sale-count" data-testid="wdash-sale-count" *ngIf="saleCountLabel">{{ saleCountLabel }}</p>
+                </div>
+              </div>
+            </mat-card-content>
+          </mat-card>
+
           <!-- Evergreen-only referral cards -->
           <ng-container *ngIf="workshopData?.evergreenWorkshop === true">
             <mat-card data-testid="wd-on-metric-click-21" class="metric-card clickable-metric" (click)="onMetricClick('shareClicked')">
@@ -1656,7 +1674,7 @@
     <div class="panel-header">
       <div class="panel-title">
         <div class="title-text">
-          <h3>{{ selectedStatusInfo?.status | titlecase }}</h3>
+          <h3>{{ selectedStatusInfo?.status === 'saleAchieved' ? 'Sale Achieved' : (selectedStatusInfo?.status | titlecase) }}</h3>
           <p>{{ selectedStatusInfo?.challengeName }} - {{ selectedStatusInfo?.subChallengeName }}</p>
         </div>
       </div>
@@ -1697,11 +1715,32 @@
       </button>
     </div>
       <div class="participants-list">
+        <!-- Name search. Narrows the panel list only; the progress table behind it is untouched. -->
+        <label class="wd-side-search">
+          <mat-icon aria-hidden="true">search</mat-icon>
+          <input data-testid="wd-side-search-85" type="search" [(ngModel)]="sideSearch"
+                 (ngModelChange)="applyFilterSide()" [ngModelOptions]="{standalone: true}"
+                 placeholder="Search names" autocomplete="off" spellcheck="false"
+                 aria-label="Search participants by name">
+          <button data-testid="wd-side-search-clear-86" type="button" class="wd-side-search-x"
+                  *ngIf="sideSearch" (click)="sideSearch = ''; applyFilterSide()" aria-label="Clear the search">
+            <mat-icon>close</mat-icon>
+          </button>
+        </label>
         <div class="filter-header">
-          <h4>Filter {{ filterOption | titlecase }} ({{ filteredParticipants.length }})</h4>
+          <h4 *ngIf="selectedStatusInfo?.status !== 'saleAchieved'">Filter {{ filterOption | titlecase }} ({{ filteredParticipants.length }})</h4>
+          <h4 *ngIf="selectedStatusInfo?.status === 'saleAchieved'">Buyers ({{ filteredParticipants.length }})</h4>
           <div>  
-        <ng-container *ngIf="selectedStatusInfo?.status !== 'totalNewUsers' && 
-                            selectedStatusInfo?.status !== 'totalNewUsersNotEnrolled'">
+        <!-- Sale Achieved sorts instead of the All / New / Old filter. -->
+        <div class="sale-sort" *ngIf="selectedStatusInfo?.status === 'saleAchieved'" role="group" aria-label="Sort buyers">
+          <button type="button" data-testid="wdash-sale-sort-amount" [class.on]="saleSort === 'amount'"
+                  [attr.aria-pressed]="saleSort === 'amount'" (click)="setSaleSort('amount')">Amount</button>
+          <button type="button" data-testid="wdash-sale-sort-recent" [class.on]="saleSort === 'recent'"
+                  [attr.aria-pressed]="saleSort === 'recent'" (click)="setSaleSort('recent')">Recent purchase</button>
+        </div>
+        <ng-container *ngIf="selectedStatusInfo?.status !== 'totalNewUsers' &&
+                            selectedStatusInfo?.status !== 'totalNewUsersNotEnrolled' &&
+                            selectedStatusInfo?.status !== 'saleAchieved'">
           <button data-testid="wd-button-63" mat-icon-button [matMenuTriggerFor]="filterMenu" aria-label="Filter participants">
             <mat-icon>filter_list</mat-icon>
           </button>
@@ -2121,7 +2160,8 @@
             </a>
           </mat-card-content>
         </mat-card> -->
-        <mat-card class="participant-card" *ngFor="let participant of filteredParticipants">
+        <mat-card class="participant-card" *ngFor="let participant of filteredParticipants"
+                  (mouseenter)="showSaleTip(participant, $any($event.currentTarget))" (mouseleave)="hideSaleTip()">
           <mat-card-content>
             <a data-testid="wd-a-84"
               *ngIf="!selectedStatusInfo?.evergreenCompleted || !can('extend')"
@@ -2149,6 +2189,13 @@
                 </span>
               </div>
             </a>
+
+            <!-- Sale Achieved panel: how much this person bought in the window; hover the card for each purchase: date, name, amount. -->
+            <div class="sale-row" data-testid="wdash-sale-amount"
+                 *ngIf="selectedStatusInfo?.status === 'saleAchieved' && participant.salePurchases?.length">
+              <span class="sale-row-amt">{{ participant.saleTotalLabel }}</span>
+              <span class="sale-row-count" matTooltip="Number of purchases">{{ participant.salePurchases.length }}</span>
+            </div>
 
             <!-- Chat group panel: one action per person — add their login to the group, or say why we cannot. -->
             <div class="chat-row-actions" *ngIf="selectedStatusInfo?.status === 'notInChatGroup'">
@@ -2215,3 +2262,27 @@
        [class.overlay-visible]="showParticipantPanel"
        (click)="closeParticipantPanel()"></div>
 </div>
+
+<!-- Purchases hover card for the Sale Achieved panel (same card as the EiFlix dashboard). Fixed above the
+     side panel (z-index 1002 > the panel's 1000); placed by showSaleTip(). -->
+<div *ngIf="saleTipRow" class="sale-tip" data-testid="wdash-sale-tip" role="tooltip" [ngStyle]="saleTipStyle"
+     (mouseenter)="keepSaleTip()" (mouseleave)="hideSaleTip()">
+  <div class="sale-tip-head">
+    <span class="sale-tip-name">{{ saleTipRow.name }}</span>
+    <span class="sale-tip-sub">Purchases · excl. GST</span>
+  </div>
+  <div class="sale-tip-list">
+    <div class="sale-tip-row" *ngFor="let s of saleTipRow.salePurchases">
+      <span class="sale-tip-when">
+        <span class="sale-tip-date">{{ s.dateLabel }}</span>
+        <span class="sale-tip-product" *ngIf="s.product">{{ s.product }}</span>
+      </span>
+      <span class="sale-tip-amt">{{ s.amountLabel }}</span>
+    </div>
+  </div>
+  <div class="sale-tip-foot">
+    <span>Total · {{ saleTipRow.salePurchases.length }}</span>
+    <span class="sale-tip-amt">{{ saleTipRow.saleTotalLabel }}</span>
+  </div>
+</div>
+

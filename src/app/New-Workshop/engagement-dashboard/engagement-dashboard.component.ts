@@ -983,14 +983,14 @@ export class EngagementDashboardComponent implements OnInit, OnDestroy {
 
     try {
       if (result.type === 'mail') {
-        const recipients = validParticipants.map(p => ({ email: p.metadata.email, name: p.metadata.name }));
+        const recipients = validParticipants.map(p => ({ profileid: p.profileid, email: p.metadata.email, name: p.metadata.name }));
         const response: any = await firstValueFrom(this.http.post(url, { type: 'mail', subject: result.subject, message: result.message, recipients }));
         this.snackbarService.show(response.successCount === recipients.length ? `Sent to all ${recipients.length}!` : `Sent: ${response.successCount}, Failed: ${response.failureCount}`);
       } else {
         const participants = validParticipants.map(p => {
           let cc = (p.metadata.countryCode || p.metadata.countrycode || '').trim().replace(/^\+?/, '+');
           const phone = (p.metadata.phonenumber?.toString().trim() || '').replace(/^\+/, '');
-          return { phonenumber: cc ? `${cc}${phone}` : phone, name: p.metadata.name,
+          return { profileid: p.profileid, phonenumber: cc ? `${cc}${phone}` : phone, name: p.metadata.name,
             customParams: result.customParams.map((param: any) => ({ name: param.name, value: param.value.replace(/\{\{name\}\}/g, p.metadata.name) })) };
         });
         const response: any = await firstValueFrom(this.http.post(url, { type: 'whatsapp', templateName: result.templateName, participants }));
