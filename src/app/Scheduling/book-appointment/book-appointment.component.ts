@@ -98,6 +98,9 @@ export class BookAppointmentComponent implements OnInit, OnChanges{
   rolePersons = {}
   filteredProfile = ""
   goback:boolean = false
+  // groupappointment variables
+  isGroupAppointment: boolean = false
+  maxBooking: number = 0
 
   constructor(
     private firestore: Firestore,
@@ -290,7 +293,8 @@ export class BookAppointmentComponent implements OnInit, OnChanges{
               if(localSlot != undefined && localSlot != null && localSlot.length != 0){
                 for (let a = 0; a < localSlot.length; a++){
                   var data = localSlot[a]
-                  if(data.booked == false && data.available == true){
+                  var isSlotOpen = (data.booked == false || this.isGroupAppointment) && data.available == true
+                  if(isSlotOpen){
                     slotsOfEIS.push({
                       slotstart: data.slotstart.toDate(),
                       slotend: data.slotend.toDate(),
@@ -338,6 +342,7 @@ export class BookAppointmentComponent implements OnInit, OnChanges{
 
   async confirmSlot(){
     var selectedSlot = this.userAvailableSlots[this.selectedSlot]
+    var mapBookingCount = {}
     console.log(selectedSlot)
     if(!selectedSlot){
       alert("Select a Slot to Book!")
