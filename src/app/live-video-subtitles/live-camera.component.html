@@ -1,0 +1,263 @@
+@if (error()) {
+  <div class="lvs-error" data-testid="lvs-cam-error">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v5m0 3h.01M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /></svg>
+    <span>{{ error() }}</span>
+    <button type="button" class="lvs-x" (click)="error.set('')" aria-label="Dismiss">×</button>
+  </div>
+}
+
+@if (running()) {
+  <div class="lvs-grid" #stage [class.lvs-full]="fullscreen()" (click)="resumeAudio()">
+    <!-- Left: the camera -->
+    <div class="lvs-main">
+      <div class="lvs-player lvs-cam" data-testid="lvs-cam-player">
+        <video #cam autoplay muted [muted]="true" [volume]="0" playsinline data-testid="lvs-cam-video"></video>
+
+        @for (b of faceBoxes(); track $index) {
+          <div
+            class="lvs-box"
+            [class.lvs-box-known]="b.recognised"
+            [class.lvs-box-dim]="!b.speaking"
+            [style.left.px]="b.left"
+            [style.top.px]="b.top"
+            [style.width.px]="b.width"
+            [style.height.px]="b.height"
+            data-testid="lvs-cam-face-box"
+          >
+            <span class="lvs-box-name">{{ b.name }}</span>
+          </div>
+        }
+
+        @if (current(); as line) {
+          <div class="lvs-caption" data-testid="lvs-cam-caption">
+            @if (nameOf(line); as n) {
+              <b class="lvs-cap-name" [class.lvs-known]="n.recognised">{{ n.name }}{{ n.guess ? '?' : ':' }}</b>
+            }
+            {{ line.seg.text }}
+          </div>
+        }
+
+        <div class="lvs-live-chips">
+          @if (audioHeld()) {
+            <span class="lvs-chip-live lvs-chip-warn" data-testid="lvs-cam-audio-held">
+              <span class="lvs-live-dot"></span>
+              Click anywhere to start the microphone
+            </span>
+          } @else {
+            <span class="lvs-chip-live" [class.lvs-hearing]="listening()" data-testid="lvs-cam-listening">
+              <span class="lvs-live-dot"></span>
+              <canvas #wave class="lvs-wave" aria-hidden="true" data-testid="lvs-cam-wave"></canvas>
+              {{ listening() ? 'Hearing speech' : 'Listening' }}
+            </span>
+          }
+          @if (!namesOn()) {
+            <span class="lvs-chip-live lvs-chip-muted" data-testid="lvs-cam-faces-off">Faces off — turn on Show names</span>
+          }
+          @if (recording()) {
+            <span class="lvs-chip-rec" data-testid="lvs-cam-rec-chip"><span class="lvs-rec-dot"></span>REC {{ fmt(nowMs() - recordStart()) }}</span>
+          }
+        </div>
+
+        <button
+          type="button"
+          class="lvs-fs"
+          (click)="toggleFullscreen()"
+          [attr.aria-label]="fullscreen() ? 'Exit full screen' : 'Full screen'"
+          data-testid="lvs-cam-fullscreen"
+        >
+          @if (fullscreen()) {
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /></svg>
+          } @else {
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
+          }
+        </button>
+
+        @if (loadPct() !== null || facesStatus()) {
+          <div class="lvs-overlay lvs-overlay-low" data-testid="lvs-cam-loading">
+            <span class="lvs-spinner"></span>
+            @if (loadPct() !== null) {
+              Loading the speech model… {{ loadPct() }}%
+            } @else {
+              {{ facesStatus() }}
+            }
+          </div>
+        }
+      </div>
+
+      <div class="lvs-card lvs-info lvs-cam-bar">
+        <div class="lvs-cam-actions">
+          @if (!recording()) {
+            <button type="button" class="lvs-btn lvs-btn-rec" (click)="startRecording()" [disabled]="finishing() > 0" data-testid="lvs-cam-record">
+              <span class="lvs-rec-dot"></span> Record
+            </button>
+            <span class="lvs-rec-opts">
+              <label class="lvs-check-sm" [class.lvs-disabled]="!namesOn()" [title]="namesOn() ? 'Face boxes and names' : 'Turn on Show names first'">
+                <input type="checkbox" [checked]="recNames() && namesOn()" [disabled]="!namesOn()" (change)="recNames.set($any($event.target).checked)" data-testid="lvs-cam-rec-names" />
+                Names in video
+              </label>
+            </span>
+          } @else {
+            <button type="button" class="lvs-btn lvs-btn-ghost" (click)="stopRecording()" data-testid="lvs-cam-stop-record">
+              <span class="lvs-stop-sq"></span> Stop recording
+            </button>
+          }
+          @if (recordedUrl(); as url) {
+            <button
+              type="button"
+              class="lvs-btn lvs-btn-ghost"
+              (click)="downloadAll()"
+              [disabled]="finishing() > 0"
+              [title]="'Video + subtitles (.srt, ' + recordedLineCount() + ' lines), saved together'"
+              data-testid="lvs-cam-download"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v12m0 0-5-5m5 5 5-5M4 20h16" /></svg>
+              Download video + subtitles
+            </button>
+            <button type="button" class="lvs-btn lvs-btn-ghost" (click)="replayRecording()" [disabled]="finishing() > 0" data-testid="lvs-cam-replay">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
+              Replay with subtitles
+            </button>
+          }
+          @if (finishing() > 0) {
+            <span class="lvs-finishing" role="status" data-testid="lvs-cam-finishing">
+              <span class="lvs-spinner lvs-spinner-dark"></span>
+              {{ srtStage() || 'Making accurate subtitles…' }} {{ srtPct() ? srtPct() + '%' : '' }}
+            </span>
+          }
+        </div>
+        <span class="lvs-spacer"></span>
+        <span class="lvs-cam-meta">
+          {{ fmt(nowMs()) }}
+          @if (pendingPhrases() > 0) {
+            · transcribing {{ pendingPhrases() }}
+          }
+        </span>
+        <button type="button" class="lvs-btn lvs-btn-danger" (click)="stop()" data-testid="lvs-cam-stop">Stop camera</button>
+      </div>
+
+      @if (showDiagnostics()) {
+        <dl class="lvs-card lvs-diag" data-testid="lvs-cam-diagnostics">
+          <dt>Devices</dt>
+          <dd data-testid="lvs-cam-devices-active">{{ activeDevices() }}</dd>
+          <dt>Microphone</dt>
+          <dd data-testid="lvs-cam-mic">{{ micText() }}</dd>
+          <dt>Speech</dt>
+          <dd data-testid="lvs-cam-speech">{{ speechText() }}</dd>
+          <dt>Last heard</dt>
+          <dd data-testid="lvs-cam-last-raw">{{ lastRaw() || '—' }}</dd>
+          <dt>Model</dt>
+          <dd>{{ modelLabel() || '—' }}</dd>
+          <dt>Runs on</dt>
+          <dd>{{ device() || '—' }}</dd>
+          <dt>Delay</dt>
+          <dd>{{ latencyMs() !== null ? 'caption ' + (latencyMs()! / 1000).toFixed(1) + ' s after the phrase ends' : '—' }}</dd>
+          <dt>Lines</dt>
+          <dd>{{ lines().length }}</dd>
+          @if (namesOn()) {
+            <dt>Faces run on</dt>
+            <dd>{{ faceDevice() || '—' }}</dd>
+            <dt>Faces</dt>
+            <dd>{{ faceTimingText() || '—' }}</dd>
+            <dt>Profiles</dt>
+            <dd>{{ profileCount() ?? '—' }}</dd>
+            <dt>Speaker basis</dt>
+            <dd>{{ basisOf(current()) }}</dd>
+            <dt>People</dt>
+            <dd data-testid="lvs-cam-people">
+              @for (p of peopleSummary(); track p) {
+                <div>{{ p }}</div>
+              } @empty {
+                —
+              }
+            </dd>
+          }
+        </dl>
+      }
+    </div>
+
+    <!-- Right: the transcript -->
+    <aside class="lvs-card lvs-transcript lvs-cam-transcript" data-testid="lvs-cam-transcript">
+      <div class="lvs-transcript-head">
+        <h2>Transcript</h2>
+        <span class="lvs-count">{{ lines().length }} lines</span>
+      </div>
+      <div class="lvs-lines" #lineList>
+        @for (line of lines(); track line.seg.startMs + line.seg.text) {
+          <div class="lvs-line" [class.lvs-line-now]="line === current()" data-testid="lvs-cam-line">
+            @if (nameOf(line); as n) {
+              <span class="lvs-avatar" [class.lvs-known]="n.recognised">{{ initials(n.name) }}</span>
+            }
+            <span class="lvs-line-body">
+              <span class="lvs-line-meta">
+                @if (nameOf(line); as n) {
+                  <b class="lvs-line-name" [class.lvs-known]="n.recognised">{{ n.name }}{{ n.guess ? '?' : '' }}</b>
+                }
+                <span class="lvs-time">{{ fmt(line.seg.startMs) }}</span>
+              </span>
+              <span class="lvs-line-text">{{ line.seg.text }}</span>
+            </span>
+          </div>
+        } @empty {
+          <div class="lvs-lines-empty">
+            @if (modelReady()) {
+              <span class="lvs-live-dot"></span> Start speaking — lines appear here.
+            } @else {
+              <span class="lvs-spinner lvs-spinner-dark"></span> Getting the speech model ready…
+            }
+          </div>
+        }
+      </div>
+    </aside>
+  </div>
+} @else {
+  <div class="lvs-drop lvs-cam-start" data-testid="lvs-cam-start">
+    <span class="lvs-drop-icon">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 10l5-3v10l-5-3M4 6h11v12H4z" /></svg>
+    </span>
+    <span class="lvs-drop-title">Live camera</span>
+    <span class="lvs-drop-hint">Subtitles from your microphone{{ namesOn() ? ' and names from the faces on camera' : '' }}, as you speak.</span>
+    <div class="lvs-devices" data-testid="lvs-cam-devices">
+      <label class="lvs-field">
+        <span>Camera</span>
+        <select [value]="cameraId()" (change)="setCamera($any($event.target).value)" data-testid="lvs-cam-camera">
+          <option value="">Default camera</option>
+          @for (d of cameras(); track d.id) {
+            <option [value]="d.id">{{ d.label }}</option>
+          }
+        </select>
+      </label>
+      <label class="lvs-field">
+        <span>Microphone</span>
+        <select [value]="micId()" (change)="setMic($any($event.target).value)" data-testid="lvs-cam-mic-select">
+          <option value="">Default microphone</option>
+          @for (d of mics(); track d.id) {
+            <option [value]="d.id">{{ d.label }}</option>
+          }
+        </select>
+      </label>
+    </div>
+    @if (!devicesNamed()) {
+      <span class="lvs-drop-note">Device names appear after you allow camera access once (press Start camera).</span>
+    }
+    <span class="lvs-drop-note">
+      ATEM Mini: connect its USB-C (webcam out) port to this Mac and choose “Blackmagic Design” for the camera — and
+      for the microphone too, to caption the mics plugged into the ATEM.
+    </span>
+    <button type="button" class="lvs-btn lvs-btn-primary" (click)="start()" [disabled]="starting()" data-testid="lvs-cam-start-btn">
+      {{ starting() ? 'Opening camera…' : 'Start camera' }}
+    </button>
+    <span class="lvs-drop-note">
+      Your browser will ask to use the camera and microphone. Nothing is uploaded; a recording is saved only if you
+      press Download.
+    </span>
+    @if (recordedUrl(); as url) {
+      <span class="lvs-cam-actions">
+        <button type="button" class="lvs-btn lvs-btn-ghost" (click)="downloadAll()" [disabled]="finishing() > 0">Download last recording + subtitles</button>
+        <button type="button" class="lvs-btn lvs-btn-ghost" (click)="replayRecording()" [disabled]="finishing() > 0">Replay with subtitles</button>
+        @if (finishing() > 0) {
+          <span class="lvs-finishing" role="status"><span class="lvs-spinner lvs-spinner-dark"></span> {{ srtStage() || 'Making accurate subtitles…' }} {{ srtPct() ? srtPct() + '%' : '' }}</span>
+        }
+      </span>
+    }
+  </div>
+}

@@ -25,8 +25,9 @@ import {
 } from './captions';
 import { BASIS_LABEL, FaceSample, PeopleTracker, Person, Profile, SpeakerPick, TrackedFace, pickSpeaker } from './speakers';
 import type { FaceAnalyser } from './face-analyser';
-import { loadProfiles } from './profiles';
+import { loadProfilesCached } from './profiles';
 import { PlaybackDenoise } from './playback-denoise';
+import { LiveCameraComponent } from './live-camera.component';
 
 /** Whisper always encodes 30 s, so 30 s chunks are the cheapest. */
 const CHUNK_MS = 30000;
@@ -60,11 +61,16 @@ const GIVE_UP_AFTER_MS = 2500;
 
 const PREF_LANGUAGE = 'lvs-language';
 const PREF_ACCURACY = 'lvs-high-accuracy';
+/**
+ * Live camera has its own accuracy setting, OFF by default: live captions
+ * come from Moonshine base (0.4 s per phrase at ~5% GPU on a MacBook, as
+ * accurate as Whisper small) and the downloaded subtitles from one turbo pass
+ * after recording. On = turbo live too (~7–9 s behind, ~80% GPU).
+ */
+// (v2: the default changed from turbo to Moonshine — older saved values are ignored.)
+const PREF_LIVE_ACCURACY = 'lvs-live-high-accuracy-v2';
 const PREF_NAMES = 'lvs-names';
 const PREF_DENOISE = 'lvs-remove-noise';
-
-/** Profiles stay loaded for the browser session (they rarely change). */
-let profilesCache: Profile[] | null = null;
 
 interface LanguageOption {
   code: string | null;
@@ -96,7 +102,7 @@ interface SpeakerBox {
 @Component({
   selector: 'app-live-video-subtitles',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, LiveCameraComponent],
   templateUrl: './live-video-subtitles.component.html',
   styleUrl: './live-video-subtitles.component.css',
 })
@@ -140,6 +146,8 @@ export class LiveVideoSubtitlesComponent implements OnDestroy {
   ];
 
   // ── UI state ──────────────────────────────────────────────────────────
+  /** Where the picture and sound come from: an uploaded file or the camera. */
+  readonly mode = signal<'upload' | 'camera'>('upload');
   readonly videoUrl = signal<string | null>(null);
   readonly fileName = signal('');
   readonly status = signal('');
@@ -180,6 +188,7 @@ export class LiveVideoSubtitlesComponent implements OnDestroy {
 
   language: string | null = 'en';
   highAccuracy = true;
+  liveHighAccuracy = false;
 
   readonly current = computed(() => this.lineAt(this.positionMs(), this.captions()));
   readonly coveragePct = computed(() => {
@@ -231,8 +240,38 @@ export class LiveVideoSubtitlesComponent implements OnDestroy {
     mq.addEventListener('change', (e) => this.zone.run(() => this.wide.set(e.matches)));
     this.language = this.pref(PREF_LANGUAGE, 'en') || null;
     this.highAccuracy = this.pref(PREF_ACCURACY, '1') === '1';
+    this.liveHighAccuracy = this.pref(PREF_LIVE_ACCURACY, '0') === '1';
     this.namesOn.set(this.pref(PREF_NAMES, '0') === '1');
     this.removeNoise.set(this.pref(PREF_DENOISE, '0') === '1');
+  }
+
+  // ── Mode ──────────────────────────────────────────────────────────────
+
+  setMode(m: 'upload' | 'camera'): void {
+    if (m === this.mode()) return;
+    if (m === 'camera') this.leaveUpload();
+    this.mode.set(m);
+  }
+
+  /** A camera recording to watch with subtitles: open it like an upload. */
+  onReplay(file: File): void {
+    this.mode.set('upload');
+    setTimeout(() => this.loadFile(file));
+  }
+
+  /**
+   * Going to the camera: drop the uploaded video and free its speech model
+   * (the camera loads its own; two copies would sit in GPU memory).
+   */
+  private leaveUpload(): void {
+    this.reset();
+    if (this.tick) clearInterval(this.tick);
+    this.tick = undefined;
+    this.worker?.terminate();
+    this.worker = undefined;
+    this.modelReady.set(false);
+    this.loadPct.set(null);
+    this.status.set('');
   }
 
   // ── Upload ────────────────────────────────────────────────────────────
@@ -303,7 +342,19 @@ export class LiveVideoSubtitlesComponent implements OnDestroy {
 
   onLanguageChange(): void {
     this.savePref(PREF_LANGUAGE, this.language ?? '');
+    // Standard accuracy uses an English-only model for English: switching
+    // to/from English swaps the model.
+    if (!this.highAccuracy && this.worker) {
+      this.modelReady.set(false);
+      this.restartSpeech();
+      this.loadModel();
+      return;
+    }
     this.restartSpeech();
+  }
+
+  onLiveAccuracyChange(): void {
+    this.savePref(PREF_LIVE_ACCURACY, this.liveHighAccuracy ? '1' : '0');
   }
 
   onAccuracyChange(): void {
@@ -372,7 +423,7 @@ export class LiveVideoSubtitlesComponent implements OnDestroy {
     this.loadFiles.clear();
     this.loadPct.set(0);
     this.status.set('Loading the speech model…');
-    this.worker?.postMessage({ type: 'load', highAccuracy: this.highAccuracy });
+    this.worker?.postMessage({ type: 'load', highAccuracy: this.highAccuracy, english: this.language === 'en' });
   }
 
   private onWorker(data: any): void {
@@ -519,15 +570,10 @@ export class LiveVideoSubtitlesComponent implements OnDestroy {
   }
 
   private async ensureProfiles(): Promise<Profile[]> {
-    if (profilesCache) {
-      this.profileCount.set(profilesCache.length);
-      return profilesCache;
-    }
     try {
-      const list = await loadProfiles(this.firestore, this.injector, (n) =>
+      const list = await loadProfilesCached(this.firestore, this.injector, (n) =>
         this.zone.run(() => this.profileCount.set(n)),
       );
-      profilesCache = list;
       this.profileCount.set(list.length);
       return list;
     } catch (e: any) {

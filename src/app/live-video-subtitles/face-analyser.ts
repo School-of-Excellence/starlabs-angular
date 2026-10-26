@@ -34,6 +34,8 @@ export interface AnalyserTimings {
 export class FaceAnalyser {
   private worker: Worker;
   private video: HTMLVideoElement;
+  /** Reading a live camera <video>: frames are taken as they are, no seeking. */
+  private readonly live: boolean;
   private canvas = document.createElement('canvas');
   private crop = document.createElement('canvas');
   private mesh: FaceLandmarker | null = null;
@@ -48,17 +50,26 @@ export class FaceAnalyser {
   /** Last measured yaw values (diagnostics / calibration). */
   lastYaws: number[] = [];
 
+  /**
+   * `source`: a file's URL (frames are read from a hidden copy, seeking
+   * ahead of the playhead) or a live camera <video> (its current frame).
+   */
   constructor(
-    videoUrl: string,
+    source: string | HTMLVideoElement,
     private readonly onProgress: (pct: number) => void,
   ) {
     this.worker = new Worker(new URL('./face.worker', import.meta.url), { type: 'module' });
     this.worker.onmessage = ({ data }) => this.onWorker(data);
-    this.video = document.createElement('video');
-    this.video.muted = true;
-    this.video.preload = 'auto';
-    this.video.playsInline = true;
-    this.video.src = videoUrl;
+    this.live = typeof source !== 'string';
+    if (typeof source === 'string') {
+      this.video = document.createElement('video');
+      this.video.muted = true;
+      this.video.preload = 'auto';
+      this.video.playsInline = true;
+      this.video.src = source;
+    } else {
+      this.video = source;
+    }
     this.crop.width = this.crop.height = CROP_SIZE;
   }
 
@@ -127,12 +138,13 @@ export class FaceAnalyser {
   }
 
   /**
-   * Measure the faces at video time `tMs`. `embed` gets identity vectors for
-   * chosen faces of this frame (call it before analysing the next frame).
+   * Measure the faces at video time `tMs` (live: the current frame, `tMs`
+   * unused). `embed` gets identity vectors for chosen faces of this frame
+   * (call it before analysing the next frame).
    */
   async analyse(tMs: number): Promise<{ faces: MeasuredFace[]; embed: EmbedFn }> {
     const t0 = performance.now();
-    await this.seek(tMs / 1000);
+    if (!this.live) await this.seek(tMs / 1000);
     const vw = this.video.videoWidth;
     const vh = this.video.videoHeight;
     if (!vw || !vh) return { faces: [], embed: async () => [] };
@@ -225,8 +237,10 @@ export class FaceAnalyser {
   dispose(): void {
     this.worker.terminate();
     this.mesh?.close();
-    this.video.removeAttribute('src');
-    this.video.load();
+    if (!this.live) {
+      this.video.removeAttribute('src');
+      this.video.load();
+    }
     this.waiting.forEach((w) => w.reject(new Error('stopped')));
     this.waiting.clear();
   }

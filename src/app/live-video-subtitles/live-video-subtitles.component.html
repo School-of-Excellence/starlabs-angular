@@ -2,15 +2,27 @@
   <header class="lvs-head">
     <div class="lvs-title">
       <h1>Live video subtitles</h1>
-      <p class="lvs-sub">Subtitles and speakers worked out in your browser as the video plays. Nothing is uploaded or saved.</p>
+      <p class="lvs-sub">Subtitles and speakers worked out in your browser — from a video or live from your camera. Nothing is uploaded or saved.</p>
     </div>
-    @if (videoUrl()) {
-      <label class="lvs-btn lvs-btn-ghost" data-testid="lvs-upload">
-        <input type="file" accept="video/*" (change)="onFile($event)" data-testid="lvs-file-input" />
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0-5 5m5-5 5 5M4 20h16" /></svg>
-        Choose another video
-      </label>
-    }
+    <div class="lvs-head-actions">
+      @if (mode() === 'upload' && videoUrl()) {
+        <label class="lvs-btn lvs-btn-ghost" data-testid="lvs-upload">
+          <input type="file" accept="video/*" (change)="onFile($event)" data-testid="lvs-file-input" />
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0-5 5m5-5 5 5M4 20h16" /></svg>
+          Choose another video
+        </label>
+      }
+      <div class="lvs-modes" role="tablist" aria-label="Source">
+        <button type="button" role="tab" class="lvs-mode" [class.lvs-on]="mode() === 'upload'" [attr.aria-selected]="mode() === 'upload'" (click)="setMode('upload')" data-testid="lvs-mode-upload">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0-5 5m5-5 5 5M4 20h16" /></svg>
+          Upload video
+        </button>
+        <button type="button" role="tab" class="lvs-mode" [class.lvs-on]="mode() === 'camera'" [attr.aria-selected]="mode() === 'camera'" (click)="setMode('camera')" data-testid="lvs-mode-camera">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 10l5-3v10l-5-3M4 6h11v12H4z" /></svg>
+          Live camera
+        </button>
+      </div>
+    </div>
   </header>
 
   <section class="lvs-toolbar" data-testid="lvs-settings">
@@ -22,21 +34,31 @@
         }
       </select>
     </label>
-    <label class="lvs-switch" title="Whisper large-v3-turbo (best words). Off: Whisper small (lighter, less accurate).">
-      <input type="checkbox" [(ngModel)]="highAccuracy" (ngModelChange)="onAccuracyChange()" data-testid="lvs-high-accuracy" />
-      <span class="lvs-track"></span>
-      High accuracy
-    </label>
+    @if (mode() === 'upload') {
+      <label class="lvs-switch" title="Whisper large-v3-turbo (best words). Off: Whisper small (lighter, less accurate).">
+        <input type="checkbox" [(ngModel)]="highAccuracy" (ngModelChange)="onAccuracyChange()" data-testid="lvs-high-accuracy" />
+        <span class="lvs-track"></span>
+        High accuracy
+      </label>
+    } @else {
+      <label class="lvs-switch" title="Off (recommended): fast, light live captions (Moonshine) — recordings still get accurate subtitles. On: Whisper turbo live — best words, ~8 s behind, heavy on the laptop.">
+        <input type="checkbox" [(ngModel)]="liveHighAccuracy" (ngModelChange)="onLiveAccuracyChange()" data-testid="lvs-live-high-accuracy" />
+        <span class="lvs-track"></span>
+        High accuracy <span class="lvs-hint-inline">(slower captions)</span>
+      </label>
+    }
     <label class="lvs-switch" title="Who is speaking: faces, lip movement and profile matching">
       <input type="checkbox" [ngModel]="namesOn()" (ngModelChange)="onNamesChange($event)" data-testid="lvs-names" />
       <span class="lvs-track"></span>
       Show names
     </label>
-    <label class="lvs-switch" title="What you hear only — subtitles are always made from the original sound">
-      <input type="checkbox" [ngModel]="removeNoise()" (ngModelChange)="onNoiseChange($event)" data-testid="lvs-remove-noise" />
-      <span class="lvs-track"></span>
-      Remove background noise
-    </label>
+    @if (mode() === 'upload') {
+      <label class="lvs-switch" title="What you hear only — subtitles are always made from the original sound">
+        <input type="checkbox" [ngModel]="removeNoise()" (ngModelChange)="onNoiseChange($event)" data-testid="lvs-remove-noise" />
+        <span class="lvs-track"></span>
+        Remove background noise
+      </label>
+    }
     <span class="lvs-spacer"></span>
     <button
       type="button"
@@ -57,7 +79,15 @@
     </div>
   }
 
-  @if (videoUrl()) {
+  @if (mode() === 'camera') {
+    <app-live-camera
+      [language]="language"
+      [highAccuracy]="liveHighAccuracy"
+      [namesOn]="namesOn()"
+      [showDiagnostics]="showDiagnostics()"
+      (replay)="onReplay($event)"
+    />
+  } @else if (videoUrl()) {
     <div class="lvs-grid" #stage [class.lvs-full]="fullscreen()">
       <!-- Left: the video -->
       <div class="lvs-main">

@@ -326,7 +326,10 @@ async function onEmbed(id: number, indices: number[]): Promise<void> {
   postMessage({ type: 'embeddings', id, embeddings, ms: performance.now() - t0 });
 }
 
-addEventListener('message', async ({ data }) => {
+/** One message at a time, in order (ONNX Runtime sessions aren't re-entrant). */
+let queue: Promise<void> = Promise.resolve();
+
+async function handle(data: any): Promise<void> {
   try {
     if (data.type === 'load') await load();
     else if (data.type === 'frame') await onFrame(data.id, data.bitmap);
@@ -335,4 +338,8 @@ addEventListener('message', async ({ data }) => {
     data?.bitmap?.close?.();
     postMessage({ type: 'error', id: data?.id, message: String(e?.message ?? e) });
   }
+}
+
+addEventListener('message', ({ data }) => {
+  queue = queue.then(() => handle(data));
 });

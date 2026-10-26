@@ -1,10 +1,11 @@
 /// <reference lib="webworker" />
 /**
- * Whisper speech-to-text for live video subtitles, off the page's main
- * thread. Runs on WebGPU when the browser has it (WASM otherwise). Models
- * download from Hugging Face on first use and are cached by the browser.
+ * Speech-to-text for live video subtitles, off the page's main thread:
+ * Whisper (turbo / small) or, for live camera captions, Moonshine base.
+ * Runs on WebGPU when the browser has it (WASM otherwise). Models download
+ * from Hugging Face on first use and are cached by the browser.
  *
- * Messages in:  {type:'load', highAccuracy}
+ * Messages in:  {type:'load', highAccuracy, english, live}
  *               {type:'transcribe', id, audio: Float32Array (16 kHz mono),
  *                startMs, language: string | null}
  * Messages out: {type:'progress', file, loaded, total}
@@ -21,6 +22,10 @@ import type { SpeechSegment } from './captions';
 
 interface ModelChoice {
   model: string;
+  /** Moonshine: works on the phrase's own length (no 30 s window), no timestamps. */
+  moonshine?: boolean;
+  /** English-only (.en) models take no language/task options. */
+  englishOnly?: boolean;
   device: 'webgpu' | 'wasm';
   dtype: Record<string, string>;
   label: string;
@@ -29,6 +34,8 @@ interface ModelChoice {
 let asr: AutomaticSpeechRecognitionPipeline | null = null;
 let loading: Promise<void> | null = null;
 let loadedKey = '';
+let englishOnly = false;
+let moonshine = false;
 
 /**
  * High accuracy = Whisper large-v3-turbo (the reference transcript in the
@@ -36,7 +43,29 @@ let loadedKey = '';
  * errors on the hall recording, vs 34.5% for base). Whisper hears the
  * original audio — noise removal before it made accuracy worse.
  */
-async function chooseModel(highAccuracy: boolean): Promise<ModelChoice> {
+/**
+ * Live camera captions (standard accuracy, English): Moonshine base. Measured
+ * on the same live-style phrases on a MacBook: 0.4 s per phrase at ~5% GPU,
+ * as accurate as Whisper small (1.2 s, ~15% GPU) — Whisper always encodes a
+ * 30 s window however short the phrase; Moonshine only the phrase. Turbo
+ * was 6.6 s per phrase at ~82% GPU.
+ */
+function moonshineChoice(gpu: boolean): ModelChoice {
+  return {
+    model: 'onnx-community/moonshine-base-ONNX',
+    moonshine: true,
+    device: gpu ? 'webgpu' : 'wasm',
+    dtype: gpu ? { encoder_model: 'fp32', decoder_model_merged: 'q4' } : { encoder_model: 'q8', decoder_model_merged: 'q8' },
+    label: gpu ? 'Moonshine base' : 'Moonshine base (CPU)',
+  };
+}
+
+async function chooseModel(highAccuracy: boolean, english: boolean, live = false): Promise<ModelChoice> {
+  // Whisper small, multilingual. (The English-only small.en returns empty
+  // text in transformers.js 3.8 with timestamps on — tried and dropped.)
+  void english;
+  const small = 'onnx-community/whisper-small';
+  const smallName = 'Whisper small';
   const gpu = (navigator as any).gpu;
   let adapter: any = null;
   try {
@@ -44,12 +73,13 @@ async function chooseModel(highAccuracy: boolean): Promise<ModelChoice> {
   } catch {
     adapter = null;
   }
+  if (live && !highAccuracy && english) return moonshineChoice(!!adapter);
   if (!adapter) {
     return {
-      model: 'onnx-community/whisper-small',
+      model: small,
       device: 'wasm',
       dtype: { encoder_model: 'q8', decoder_model_merged: 'q8' },
-      label: 'Whisper small (CPU)',
+      label: `${smallName} (CPU)`,
     };
   }
   const f16 = adapter.features?.has('shader-f16') === true;
@@ -62,18 +92,23 @@ async function chooseModel(highAccuracy: boolean): Promise<ModelChoice> {
       label: `Whisper large-v3-turbo (${q})`,
     };
   }
+  // The encoder at fp16 (not 4-bit): it hears the audio, and 4-bit there
+  // cost noticeably more wrong words.
+  const enc = f16 ? 'fp16' : 'fp32';
   return {
-    model: 'onnx-community/whisper-small',
+    model: small,
     device: 'webgpu',
-    dtype: { encoder_model: 'q4', decoder_model_merged: 'q4' },
-    label: 'Whisper small (q4)',
+    dtype: { encoder_model: enc, decoder_model_merged: 'q4' },
+    label: `${smallName} (${enc} encoder)`,
   };
 }
 
-async function load(highAccuracy: boolean): Promise<void> {
-  const choice = await chooseModel(highAccuracy);
+async function load(highAccuracy: boolean, english: boolean, live = false): Promise<void> {
+  const choice = await chooseModel(highAccuracy, english, live);
   const key = `${choice.model}|${choice.device}|${JSON.stringify(choice.dtype)}`;
   if (asr && key === loadedKey) {
+    englishOnly = !!choice.englishOnly;
+    moonshine = !!choice.moonshine;
     postMessage({ type: 'ready', model: choice.label, device: choice.device, dtype: choice.dtype });
     return;
   }
@@ -91,9 +126,11 @@ async function load(highAccuracy: boolean): Promise<void> {
     },
   })) as AutomaticSpeechRecognitionPipeline;
   loadedKey = key;
+  englishOnly = !!choice.englishOnly;
+  moonshine = !!choice.moonshine;
   // Warm up: the first WebGPU run compiles shaders (several seconds); do it
   // now on silence so the first real chunk isn't late.
-  await asr(new Float32Array(16000), { return_timestamps: true });
+  await asr(new Float32Array(16000), choice.moonshine ? { max_new_tokens: 8 } : { return_timestamps: true });
   postMessage({ type: 'ready', model: choice.label, device: choice.device, dtype: choice.dtype });
 }
 
@@ -107,10 +144,18 @@ async function transcribe(
   if (!asr) throw new Error('Speech model is not loaded');
   const t0 = performance.now();
   const lenMs = (audio.length / 16000) * 1000;
+  if (moonshine) {
+    // Moonshine: one line for the phrase (it gives no timestamps; live
+    // phrases are short, and long text is split by caption shaping).
+    const res: any = await asr(audio, { max_new_tokens: Math.ceil((lenMs / 1000) * 6.5) + 10 });
+    const text = String(res?.text ?? '').trim();
+    const segments: SpeechSegment[] = text ? [{ startMs, endMs: startMs + lenMs, text }] : [];
+    postMessage({ type: 'result', id, segments, ms: performance.now() - t0 });
+    return;
+  }
   const out: any = await asr(audio, {
     return_timestamps: true,
-    task: 'transcribe',
-    ...(language ? { language } : {}),
+    ...(englishOnly ? {} : { task: 'transcribe', ...(language ? { language } : {}) }),
   });
   const chunks: any[] = out?.chunks ?? [];
   const segments: SpeechSegment[] = chunks
@@ -124,10 +169,21 @@ async function transcribe(
   postMessage({ type: 'result', id, segments, ms: performance.now() - t0 });
 }
 
-addEventListener('message', async ({ data }) => {
+/**
+ * Messages are handled strictly one at a time, in order. Otherwise a model
+ * switch (High accuracy toggled mid-sentence) disposed the model while a
+ * transcription was still running in it, and WebAssembly crashed ("table
+ * index is out of bounds" / "null function").
+ */
+let queue: Promise<void> = Promise.resolve();
+/** Only the newest model switch matters when several queue up (quick toggles). */
+let latestLoad = 0;
+
+async function handle(data: any, loadNo: number): Promise<void> {
   try {
     if (data.type === 'load') {
-      loading = load(!!data.highAccuracy);
+      if (loadNo !== latestLoad) return;
+      loading = load(!!data.highAccuracy, !!data.english, !!data.live);
       await loading;
       loading = null;
     } else if (data.type === 'transcribe') {
@@ -137,4 +193,9 @@ addEventListener('message', async ({ data }) => {
     loading = null;
     postMessage({ type: 'error', id: data?.id, message: String(e?.message ?? e) });
   }
+}
+
+addEventListener('message', ({ data }) => {
+  const loadNo = data.type === 'load' ? ++latestLoad : 0;
+  queue = queue.then(() => handle(data, loadNo));
 });

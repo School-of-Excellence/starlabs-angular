@@ -755,3 +755,293 @@ h2 {
     gap: 14px;
   }
 }
+
+/* ── Mode switch (Upload / Live camera) ───────────────────────────── */
+
+.lvs-modes {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--lvs-line-strong);
+  border-radius: 10px;
+  background: var(--lvs-raised);
+}
+
+.lvs-mode {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  padding: 7px 14px;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  color: var(--lvs-muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.lvs-mode:hover {
+  color: var(--lvs-ink);
+}
+
+.lvs-mode.lvs-on {
+  background: var(--lvs-accent-soft);
+  color: var(--lvs-ink);
+}
+
+.lvs-head-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* ── Live camera ──────────────────────────────────────────────────── */
+
+.lvs-cam video {
+  display: block;
+  width: 100%;
+  max-height: calc(100vh - 260px);
+  min-height: 240px;
+  background: #000;
+}
+
+.lvs-full .lvs-cam video {
+  height: 100%;
+  max-height: none;
+  object-fit: contain;
+}
+
+.lvs-live-chips {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.lvs-chip-live,
+.lvs-chip-rec {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: rgba(8, 10, 14, 0.7);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.lvs-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--lvs-faint);
+  flex: none;
+}
+
+.lvs-hearing .lvs-live-dot {
+  background: var(--lvs-known);
+  box-shadow: 0 0 0 4px rgba(58, 214, 138, 0.25);
+}
+
+.lvs-lines-empty .lvs-live-dot {
+  background: var(--lvs-known);
+}
+
+.lvs-chip-rec {
+  font-family: 'Geist Mono', monospace;
+}
+
+.lvs-rec-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #ff4d4f;
+  flex: none;
+}
+
+.lvs-chip-rec .lvs-rec-dot {
+  animation: lvs-blink 1s steps(2, start) infinite;
+}
+
+@keyframes lvs-blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+.lvs-stop-sq {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: #ff4d4f;
+}
+
+.lvs-overlay-low {
+  top: auto;
+  bottom: 70px;
+}
+
+.lvs-cam-bar {
+  gap: 10px 14px;
+}
+
+.lvs-cam-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.lvs-cam-meta {
+  color: var(--lvs-muted);
+  font-family: 'Geist Mono', monospace;
+  font-size: 12px;
+}
+
+.lvs-btn-primary {
+  margin-top: 8px;
+  padding: 10px 20px;
+  background: var(--lvs-accent);
+  color: #fff;
+}
+
+.lvs-btn-primary:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.lvs-btn-rec {
+  background: rgba(255, 77, 79, 0.12);
+  border-color: rgba(255, 77, 79, 0.4);
+  color: #ffb3b3;
+}
+
+.lvs-btn-rec:hover {
+  background: rgba(255, 77, 79, 0.2);
+}
+
+.lvs-btn-danger {
+  background: none;
+  border-color: var(--lvs-line-strong);
+  color: var(--lvs-danger);
+}
+
+.lvs-btn-danger:hover {
+  background: rgba(255, 107, 107, 0.1);
+}
+
+a.lvs-btn {
+  text-decoration: none;
+}
+
+.lvs-cam-start {
+  cursor: default;
+}
+
+.lvs-cam-start:hover {
+  border-color: var(--lvs-line-strong);
+  background: var(--lvs-card);
+}
+
+.lvs-cam-transcript {
+  height: min(calc(100vh - 220px), 680px);
+}
+
+.lvs-cam-transcript .lvs-line {
+  cursor: default;
+}
+
+.lvs-chip-warn {
+  background: rgba(242, 169, 59, 0.92);
+  color: #1a1206;
+  pointer-events: auto;
+}
+
+.lvs-chip-warn .lvs-live-dot {
+  background: #1a1206;
+}
+
+.lvs-hint-inline {
+  color: var(--lvs-faint);
+  font-size: 12px;
+}
+
+.lvs-devices {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin: 6px 0 2px;
+}
+
+.lvs-devices select {
+  max-width: 280px;
+}
+
+.lvs-wave {
+  width: 96px;
+  height: 18px;
+  display: block;
+}
+
+/* Faces that aren't the current speaker: a light outline with the name. */
+.lvs-box-dim {
+  border-width: 1px;
+  border-style: dashed;
+  opacity: 0.7;
+}
+
+.lvs-box-dim .lvs-box-name {
+  font-size: 11px;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.lvs-chip-muted {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.lvs-rec-opts {
+  display: inline-flex;
+  gap: 12px;
+  align-items: center;
+  padding: 0 4px;
+  color: var(--lvs-muted);
+  font-size: 13px;
+}
+
+.lvs-check-sm {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  cursor: pointer;
+}
+
+.lvs-check-sm input {
+  accent-color: var(--lvs-accent);
+}
+
+.lvs-check-sm.lvs-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.lvs-finishing {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--lvs-accent-soft);
+  color: var(--lvs-ink);
+  font-size: 13px;
+}
+
+.lvs-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

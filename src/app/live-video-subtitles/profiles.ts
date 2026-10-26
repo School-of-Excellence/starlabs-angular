@@ -58,3 +58,20 @@ export async function loadProfiles(
     return out;
   });
 }
+
+/** Profiles stay loaded for the browser session (they rarely change). */
+let cache: Profile[] | null = null;
+let loading: Promise<Profile[]> | null = null;
+
+/** {@link loadProfiles}, once per browser session (shared by upload and camera). */
+export function loadProfilesCached(
+  firestore: Firestore,
+  injector: EnvironmentInjector,
+  onProgress: (loaded: number) => void,
+): Promise<Profile[]> {
+  if (cache) return Promise.resolve(cache);
+  loading ??= loadProfiles(firestore, injector, onProgress)
+    .then((list) => (cache = list))
+    .finally(() => (loading = null));
+  return loading;
+}

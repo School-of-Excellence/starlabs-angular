@@ -23,7 +23,7 @@ const CAPTION_MAX_MS = 4000;
  * (Per-word timestamps were tried on mobile and rejected: their timing
  * jitters and chops phrases into "Thank" / "you very" / "much.")
  */
-export function shapeCaptions(segments: SpeechSegment[]): SpeechSegment[] {
+export function shapeCaptions(segments: SpeechSegment[], opts: { minSplitWords?: number } = {}): SpeechSegment[] {
   const out: SpeechSegment[] = [];
   for (const s of segments) {
     const text = s.text
@@ -34,7 +34,10 @@ export function shapeCaptions(segments: SpeechSegment[]): SpeechSegment[] {
     const start = s.startMs;
     const end = Math.max(s.endMs, s.startMs + 300);
     const dur = end - start;
-    if (dur <= CAPTION_MAX_MS) {
+    // Live phrases carry pauses inside them: split only text that's actually
+    // long, never a few words ("Thank" / "you.").
+    const words = text.split(' ').length;
+    if (dur <= CAPTION_MAX_MS || words < (opts.minSplitWords ?? 2)) {
       out.push({ startMs: start, endMs: end, text });
       continue;
     }
@@ -178,4 +181,55 @@ export function markDone(ranges: [number, number][], s: number, e: number): void
   }
   ranges.length = 0;
   ranges.push(...merged);
+}
+
+/** SubRip (.srt) text for timed lines (ms from the start of the video). */
+export function toSrt(lines: { startMs: number; endMs: number; text: string }[]): string {
+  const ts = (ms: number) => {
+    const t = Math.max(0, Math.round(ms));
+    const h = Math.floor(t / 3600000);
+    const m = Math.floor((t % 3600000) / 60000);
+    const s = Math.floor((t % 60000) / 1000);
+    const p = (n: number, w = 2) => String(n).padStart(w, '0');
+    return `${p(h)}:${p(m)}:${p(s)},${p(t % 1000, 3)}`;
+  };
+  return lines
+    .map((l, i) => `${i + 1}\n${ts(l.startMs)} --> ${ts(Math.max(l.endMs, l.startMs + 500))}\n${l.text.trim()}\n`)
+    .join('\n');
+}
+
+/**
+ * Cut a recording into pieces of at most `maxMs` for Whisper, each ending in
+ * the middle of the longest pause in its last `searchMs` (so no word is cut).
+ * Returns [startMs, endMs] pairs.
+ */
+export function splitForWhisper(pcm: Float32Array, maxMs = 28000, searchMs = 6000): [number, number][] {
+  const total = (pcm.length / 16000) * 1000;
+  const out: [number, number][] = [];
+  let s = 0;
+  while (s < total) {
+    let e = Math.min(s + maxMs, total);
+    if (e < total) {
+      const from = e - searchMs;
+      const voiced = voiceFrames(pcm.subarray(Math.floor(from * 16), Math.floor(e * 16)));
+      let best = -1;
+      let bestLen = 0;
+      let run = -1;
+      for (let i = 0; i <= voiced.length; i++) {
+        if (i < voiced.length && !voiced[i]) {
+          if (run < 0) run = i;
+        } else if (run >= 0) {
+          if (i - run >= bestLen) {
+            bestLen = i - run;
+            best = run + Math.floor((i - run) / 2);
+          }
+          run = -1;
+        }
+      }
+      if (best >= 0) e = Math.round(from + best * VOICE_FRAME_MS);
+    }
+    out.push([s, e]);
+    s = e;
+  }
+  return out;
 }

@@ -61,7 +61,8 @@ const MIN_LIP_ACTIVITY = 0.025;
 const LIP_LEAD_RATIO = 1.35;
 // Samples further apart than this aren't compared (a gap or a camera cut
 // would otherwise look like a big mouth movement).
-const MAX_SAMPLE_GAP_MS = 1000;
+// (Live camera samples faces every 1.2 s while someone is speaking.)
+const MAX_SAMPLE_GAP_MS = 1500;
 
 /**
  * Pick who is saying `seg` from the face samples around it. A face counts as
@@ -240,9 +241,14 @@ export class PeopleTracker {
   private prevT = -1e12;
 
   constructor(
-    private readonly profiles: Profile[],
+    private profiles: Profile[],
     private readonly stepMs: number,
   ) {}
+
+  /** Profiles arrived (or changed): later frames are matched against them. */
+  setProfiles(profiles: Profile[]): void {
+    this.profiles = profiles;
+  }
 
   isRecognised(id: number): boolean {
     return this.people[id]?.profileId != null;
