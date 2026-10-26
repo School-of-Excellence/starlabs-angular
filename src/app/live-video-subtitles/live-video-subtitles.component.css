@@ -1045,3 +1045,25 @@ a.lvs-btn {
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+.lvs-folder {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--lvs-muted);
+  font-size: 12px;
+}
+
+.lvs-link-sm {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--lvs-accent);
+  font: inherit;
+  cursor: pointer;
+}
+
+.lvs-saved {
+  color: var(--lvs-known);
+  font-size: 13px;
+}

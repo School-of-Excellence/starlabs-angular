@@ -10,7 +10,7 @@ import {
   query, where, orderBy, getDoc, setDoc, updateDoc, serverTimestamp, arrayRemove, arrayUnion, deleteField,
   startAt, endAt, startAfter, limit,
 } from '@angular/fire/firestore';
-import { writeBatch, FieldPath } from 'firebase/firestore';
+import { writeBatch, FieldPath, increment } from 'firebase/firestore';
 import { Storage } from '@angular/fire/storage';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Subject, Subscription, takeUntil } from 'rxjs';
@@ -43,6 +43,8 @@ export interface Attachment {
   duration?: number;
   /** Original filetype/mediatype as stored, so <audio>/<video> can be given a type hint. */
   mime?: string;
+  /** `filethumbnail` — the small preview (image) or first frame (video) the uploader stored. */
+  thumbUrl?: string;
 }
 
 export interface Receipt { name: string; at: string; }
@@ -80,6 +82,12 @@ export interface ChatMessage {
    */
   reactions?: { [emoji: string]: string[] };
   _reactionsByUid?: boolean;
+  /** The stored doc as read — needed to soft-delete it the way the Flutter app does. */
+  _raw?: any;
+  /** Set on a deleted message (`deleted: true`), which only the A&H team sees: "Deleted today, 2:31 PM". */
+  _deleted?: string;
+  /** Files a phone is still uploading (`attachments` minus the `files` already landed). */
+  _uploading?: number;
   mentions?: string[];
   readBy?: Receipt[];
   deliveredTo?: Receipt[];
@@ -596,6 +604,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     this.media.pauseAll();
     this.discardRecording();          // revokes the preview object URL
     clearInterval(this.recTimer);
+    this.stopLevels();
     clearTimeout(this.toastTimer);
     this.resizeObserver?.disconnect();
     this.messagesSub?.unsubscribe();
@@ -825,6 +834,53 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       });
   }
 
+  /* ── Unread, counted exactly as the Flutter app counts it (MessagesService._listenGroupPending) ──
+     Per group I am in: the messages whose `pending` still lists me, not counting my own or deleted
+     ones (up to 100). Until that listener answers, my `pendingcount` entry stands in.
+
+     The web used to read `last_pending` on the group doc instead. That field is written by the
+     ChatxNotification function from the NEWEST message's `pending`, and the installed phone app never
+     removes you from it when you read — so after reading on the phone the web kept a badge the app
+     no longer showed. Message-level `pending` is cleared by both apps, so both now agree. */
+  private unreadSubs = new Map<string, Subscription>();
+  private unreadByGroup: { [groupId: string]: number } = {};
+
+  private pendingCountOf(data: any): number {
+    const n = parseInt(`${data?.['pendingcount']?.[this.currentUid] ?? 0}`, 10);
+    return n > 0 ? n : 0;
+  }
+
+  private syncUnreadListeners(groupIds: string[]): void {
+    const keep = new Set(groupIds);
+    for (const [id, sub] of this.unreadSubs) {
+      if (keep.has(id)) continue;
+      sub.unsubscribe();
+      this.unreadSubs.delete(id);
+      delete this.unreadByGroup[id];
+    }
+    groupIds.forEach(id => {
+      if (this.unreadSubs.has(id)) return;
+      const sub = collectionSnapshots(query(
+        collection(this.supportchat, id, 'messages'),
+        where('pending', 'array-contains', this.currentUid),
+        limit(100),
+      )).pipe(takeUntil(this.destroy$)).subscribe({
+        next: docs => {
+          // My own messages never count (an older build may have listed the sender), nor deleted ones.
+          const n = docs.filter(m => {
+            const x: any = m.data();
+            return x['sender_uid'] !== this.currentUid && x['deleted'] !== true;
+          }).length;
+          this.unreadByGroup[id] = n;
+          const g = this.groups.find(x => x.id === id);
+          if (g) g.unread = n;
+        },
+        error: e => console.error('group-chat: unread count', id, e),
+      });
+      this.unreadSubs.set(id, sub);
+    });
+  }
+
   /** The group bucket behind the list on screen, or null when a channel list is showing. */
   get currentGroupBucket(): GroupBucket | null {
     if (this.tab === 'groups') return this.groupsSub === 'mine' ? 'mine' : 'others';
@@ -853,6 +909,8 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   /** Replace one bucket's rows, keeping the others and any messages already streamed in. */
   private mergeGroups(docs: any[], b: GroupBucket): void {
     const mapped = docs.map(d => ({ ...this.mapGroupDoc(d, b === 'archived'), _bucket: b }));
+    // Only groups I am in can be unread for me: one count listener per group in My groups.
+    if (b === 'mine') this.syncUnreadListeners(docs.map(d => d.id));
     // Demo groups drop out once live data lands; other buckets stay as they are.
     const kept = this.groups.filter(g => g._live && g._bucket !== b);
     // Mine and others can overlap for one snapshot while a membership change propagates — keep one row.
@@ -885,7 +943,6 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     const data: any = d.data();
     const uids: string[] = data['members'] || [];
     const existing = this.groups.find(g => g.id === d.id);
-    const pending: string[] = data['last_pending'] || [];
     return {
       id: d.id,
       name: data['group_name'] || 'Untitled group',
@@ -899,11 +956,13 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       createdBy: this.nameOfUid(data['creator_uid']),
       members: uids.map(uid => ({ id: uid, name: this.nameOfUid(uid), journey: null })),
       messages: existing?.messages || [],
-      lastMessage: data['last_message'] || '',
+      lastMessage: this.previewOfLast(data['last_message'] || ''),
       lastAt: this.tsToIso(data['last_modification']),
       lastIsAnnouncement: this.latestIsAnnouncement(data),
-      unread: pending.includes(this.currentUid) ? 1 : 0,
-      pinned: !!data['pinned'],
+      // Counted the way the Flutter app counts it (see syncUnreadListeners), not from `last_pending`.
+      unread: this.unreadByGroup[d.id] ?? this.pendingCountOf(data),
+      // Pinning is per person (`pinnedat.<uid>`), as in the Flutter app — not one flag for everyone.
+      pinned: !!data['pinnedat']?.[this.currentUid],
       deletedLog: existing?.deletedLog || [],
       archived,
       _live: true,
@@ -1183,10 +1242,12 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
         // viewport, and only when the reader is already at the bottom.
         const wasAtBottom = this.isNearBottom();
         // One malformed doc must not take the whole thread down with it.
-        target.messages = docs.map(d => {
+        target.messages = (docs.map(d => {
           try { return this.mapMessageDoc(d); }
           catch (e) { console.error('group-chat: skipped a message', d?.id, e); return null; }
-        }).filter(Boolean) as ChatMessage[];
+        }).filter(Boolean) as ChatMessage[])
+          // A deleted message disappears for everyone except the A&H team, as in the Flutter app.
+          .filter(m => !m._deleted || this.isTeamViewer);
         this.messagesLoading = false;
         // Anything that lands while this thread is open counts as read.
         this.markArrivalsRead(docs);
@@ -1209,7 +1270,12 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   private mapMessageDoc(d: any): ChatMessage {
-    const data: any = d.data();
+    const raw: any = d.data();
+    const deleted = raw['deleted'] === true;
+    // A deleted message is emptied, with what it said kept in `deleted_content` for the team. Laid back
+    // over the doc for display, exactly as the Flutter app's `_asSent` does.
+    const data: any = deleted && raw['deleted_content'] && typeof raw['deleted_content'] === 'object'
+      ? { ...raw, ...raw['deleted_content'] } : raw;
     const uid = data['sender_uid'];
     const files: any[] = data['files'] || [];
     const attachments = files.map(f => this.fileRecordToAttachment(f));
@@ -1232,6 +1298,10 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       deliveredTo: [],
       buttons: this.parseButtons(data['buttons']),
       replyTo: this.mapReplyTo(data['reply_to']),
+      edited: data['edited'] === true,
+      _deleted: deleted ? this.deletedLabel(raw) : undefined,
+      _uploading: Math.max(0, (Number(data['attachments']) || 0) - files.length) || undefined,
+      _raw: raw,
       _ref: d.ref,
       _rawMessage: data['message'] || '',
       _files: files,
@@ -1260,11 +1330,14 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     if (!raw) return undefined;
     const files: any[] = raw['files'] || [];
     const first = files[0];
-    const mime: string = first?.['filetype'] || first?.['mediatype'] || '';
-    const isMedia = /^image\/|^video\/|^(image|video)$/.test(mime);
+    // Through the same classifier as attachments: the app stores `filetype: "jpg"`, `mediatype: "image"`.
+    const firstType = first ? this.fileRecordToAttachment(first).type : null;
+    const isMedia = firstType === 'image' || firstType === 'video';
     return {
       senderName: this.nameOfUid(raw['sender_uid']),
-      text: this.plainPreview(this.expandMentions(raw['message'] || '')),
+      // The Flutter app empties a quote when its message is deleted and marks it `deleted`.
+      text: raw['deleted'] === true ? 'Deleted message'
+        : this.plainPreview(this.expandMentions(raw['message'] || '')),
       messageId: raw['messageid'] || undefined,
       senderUid: raw['sender_uid'],
       // Flutter prefers filethumbnail and falls back to fileurl — match that.
@@ -1323,7 +1396,11 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     // A webm can be either; treat it as video only when the record says so.
     if (ext === 'webm' && /audio/.test(raw)) type = 'voice';
 
-    return { type, dataUrl: f?.fileurl || '', name: f?.filename || '', mime: f?.filetype || f?.mediatype || '' };
+    const mime = [f?.filetype, f?.mediatype].find(v => typeof v === 'string' && v.includes('/')) || '';
+    return {
+      type, dataUrl: f?.fileurl || '', name: (f?.filename || '').replace(/^\d{13}_/, ''), mime,
+      thumbUrl: f?.filethumbnail || undefined,
+    };
   }
 
   /** Stored as `@profileid` (chat-screen convention) — shown as `@Name`. */
@@ -1429,26 +1506,46 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     batch.commit().catch(e => console.error('mark arrivals read', e));
   }
 
+  /**
+   * The message doc and group update the Flutter app writes (msgThread.dart `_sendDraft`), plus the
+   * web-only `type`, `message_search` and `buttons`.
+   *
+   * One CLIENT time for `time`, `last_modification` and `last_announcement_at`, as the app does. The
+   * ChatxNotification Cloud Function copies the message `time` into `last_modification`, and the chat
+   * list's announcement check compares that with `last_announcement_at` to the millisecond — two separate
+   * serverTimestamp()s (the old web write) are tens of ms apart, so the megaphone never showed.
+   */
   private async writeMessage(group: ChatItem, body: string, files: any[], replyTarget?: ChatMessage | null,
-                             buttons: Cta[] = [], announcement = false): Promise<void> {
+                             buttons: Cta[] = [], announcement = false,
+                             voice?: { seconds: number; wave: number[] | null }): Promise<void> {
     const messageId = doc(collection(this.firestore, 'temp')).id;
     const { message, mentions } = this.collapseMentions(body, group);
     const pending = this.otherMembers(group);
+    const now = new Date();
+    const links = this.youtubeLinks(message);
     const payload: any = {
       messageid: messageId,
       message,
       sender_uid: this.currentUid,
-      time: serverTimestamp(),
+      sender_email: `${this.currentProfile?.['email'] ?? ''}`,
+      time: now,
       type: files.length > 0 ? 'media' : 'text',
       files,
       message_search: this.normalizeForSearch(message),
-      // Same {label,url} shape channel broadcasts store, so one renderer serves both.
-      buttons: buttons.map(b => ({ label: b.label, url: b.href })),
-      links: [],
+      links: links.length ? links : null,
       read_by: [this.currentUid],
       pending,
-      mentions,
+      mentions: mentions.length ? mentions : null,
     };
+    // A voice note: the app decides "voice bubble" by `voice_seconds`, and draws `voice_wave`.
+    if (voice) {
+      payload.voice_seconds = voice.seconds;
+      if (voice.wave?.length) payload.voice_wave = voice.wave;
+    }
+    // Link buttons only exist when the web author added some (the app shows them but can't add them),
+    // so the field is written only then — a message without buttons looks the same from either app.
+    // Same {label,url} shape channel broadcasts store, so one renderer serves both.
+    if (buttons.length) payload.buttons = buttons.map(b => ({ label: b.label, url: b.href }));
     // Exactly the Flutter app's flag: present and true on an announcement, absent otherwise.
     if (announcement) payload.announcement = true;
     if (replyTarget) {
@@ -1461,24 +1558,162 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       };
     }
     await setDoc(doc(collection(this.supportchat, group.id, 'messages'), messageId), payload);
-    await updateDoc(group._ref, {
-      last_message: body.trim() || (files.length ? '📎 Attachment' : ''),
+    const update: any = {
+      // The app's rule: the text, or the first file's kind ("image") — the chat lists label kinds.
+      last_message: body.trim() || (files[0]?.['mediatype'] ?? 'application'),
       last_sender_uid: this.currentUid,
-      last_modification: serverTimestamp(),
+      last_modification: now,
       last_pending: pending,
-      // Same field and same value as last_modification (one update, one server time), so the chat
-      // list on both apps shows the megaphone until the next message moves last_modification on.
-      ...(announcement ? { last_announcement_at: serverTimestamp() } : {}),
+    };
+    if (announcement) update.last_announcement_at = now;
+    // The app-icon badge and the mobile chat-icon dot count chats by `pendingcount` only.
+    pending.forEach(u => { update[`pendingcount.${u}`] = increment(1); });
+    await updateDoc(group._ref, update);
+  }
+
+  /** YouTube links in the text — the app's `msgYoutubeLinks`, stored as `links`. */
+  private static readonly LINK_RE = /(?:(?:https?|ftp):\/\/)?[\w/\-?=%.]+\.[\w/\-?=%.]+/g;
+  private static readonly YOUTUBE_RE =
+    /^((?:https?:)?\/\/)?((?:www|m)\.)?((?:youtube(-nocookie)?\.com|youtu.be))(\/(?:[\w\-]+\?v=|embed\/|v\/)?)([\w\-]+)(\S+)?$/;
+
+  private youtubeLinks(text: string): string[] {
+    return (text.match(GroupChatScreenComponent.LINK_RE) || []).filter(l => GroupChatScreenComponent.YOUTUBE_RE.test(l));
+  }
+
+  /** What the chat list shows for a message: its text, or the first file's kind (the app's `_lastMessageOf`). */
+  private lastMessageOf(raw: any): string {
+    const text = `${raw?.['message'] ?? ''}`.trim();
+    if (text) return text;
+    const files: any[] = raw?.['files'] || [];
+    return files.length && files[0] && typeof files[0] === 'object' ? `${files[0]['mediatype'] ?? 'application'}` : 'application';
+  }
+
+  /** The app's chat-list labels for a `last_message` that is a media kind ("image" → "Photo"). */
+  private static readonly MEDIA_LABELS: { [kind: string]: string } = {
+    image: '📷 Photo', video: '🎥 Video', audio: '🎤 Voice note', application: '📎 File',
+  };
+
+  private previewOfLast(last: string): string {
+    const t = (last || '').trim();
+    if (/^[a-z]+(\/\S*)?$/.test(t)) {
+      const label = GroupChatScreenComponent.MEDIA_LABELS[t.split('/')[0]];
+      if (label) return label;
+    }
+    return t;
+  }
+
+  /** "Deleted today, 2:31 PM" — and who, when it wasn't the sender (the app's `_deletedLabel`). */
+  private deletedLabel(raw: any): string {
+    const by = `${raw?.['deleted_by'] ?? ''}`;
+    const who = !by || by === `${raw?.['sender_uid'] ?? ''}` ? '' : ` by ${this.nameOfUid(by)}`;
+    const iso = this.tsToIso(raw?.['deleted_at']);
+    const at = iso ? new Date(iso) : null;
+    if (!at || isNaN(at.getTime())) return `Deleted${who}`;
+    const today = new Date(); const yesterday = new Date(); yesterday.setDate(today.getDate() - 1);
+    const day = at.toDateString() === today.toDateString() ? 'today'
+      : at.toDateString() === yesterday.toDateString() ? 'yesterday'
+      : at.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+    return `Deleted${who} ${day}, ${this.clockTime(iso)}`;
+  }
+
+  /** The A&H team, as the Flutter app defines it (`chatxadmin` or `ahmember`) — it alone sees deleted messages. */
+  get isTeamViewer(): boolean { return this.ahMember || this.chatAdmin; }
+
+  /**
+   * Uploads one file and returns the Flutter app's file record (AppService.uploadMedia):
+   *   filename · filetype (extension, "jpg") · fileurl · mediatype (kind, "image") · filethumbnail
+   * The preview is a ~480px JPEG for images and the first frame for videos, so phones load the small
+   * one in the chat. Storage path stays chat-screen's, so the old web screen still serves the files.
+   */
+  private async uploadToStorage(groupId: string, file: File | Blob, filename: string, mime: string): Promise<any> {
+    const kind = this.mediaKind(mime, filename);
+    const storageRef = ref(this.storage, `chat-files/${groupId}/${Date.now()}_${filename}`);
+    const snapshot = await uploadBytes(storageRef, file, {
+      contentType: mime || undefined,
+      // Opened in a browser, it downloads as "report.pdf", not as the storage path (as the app does).
+      contentDisposition: `inline; filename*=UTF-8''${encodeURIComponent(filename)}`,
+    });
+    const fileurl = await getDownloadURL(snapshot.ref);
+    let filethumbnail: string | null = null;
+    try {
+      const preview = kind === 'image' ? await this.imagePreview(file)
+        : kind === 'video' ? await this.videoFrame(file) : null;
+      if (preview) {
+        const base = filename.replace(/\.[^.]+$/, '');
+        const previewRef = ref(this.storage, `chat-files/${groupId}/${Date.now()}_preview_${base}.jpg`);
+        await uploadBytes(previewRef, preview, { contentType: 'image/jpeg' });
+        filethumbnail = await getDownloadURL(previewRef);
+      }
+    } catch (e) {
+      console.warn('group-chat: preview not made', e);   // the full file is up; the preview is optional
+    }
+    return { filename, filetype: this.extOf(filename, mime), fileurl, mediatype: kind, filethumbnail };
+  }
+
+  /** The app's four kinds: image · video · audio · application. */
+  private mediaKind(mime: string, filename: string): 'image' | 'video' | 'audio' | 'application' {
+    const m = (mime || '').toLowerCase();
+    if (m.startsWith('image/')) return 'image';
+    if (m.startsWith('video/')) return 'video';
+    if (m.startsWith('audio/')) return 'audio';
+    const t = this.fileRecordToAttachment({ filename }).type;
+    return t === 'image' ? 'image' : t === 'video' ? 'video' : t === 'voice' ? 'audio' : 'application';
+  }
+
+  private extOf(filename: string, mime: string): string {
+    const fromName = /\.([a-z0-9]+)$/i.exec(filename || '')?.[1];
+    if (fromName) return fromName.toLowerCase();
+    return ((mime || '').split('/')[1] || '').split(';')[0].toLowerCase();
+  }
+
+  /** ~480px on the short side, JPEG at 60% — the app's image preview. Null when the browser can't decode it. */
+  private imagePreview(file: Blob): Promise<Blob | null> {
+    return new Promise(resolve => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const short = Math.min(img.naturalWidth, img.naturalHeight);
+          const scale = short > 480 ? 480 / short : 1;
+          const c = document.createElement('canvas');
+          c.width = Math.max(1, Math.round(img.naturalWidth * scale));
+          c.height = Math.max(1, Math.round(img.naturalHeight * scale));
+          c.getContext('2d')?.drawImage(img, 0, 0, c.width, c.height);
+          c.toBlob(b => { URL.revokeObjectURL(url); resolve(b); }, 'image/jpeg', 0.6);
+        } catch { URL.revokeObjectURL(url); resolve(null); }
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+      img.src = url;
     });
   }
 
-  /** Storage path matches chat-screen so both screens serve the same files. */
-  private async uploadToStorage(groupId: string, file: File | Blob, filename: string, mime: string): Promise<any> {
-    const storageRef = ref(this.storage, `chat-files/${groupId}/${Date.now()}_${filename}`);
-    const snapshot = await uploadBytes(storageRef, file);
-    const fileurl = await getDownloadURL(snapshot.ref);
-    // Exactly chat-screen's file record — filename / filetype / fileurl / mediatype, nothing more.
-    return { filename, filetype: mime, fileurl, mediatype: mime };
+  /** A video's first frame as a JPEG poster (the app's VideoThumbnail, quality 50). */
+  private videoFrame(file: Blob): Promise<Blob | null> {
+    return new Promise(resolve => {
+      const url = URL.createObjectURL(file);
+      const v = document.createElement('video');
+      let settled = false;
+      const done = (b: Blob | null) => {
+        if (settled) return;
+        settled = true; clearTimeout(timer); URL.revokeObjectURL(url); resolve(b);
+      };
+      const timer = setTimeout(() => done(null), 8000);
+      v.muted = true; v.playsInline = true; v.preload = 'auto';
+      v.onloadeddata = () => { v.currentTime = Math.min(0.1, (v.duration || 1) / 2); };
+      v.onseeked = () => {
+        try {
+          const short = Math.min(v.videoWidth, v.videoHeight) || 480;
+          const scale = short > 480 ? 480 / short : 1;
+          const c = document.createElement('canvas');
+          c.width = Math.max(1, Math.round(v.videoWidth * scale));
+          c.height = Math.max(1, Math.round(v.videoHeight * scale));
+          c.getContext('2d')?.drawImage(v, 0, 0, c.width, c.height);
+          c.toBlob(b => done(b), 'image/jpeg', 0.5);
+        } catch { done(null); }
+      };
+      v.onerror = () => done(null);
+      v.src = url;
+    });
   }
 
   private notify(msg: string): void { this.snackBar.open(msg, 'Close', { duration: 2000 }); }
@@ -1573,6 +1808,21 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   photoOf(name: string): string | null { return this.directory[name]?.photoUrl || null; }
 
   isTeamMember(name: string): boolean { return this.directory[name]?.source === 'team'; }
+
+  /**
+   * The chat list's preview line, built the way the app's msgGroupPreview builds it: `@<profileid>` turned
+   * into `@Name`, formatting marks dropped, first line only.
+   *
+   * `last_message` can still hold raw ids: the app writes `@<profileid>` and the ChatxNotification function
+   * rewrites it to names about a second later, but on a slow connection the app's write lands last.
+   * Resolved here at display time rather than when the group loads, so names that arrive after the
+   * group (profile_data loads separately) still apply.
+   */
+  listPreview(text?: string): string {
+    const named = (text || '').replace(/@([A-Za-z0-9]{20})\b/g, (whole, id) =>
+      this.profileIdToName[id] ? `@${this.profileIdToName[id]}` : whole);
+    return this.plainPreview(named).split('\n').map(l => l.trim()).find(Boolean) || '';
+  }
 
   plainPreview(text?: string): string {
     return (text || '')
@@ -1958,6 +2208,12 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   togglePinChat(item: ChatItem, event: Event): void {
     event.stopPropagation();
     const next = !item.pinned;
+    if (this.isLive(item) && !this.isChannel(item)) {
+      updateDoc(item._ref, { [`pinnedat.${this.currentUid}`]: next ? serverTimestamp() : deleteField() })
+        .then(() => this.notify(next ? 'Chat pinned' : 'Chat unpinned'))
+        .catch(e => { console.error('pin chat', e); this.notify('Error updating pin status'); });
+      return;
+    }
     if (this.isLive(item)) {
       updateDoc(item._ref, { pinned: next })
         .then(() => this.notify(next ? 'Chat pinned' : 'Chat unpinned'))
@@ -2543,6 +2799,10 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
         { k: 'delivered', label: 'Delivery',  icon: 'fact_check',   show: true,     danger: false },
       ].filter(o => o.show);
     }
+    // A deleted message (team only) can be copied, nothing else — as in the app.
+    if (m._deleted) {
+      return [{ k: 'copy', label: 'Copy', icon: 'content_copy', show: !!m.text, danger: false }].filter(o => o.show);
+    }
     // A view-only reader (not in `members`) can copy and raise a ticket — nothing that changes the chat.
     const can = !this.viewOnly;
     return [
@@ -2580,6 +2840,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   onBubbleDblClick(m: ChatMessage): void {
     // Broadcasts are an archive — there is nothing here that bulk-deletes one.
     if (m._broadcast) return;
+    if (m._deleted) return;             // already deleted
     if (this.viewOnly) return;          // multi-select only leads to bulk delete
     if (this.selectMode) return;
     this.selectMode = true;
@@ -2690,9 +2951,17 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     this.clearDraft(); this.editing = null;
     if (!text) return;
     if (this.isLive(active)) {
-      // Only the `message` field is written — chat-screen has no edit marker to set.
+      // The app's edit (msgThread.dart `_saveEdit`): edited + edited_at, and the chat list's preview
+      // when it is the newest message. `message_search` is kept in step for the web search.
       const { message, mentions } = this.collapseMentions(text, active);
-      updateDoc(editing._ref, { message, mentions, message_search: this.normalizeForSearch(message) })
+      const msgs = this.sourceOf(active).messages;
+      const wasLatest = msgs[msgs.length - 1]?.id === editing.id;
+      updateDoc(editing._ref, {
+        message, mentions: mentions.length ? mentions : null,
+        message_search: this.normalizeForSearch(message),
+        edited: true, edited_at: new Date(),
+      })
+        .then(() => wasLatest ? updateDoc(active._ref, { last_message: text }) : undefined)
         .catch(e => { console.error('edit', e); this.notify('Error editing message'); });
       return;
     }
@@ -3064,7 +3333,56 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   /** True while the recorder is paused — still armed, not capturing. */
   recPaused = false;
   /** The finished clip awaiting review. Null while recording and after it is sent or discarded. */
-  recReview: { blob: Blob; url: string; secs: number } | null = null;
+  recReview: { blob: Blob; url: string; secs: number; wave: number[] | null } | null = null;
+
+  /*
+   * Loudness while recording, sampled every 100 ms as the Flutter app does (record's onAmplitudeChanged):
+   * the peak in dBFS mapped to 0..1 by (dB + 50) / 50, then squeezed into 64 bars for `voice_wave`.
+   */
+  private recLevels: number[] = [];
+  private recAudio: AudioContext | null = null;
+  private recLevelTimer: any = null;
+
+  private startLevels(stream: MediaStream): void {
+    this.stopLevels();
+    this.recLevels = [];
+    try {
+      const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (!AC) return;
+      const ctx: AudioContext = new AC();
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 2048;
+      ctx.createMediaStreamSource(stream).connect(analyser);
+      const buf = new Float32Array(analyser.fftSize);
+      this.recAudio = ctx;
+      this.recLevelTimer = setInterval(() => {
+        if (this.recPaused) return;
+        analyser.getFloatTimeDomainData(buf);
+        let peak = 0;
+        for (let i = 0; i < buf.length; i++) peak = Math.max(peak, Math.abs(buf[i]));
+        const db = peak > 0 ? 20 * Math.log10(peak) : -160;
+        this.recLevels.push(Math.min(1, Math.max(0, (db + 50) / 50)));
+      }, 100);
+    } catch (e) { console.warn('group-chat: no waveform', e); }
+  }
+
+  private stopLevels(): void {
+    clearInterval(this.recLevelTimer);
+    this.recLevelTimer = null;
+    this.recAudio?.close().catch(() => {});
+    this.recAudio = null;
+  }
+
+  /** The app's `msgWaveBars`: 64 bars, each the loudest moment in its slice, 0..100. */
+  private waveBars(levels: number[], bars = 64): number[] | null {
+    if (!levels.length) return null;
+    return Array.from({ length: bars }, (_, i) => {
+      const from = Math.floor(i * levels.length / bars);
+      const to = Math.min(levels.length, Math.max(from + 1, Math.floor((i + 1) * levels.length / bars)));
+      if (from >= levels.length) return 0;
+      return Math.round(Math.max(...levels.slice(from, to)) * 100);
+    });
+  }
   /** True while a reviewed clip is uploading, so Send cannot be pressed twice. */
   sendingRecording = false;
 
@@ -3092,7 +3410,8 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     const blob = new Blob(this.recChunks, { type: mime });
     this.recChunks = [];
     if (blob.size === 0) { this.discardRecording(); return; }
-    this.recReview = { blob, url: URL.createObjectURL(blob), secs };
+    this.recReview = { blob, url: URL.createObjectURL(blob), secs, wave: this.waveBars(this.recLevels) };
+    this.recLevels = [];
   }
 
   /** Throw the clip away; an object URL left unrevoked holds the audio in memory. */
@@ -3102,6 +3421,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     this.recPaused = false;
     this.recSecs = 0;
     this.recChunks = [];
+    this.recLevels = [];
   }
 
   /** Discard what was recorded and start again from zero. */
@@ -3121,6 +3441,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       rec.ondataavailable = e => { if (e.data.size) this.recChunks.push(e.data); };
       rec.addEventListener('stop', () => stream.getTracks().forEach(t => t.stop()), { once: true });
       rec.start();
+      this.startLevels(stream);
       this.mediaRecorder = rec;
       this.recSecs = 0;
       this.recPaused = false;
@@ -3133,6 +3454,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   private stopRecorder(): Promise<void> {
     clearInterval(this.recTimer);
+    this.stopLevels();
     this.recording = false;
     this.recPaused = false;
     return new Promise(res => {
@@ -3154,7 +3476,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     const target = this.active;
     const review = this.recReview;
     if (!target || !review || this.sendingRecording) return;
-    const { blob, secs } = review;
+    const { blob, secs, wave } = review;
 
     this.sendingRecording = true;
     // Cleared up front: the composer returns to normal immediately, and a second Send during the
@@ -3171,7 +3493,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
         const replyTarget = this.replyTo;
         this.replyTo = null;
         this.justSent = true;
-        await this.writeMessage(target, '', [record], replyTarget);
+        await this.writeMessage(target, '', [record], replyTarget, [], false, { seconds: secs, wave });
         return;
       }
 
@@ -3472,7 +3794,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     if (!active || !this.features.react) return;     // view-only and archived threads show, never write
     if (this.isLive(active)) {
       const m = this.sourceOf(active).messages.find(x => x.id === msgId);
-      if (!m?._ref) return;
+      if (!m?._ref || m._deleted) return;
       const reacted = (m.reactions?.[emoji] || []).includes(this.currentUid);
       updateDoc(m._ref, new FieldPath('reactions', emoji),
                 reacted ? arrayRemove(this.currentUid) : arrayUnion(this.currentUid))
@@ -3500,16 +3822,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     const ids = msgs.map(m => m.id);
 
     if (this.isLive(active)) {
-      const batch = writeBatch(this.firestore);
-      msgs.forEach(m => batch.delete(doc(this.supportchat, active.id, 'messages', m.id)));
-      // last_modification stays, so a deleted latest announcement would keep its megaphone in the list.
-      const latest = active.messages[active.messages.length - 1];
-      if (latest && ids.includes(latest.id) && latest.kind === 'announcement') {
-        batch.update(active._ref, { last_announcement_at: deleteField() });
-      }
-      batch.commit()
-        .then(() => this.notify(`${msgs.length} message${msgs.length === 1 ? '' : 's'} deleted`))
-        .catch(e => { console.error('delete messages', e); this.notify('Error deleting messages'); });
+      this.softDelete(active, msgs.filter(m => !m._deleted));
       this.exitSelect();
       this.infoMsg = null;
       return;
@@ -3534,6 +3847,78 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     src.lastAt = last ? last.at : src.lastAt;
     this.exitSelect();
     this.infoMsg = null;
+  }
+
+  /**
+   * The Flutter app's delete (msgThread.dart `_delete`), so both apps agree on what a deleted message is:
+   *   message → deleted, deleted_at, deleted_by, deleted_content {what it said}, content emptied,
+   *             pinned false, pending [] (nobody is waiting to read it any more)
+   *   group   → pendingcount down for those still waiting; when it was the newest message standing,
+   *             last_message / last_sender_uid from the one before, and last_announcement_at removed
+   *   replies → their quote of it emptied and marked deleted
+   * It disappears for participants; the A&H team still sees it, marked deleted.
+   * Not a hard delete any more: that lost the team's copy and left phones with no "deleted" marker.
+   */
+  private async softDelete(group: ChatItem, msgs: ChatMessage[]): Promise<void> {
+    if (!msgs.length) return;
+    const KEPT = ['message', 'files', 'mentions', 'links', 'reply_to', 'attachments', 'voice_seconds', 'voice_wave', 'buttons'];
+    const ids = new Set(msgs.map(m => m.id));
+    const now = new Date();
+    const batch = writeBatch(this.firestore);
+    const waiting: { [uid: string]: number } = {};
+    msgs.forEach(m => {
+      const raw = m._raw || {};
+      const kept: any = {};
+      KEPT.forEach(k => { if (raw[k] != null) kept[k] = raw[k]; });
+      batch.update(m._ref, {
+        deleted: true, deleted_at: now, deleted_by: this.currentUid, deleted_content: kept,
+        message: '', files: [], mentions: null, links: null, buttons: [],
+        reply_to: deleteField(), attachments: deleteField(), voice_seconds: deleteField(), voice_wave: deleteField(),
+        message_search: deleteField(),
+        pinned: false, pending: [],
+      });
+      (raw['pending'] || []).forEach((u: string) => { waiting[u] = (waiting[u] || 0) + 1; });
+    });
+
+    const update: any = {};
+    // Counted down, but never below zero: messages sent before the web kept `pendingcount` never added to it.
+    try {
+      const counts = (await getDoc(group._ref)).data()?.['pendingcount'] || {};
+      Object.entries(waiting).forEach(([u, n]) => {
+        const left = (parseInt(`${counts[u] ?? 0}`, 10) || 0) - n;
+        update[`pendingcount.${u}`] = left > 0 ? left : deleteField();
+      });
+    } catch (e) { console.error('delete: pendingcount', e); }
+
+    // The chat list shows the newest message still standing.
+    const standing = this.sourceOf(group).messages.filter(m => !m._deleted);
+    const newest = standing[standing.length - 1];
+    if (newest && ids.has(newest.id)) {
+      const previous = [...standing].reverse().find(m => !ids.has(m.id));
+      update.last_message = previous ? this.lastMessageOf(previous._raw) : '';
+      update.last_sender_uid = previous?._senderUid ?? null;
+      update.last_announcement_at = deleteField();
+    }
+    if (Object.keys(update).length) batch.update(group._ref, update);
+
+    try {
+      await batch.commit();
+      this.notify(`${msgs.length} message${msgs.length === 1 ? '' : 's'} deleted`);
+    } catch (e) {
+      console.error('delete messages', e);
+      this.notify('Error deleting messages');
+      return;
+    }
+    // Replies carry a copy of what they quote; for a deleted message that copy is emptied too.
+    for (const id of ids) {
+      try {
+        const quoting = await getDocs(query(collection(this.supportchat, group.id, 'messages'),
+                                            where('reply_to.messageid', '==', id)));
+        for (const r of quoting.docs) {
+          await updateDoc(r.ref, { 'reply_to.message': '', 'reply_to.files': [], 'reply_to.deleted': true });
+        }
+      } catch (e) { console.error('delete: emptying quotes', e); }
+    }
   }
 
   confirmDeleteNow(): void {

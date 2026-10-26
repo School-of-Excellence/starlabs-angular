@@ -77,6 +77,7 @@
     "leaflet": "^1.9.4",
     "livekit-client": "2.19.1",
     "marked": "^15.0.12",
+    "mediabunny": "1.61.3",
     "ng-apexcharts": "1.15.0",
     "ngx-editor": "^19.0.0-beta.1",
     "ngx-markdown": "^19.1.1",

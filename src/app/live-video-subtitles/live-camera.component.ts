@@ -17,11 +17,13 @@ import {
 import { isPlatformBrowser } from '@angular/common';
 import { Firestore } from '@angular/fire/firestore';
 
-import { SpeechSegment, shapeCaptions, splitForWhisper, toSrt, trimToVoice, voiceFrames } from './captions';
+import { SpeechSegment, VOICE_FRAME_MS, shapeCaptions, splitForWhisper, toSrt, trimToVoice, voiceFrames } from './captions';
 import { LiveAudio, Phrase, WAVE_FRAMES, collapseRepeats, isFillerHallucination, normalizeForWhisper } from './live-audio';
 import { loadProfilesCached } from './profiles';
 import { BASIS_LABEL, FaceSample, PeopleTracker, Person, SpeakerPick, TrackedFace, pickSpeaker } from './speakers';
 import type { FaceAnalyser } from './face-analyser';
+import { RecordingStore } from './recording-store';
+import { zipFiles } from './zip';
 
 /**
  * One analysed camera frame every 1.2 s while someone is speaking (lip
@@ -42,6 +44,68 @@ const PREF_MIC = 'lvs-mic-id';
 export interface DeviceOption {
   id: string;
   label: string;
+}
+
+/** The subtitled copy is abandoned if converting makes no progress for this long. */
+const CONVERT_STALL_MS = 20000;
+
+/** Background turbo pieces: at most this long, ending in a pause. */
+const BG_PIECE_MS = 28000;
+/** A piece with less voice than this (20 ms frames) is silence: skipped. */
+const MIN_VOICED_FRAMES = 15;
+/** More silence than this (frames) before a piece's first words is cut off… */
+const LEAD_SILENCE_FRAMES = 50;
+/** …keeping this much before them. */
+const LEAD_KEEP_FRAMES = 15;
+
+/** A subtitle line, ms from the start of the recording. */
+interface SubLine {
+  startMs: number;
+  endMs: number;
+  text: string;
+}
+
+/** A ≤28 s stretch of a recording for turbo (ms from the recording's start). */
+interface Piece {
+  startMs: number;
+  endMs: number;
+  done: boolean;
+  segs: SpeechSegment[];
+  /** Voice per 20 ms frame (tightens caption times); dropped once done. */
+  voiced: boolean[];
+}
+
+/**
+ * One recording: its turbo pieces, the faces seen while it was made (for
+ * names), and its finishing (final .srt, subtitled MP4). It finishes on its
+ * own, so the next recording can start straight away.
+ */
+interface RecJob {
+  name: string;
+  toFolder: boolean;
+  /** Its own folder (raw video, .srt, subtitled MP4), when saving to a folder. */
+  dir: any;
+  /** Live-clock time of the recording's first frame. */
+  audio0: number;
+  /** Live-clock time where the next turbo piece starts. */
+  cut: number;
+  /** Live-clock time it stopped. */
+  endLive: number;
+  pieces: Piece[];
+  faces: { t: number; faces: TrackedFace[] }[];
+  tracker: PeopleTracker | null;
+  stopped: boolean;
+  blob: Blob | null;
+  finalizing: boolean;
+  done: boolean;
+  /** Replaced by a newer recording before it was saved anywhere. */
+  cancelled: boolean;
+  /** The finished subtitles. */
+  final: SubLine[] | null;
+}
+
+function baseName(file: string): string {
+  return file.replace(/\.(webm|mp4)$/, '');
 }
 
 /** Lines this close are treated as the same turn (name continuity). */
@@ -84,8 +148,10 @@ interface VideoFace {
 /**
  * Live camera mode: the laptop camera + microphone, with subtitles (Whisper
  * on WebGPU, phrase by phrase) and, when names are on, who is speaking (faces
- * + lip movement, matched to profiles). Optional recording, saved only when
- * the viewer downloads it.
+ * + lip movement, matched to profiles). Optional recording, into a folder as
+ * it records: Whisper turbo builds its accurate subtitles in the background
+ * meanwhile (the live captions on screen stay fast), and after it stops a
+ * copy with the subtitles drawn in is made.
  */
 @Component({
   selector: 'app-live-camera',
@@ -136,19 +202,32 @@ export class LiveCameraComponent implements OnDestroy {
   readonly lastRaw = signal('');
   readonly pendingPhrases = signal(0);
   /**
-   * After a recording: Whisper turbo makes one pass over its audio for an
-   * accurate, in-sync subtitle file. Until it's done, Record / Download /
-   * Replay wait (a loader shows the progress).
+   * After a recording stops: turbo's last piece, then the subtitled MP4.
+   * Until they're done, Download / Replay of that recording wait (a loader
+   * shows the progress); Record doesn't.
    */
   readonly srtWorking = signal(false);
   readonly srtPct = signal(0);
   readonly srtStage = signal('');
   readonly finishing = computed(() => (this.srtWorking() ? 1 : 0));
-  private srtWorker: Worker | null = null;
-  /** The turbo subtitles for the last recording (ms from its start). */
-  private accurateLines: { startMs: number; endMs: number; text: string }[] | null = null;
-  /** Face samples during the recording (for the subtitle file's names). */
-  private recFaces: { t: number; faces: TrackedFace[] }[] = [];
+  /** Making the subtitled copy of the video (cancelled if the page closes). */
+  private conversion: { cancel(): Promise<void> } | null = null;
+  /** The recording being made, or the last one made. */
+  private job: RecJob | null = null;
+  readonly lineCount = signal(0);
+  /** While recording: how far the accurate subtitles have got. */
+  readonly accurateText = signal('');
+  /** A previous recording still finishing in the background. */
+  readonly prevStatus = signal('');
+  // Turbo, making the accurate subtitles in the background.
+  private bgWorker: Worker | null = null;
+  private bgReady = false;
+  private bgFailed = '';
+  private bgNext = 1;
+  private bgPieces = new Map<number, { job: RecJob; piece: Piece }>();
+  private bgLoadFiles = new Map<string, { loaded: number; total: number }>();
+  /** Subtitled copies are made one at a time. */
+  private burnChain: Promise<void> = Promise.resolve();
   readonly latencyMs = signal<number | null>(null);
   /** Every face in the latest frame (names on); the speaker's is strong. */
   readonly faceBoxes = signal<FaceBox[]>([]);
@@ -171,12 +250,27 @@ export class LiveCameraComponent implements OnDestroy {
   readonly recordStart = signal(0);
   readonly recordedUrl = signal<string | null>(null);
   readonly recordedName = signal('');
-  /** Live-clock span of the last recording (for its subtitle file). */
-  private recSpan: [number, number] | null = null;
+  // Saving into a folder while recording (Chrome / Edge).
+  readonly folderSupported = RecordingStore.supported();
+  readonly saveToFolder = signal(RecordingStore.supported());
+  readonly folderName = signal('');
+  readonly savedToFolder = signal(false);
+  readonly savedMb = signal(0);
+  readonly unfinished = signal<string[]>([]);
+  readonly preparingRec = signal(false);
+  /** The download's .zip is being put together. */
+  readonly zipping = signal(false);
+  private readonly store = new RecordingStore();
+  /** Template: this recording is being saved into the folder. */
+  recordToFolderNow(): boolean {
+    return this.recording() && !!this.job?.toFolder;
+  }
+  private liveSrtTimer?: ReturnType<typeof setInterval>;
   /**
-   * Draw the face boxes and names into the recording. (Captions aren't drawn
-   * in: they arrive seconds after the words, so they'd sit that far behind
-   * in the video — they go into the .srt file instead, timed to the speech.)
+   * Draw the face boxes and names into the recording. (Live captions aren't
+   * drawn in: they arrive seconds after the words, so they'd sit that far
+   * behind in the video. The accurate subtitles are drawn into a copy after
+   * recording — see burnSubtitles — timed to the speech.)
    */
   readonly recNames = signal(true);
   private recCanvas: HTMLCanvasElement | null = null;
@@ -203,8 +297,13 @@ export class LiveCameraComponent implements OnDestroy {
   private jobs = new Map<number, Phrase & { sentAt: number }>();
   private tick?: ReturnType<typeof setInterval>;
   private recorder: MediaRecorder | null = null;
-  private recordChunks: Blob[] = [];
   private recordedBlob: Blob | null = null;
+  /**
+   * The recording with its accurate subtitles drawn into the picture (MP4),
+   * so they show in any player — a separate .srt is ignored by most.
+   */
+  private subtitledBlob: Blob | null = null;
+  readonly subtitledName = signal('');
   // Faces.
   private analyser: FaceAnalyser | null = null;
   private tracker: PeopleTracker | null = null;
@@ -215,6 +314,10 @@ export class LiveCameraComponent implements OnDestroy {
   constructor() {
     if (!this.isBrowser) return;
     document.addEventListener('fullscreenchange', this.onFullscreenChange);
+    this.store.rememberedFolder().then((name) => {
+      this.folderName.set(name);
+      if (name) this.checkUnfinished();
+    });
     this.cameraId.set(this.pref(PREF_CAMERA));
     this.micId.set(this.pref(PREF_MIC));
     this.refreshDevices();
@@ -326,6 +429,7 @@ export class LiveCameraComponent implements OnDestroy {
     this.listening.set(false);
     this.faceBoxes.set([]);
     if (document.fullscreenElement) document.exitFullscreen().catch(() => undefined);
+    this.releaseBgWorker();
   }
 
   private onTick(): void {
@@ -346,6 +450,10 @@ export class LiveCameraComponent implements OnDestroy {
         `model ${this.modelReady() ? 'ready' : this.loadPct() !== null ? `loading ${this.loadPct()}%` : 'not loaded'}`,
     );
     this.updateBox();
+    if (this.recording() && this.job) {
+      this.cutPieces(this.job, false);
+      this.updateAccurateText();
+    }
   }
 
   /**
@@ -573,7 +681,7 @@ export class LiveCameraComponent implements OnDestroy {
         if (gen !== this.faceGen) return;
         this.faces.set(t, tracked);
         this.faceTimes.push(t);
-        if (this.recording()) this.recFaces.push({ t, faces: tracked });
+        if (this.recording() && this.job) this.job.faces.push({ t, faces: tracked });
         while (this.faceTimes.length && this.faceTimes[0] < t - FACE_KEEP_MS) this.faces.delete(this.faceTimes.shift()!);
       } catch (e: any) {
         if (gen !== this.faceGen) return;
@@ -614,10 +722,14 @@ export class LiveCameraComponent implements OnDestroy {
     return id == null ? null : (this.tracker?.people[id] ?? null);
   }
 
-  /** Name shown for a line ('' when names are off). */
+  /**
+   * Name shown for a line: null when names are off, or when no face on
+   * screen is saying it (no name rather than "Unknown", which is for a face
+   * that isn't recognised).
+   */
   nameOf(line: LiveLine): { name: string; recognised: boolean; guess: boolean } | null {
     this.faceVersion();
-    if (!this.namesOn() || !line.pick) return null;
+    if (!this.namesOn() || line.pick?.personId == null) return null;
     const p = this.person(line.pick.personId);
     return { name: p?.name ?? 'Unknown', recognised: p?.profileId != null, guess: !!p && line.pick.basis === 'mostVisible' };
   }
@@ -678,8 +790,21 @@ export class LiveCameraComponent implements OnDestroy {
 
   // ── Recording ─────────────────────────────────────────────────────────
 
-  startRecording(): void {
-    if (!this.stream || this.recording() || this.finishing()) return;
+  async startRecording(): Promise<void> {
+    if (!this.stream || this.recording() || this.preparingRec()) return;
+    // The folder first, straight from this click (the browser needs a click
+    // to show its folder picker / to allow access again).
+    let toFolder = false;
+    if (this.folderSupported && this.saveToFolder()) {
+      this.preparingRec.set(true);
+      toFolder = await this.store.ensureFolder();
+      this.preparingRec.set(false);
+      if (!toFolder) {
+        this.error.set('Recording not started — no folder was chosen. Untick “Save to folder” to record without one.');
+        return;
+      }
+      this.folderName.set(this.store.folderName);
+    }
     const type = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'].find((t) =>
       MediaRecorder.isTypeSupported(t),
     );
@@ -687,49 +812,173 @@ export class LiveCameraComponent implements OnDestroy {
     // boxes, which are in sync) — the plain camera stream otherwise.
     const burnNames = this.recNames() && this.namesOn();
     const source = burnNames ? this.composedStream() : this.stream;
+    let recorder: MediaRecorder;
     try {
-      this.recorder = new MediaRecorder(source, type ? { mimeType: type } : undefined);
+      recorder = new MediaRecorder(source, type ? { mimeType: type } : undefined);
     } catch (e: any) {
       this.error.set(`Recording isn't available in this browser (${e?.message ?? e}).`);
       return;
     }
+    this.recorder = recorder;
+    // The previous recording, if still finishing, carries on in the
+    // background when it's in the folder; one held only in the browser is
+    // replaced (as before, a new recording replaces the last one).
+    const prev = this.job;
+    if (prev && !prev.done) {
+      if (prev.toFolder) this.prevStatus.set('Previous recording: finishing…');
+      else prev.cancelled = true;
+    }
+    // The loader below is for this recording from now on.
+    this.srtWorking.set(false);
+    this.srtStage.set('');
     this.clearRecording();
-    this.recordChunks = [];
-    this.recorder.ondataavailable = (e) => e.data.size && this.recordChunks.push(e.data);
-    this.recorder.onstop = () =>
-      this.zone.run(() => {
-        const mime = this.recorder?.mimeType || 'video/webm';
-        this.recordedBlob = new Blob(this.recordChunks, { type: mime });
-        this.recordChunks = [];
-        const ext = mime.includes('mp4') ? 'mp4' : 'webm';
-        const d = new Date();
-        const pad = (n: number) => String(n).padStart(2, '0');
-        this.recordedName.set(
-          `live-recording-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}.${ext}`,
-        );
-        this.recordedUrl.set(URL.createObjectURL(this.recordedBlob));
-        if (this.recSpan) this.makeAccurateSubtitles(this.recordedBlob, this.recSpan);
+    const chunks: Blob[] = [];
+    const mime = recorder.mimeType || type || 'video/webm';
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const name = `live-recording-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.${mime.includes('mp4') ? 'mp4' : 'webm'}`;
+    this.recordedName.set(name);
+    let dir: any = null;
+    if (toFolder) {
+      try {
+        dir = await this.store.begin(name, baseName(name));
+      } catch (e: any) {
+        this.error.set(`Couldn't write to the folder (${e?.message ?? e}) — recording in the browser instead; use Download afterwards.`);
+        toFolder = false;
+      }
+    }
+    const clock = this.audio?.clockMs() ?? 0;
+    const job: RecJob = {
+      name,
+      toFolder,
+      dir,
+      audio0: clock,
+      cut: clock,
+      endLive: clock,
+      pieces: [],
+      faces: [],
+      tracker: this.tracker,
+      stopped: false,
+      blob: null,
+      finalizing: false,
+      done: false,
+      cancelled: false,
+      final: null,
+    };
+    this.job = job;
+    this.lineCount.set(0);
+    this.savedToFolder.set(false);
+    this.savedMb.set(0);
+    // The video's first frame: the accurate subtitles are timed from here.
+    recorder.onstart = () => {
+      job.audio0 = job.cut = this.audio?.clockMs() ?? job.audio0;
+    };
+    recorder.ondataavailable = (e) => {
+      if (!e.data.size) return;
+      if (job.toFolder) {
+        // Into the folder as it records: an interruption keeps all but the
+        // last few seconds.
+        this.store.addPart(e.data);
+        if (job === this.job) this.zone.run(() => this.savedMb.set(Math.round((this.store.savedBytes + e.data.size) / 1e5) / 10));
+      } else {
+        chunks.push(e.data);
+      }
+    };
+    recorder.onstop = () =>
+      this.zone.run(async () => {
+        let blob: Blob;
+        try {
+          // Join the pieces into one file in the folder; use that file
+          // (read from disk, not memory) for replay and subtitles.
+          blob = job.toFolder ? await this.store.finish() : new Blob(chunks, { type: mime });
+        } catch (e: any) {
+          job.cancelled = true;
+          if (job === this.job) {
+            this.srtWorking.set(false);
+            this.srtStage.set('');
+          }
+          this.error.set(`Couldn't finish saving the recording (${e?.message ?? e}). Its pieces are kept in the folder — use Recover.`);
+          this.checkUnfinished();
+          return;
+        } finally {
+          chunks.length = 0;
+        }
+        job.blob = blob;
+        if (job === this.job) {
+          this.recordedBlob = blob;
+          this.recordedUrl.set(URL.createObjectURL(blob));
+          this.savedToFolder.set(job.toFolder);
+        }
+        this.maybeFinish(job);
       });
-    this.recorder.start(1000);
+    // Smaller pieces when saving to a folder (each is a crash-safe save point).
+    recorder.start(toFolder ? 5000 : 1000);
     this.recordStart.set(this.nowMs());
-    this.recSpan = null;
-    this.recFaces = [];
-    this.accurateLines = null;
     this.recording.set(true);
+    // Turbo starts loading now; it works on a piece every ~28 s.
+    this.ensureBgWorker();
+    this.updateAccurateText();
+    if (toFolder) {
+      // The subtitles so far — accurate where turbo is done, live captions
+      // after that — saved next to the video every 10 s, so an interrupted
+      // recording keeps its subtitles too.
+      this.liveSrtTimer = setInterval(() => this.saveSubtitles(job), 10000);
+    }
+  }
+
+  /** Write a recording's subtitles (as far as they go) into the folder. */
+  private saveSubtitles(job: RecJob): Promise<void> {
+    if (!job.toFolder || job.cancelled) return Promise.resolve();
+    return this.store.writeText(job.dir, baseName(job.name) + '.srt', toSrt(this.linesFor(job)));
+  }
+
+  /** Pick a different folder for recordings (from a click). */
+  async changeFolder(): Promise<void> {
+    if (await this.store.ensureFolder(true)) {
+      this.folderName.set(this.store.folderName);
+      this.checkUnfinished();
+    }
+  }
+
+  private async checkUnfinished(): Promise<void> {
+    this.unfinished.set(await this.store.unfinished().catch(() => []));
+  }
+
+  /** Join the pieces of recordings an interruption left unfinished. */
+  async recoverUnfinished(): Promise<void> {
+    if (!(await this.store.ensureFolder())) return;
+    const done = await this.store.recover();
+    await this.checkUnfinished();
+    this.error.set(
+      done.length
+        ? `Recovered ${done.length} recording${done.length > 1 ? 's' : ''} in “${this.store.folderName}”: ${done.join(', ')}`
+        : `Couldn't recover the recording${this.store.lastError ? ` (${this.store.lastError})` : ''}.`,
+    );
   }
 
   stopRecording(): void {
     if (!this.recording()) return;
-    this.recSpan = [this.recordStart(), this.nowMs()];
+    const job = this.job;
     // The words being spoken right now go to the live captions at once.
     this.audio?.flush();
     this.recorder?.stop();
     this.recording.set(false);
+    clearInterval(this.liveSrtTimer);
     clearInterval(this.recDraw);
     // Only the drawn picture's track: the audio track is the camera's own.
     this.recStream?.getVideoTracks().forEach((t) => t.stop());
     this.recStream = null;
     this.recCanvas = null;
+    this.accurateText.set('');
+    if (job) {
+      job.stopped = true;
+      job.endLive = this.audio?.clockMs() ?? job.cut;
+      // Only the sound since the last piece is left for turbo.
+      this.cutPieces(job, true);
+      this.srtWorking.set(true);
+      this.reportFinishing(job);
+      this.maybeFinish(job);
+    }
   }
 
   /**
@@ -744,7 +993,9 @@ export class LiveCameraComponent implements OnDestroy {
     canvas.width = W;
     canvas.height = H;
     this.recCanvas = canvas;
-    const g = canvas.getContext('2d')!;
+    // Opaque: a transparent canvas is recorded with an extra transparency
+    // layer, which the subtitled-copy converter can't read (it stalls).
+    const g = canvas.getContext('2d', { alpha: false })!;
     const draw = () => {
       g.drawImage(cam, 0, 0, W, H);
       this.drawFaces(g, W);
@@ -780,146 +1031,406 @@ export class LiveCameraComponent implements OnDestroy {
     g.setLineDash([]);
   }
 
-  /**
-   * Subtitles for the last recording as a .srt file: the lines spoken while
-   * it was recording, timed from its start, with the speaker's name when
-   * names are on. Built on click, so lines still being transcribed when
-   * recording stopped are included.
-   */
-  downloadSubtitles(): void {
-    const span = this.recSpan;
-    if (!span) return;
-    const [from, to] = span;
-    // The turbo pass when it finished (already timed to the recording),
-    // else the live captions from the recording's time span.
-    const lines = this.accurateLines ?? this.lines()
-      .filter((l) => l.seg.endMs > from && l.seg.startMs < to)
-      .map((l) => {
-        const n = this.nameOf(l);
-        const name = n ? `${n.name}${n.guess ? '?' : ''}: ` : '';
-        return {
-          startMs: Math.max(0, l.seg.startMs - from),
-          endMs: Math.min(to, l.seg.endMs) - from,
-          text: name + l.seg.text,
-        };
-      });
-    const blob = new Blob([toSrt(lines)], { type: 'application/x-subrip;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = this.recordedName().replace(/\.(webm|mp4)$/, '') + '.srt';
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }
-
-  /** How many caption lines the last recording's subtitle file will have. */
+  /** How many caption lines the last recording's subtitle file has. */
   recordedLineCount(): number {
-    if (this.accurateLines) return this.accurateLines.length;
-    const span = this.recSpan;
-    if (!span) return 0;
-    return this.lines().filter((l) => l.seg.endMs > span[0] && l.seg.startMs < span[1]).length;
+    return this.lineCount();
   }
 
+  /** The last recording's name without its extension (its folder's name). */
+  recordedBaseName(): string {
+    return baseName(this.recordedName());
+  }
+
+  // ── Accurate subtitles, in the background while recording ────────────
+
   /**
-   * One Whisper turbo pass over the recording's own audio (the way Replay
-   * gets its accurate subtitles), in ≤28 s pieces cut at pauses. Times come
-   * from the recording itself, so the .srt is in exact sync; names come from
-   * the faces seen while each line was said. Turbo runs only for this burst
-   * (its worker is closed afterwards), not throughout the live session.
+   * Turbo (Whisper large-v3-turbo) in its own worker, from the first
+   * recording until the camera is turned off. It works on one ≤28 s piece
+   * of the recording at a time — a few seconds of GPU every ~28 s.
    */
-  private async makeAccurateSubtitles(blob: Blob, span: [number, number]): Promise<void> {
-    this.accurateLines = null;
-    this.srtWorking.set(true);
-    this.srtPct.set(0);
-    this.srtStage.set('Reading the recording…');
+  private ensureBgWorker(): void {
+    if (this.bgWorker || this.bgFailed) return;
     try {
-      const ctx = new AudioContext({ sampleRate: 16000 });
-      let pcm: Float32Array;
-      try {
-        const ab = await ctx.decodeAudioData(await blob.arrayBuffer());
-        pcm = new Float32Array(ab.length);
-        for (let ch = 0; ch < ab.numberOfChannels; ch++) {
-          const d = ab.getChannelData(ch);
-          for (let i = 0; i < d.length; i++) pcm[i] += d[i] / ab.numberOfChannels;
-        }
-      } finally {
-        ctx.close();
-      }
-      const totalMs = (pcm.length / 16000) * 1000;
-      const pieces = splitForWhisper(pcm);
-      const segments: SpeechSegment[] = [];
-      const worker = new Worker(new URL('./speech.worker', import.meta.url), { type: 'module' });
-      this.srtWorker = worker;
-      this.srtStage.set('Loading the accurate model…');
-      await new Promise<void>((resolve, reject) => {
-        let next = 0;
-        const send = () => {
-          if (next >= pieces.length) return resolve();
-          const [s, e] = pieces[next++];
-          const audio = pcm.slice(Math.floor(s * 16), Math.floor(e * 16));
-          worker.postMessage({ type: 'transcribe', id: next, audio, startMs: s, language: this.language() }, [audio.buffer]);
-        };
-        worker.onmessage = ({ data }) =>
-          this.zone.run(() => {
-            if (data.type === 'ready') {
-              this.srtStage.set('Making accurate subtitles…');
-              send();
-            } else if (data.type === 'result') {
-              segments.push(...data.segments);
-              this.srtPct.set(Math.round((100 * pieces[next - 1][1]) / (totalMs || 1)));
-              send();
-            } else if (data.type === 'error') {
-              reject(new Error(data.message));
-            }
-          });
-        worker.onerror = (e) => reject(new Error(e.message || 'speech worker failed'));
-        worker.postMessage({ type: 'load', highAccuracy: true, english: this.language() === 'en' });
-      });
-      const voiced = voiceFrames(pcm);
-      const shaped = shapeCaptions(segments.map((s) => ({ ...s, text: collapseRepeats(s.text) }))).map((s) =>
-        trimToVoice(s, voiced, 0),
-      );
-      const out: { startMs: number; endMs: number; text: string }[] = [];
-      let prevId: number | null = null;
-      let prevEnd = -1e9;
-      for (const seg of shaped) {
-        let name = '';
-        if (this.namesOn() && this.tracker) {
-          const samples: FaceSample[] = [];
-          for (const r of this.recFaces) {
-            const t = r.t - span[0];
-            if (t < seg.startMs - 500 || t > seg.endMs + 500) continue;
-            for (const f of r.faces) samples.push({ timeMs: t, personId: f.personId, area: f.box[2] * f.box[3], mouth: f.mouth });
-          }
-          const pick = pickSpeaker(seg, samples, seg.startMs - prevEnd < TURN_GAP_MS ? prevId : null);
-          prevId = pick.personId;
-          prevEnd = seg.endMs;
-          const p = this.person(pick.personId);
-          name = `${p?.name ?? 'Unknown'}${p && pick.basis === 'mostVisible' ? '?' : ''}: `;
-        }
-        out.push({ startMs: seg.startMs, endMs: seg.endMs, text: name + seg.text });
-      }
-      this.accurateLines = out;
+      const w = new Worker(new URL('./speech.worker', import.meta.url), { type: 'module' });
+      w.onmessage = ({ data }) => this.zone.run(() => this.onBgWorker(data));
+      w.onerror = (e) => this.zone.run(() => this.bgFail(e.message || 'speech worker failed'));
+      w.postMessage({ type: 'load', highAccuracy: true, english: this.language() === 'en' });
+      this.bgWorker = w;
+      this.bgReady = false;
+      this.bgLoadFiles.clear();
     } catch (e: any) {
-      this.error.set(`Couldn't make the accurate subtitles (${e?.message ?? e}) — the download uses the live captions instead.`);
-    } finally {
-      this.srtWorker?.terminate();
-      this.srtWorker = null;
-      this.srtWorking.set(false);
-      this.srtStage.set('');
+      this.bgFail(String(e?.message ?? e));
     }
   }
 
-  /** Save the video and its .srt together (same name, subtitles in sync). */
-  downloadAll(): void {
-    const url = this.recordedUrl();
-    if (!url || this.finishing()) return;
+  private onBgWorker(data: any): void {
+    if (data.type === 'progress') {
+      this.bgLoadFiles.set(data.file, { loaded: data.loaded ?? 0, total: data.total ?? 0 });
+    } else if (data.type === 'ready') {
+      this.bgReady = true;
+    } else if (data.type === 'result' || data.type === 'error') {
+      const entry = data.id != null ? this.bgPieces.get(data.id) : undefined;
+      if (!entry) {
+        if (data.type === 'error') this.bgFail(data.message);
+        return;
+      }
+      this.bgPieces.delete(data.id);
+      const { job, piece } = entry;
+      piece.segs =
+        data.type === 'result'
+          ? shapeCaptions((data.segments as SpeechSegment[]).map((s) => ({ ...s, text: collapseRepeats(s.text) }))).map((s) =>
+              trimToVoice(s, piece.voiced, piece.startMs),
+            )
+          : this.liveLines(job, piece.startMs, piece.endMs, false); // this piece: the live captions
+      piece.done = true;
+      piece.voiced = [];
+      this.onJobProgress(job);
+    }
+    this.updateAccurateText();
+  }
+
+  /** Turbo can't run: recordings keep the live captions instead. */
+  private bgFail(message: string): void {
+    this.bgFailed = message;
+    this.bgWorker?.terminate();
+    this.bgWorker = null;
+    const jobs = new Set<RecJob>();
+    for (const { job, piece } of this.bgPieces.values()) {
+      piece.segs = this.liveLines(job, piece.startMs, piece.endMs, false);
+      piece.done = true;
+      jobs.add(job);
+    }
+    this.bgPieces.clear();
+    this.error.set(`Accurate subtitles unavailable (${message}) — recordings get the live captions.`);
+    jobs.forEach((j) => this.onJobProgress(j));
+  }
+
+  /** Turbo is closed once the camera is off and no recording needs it. */
+  private releaseBgWorker(): void {
+    if (this.running() || this.bgPieces.size) return;
+    this.bgWorker?.terminate();
+    this.bgWorker = null;
+    this.bgReady = false;
+    this.bgFailed = '';
+  }
+
+  /**
+   * Hand the next stretch of the recording's sound to turbo: a ≤28 s piece
+   * ending in a pause, once that much has been heard — or everything left,
+   * when the recording stops. The same cuts an uploaded video gets.
+   */
+  private cutPieces(job: RecJob, final: boolean): void {
+    const a = this.audio;
+    if (!a || this.bgFailed) return;
+    const end = final ? job.endLive : a.clockMs();
+    if (!final && end - job.cut < BG_PIECE_MS + 500) return;
+    const from = Math.max(job.cut, a.keptFromMs());
+    const pcm = end - from > 300 ? a.slice(from, end) : null;
+    if (!pcm) {
+      if (final) job.cut = end;
+      return;
+    }
+    let cuts = splitForWhisper(pcm, BG_PIECE_MS);
+    if (!final) cuts = cuts.slice(0, 1); // the rest waits for more sound
+    for (const [s0, e] of cuts) {
+      let s = s0;
+      let voiced = voiceFrames(pcm.subarray(Math.floor(s * 16), Math.floor(e * 16)));
+      // A long silence before the first words: start just before them.
+      // (After a few seconds of silence Whisper put the first line at the
+      // start of the piece — seconds early.)
+      const first = voiced.findIndex((v, i) => v && voiced[i + 1] && voiced[i + 2]);
+      if (first > LEAD_SILENCE_FRAMES) {
+        const skip = first - LEAD_KEEP_FRAMES;
+        s += skip * VOICE_FRAME_MS;
+        voiced = voiced.slice(skip);
+      }
+      const audio = pcm.slice(Math.floor(s * 16), Math.floor(e * 16));
+      const piece: Piece = { startMs: from + s - job.audio0, endMs: from + e - job.audio0, done: false, segs: [], voiced };
+      job.pieces.push(piece);
+      if (voiced.filter(Boolean).length < MIN_VOICED_FRAMES) {
+        piece.done = true; // silence: nothing to transcribe (turbo would invent words)
+        continue;
+      }
+      const id = this.bgNext++;
+      this.bgPieces.set(id, { job, piece });
+      this.bgWorker?.postMessage({ type: 'transcribe', id, audio, startMs: piece.startMs, language: this.language() }, [audio.buffer]);
+    }
+    job.cut = from + cuts[cuts.length - 1][1];
+  }
+
+  /** Recording time (ms) up to which turbo is done, piece by piece in order. */
+  private doneMs(job: RecJob): number {
+    let t = 0;
+    for (const p of job.pieces) {
+      if (!p.done) break;
+      t = p.endMs;
+    }
+    return t;
+  }
+
+  /**
+   * A recording's subtitles (ms from its start): turbo's where it's done,
+   * the live captions after that (while recording, or if turbo failed).
+   */
+  private linesFor(job: RecJob): SubLine[] {
+    if (job.final) return job.final;
+    const doneMs = this.doneMs(job);
+    const accurate = this.nameLines(
+      job,
+      job.pieces.filter((p) => p.done && p.endMs <= doneMs).flatMap((p) => p.segs),
+    );
+    const endRel = (job.stopped ? job.endLive : this.nowMs()) - job.audio0;
+    return endRel > doneMs ? [...accurate, ...this.liveLines(job, doneMs, endRel, true)] : accurate;
+  }
+
+  /** Live captions said between two recording times (by their middle). */
+  private liveLines(job: RecJob, fromMs: number, toMs: number, withNames: boolean): SubLine[] {
+    const from = job.audio0 + fromMs;
+    const to = job.audio0 + toMs;
+    return this.lines()
+      .filter((l) => {
+        const mid = (l.seg.startMs + l.seg.endMs) / 2;
+        return mid >= from && mid < to;
+      })
+      .map((l) => {
+        const n = withNames ? this.nameOf(l) : null;
+        return {
+          startMs: Math.max(0, l.seg.startMs - job.audio0),
+          endMs: Math.min(l.seg.endMs, to) - job.audio0,
+          text: (n ? `${n.name}${n.guess ? '?' : ''}: ` : '') + l.seg.text,
+        };
+      });
+  }
+
+  /** Speaker names from the faces seen while each line was said. */
+  private nameLines(job: RecJob, segs: SpeechSegment[]): SubLine[] {
+    const tracker = (job.tracker ??= this.tracker);
+    if (!this.namesOn() || !tracker) return segs.map((s) => ({ startMs: s.startMs, endMs: s.endMs, text: s.text }));
+    let prevId: number | null = null;
+    let prevEnd = -1e9;
+    return segs.map((seg) => {
+      const samples: FaceSample[] = [];
+      for (const r of job.faces) {
+        const t = r.t - job.audio0;
+        if (t < seg.startMs - 500 || t > seg.endMs + 500) continue;
+        for (const f of r.faces) samples.push({ timeMs: t, personId: f.personId, area: f.box[2] * f.box[3], mouth: f.mouth });
+      }
+      const pick = pickSpeaker(seg, samples, seg.startMs - prevEnd < TURN_GAP_MS ? prevId : null);
+      prevId = pick.personId;
+      prevEnd = seg.endMs;
+      const p = pick.personId == null ? null : (tracker.people[pick.personId] ?? null);
+      // No face saying it: no name (as on screen).
+      const name = pick.personId == null ? '' : `${p?.name ?? 'Unknown'}${p && pick.basis === 'mostVisible' ? '?' : ''}: `;
+      return { startMs: seg.startMs, endMs: seg.endMs, text: name + seg.text };
+    });
+  }
+
+  /** A turbo piece finished: save the subtitles so far; finish if it was the last. */
+  private onJobProgress(job: RecJob): void {
+    this.saveSubtitles(job);
+    if (job.stopped) this.reportFinishing(job);
+    this.maybeFinish(job);
+  }
+
+  /** Progress of a stopped recording's last turbo pieces. */
+  private reportFinishing(job: RecJob): void {
+    const len = Math.max(1, job.endLive - job.audio0);
+    const pct = Math.min(99, Math.round((100 * this.doneMs(job)) / len));
+    if (job === this.job) {
+      this.srtStage.set('Making accurate subtitles…');
+      this.srtPct.set(pct);
+    } else {
+      this.prevStatus.set(`Previous recording: accurate subtitles ${pct}%`);
+    }
+  }
+
+  private updateAccurateText(): void {
+    const job = this.job;
+    if (!job || !this.recording()) return this.accurateText.set('');
+    if (this.bgFailed) return this.accurateText.set('Live captions only');
+    if (!this.bgReady) {
+      let loaded = 0;
+      let total = 0;
+      this.bgLoadFiles.forEach((f) => {
+        loaded += f.loaded;
+        total += f.total;
+      });
+      return this.accurateText.set(`Loading accurate subtitles${total ? ` ${Math.round((100 * loaded) / total)}%` : ''}…`);
+    }
+    const done = this.doneMs(job);
+    this.accurateText.set(done > 0 ? `Accurate subtitles to ${this.fmt(done)}` : 'Accurate subtitles: building…');
+  }
+
+  /** Stopped, its file is complete and turbo is done: final .srt, then the subtitled MP4. */
+  private maybeFinish(job: RecJob): void {
+    if (!job.stopped || !job.blob || job.finalizing || job.cancelled || job.pieces.some((p) => !p.done)) return;
+    job.finalizing = true;
+    // Subtitled copies are made one at a time (a new recording may already be going).
+    this.burnChain = this.burnChain.then(() => this.finishJob(job));
+  }
+
+  private async finishJob(job: RecJob): Promise<void> {
+    try {
+      if (job.cancelled) return;
+      job.final = this.linesFor(job);
+      job.faces = [];
+      await this.saveSubtitles(job).catch(() => undefined);
+      if (job === this.job) this.lineCount.set(job.final.length);
+      await this.burnSubtitles(job);
+    } finally {
+      job.done = true;
+      if (job === this.job) {
+        this.srtWorking.set(false);
+        this.srtStage.set('');
+        this.srtPct.set(0);
+      }
+      this.prevStatus.set('');
+      this.releaseBgWorker();
+    }
+  }
+
+  /**
+   * A copy of the recording with the subtitles drawn into the picture, as an
+   * MP4 (H.264 + AAC — plays in QuickTime, Windows, phones, WhatsApp…). Made
+   * with WebCodecs (the GPU's video encoder), faster than real time. Saved
+   * next to the recording in the folder, or kept for Download.
+   */
+  private async burnSubtitles(job: RecJob): Promise<void> {
+    const lines = job.final ?? this.linesFor(job);
+    const blob = job.blob;
+    if (!lines.length || !blob) return;
+    const show = (pct: number) => {
+      if (job === this.job) {
+        this.srtStage.set('Adding subtitles to the video…');
+        this.srtPct.set(pct);
+      } else {
+        this.prevStatus.set(`Previous recording: adding subtitles to the video ${pct}%`);
+      }
+    };
+    show(0);
+    const name = baseName(job.name) + '.subtitled.mp4';
+    const toFolder = job.toFolder;
+    let writable: (WritableStream & { abort(): Promise<void> }) | null = null;
+    // If the converter stops making progress, give up rather than leave
+    // Download waiting forever.
+    let lastMove = performance.now();
+    let stallTimer: ReturnType<typeof setInterval> | undefined;
+    const stalled = new Promise<never>((_, reject) => {
+      stallTimer = setInterval(() => {
+        if (performance.now() - lastMove > CONVERT_STALL_MS) reject(new Error('the video converter stopped responding'));
+      }, 2000);
+    });
+    stalled.catch(() => undefined);
+    try {
+      const mb = await import('mediabunny');
+      const input = new mb.Input({ source: new mb.BlobSource(blob), formats: mb.ALL_FORMATS });
+      const video = await input.getPrimaryVideoTrack();
+      if (!video) return;
+      const first = await new mb.EncodedPacketSink(video).getFirstPacket();
+      if (first?.sideData?.alpha) throw new Error('the recording has a transparency layer');
+      const t0 = await input.getFirstTimestamp().catch(() => 0);
+      const W = video.displayWidth;
+      const H = video.displayHeight;
+      let target: InstanceType<typeof mb.BufferTarget> | InstanceType<typeof mb.StreamTarget>;
+      if (toFolder) {
+        writable = await this.store.writable(job.dir, name);
+        target = new mb.StreamTarget(writable as WritableStream<any>, { chunked: true });
+      } else {
+        target = new mb.BufferTarget();
+      }
+      const output = new mb.Output({
+        format: new mb.Mp4OutputFormat({ fastStart: toFolder ? false : 'in-memory' }),
+        target,
+      });
+      const canvas = new OffscreenCanvas(W, H);
+      const g = canvas.getContext('2d')!;
+      const avc = await mb.canEncodeVideo('avc', { width: W, height: H });
+      const aac = await mb.canEncodeAudio('aac');
+      const conversion = await Promise.race([
+        stalled,
+        mb.Conversion.init({
+          input,
+          output,
+          video: {
+            ...(avc ? { codec: 'avc' as const } : {}),
+            forceTranscode: true,
+            bitrate: mb.QUALITY_HIGH,
+            process: (sample) => {
+              lastMove = performance.now();
+              sample.draw(g, 0, 0, W, H);
+              const ms = (sample.timestamp - t0) * 1000;
+              const line = lines.find((l) => ms >= l.startMs && ms < l.endMs);
+              if (line) drawSubtitle(g, W, H, line.text);
+              return canvas;
+            },
+          },
+          audio: aac ? { codec: 'aac' } : {},
+        }),
+      ]);
+      if (!conversion.isValid) throw new Error('this recording can’t be converted here');
+      this.conversion = conversion;
+      conversion.onProgress = (p) => this.zone.run(() => show(Math.round(p * 100)));
+      await Promise.race([stalled, conversion.execute()]);
+      let out: Blob;
+      if (toFolder) {
+        writable = null; // closed by the conversion
+        out = await this.store.file(job.dir, name);
+      } else {
+        out = new Blob([(target as InstanceType<typeof mb.BufferTarget>).buffer!], { type: 'video/mp4' });
+      }
+      if (job === this.job && !job.cancelled) {
+        this.subtitledBlob = out;
+        this.subtitledName.set(name);
+      }
+    } catch (e: any) {
+      await this.conversion?.cancel().catch(() => undefined);
+      if (writable) {
+        await writable.abort().catch(() => undefined);
+        await this.store.remove(job.dir, name);
+      }
+      this.error.set(
+        job === this.job
+          ? `Couldn't add the subtitles into the video (${e?.message ?? e}) — the download has the video and a separate .srt.`
+          : `Couldn't add the subtitles into ${job.name} (${e?.message ?? e}); its .srt is in the folder.`,
+      );
+    } finally {
+      clearInterval(stallTimer);
+      this.conversion = null;
+    }
+  }
+
+  /**
+   * The last recording as one .zip holding its folder, the same three files
+   * as a folder recording: the raw video, the .srt (timed from its start,
+   * with speakers' names when names are on) and the MP4 with the subtitles
+   * in the picture (left out if it couldn't be made). One file, because
+   * browsers block a second download from the same click.
+   */
+  async downloadAll(): Promise<void> {
+    if (!this.recordedBlob || !this.job || this.finishing() || this.zipping()) return;
+    const base = baseName(this.recordedName());
+    const files = [
+      { path: `${base}/${this.recordedName()}`, data: this.recordedBlob },
+      { path: `${base}/${base}.srt`, data: new Blob([toSrt(this.linesFor(this.job))], { type: 'application/x-subrip;charset=utf-8' }) },
+    ];
+    if (this.subtitledBlob) files.push({ path: `${base}/${this.subtitledName()}`, data: this.subtitledBlob });
+    this.zipping.set(true);
+    try {
+      this.save(await zipFiles(files), base + '.zip');
+    } catch (e: any) {
+      this.error.set(`Couldn't put the download together (${e?.message ?? e}).`);
+    } finally {
+      this.zipping.set(false);
+    }
+  }
+
+  private save(blob: Blob, name: string): void {
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = this.recordedName();
+    a.download = name;
     a.click();
-    // A moment apart: browsers handle two downloads from one click better.
-    setTimeout(() => this.downloadSubtitles(), 400);
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
   }
 
   replayRecording(): void {
@@ -934,6 +1445,8 @@ export class LiveCameraComponent implements OnDestroy {
     if (url) URL.revokeObjectURL(url);
     this.recordedUrl.set(null);
     this.recordedBlob = null;
+    this.subtitledBlob = null;
+    this.subtitledName.set('');
   }
 
   // ── Full screen ───────────────────────────────────────────────────────
@@ -1050,8 +1563,52 @@ export class LiveCameraComponent implements OnDestroy {
     navigator.mediaDevices?.removeEventListener('devicechange', this.onDeviceChange);
     this.stop();
     this.worker?.terminate();
-    this.srtWorker?.terminate();
+    this.bgWorker?.terminate();
+    this.conversion?.cancel().catch(() => undefined);
+    clearInterval(this.liveSrtTimer);
     this.clearRecording();
     document.removeEventListener('fullscreenchange', this.onFullscreenChange);
   }
+}
+
+/**
+ * One subtitle, bottom-centre: white text on a dark band (wrapped to at most
+ * three lines), the speaker's name ("Name: …") in green.
+ */
+function drawSubtitle(g: OffscreenCanvasRenderingContext2D, W: number, H: number, text: string): void {
+  const m = /^([^:]{1,40}\??):\s+(.*)$/s.exec(text);
+  const name = m ? m[1] + ':' : '';
+  const body = (m ? m[2] : text).trim();
+  const font = Math.max(18, Math.round(H / 22));
+  g.font = `600 ${font}px Geist, Arial, sans-serif`;
+  g.textBaseline = 'alphabetic';
+  const maxW = W * 0.86;
+  // Wrap: the name stays on the first line.
+  const words = (name ? [name, ...body.split(/\s+/)] : body.split(/\s+/)).filter(Boolean);
+  const rows: string[][] = [[]];
+  for (const w of words) {
+    const row = rows[rows.length - 1];
+    if (row.length && g.measureText([...row, w].join(' ')).width > maxW) rows.push([w]);
+    else row.push(w);
+  }
+  const shown = rows.slice(-3);
+  const lineH = Math.round(font * 1.3);
+  const pad = Math.round(font * 0.45);
+  const widths = shown.map((r) => g.measureText(r.join(' ')).width);
+  const boxW = Math.max(...widths) + pad * 2;
+  const boxH = lineH * shown.length + pad;
+  const bottom = H - Math.round(H * 0.06);
+  g.fillStyle = 'rgba(0, 0, 0, 0.72)';
+  g.fillRect((W - boxW) / 2, bottom - boxH, boxW, boxH);
+  shown.forEach((r, i) => {
+    let x = (W - widths[i]) / 2;
+    const y = bottom - boxH + pad / 2 + lineH * (i + 1) - Math.round(font * 0.3);
+    for (const [j, w] of r.entries()) {
+      const isName = name && rows.indexOf(r) === 0 && j === 0;
+      g.fillStyle = isName ? '#6ee7a0' : '#ffffff';
+      const piece = j < r.length - 1 ? w + ' ' : w;
+      g.fillText(piece, x, y);
+      x += g.measureText(piece).width;
+    }
+  });
 }

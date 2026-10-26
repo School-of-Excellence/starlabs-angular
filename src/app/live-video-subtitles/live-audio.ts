@@ -34,7 +34,11 @@ const PRE_ROLL_MS = 250;
 const POST_ROLL_MS = 200;
 /** Voiced frames in a row that count as speech starting (not a click). */
 const START_FRAMES = 3;
-const KEEP_MS = 40000;
+/**
+ * Audio kept: enough for a 28 s background pass to be cut from it even when
+ * the page's timers are slowed (tab in the background).
+ */
+const KEEP_MS = 120000;
 /** Frames kept for the live waveform (20 ms each → 2.4 s). */
 export const WAVE_FRAMES = 120;
 /** The noise floor is the quiet level (10th percentile) of the last… */
@@ -53,8 +57,10 @@ const MAX_GAIN = 8;
 const WORKLET = `
 class LvsCapture extends AudioWorkletProcessor {
   process(inputs) {
+    // No input (a track sending nothing for a while) counts as silence, so
+    // the live clock keeps real time — recordings' subtitles are timed by it.
     const ch = inputs[0] && inputs[0][0];
-    if (ch) this.port.postMessage(ch.slice(0));
+    this.port.postMessage(ch ? ch.slice(0) : new Float32Array(128));
     return true;
   }
 }
@@ -282,6 +288,11 @@ export class LiveAudio {
       this.voicedFrames = 0;
       this.voicedDbSum = 0;
     }
+  }
+
+  /** Earliest live time (ms) still kept. */
+  keptFromMs(): number {
+    return (Math.max(0, this.written - this.ring.length) / RATE) * 1000;
   }
 
   /**

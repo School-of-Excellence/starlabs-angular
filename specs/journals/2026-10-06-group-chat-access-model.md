@@ -15,14 +15,31 @@
 
 | 7 | uncommitted (on `feature-test`) | **Reactions saved to Firestore**, same as Flutter: `reactions.<emoji>` = [uid…], toggled with arrayUnion/arrayRemove via `FieldPath`. Emoji set now Flutter's 👍 🙌 ❤️ 🔥 🙏. Chips show for everyone (count only when >1), tappable only where `features.react`. Announcement card gets the 5-emoji picker instead of a fixed 👍. New hook `gcs-ann-picker-emoji` | `.ts`, `.html`, `.css` | reverts with the rest |
 
-#1–#7 all live in the same component files; reverting one alone means hand-editing.
+| 8 | uncommitted in **breakthroughs-flutter** (`harish-development`) | Mobile Messages hub: **Channels tab commented out**, hub shows Chats · Support. `MsgHubTab` enum, TabController length 2, labels/counts/hints/children lists; channel unreads dropped from `MessagesService.total` (the chat-icon badge). `_channelsTab()` kept with `ignore: unused_element` | `lib/Messages/messagesHub.dart`, `lib/Messages/messagesService.dart` | `git -C ~/Projects/Flutter/breakthroughs-flutter checkout -- lib/Messages/messagesHub.dart lib/Messages/messagesService.dart` |
+
+| 9 | uncommitted (on `feature-test`) | **Web ↔ mobile parity for group messages.** Send: one client `Date` for `time` / `last_modification` / `last_announcement_at` (fixes the never-showing megaphone), `pendingcount.<uid>` +1, `sender_email`, YouTube `links`, `mentions: null` when none, `voice_seconds` + 64-bar `voice_wave` on voice notes, `last_message` = first file's kind. Files: the app's record (`filetype` ext, `mediatype` kind, `filethumbnail` ~480px JPEG / video first frame), contentDisposition. Edit: `edited`, `edited_at`, group `last_message` when newest. Delete: the app's SOFT delete (`deleted`, `deleted_at`, `deleted_by`, `deleted_content`, emptied content, `pending: []`, `pendingcount` down — clamped at 0 —, `last_message`/`last_sender_uid` from the previous standing message, `last_announcement_at` removed, quotes in replies blanked); deleted messages hidden except for the A&H team, who see them dimmed with "Deleted … today, 2:31 PM". Read: `edited` label (dropped the duplicate in-bubble one), "Uploading N files…" while a phone's files land, quotes of deleted messages, image/video previews, chat-list media labels ("📷 Photo"). Chat pin for groups is per person (`pinnedat.<uid>`); channels keep `pinned` | `.ts`, `.html`, `.css` | reverts with the rest |
+| 10 | uncommitted in **breakthroughs-flutter** (`harish-development`) | `message_search` written on send/edit (new `msgSearchKey`, identical to web `normalizeForSearch`), removed on delete; opening a chat also removes me from `last_pending`, so the web stops showing it unread | `lib/Messages/msgFormat.dart`, `lib/Messages/msgThread.dart` | `git -C ~/Projects/Flutter/breakthroughs-flutter checkout -- lib/Messages/msgFormat.dart lib/Messages/msgThread.dart` |
+| 11 | uncommitted in **starlabs-cloud-function** (`development`), **NOT deployed** | `ChatxNotification`: `last_message` = first file's `mediatype` when the message has files and no text (was `''`) | `functions/components/communication.js` | `git -C ~/Projects/Functions/starlabs-cloud-function checkout -- functions/components/communication.js` |
+
+| 12 | uncommitted (on `feature-test`) | **Web unread badge now counted like the app**: per group in My groups, a listener on messages whose `pending` lists me (minus my own and deleted, limit 100); `pendingcount[me]` until it answers. `last_pending` no longer drives the badge. Found on "test 123" (starlabs-test): Charan read everything on the phone (in every message's `read_by`, no `pendingcount` entry) but `last_pending` still listed him, because the installed app never removes you from it — so web showed a badge, the app didn't | `.ts` | reverts with the rest |
+
+| 13 | uncommitted (on `feature-test`) | Chat-list preview built like the app's `msgGroupPreview`: `@<profileid>` → `@Name` (at display time, so late-loading names apply), formatting marks dropped, first line only (`listPreview`). `buttons` written only when the message has some (the app never writes the field; it only displays buttons) | `.ts`, `.html` | reverts with the rest |
+
+#1–#7, #9, #12 and #13 live in the same component files; reverting one alone means hand-editing. #8, #10, #11 are other repos.
 
 ## Announcements — why it matches Flutter exactly
 Flutter (`harish-development`, `lib/Messages/msgThread.dart` `_sendDraft`) writes `announcement: true` on the
 message and `last_announcement_at: time` on the group, and decides "latest is an announcement" by comparing
-`last_announcement_at` to `last_modification` within 1 ms (`MessagesService.latestIsAnnouncement`). The web
-writes both group fields in ONE `updateDoc` with `serverTimestamp()`, so they resolve to the same instant and
-both apps agree. Reactions were wired the same way in #7. Reverting one alone means hand-editing; they were made back-to-back.
+`last_announcement_at` to `last_modification` within 1 ms (`MessagesService.latestIsAnnouncement`).
+
+**CORRECTION 2026-10-26 — the web megaphone does not work.** The earlier claim here ("one `updateDoc`, same
+instant, both apps agree") missed the `ChatxNotification` Cloud Function (starlabs-cloud-function,
+`communication.js`). It runs on every new message and sets the group's `last_modification` to the MESSAGE's
+`time`. Web writes the message `time` with one `serverTimestamp()` (setDoc) and `last_announcement_at` with
+another (the later updateDoc), typically tens of ms apart, so the 1 ms check fails on both apps. Flutter works
+because it uses one client `DateTime` for the message time, `last_modification` and `last_announcement_at`.
+Fixed in #9: the web now uses one client time for all three. Full app-vs-web field audit was sent to the
+operator as a scratchpad doc, not committed (docs-outside-project rule). Reactions were wired the same way in #7. Reverting one alone means hand-editing; they were made back-to-back.
 
 ## What was asked
 1. "Before we were having the admins array, it's not needed. In user roles there is a role called

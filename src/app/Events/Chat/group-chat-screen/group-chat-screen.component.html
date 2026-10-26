@@ -88,7 +88,7 @@
               </span>
               <ng-template #lastMsg>
                 <span class="wc-row-preview">
-                  <mat-icon class="wc-row-announce" *ngIf="c.lastIsAnnouncement" aria-label="Announcement">campaign</mat-icon>{{ c.lastMessage || '—' }}
+                  <mat-icon class="wc-row-announce" *ngIf="c.lastIsAnnouncement" aria-label="Announcement">campaign</mat-icon>{{ listPreview(c.lastMessage) || '—' }}
                 </span>
               </ng-template>
               <span class="wc-row-unread" *ngIf="c.unread > 0">{{ c.unread }}</span>
@@ -367,12 +367,15 @@
             <!-- Announcement -->
             <div class="wc-ann-wrap" *ngIf="m.kind === 'announcement'; else normalBubble"
                  [id]="'msg-' + m.id" (dblclick)="onBubbleDblClick(m)">
-              <div class="wc-ann">
+              <div class="wc-ann" [class.deleted]="m._deleted">
                 <div class="wc-ann-head">
                   <mat-icon>campaign</mat-icon>
                   <span class="wc-ann-label">Announcement</span>
                   <mat-icon class="wc-ann-pin" *ngIf="m.pinned">push_pin</mat-icon>
                   <span class="wc-ann-time">{{ clockTime(m.at) }}</span>
+                </div>
+                <div class="wc-deleted-note" *ngIf="m._deleted">
+                  <mat-icon>delete_outline</mat-icon> {{ m._deleted }}
                 </div>
                 <div class="wc-ann-body">
                   <ng-container *ngTemplateOutlet="richBody; context: { $implicit: parsedOf(m).blocks, light: false }"></ng-container>
@@ -400,7 +403,7 @@
                 <div class="wc-picker ann" *ngIf="pickerId === m.id">
                   <button data-testid="gcs-ann-picker-emoji" *ngFor="let e of QUICK_EMOJIS; trackBy: trackByIndex" (click)="toggleReaction(m.id, e)">{{ e }}</button>
                 </div>
-                <div class="wc-ann-actions" *ngIf="!selectMode">
+                <div class="wc-ann-actions" *ngIf="!selectMode && !m._deleted">
                   <button data-testid="gcs-ann-react" *ngIf="features.react" [class.on]="pickerId === m.id" matTooltip="React"
                           (click)="pickerId = pickerId === m.id ? null : m.id">
                     <mat-icon>add_reaction</mat-icon>
@@ -458,6 +461,7 @@
                     <div class="wc-bubble-line" #bubbleLine
                          (mouseenter)="onBubbleEnter(m.id, bubbleLine)" (mouseleave)="hoverId = null; pickerId = null">
                     <div class="wc-bubble"
+                         [class.deleted]="m._deleted"
                          [class.mine]="alignRight(m)"
                          [class.mention]="mentionsMe(m) && !isLight(m)">
 
@@ -472,6 +476,11 @@
 
                       <div class="wc-picker" *ngIf="pickerId === m.id" [class.from-left]="hoverFlip">
                         <button data-testid="gcs-msg-picker-emoji" *ngFor="let e of QUICK_EMOJIS; trackBy: trackByIndex" (click)="toggleReaction(m.id, e)">{{ e }}</button>
+                      </div>
+
+                      <!-- Deleted (only the A&H team sees these): what it said, dimmed, with when and by whom. -->
+                      <div class="wc-deleted-note" *ngIf="m._deleted">
+                        <mat-icon>delete_outline</mat-icon> {{ m._deleted }}
                       </div>
 
                       <div class="wc-bubble-pinned" *ngIf="m.pinned">
@@ -491,10 +500,11 @@
 
                       <ng-container *ngFor="let att of attachmentsOf(m); trackBy: trackByIndex">
                         <img data-testid="gcs-msg-att-image" class="wc-att-image" *ngIf="att.type === 'image'"
-                             [src]="att.dataUrl" [alt]="att.name || 'image'"
+                             [src]="att.thumbUrl || att.dataUrl" [alt]="att.name || 'image'"
                              (click)="openImage(att.dataUrl)"/>
 
                         <video class="wc-att-video" *ngIf="att.type === 'video'" [src]="att.dataUrl" controls
+                               [attr.poster]="att.thumbUrl || null"
                                (play)="onMediaPlay($event)"></video>
 
                         <app-chat-audio *ngIf="att.type === 'voice'" class="wc-audio-block"
@@ -512,8 +522,13 @@
                         </a>
                       </ng-container>
 
+                      <!-- A phone is still uploading this message's files (`attachments` > files landed). -->
+                      <div class="wc-uploading" *ngIf="m._uploading">
+                        <mat-progress-spinner diameter="14" mode="indeterminate"></mat-progress-spinner>
+                        Uploading {{ m._uploading }} file{{ m._uploading === 1 ? '' : 's' }}…
+                      </div>
+
                       <ng-container *ngTemplateOutlet="richBody; context: { $implicit: parsedOf(m).blocks, light: isLight(m) }"></ng-container>
-                      <span class="wc-edited" *ngIf="m.edited">(edited)</span>
 
 
                       <!-- Attached to the foot of the bubble, WhatsApp-style: full bubble width,

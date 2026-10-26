@@ -766,6 +766,13 @@
 .wc-chip.mine { background: var(--blue-tint); border-color: var(--blue-line); color: var(--blue-text); }
 /* Shown to view-only / archived readers, who can see reactions but not add them. */
 .wc-chip.static { cursor: default; pointer-events: none; }
+
+/* Deleted messages — shown to the A&H team only, dimmed, as the Flutter app does. */
+.wc-bubble.deleted, .wc-ann.deleted { opacity: .6; border-style: dashed; }
+.wc-deleted-note { display: flex; align-items: center; gap: 4px; margin-bottom: 4px; font-size: 11px; font-weight: 600; color: var(--ink3); }
+.wc-deleted-note mat-icon { font-size: 13px; width: 13px; height: 13px; }
+/* A phone is still uploading this message's files. */
+.wc-uploading { display: flex; align-items: center; gap: 7px; margin: 2px 0 4px; font-size: 12px; color: var(--ink3); }
 .wc-chip span { font-size: 12px; }
 
 /* Card + stamp on one line — the stamp always sits to the RIGHT of the card.

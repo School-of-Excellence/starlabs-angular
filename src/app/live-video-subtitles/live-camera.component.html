@@ -87,10 +87,22 @@
       <div class="lvs-card lvs-info lvs-cam-bar">
         <div class="lvs-cam-actions">
           @if (!recording()) {
-            <button type="button" class="lvs-btn lvs-btn-rec" (click)="startRecording()" [disabled]="finishing() > 0" data-testid="lvs-cam-record">
-              <span class="lvs-rec-dot"></span> Record
+            <button type="button" class="lvs-btn lvs-btn-rec" (click)="startRecording()" [disabled]="preparingRec()" data-testid="lvs-cam-record">
+              <span class="lvs-rec-dot"></span> {{ preparingRec() ? 'Choose a folder…' : 'Record' }}
             </button>
             <span class="lvs-rec-opts">
+              @if (folderSupported) {
+                <label class="lvs-check-sm" title="Saved into a folder on this computer while it records — an interruption keeps it">
+                  <input type="checkbox" [checked]="saveToFolder()" (change)="saveToFolder.set($any($event.target).checked)" data-testid="lvs-cam-save-folder" />
+                  Save to folder
+                </label>
+                @if (saveToFolder()) {
+                  <span class="lvs-folder" data-testid="lvs-cam-folder">
+                    {{ folderName() ? '“' + folderName() + '”' : '(asks on Record)' }}
+                    <button type="button" class="lvs-link-sm" (click)="changeFolder()" data-testid="lvs-cam-change-folder">{{ folderName() ? 'Change' : 'Choose' }}</button>
+                  </span>
+                }
+              }
               <label class="lvs-check-sm" [class.lvs-disabled]="!namesOn()" [title]="namesOn() ? 'Face boxes and names' : 'Turn on Show names first'">
                 <input type="checkbox" [checked]="recNames() && namesOn()" [disabled]="!namesOn()" (change)="recNames.set($any($event.target).checked)" data-testid="lvs-cam-rec-names" />
                 Names in video
@@ -100,18 +112,40 @@
             <button type="button" class="lvs-btn lvs-btn-ghost" (click)="stopRecording()" data-testid="lvs-cam-stop-record">
               <span class="lvs-stop-sq"></span> Stop recording
             </button>
+            @if (recordToFolderNow()) {
+              <span class="lvs-folder" data-testid="lvs-cam-saving">Saving to “{{ folderName() }}” · {{ savedMb() }} MB</span>
+            }
+            @if (accurateText()) {
+              <span class="lvs-folder" data-testid="lvs-cam-accurate" title="Whisper turbo makes the accurate subtitles in the background, a piece every ~28 s; they're saved with the recording">{{ accurateText() }}</span>
+            }
+          }
+          @if (savedToFolder() && !recording() && finishing() === 0) {
+            <span class="lvs-saved" data-testid="lvs-cam-saved" [title]="recordedName() + ' (raw), ' + (subtitledName() ? subtitledName() + ' (subtitles in the picture), ' : '') + 'and the .srt'"
+              >✓ Saved in “{{ folderName() }}/{{ recordedBaseName() }}”: raw video, .srt{{ subtitledName() ? ' and the MP4 with subtitles' : '' }}</span
+            >
+          }
+          @if (prevStatus()) {
+            <span class="lvs-finishing" role="status" data-testid="lvs-cam-prev">
+              <span class="lvs-spinner lvs-spinner-dark"></span>
+              {{ prevStatus() }}
+            </span>
+          }
+          @if (unfinished().length && !recording()) {
+            <button type="button" class="lvs-btn lvs-btn-ghost" (click)="recoverUnfinished()" data-testid="lvs-cam-recover">
+              Recover unfinished recording{{ unfinished().length > 1 ? 's (' + unfinished().length + ')' : '' }}
+            </button>
           }
           @if (recordedUrl(); as url) {
             <button
               type="button"
               class="lvs-btn lvs-btn-ghost"
               (click)="downloadAll()"
-              [disabled]="finishing() > 0"
-              [title]="'Video + subtitles (.srt, ' + recordedLineCount() + ' lines), saved together'"
+              [disabled]="finishing() > 0 || zipping()"
+              [title]="'One .zip with a folder: the raw video, the subtitles file (.srt, ' + recordedLineCount() + ' lines)' + (subtitledName() ? ' and the MP4 with the subtitles in the picture' : '')"
               data-testid="lvs-cam-download"
             >
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v12m0 0-5-5m5 5 5-5M4 20h16" /></svg>
-              Download video + subtitles
+              {{ zipping() ? 'Preparing download…' : 'Download video + subtitles' }}
             </button>
             <button type="button" class="lvs-btn lvs-btn-ghost" (click)="replayRecording()" [disabled]="finishing() > 0" data-testid="lvs-cam-replay">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
@@ -250,9 +284,14 @@
       Your browser will ask to use the camera and microphone. Nothing is uploaded; a recording is saved only if you
       press Download.
     </span>
+    @if (unfinished().length) {
+      <button type="button" class="lvs-btn lvs-btn-ghost" (click)="recoverUnfinished()" data-testid="lvs-cam-recover-start">
+        Recover unfinished recording{{ unfinished().length > 1 ? 's (' + unfinished().length + ')' : '' }} in “{{ folderName() }}”
+      </button>
+    }
     @if (recordedUrl(); as url) {
       <span class="lvs-cam-actions">
-        <button type="button" class="lvs-btn lvs-btn-ghost" (click)="downloadAll()" [disabled]="finishing() > 0">Download last recording + subtitles</button>
+        <button type="button" class="lvs-btn lvs-btn-ghost" (click)="downloadAll()" [disabled]="finishing() > 0 || zipping()">{{ zipping() ? 'Preparing download…' : 'Download last recording + subtitles' }}</button>
         <button type="button" class="lvs-btn lvs-btn-ghost" (click)="replayRecording()" [disabled]="finishing() > 0">Replay with subtitles</button>
         @if (finishing() > 0) {
           <span class="lvs-finishing" role="status"><span class="lvs-spinner lvs-spinner-dark"></span> {{ srtStage() || 'Making accurate subtitles…' }} {{ srtPct() ? srtPct() + '%' : '' }}</span>

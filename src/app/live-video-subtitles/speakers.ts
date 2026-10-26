@@ -63,6 +63,10 @@ const LIP_LEAD_RATIO = 1.35;
 // would otherwise look like a big mouth movement).
 // (Live camera samples faces every 1.2 s while someone is speaking.)
 const MAX_SAMPLE_GAP_MS = 1500;
+// Lips are judged still only from this many sample pairs: at the live
+// camera's 1.2 s steps one pair can catch a talking mouth at the same
+// openness twice, which named nobody while that face was plainly talking.
+const MIN_STILL_PAIRS = 2;
 
 /**
  * Pick who is saying `seg` from the face samples around it. A face counts as
@@ -85,7 +89,8 @@ export function pickSpeaker(seg: SpeechSegment, samples: Iterable<FaceSample>, p
   const activity = new Map<number, number>();
   byPerson.forEach((s, id) => {
     const a = lipActivity(s);
-    if (a !== null) activity.set(id, a);
+    // Too few looks to call still lips still: left unmeasured.
+    if (a !== null && (a.mean >= MIN_LIP_ACTIVITY || a.pairs >= MIN_STILL_PAIRS)) activity.set(id, a.mean);
   });
 
   const talkers = [...activity.entries()].filter(([, a]) => a >= MIN_LIP_ACTIVITY).sort((a, b) => b[1] - a[1]);
@@ -112,7 +117,7 @@ export function pickSpeaker(seg: SpeechSegment, samples: Iterable<FaceSample>, p
 }
 
 /** Mean |Δ mouth| between back-to-back samples; null if none (unmeasurable). */
-function lipActivity(s: FaceSample[]): number | null {
+function lipActivity(s: FaceSample[]): { mean: number; pairs: number } | null {
   let sum = 0;
   let pairs = 0;
   for (let i = 1; i < s.length; i++) {
@@ -123,7 +128,7 @@ function lipActivity(s: FaceSample[]): number | null {
     sum += Math.abs(b - a);
     pairs++;
   }
-  return pairs === 0 ? null : sum / pairs;
+  return pairs === 0 ? null : { mean: sum / pairs, pairs };
 }
 
 function mostVisible(byPerson: Map<number, FaceSample[]>): number {
