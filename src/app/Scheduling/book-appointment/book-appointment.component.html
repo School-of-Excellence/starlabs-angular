@@ -15,12 +15,14 @@
   <div *ngIf="selectedUser != null && clientJourney.length != 0" class="appointmentbox">
     <div *ngFor="let journey of clientJourney">
       <label class="noappointment" *ngIf="journey.products.length == 0"> No active products for the Client</label>
-      <div class="productbox" *ngFor="let product of journey.products">
+      <label class="noappointment" *ngIf="journey.products.length != 0 && shownProducts(journey.products).length == 0"> No products match the filter</label>
+      <div class="productbox" *ngFor="let product of shownProducts(journey.products)">
         <label class="producttitle">Your <b>'{{mapProduct[product.productid]}}''</b> Product:</label>
         <label class="noappointment" *ngIf="product.appointment.length == 0"> No Appointment currently available</label>
+        <label class="noappointment" *ngIf="product.appointment.length != 0 && shownAppointments(product).length == 0"> No appointment types match the filter</label>
         <br>
         <mat-radio-group [(ngModel)]="selectedAppointment" (ngModelChange)="onAppointmentSelect()" labelPosition="after">
-          <mat-radio-button class="radionbtn" *ngFor="let appointment of product.appointment" [value]="appointment">
+          <mat-radio-button class="radionbtn" *ngFor="let appointment of shownAppointments(product)" [value]="appointment">
             <label style="font-size: 16px;" [ngClass]="{'notready':appointment['status'] != 'ready'}">{{mapAppointments[appointment.id]}}</label>
           </mat-radio-button>
         </mat-radio-group>

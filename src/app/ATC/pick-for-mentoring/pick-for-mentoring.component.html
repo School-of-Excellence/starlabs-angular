@@ -25,7 +25,7 @@
     <!-- Alpha ATC -->
     <mat-tab label="Validated ATC">
       <mat-accordion multi>
-        <mat-expansion-panel *ngFor="let atc of filteralphaATC.slice(alphaStart, alphaEnd); let i = index" (opened)="getTranscription('alpha', atc)">
+        <mat-expansion-panel data-testid="pfm-panel-alpha" [attr.data-atc]="atc.atcid" *ngFor="let atc of filteralphaATC.slice(alphaStart, alphaEnd); let i = index" (opened)="getTranscription('alpha', atc)">
           <mat-expansion-panel-header #header collapsedHeight="175px" expandedHeight="200px">
             <mat-panel-title>
               <div class="expansionheader">
@@ -37,8 +37,8 @@
                 <br>
                 <span class="head">Prescribed On: </span><span class="body">{{atc.prescription_date.toDate() | date:"mediumDate"}}</span>
                 <br>
-                <button class="mt-1 tobebtn" *ngIf="!atc.mentoringid" mat-stroked-button (click)="$event.stopPropagation(); pickformentoring('alpha', atc)">Pick For Mentoring</button>
-                <button class="mt-1 donebtn" *ngIf="atc.mentoringid" mat-stroked-button (click)="$event.stopPropagation();">Picked For Mentoring</button>
+                <button data-testid="pfm-pick" class="mt-1 tobebtn" *ngIf="!atc.mentoringid" mat-stroked-button (click)="$event.stopPropagation(); pickformentoring('alpha', atc)">Pick For Mentoring</button>
+                <button data-testid="pfm-picked" class="mt-1 donebtn" *ngIf="atc.mentoringid" mat-stroked-button (click)="$event.stopPropagation();">Picked For Mentoring</button>
                 <span *ngIf="atc['status'] != null" class="maticon">{{atc['status'] }}</span>
               </div>
             </mat-panel-title>
@@ -74,7 +74,7 @@
     <!-- Validation ATC -->
     <mat-tab label="Yet to Validated">
       <mat-accordion multi>
-        <mat-expansion-panel *ngFor="let atc of filtervalidateATC.slice(validateStart, validateEnd); let i = index" (opened)="getTranscription('validate', atc)">
+        <mat-expansion-panel data-testid="pfm-panel-validate" [attr.data-atc]="atc.atcid" *ngFor="let atc of filtervalidateATC.slice(validateStart, validateEnd); let i = index" (opened)="getTranscription('validate', atc)">
           <mat-expansion-panel-header #header collapsedHeight="175px" expandedHeight="200px">
             <mat-panel-title>
               <div class="expansionheader">
@@ -86,8 +86,9 @@
                 <br>
                 <span class="head">Prescribed On: </span><span class="body">{{atc.prescription_date.toDate() | date:"mediumDate"}}</span>
                 <br>
-                <button class="mt-1 tobebtn" *ngIf="!atc.mentoring" mat-stroked-button (click)="$event.stopPropagation(); pickformentoring('validation', atc)">Pick For Mentoring</button>
-                <button class="mt-1 donebtn" *ngIf="atc.mentoring" mat-stroked-button (click)="$event.stopPropagation();">Picked For Mentoring</button>
+                <!-- `mentoringid` (as on the Validated tab) — `atc.mentoring` is never set, so this tab never showed Picked and re-picking created duplicates (fixed 2026-10-17) -->
+                <button data-testid="pfm-pick" class="mt-1 tobebtn" *ngIf="!atc.mentoringid" mat-stroked-button (click)="$event.stopPropagation(); pickformentoring('validation', atc)">Pick For Mentoring</button>
+                <button data-testid="pfm-picked" class="mt-1 donebtn" *ngIf="atc.mentoringid" mat-stroked-button (click)="$event.stopPropagation();">Picked For Mentoring</button>
                 <span *ngIf="atc['status'] != null && atc['status'] != 'atc given'" class="maticon">{{atc['status']}}</span>
               </div>
             </mat-panel-title>
@@ -108,8 +109,8 @@
             </div>
           </div>
           <div class="mt-2" *ngIf="atc.transcription != null && atc.transcription != undefined && atc.transcription.length != 0 && atc['status'] == 'atc given'">
-            <button class="me-3" mat-stroked-button (click)="editATC(atc.atcid, 'validation')">Edit ATC</button>
-            <button class="me-3" mat-stroked-button (click)="markATCvalidate(atc.atcid, atc.validator)">Validate ATC</button>
+            <button data-testid="pfm-edit" class="me-3" mat-stroked-button (click)="editATC(atc.atcid, 'validation')">Edit ATC</button>
+            <button data-testid="pfm-validate" class="me-3" mat-stroked-button (click)="markATCvalidate(atc.atcid, atc.validator)">Validate ATC</button>
           </div>
         </mat-expansion-panel>
       </mat-accordion>
@@ -124,7 +125,7 @@
     <!-- Mentoring ATC -->
     <mat-tab label="Picked For Mentoring">
       <mat-accordion multi>
-        <mat-expansion-panel *ngFor="let atc of filtermentoringATC.slice(mentorStart, mentorEnd); let i = index" (opened)="getTranscription(atc['status'] == 'atc given' ? 'validate' : 'alpha', atc)">
+        <mat-expansion-panel data-testid="pfm-panel-mentor" [attr.data-atc]="atc.atcid" *ngFor="let atc of filtermentoringATC.slice(mentorStart, mentorEnd); let i = index" (opened)="getTranscription(atc['status'] == 'atc given' ? 'validate' : 'alpha', atc)">
           <mat-expansion-panel-header #header collapsedHeight="110%" expandedHeight="115%">
             <mat-panel-title>
               <div class="expansionheader p-3">
@@ -136,14 +137,14 @@
                 <br>
                 <span class="head">Prescribed On: </span><span class="body">{{atc.prescription_date.toDate() | date:"mediumDate"}}</span>
                 <br>
-                <label class="body"> <b><i>Mentoring Note:</i></b> {{(mapMentoringNote[atc.mentoringid] || {})['mentoringnote'] != null ? mapMentoringNote[atc.mentoringid]['mentoringnote'] : 'No Notes'}}</label>
+                <label data-testid="pfm-mentor-note" class="body"> <b><i>Mentoring Note:</i></b> {{(mapMentoringNote[atc.mentoringid] || {})['mentoringnote'] != null ? mapMentoringNote[atc.mentoringid]['mentoringnote'] : 'No Notes'}}</label>
                 <!-- <span class="head">Mentoring Note: </span><label class="body">{{atc.mentoringnote.length != 0 ? atc.mentoringnote : 'No Note'}}</label> -->
               </div>
             </mat-panel-title>
           </mat-expansion-panel-header>
           <div class="mentorbox">
-            <textarea matInput class="mentornotefield" #noteField placeholder="Add Mentoring Note...."></textarea>
-            <button mat-raised-button class="mentorbtn" (click)="updateMentoringNote(noteField.value, atc)">Add Note</button>
+            <textarea data-testid="pfm-note-text" matInput class="mentornotefield" #noteField placeholder="Add Mentoring Note...."></textarea>
+            <button data-testid="pfm-add-note" mat-raised-button class="mentorbtn" (click)="updateMentoringNote(noteField.value, atc)">Add Note</button>
           </div>
           <div *ngIf="atc.transcription == null || atc.transcription == undefined || atc.transcription.length == 0">
             <span class="text-secondary text-center">Fetching Adjustment & Procedures.....</span>

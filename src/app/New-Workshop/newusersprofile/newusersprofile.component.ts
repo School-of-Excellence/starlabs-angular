@@ -42,6 +42,12 @@ import { canOpenNewUsers as canOpenNewUsersRule } from '../workshop-access/works
 import { AssignTagsDialogComponent } from './assign-tags-dialog/assign-tags-dialog.component';
 import { EmailInputComponent } from '../../Participants Profile Management/participants-analytics/email-input/email-input.component';
 
+/**
+ * Toolbar conversion filter. '' is the cleared state, not a third menu row —
+ * the menu offers exactly two options and re-picking the active one clears it.
+ */
+export type ConvertedFilter = '' | 'converted' | 'notconverted';
+
 @Component({
   selector: 'app-newusersprofile',
   standalone: true,
@@ -108,8 +114,11 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   // What the export panel offers right now (base + Workshop/Moved On when filtering).
   exportColumnsView = this.exportColumns;
 
-  // Converted filter: only profiles moved to existing users (movedtoexist == true).
-  convertedOnly = false;
+  // Conversion filter, driven by the two-option toolbar menu:
+  //   'converted'    -> only profiles that moved over to existing users
+  //   'notconverted' -> only profiles that have not moved over
+  //   ''             -> no conversion filter
+  convertedFilter: ConvertedFilter = '';
   private lastConvertedActive = false;
 
   // tag id -> name, from the newusertags collection (live).
@@ -301,9 +310,10 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
         if (end != null && created > end) return false;
       }
 
-      // Converted filter — only profiles moved to existing users. State lives
-      // on `this`; the filter string carries a flag so the table re-filters.
-      if (this.convertedOnly && u.movedtoexist !== true) return false;
+      // Conversion filter — one side or the other, never both. State lives on
+      // `this`; the filter string carries the choice so the table re-filters.
+      if (this.convertedFilter === 'converted' && u.movedtoexist !== true) return false;
+      if (this.convertedFilter === 'notconverted' && u.movedtoexist === true) return false;
 
       // Workshop filter — only profiles enrolled in a selected workshop.
       // The enrolled set lives on `this` (not the filter string); while it is
@@ -357,7 +367,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
 
   get hasAnyFilter(): boolean {
     return !!(this.searchText || this.selectByTagIds.size > 0 || this.hasDateFilter
-      || this.selectedWorkshopIds.size > 0 || this.convertedOnly);
+      || this.selectedWorkshopIds.size > 0 || !!this.convertedFilter);
   }
 
   clearAllFilters(): void {
@@ -366,13 +376,29 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
     this.selectByTagPolarity = 'include';
     this.startDate = null;
     this.endDate = null;
-    this.convertedOnly = false;
+    this.convertedFilter = '';
     this.resetWorkshopFilter();
     this.refreshFilter();
   }
 
-  toggleConvertedFilter(): void {
-    this.convertedOnly = !this.convertedOnly;
+  // The toolbar button's text, so the chosen side is readable without opening
+  // the menu. Unset reads as the dimension, not as one of its two answers.
+  get convertedLabel(): string {
+    if (this.convertedFilter === 'converted') return 'Converted';
+    if (this.convertedFilter === 'notconverted') return 'Not converted';
+    return 'Conversion';
+  }
+
+  // Picking the option that is already active clears it, so two rows cover
+  // three states and the menu needs no "any" row.
+  setConvertedFilter(value: ConvertedFilter): void {
+    this.convertedFilter = this.convertedFilter === value ? '' : value;
+    this.updateDisplayedColumns();
+    this.refreshFilter();
+  }
+
+  clearConvertedFilter(): void {
+    this.convertedFilter = '';
     this.updateDisplayedColumns();
     this.refreshFilter();
   }
@@ -380,12 +406,10 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   // Rebuild the datasource filter from search + tags + date range.
   private refreshFilter(): void {
     // Start = beginning of the start day, End = end of the end day (inclusive).
-    const start = this.startDate
-      ? new Date(this.startDate.getFullYear(), this.startDate.getMonth(), this.startDate.getDate(), 0, 0, 0, 0).getTime()
-      : null;
-    const end = this.endDate
-      ? new Date(this.endDate.getFullYear(), this.endDate.getMonth(), this.endDate.getDate(), 23, 59, 59, 999).getTime()
-      : null;
+    // Both bounds are typable now, so a half-typed date has to read as "no
+    // bound" rather than as a NaN comparison that quietly matches everything.
+    const start = this.dayBound(this.startDate, 'start');
+    const end = this.dayBound(this.endDate, 'end');
 
     this.dataSource.filter = JSON.stringify({
       q: this.searchText.trim().toLowerCase(),
@@ -399,7 +423,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
       workshops: [...this.selectedWorkshopIds],
       wmode: this.workshopFilterMode,
       wv: this.workshopFilterVersion,
-      conv: this.convertedOnly
+      conv: this.convertedFilter
     });
     this.dataSource.paginator?.firstPage();
   }
@@ -414,8 +438,20 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
     this.refreshFilter();
   }
 
+  // Midnight (start) or 23:59:59.999 (end) of the picked day; null when the
+  // control is empty or holds a date the adapter could not parse.
+  private dayBound(value: Date | null, edge: 'start' | 'end'): number | null {
+    if (!(value instanceof Date) || Number.isNaN(value.getTime())) return null;
+    return edge === 'start'
+      ? new Date(value.getFullYear(), value.getMonth(), value.getDate(), 0, 0, 0, 0).getTime()
+      : new Date(value.getFullYear(), value.getMonth(), value.getDate(), 23, 59, 59, 999).getTime();
+  }
+
+  // Active only when a bound actually narrows the table — an unparseable date
+  // must not light the control up while filtering nothing.
   get hasDateFilter(): boolean {
-    return !!(this.startDate || this.endDate);
+    return this.dayBound(this.startDate, 'start') != null
+      || this.dayBound(this.endDate, 'end') != null;
   }
 
   toDate(value: any): Date | null {
@@ -793,7 +829,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
 
     this.workshopFilterLoading = true;
     this.workshopProfileIds = null; // predicate hides rows while loading
-    // Clear now (not just on completion) so a mid-load export can't read the
+    // Clear now (not just on completion) so a mid-load export can't read the.
     // previous selection's titles.
     this.workshopsByProfile.clear();
     this.refreshFilter();
@@ -868,8 +904,10 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
       cols.push('workshop');
       exportCols.push(this.workshopExportColumn);
     }
-    // The Moved On column/export only appears while the Converted filter is on.
-    if (this.convertedOnly) {
+    // The Moved On column/export belongs to the "Converted" side only — the
+    // profiles on the other side have no move date to put in it.
+    const convertedActive = this.convertedFilter === 'converted';
+    if (convertedActive) {
       cols.push('movedon');
       exportCols.push(this.movedonExportColumn);
     }
@@ -891,9 +929,9 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
       }
     }
 
-    if (this.convertedOnly !== this.lastConvertedActive) {
-      this.lastConvertedActive = this.convertedOnly;
-      if (this.convertedOnly) {
+    if (convertedActive !== this.lastConvertedActive) {
+      this.lastConvertedActive = convertedActive;
+      if (convertedActive) {
         if (!this.selectedExportKeys.includes('movedon')) {
           this.selectedExportKeys = [...this.selectedExportKeys, 'movedon'];
         }
@@ -1057,7 +1095,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
           name: param.name,
           value: param.value.replace(/\{\{name\}\}/g, name)
         }));
-        return { phonenumber, name, customParams: processedParams };
+        return { profileid: participant['profileid'], phonenumber, name, customParams: processedParams };
       });
 
     if (participants.length === 0) {
@@ -1205,7 +1243,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
           })
           .map(participant => {
             const metadata = participant['metadata'];
-            return { email: metadata['email'], name: metadata['name'] };
+            return { profileid: participant['profileid'], email: metadata['email'], name: metadata['name'] };
           });
 
         if (recipients.length === 0) {
@@ -1257,7 +1295,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
               name: param.name,
               value: param.value.replace(/\{\{name\}\}/g, name)
             }));
-            return { phonenumber: fullPhoneNumber, name, customParams: processedParams };
+            return { profileid: participant['profileid'], phonenumber: fullPhoneNumber, name, customParams: processedParams };
           });
 
         if (participants.length === 0) {

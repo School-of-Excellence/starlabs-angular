@@ -77,7 +77,8 @@
       class="full-width"
     >
       <mat-label>Profiles</mat-label>
-      <mat-select data-testid="rxd-mat-select-2" [(ngModel)]="selectedProfiles" multiple [disabled]="enabled">
+      <mat-select data-testid="rxd-mat-select-2" #mainProfilesSel [(ngModel)]="selectedProfiles" multiple [disabled]="enabled"
+        (opened)="mainProfilesOpened = true">
         <mat-select-trigger>
           {{ getProfileNamesFromIds(selectedProfiles) }}
         </mat-select-trigger>
@@ -92,22 +93,21 @@
         </mat-option>
 
         <mat-option
-          *ngFor="let profileId of getProfileIds()"
-          [value]="profileId"
-          [style]="{
-            display: filterProfilesIds(profileSearch, profileId) ? '' : 'none'
-          }"
+          *ngFor="let o of profileIndex | profileOptions : selectedProfiles : profileSearch : (mainProfilesSel.panelOpen || mainProfilesOpened); trackBy: trackProfile"
+          [value]="o.p.id"
+          [style.display]="o.hidden ? 'none' : null"
         >
           <div class="option-content">
             <app-profile-picture
-              [profileId]="profileId"
-              [name]="getProfileFields(profileId, 'name')"
+              [profileId]="o.p.id"
+              [src]="o.p.photo"
+              [name]="o.p.name"
               [size]="24"
             ></app-profile-picture>
             <div class="option-details">
-              <span>{{ getProfileFields(profileId, "name") }}</span>
+              <span>{{ o.p.name }}</span>
               <span class="option-email">
-                {{ getProfileFields(profileId, "email") }}
+                {{ o.p.email }}
               </span>
             </div>
           </div>
@@ -127,8 +127,9 @@
 
     <mat-form-field appearance="outline" class="child-input">
       <mat-label>Select Icon</mat-label>
-      <mat-select data-testid="rxd-mat-select-3" [(ngModel)]="icon">
-        <mat-option *ngFor="let icon of icons" [value]="icon">
+      <mat-select data-testid="rxd-mat-select-3" #mainIconSel [(ngModel)]="icon"
+        (opened)="mainIconOpened = true">
+        <mat-option *ngFor="let icon of icons | iconOptions : icon : (mainIconSel.panelOpen || mainIconOpened)" [value]="icon">
           <mat-icon>{{ icon }}</mat-icon> {{ icon }}
         </mat-option>
       </mat-select>
@@ -200,8 +201,9 @@
 
         <mat-form-field appearance="outline" class="child-input">
           <mat-label>Child Icon</mat-label>
-          <mat-select data-testid="rxd-mat-select-5" [(ngModel)]="child.icon">
-            <mat-option *ngFor="let icon of icons" [value]="icon">
+          <mat-select data-testid="rxd-mat-select-5" #childIconSel [(ngModel)]="child.icon"
+            (opened)="child.iconOpened = true">
+            <mat-option *ngFor="let icon of icons | iconOptions : child.icon : (childIconSel.panelOpen || !!child.iconOpened)" [value]="icon">
               <mat-icon>{{ icon }}</mat-icon> {{ icon }}
             </mat-option>
           </mat-select>
@@ -224,7 +226,8 @@
           class="full-width"
         >
           <mat-label>Child Profiles</mat-label>
-          <mat-select data-testid="rxd-mat-select-7" [(ngModel)]="child.profileid" multiple>
+          <mat-select data-testid="rxd-mat-select-7" #childProfilesSel [(ngModel)]="child.profileid" multiple
+            (opened)="child.profilesOpened = true">
             <mat-select-trigger>
               {{ getProfileNamesFromIds(child.profileid) }}
             </mat-select-trigger>
@@ -239,24 +242,21 @@
             </mat-option>
 
             <mat-option
-              *ngFor="let profileId of getProfileIds()"
-              [value]="profileId"
-              [style]="{
-                display: filterProfilesIds(child.profileSearch, profileId)
-                  ? ''
-                  : 'none'
-              }"
+              *ngFor="let o of profileIndex | profileOptions : child.profileid : child.profileSearch : (childProfilesSel.panelOpen || !!child.profilesOpened); trackBy: trackProfile"
+              [value]="o.p.id"
+              [style.display]="o.hidden ? 'none' : null"
             >
               <div class="option-content">
                 <app-profile-picture
-                  [profileId]="profileId"
-                  [name]="getProfileFields(profileId, 'name')"
+                  [profileId]="o.p.id"
+                  [src]="o.p.photo"
+                  [name]="o.p.name"
                   [size]="24"
                 ></app-profile-picture>
                 <div class="option-details">
-                  <span>{{ getProfileFields(profileId, "name") }}</span>
+                  <span>{{ o.p.name }}</span>
                   <span class="option-email">
-                    {{ getProfileFields(profileId, "email") }}
+                    {{ o.p.email }}
                   </span>
                 </div>
               </div>
@@ -290,10 +290,10 @@
     <button data-testid="rxd-save"
       mat-raised-button
       color="primary"
-      [disabled]="!isMainValid || !ordernumberValid"
+      [disabled]="!isMainValid || !ordernumberValid || saving"
       (click)="save()"
     >
-      {{ data?.editData ? "Update" : "Save" }}</button
+      {{ saving ? "Saving…" : data?.editData ? "Update" : "Save" }}</button
     >&nbsp;&nbsp;&nbsp;
     <button data-testid="rxd-close-2" mat-raised-button color="warn" (click)="close()">
       {{ "close" }}

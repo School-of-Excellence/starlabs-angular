@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, ElementRef, OnDestroy, OnInit, ViewChild, signal } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, TemplateRef, ViewChild, signal } from '@angular/core';
 import { arrayUnion, collection, collectionData, doc, Firestore, getDoc, getDocs, orderBy, query, serverTimestamp, setDoc, Timestamp, where, writeBatch } from '@angular/fire/firestore';
 import { FormArray, FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -16,6 +16,7 @@ import { ParticipantsAnalyticsComponent } from '../../Participants Profile Manag
 import { WatiService } from '../../wati.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
+import { MatDialog } from '@angular/material/dialog';
 
 const FAVOURITES_KEY = 'wati_favourite_templates';
 
@@ -99,6 +100,7 @@ interface StatusCounts {
 export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
 
   @ViewChild('commnunicationGridPlanner', { static: false }) commnunicationGridPlanner !: ElementRef;
+  @ViewChild('communicationDialog') communicationDialog!: TemplateRef<any>;
 
   private destroy$ = new Subject<void>();
 
@@ -108,6 +110,7 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
   months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   loggedInProfile = null;
   localStorageKey = 'communicationform';
+  today : Date = new Date();
 
   // communication planner
   dateBasedMap = {};
@@ -115,6 +118,9 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
   eventBasedGroupMap = {};
   selectedCommunication = null;
   openedCommunications = [];
+  communicationSearch = '';
+  selectedParticipant = [];
+  participantSearch = '';
 
   // profile data
   mapProfile = {};
@@ -132,6 +138,10 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
   // email template
   emailTemplates = [];
   emailTemplateMap = {};
+
+  // app notification template
+  appNotificationTemplate = [];
+  appNotificationTemplateMap = {};
 
   // wati template
   serverUrls: any[] = [];
@@ -155,6 +165,7 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
   eventMap = {};
   selectedEvent = null;
   upcomingEvents = [];
+  eventSearch = '';
 
   loadingStatus = {
     communicationPlanner: true,
@@ -202,6 +213,9 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
     total: 0
   };
 
+  // side panel
+  expandedCommunication = null;
+
   constructor(
     private firestore: Firestore,
     private from: FormBuilder,
@@ -210,7 +224,9 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
     private authService: AuthguardService,
     private watiService: WatiService,
     private snackBar: MatSnackBar,
+    private dialog : MatDialog,
   ) {
+    this.today.setHours(0,0,0,0)
     this.buildCalendar();
     this.authService.getRoles().then((data) => this.loggedInProfile = data);
     this.searchSubject.pipe(debounceTime(300), distinctUntilChanged(), takeUntil(this.destroy$))
@@ -220,13 +236,14 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.initializeProfileData();
     this.fetchCommunicationPlanner();
-    this.subscribeCommunicationToCurrentMonth();
+    // this.subscribeCommunicationToCurrentMonth();
     this.fetchEmailArchieve();
     this.fetchWatiArchieve();
     this.fetchAppNotification();
     this.fetchEvents();
     this.fetchEmailTemplates();
     this.fetchWatiTemplates();
+    // this.fetchAppNotificationTemplates();
     this.loadTemplatesFromAllServers();
   }
 
@@ -247,10 +264,9 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
   // function to handle tab switch
   onActiveTabChange(tab) {
     if (tab !== this.activeTab) { this.activeTab = tab };
-    this.communicationFormMode = null;
-    this.communicationForm.clear();
     this.selectedCommunication = null;
     this.openedCommunications = [];
+    this.clearForm();
   }
 
   // is all load
@@ -387,10 +403,19 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
 
   // ==================== COMMUNICATION FROM ====================
 
+  openCommunicationPopUp(){
+    this.dialog.open(this.communicationDialog, {
+      panelClass: 'comm-dialog-panel',
+      width : '90vw',
+      autoFocus: false
+    });
+  }
+
   // function to open form
   openCommunicationForm() {
     this.communicationFormMode = 'add';
     this.addCommunicationFrom();
+    this.openCommunicationPopUp();
   }
 
   // function to add new communication to form
@@ -405,6 +430,9 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
         emailtemplate: [null],
         watitemplate: [null],
         apptemplate: [null],
+
+        emailsearch : '',
+        eventsearch : ''
       })
     );
   }
@@ -412,7 +440,7 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
   // function remove added communication from formarray
   removeCommunicationForm(index) {
     if (this.communicationForm?.controls.length === 1) {
-      this.communicationFormMode = null;
+      this.clearForm();
     }
     this.communicationForm.removeAt(index);
   }
@@ -449,6 +477,8 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
           }
           const emailTemplate = this.getSelectedEmail(values.emailtemplate);
           const emailTemplateObject = values.emailtemplate ? { docid: values.emailtemplate, templatealias: emailTemplate?.templatealias, postmarktemplateid: emailTemplate.postmarktemplateid } : null
+          
+          // const appNotificationObject = { docid : values.apptemplate }
           const communicationDoc = {
             docid: docref.id,
             title: values?.title ?? '',
@@ -456,7 +486,7 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
             eventref: eventRef,
             emailtemplate: emailTemplateObject ?? null,
             watitemplate: values.watitemplate ?? null,
-            apptemplate: values.apptemplate ?? null,
+            apptemplate: null,
             lastupated: lastupated,
             type: values?.type ?? null
           }
@@ -466,8 +496,7 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
           batch.set(docref, communicationDoc, { merge: true });
         })
         await batch.commit();
-        this.communicationFormMode = null;
-        this.communicationForm.clear();
+        this.clearForm();
         console.log('Successfully saved communication')
         alert('Successfully saved communication');
       } catch (error) {
@@ -493,19 +522,22 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
         emailtemplate: [communication?.emailtemplate?.docid ?? null],
         watitemplate: [communication?.watitemplate ?? null],
         apptemplate: [communication?.apptemplate ?? null],
+
+        // search 
+        emailsearch : '',
+        eventsearch : '',
       })
     );
     this.communicationFormMode = 'edit';
-    this.commnunicationGridPlanner.nativeElement.scrollTo({
-      top: 0,
-      behavior: 'smooth'
-    })
+    this.openCommunicationPopUp();
+    // this.commnunicationGridPlanner.nativeElement.scrollTo({
+    //   top: 0,
+    //   behavior: 'smooth'
+    // })
   }
   
   // to handel day cell click
   onCommunicationAddClick(date: Date) {
-    this.onActiveTabChange('library');
-
     this.communicationForm.push(
       this.from.group({
         docid: [doc(collection(this.firestore, 'communication planner')).id],
@@ -516,16 +548,72 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
         emailtemplate: [null],
         watitemplate: [null],
         apptemplate: [null],
+
+        // search
+        emailsearch : '',
+        eventsearch : ''
       })
     );
     this.communicationFormMode = 'add';
+    this.openCommunicationPopUp();
   }
+
+  onCommunicationDuplicate(communication : any) {
+    if ([null , undefined ,''].includes(communication)) {
+      alert('please select the communication to duplicate');
+      return
+    }
+    this.communicationForm.push(
+      this.from.group({
+        docid: [doc(collection(this.firestore, 'communication planner')).id],
+        title: [communication?.title ?? '', { validators: [Validators.required], update: "change" }],
+        date: [this.toDate(communication?.date) , { validators: [Validators.required], update: "change" }],
+        eventref: [communication?.eventref?.id ?? null, { validators: [Validators.required], update: "change" }],
+        type: [communication?.type ?? null],
+        emailtemplate: [communication?.emailtemplate?.docid ?? null],
+        watitemplate: [communication?.watitemplate ?? null],
+        apptemplate: [communication?.apptemplate ?? null],
+
+        // search 
+        emailsearch : '',
+        eventsearch : '',
+      })
+    );
+    this.communicationFormMode = 'add';
+    this.openCommunicationPopUp();
+  }
+
+  showAddButtonInDateCell(date : Date){
+    return this.today <= date;
+  }
+
+  dateFilter = (date: Date | null): boolean => {
+    if (!date) {
+      return false;
+    }
+
+    return this.today <= date;
+  };
 
   // function to clear form
   clearForm() {
+    this.dialog.closeAll()
     this.communicationForm.clear();
     this.communicationFormMode = null;
   }
+
+  getFilteredEmailTemplates(emailSearch = ''){
+    const search = emailSearch?.trim().toLocaleLowerCase() ?? '';
+    if (search.length > 0) {
+      return this.emailTemplates.filter((template) => {
+        const name = template?.templatename?.trim()?.toLocaleLowerCase() ?? '';
+
+        return name.includes(search);
+      });
+    }
+    return [...this.emailTemplates]; 
+  }
+
 
   // ==================== DATA LOAD AND FILTERS ====================
 
@@ -573,10 +661,59 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
 
   // function to apply filter
   applyFilter(communication) {
+    const search = this.communicationSearch?.trim()?.toLowerCase();
     if (this.selectedEvent !== null) {
       const eventId = communication?.eventref?.id ?? null;
-      return this.selectedEvent === eventId;
+      if (this.selectedEvent !== eventId) {
+        return false;
+      }
     }
+
+    if (search.length > 0) {
+      const communicationTitle = communication?.title?.toLowerCase() ?? '';
+      const emailTemplate = this.emailTemplateMap[communication?.emailtemplate?.docid ?? '']?.templatename?.toLowerCase() ?? '';
+      const watiTemplate = this.watiTemplateMap[communication?.watitemplate?.templateid ?? '']?.templatename?.toLowerCase() ?? '';
+      const appNotification = this.appNotificationTemplateMap[communication?.apptemplate?.docid ?? '']?.title?.toLowerCase() ?? '';
+
+      if (!(communicationTitle.includes(search) || emailTemplate.includes(search) || watiTemplate.includes(search) || appNotification.includes(search))) {
+        return false
+      }
+    }
+
+    if (this.selectedParticipant?.length > 0) {
+      const participants : Set<string> = new Set();
+      let hasParticipant = false;
+      const email = this.communicationEmailLog[communication?.docid ?? ''] ?? [];
+      const wati = this.communicationwatilLog[communication?.docid ?? ''] ?? [];
+
+      for (const archieve of email) {
+        const pidList = archieve?.profileid ?? [];
+        for (const pid of pidList) {
+          participants.add(pid);
+        }
+      }
+
+      for (const archieve of wati) {
+        const pidList = archieve?.profileid ?? [];
+        for (const pid of pidList) {
+          participants.add(pid);
+        }
+      }
+
+      // console.log(participants)
+      for (const pid of this.selectedParticipant) {
+        if (participants.has(pid)) {
+          hasParticipant = true;
+          break
+        }
+      }
+
+      if (!hasParticipant) {
+        return false
+      }
+
+    }
+
     return true
   }
 
@@ -666,19 +803,30 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
   async fetchEmailArchieve() {
     this.loadingStatus.emailArchieve = true;
     const { start, end } = this.getCurrentMonthDateRange();
-    let emails = [];
+    const emailQuery = query(collection(this.firestore, 'email archive'), where('date', '>=', Timestamp.fromDate(start)), where('date', '<=', Timestamp.fromDate(end)))
+    
+    if (this.subscriptions['email archive']) {
+      this.subscriptions['email archive'].unsubscribe();
+    }
+
+    if (this.isCurrentMonth()) {
+      this.subscriptions['email archive'] = collectionData(emailQuery).subscribe((email) => {
+        this.processEmailArchieve(email);
+        this.loadingStatus.emailArchieve = false;
+      });
+    } else {
+      const emailSnap = await getDocs(emailQuery);
+      const emails = emailSnap.docs.map((doc) => doc.data());
+      this.processEmailArchieve(emails)
+      this.loadingStatus.emailArchieve = false;
+    }
+  }
+
+  processEmailArchieve(emails){
     const communicationEmailLog = {};
     const emailArchieve = {}
 
-    if (this.isCurrentMonth()) {
-      emails = [...this.currentMonthEmail];
-    } else {
-      const q = query(collection(this.firestore, 'email archive'), where('date', '>=', Timestamp.fromDate(start)), where('date', '<=', Timestamp.fromDate(end)))
-      const emailSnap = await getDocs(q);
-      emails = emailSnap.docs.map((doc) => doc.data());
-    }
-
-    emails.forEach((email) => {
+    for (const email of emails) {
       const date = email['date']?.toDate();
       const key = date?.toLocaleDateString() ?? 'Unknown';
       const communicationDocid = email['communicationplannerid'] ?? null;
@@ -693,30 +841,41 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
         communicationEmailLog[communicationDocid] = communicationEmailLog[communicationDocid] ?? [];
         communicationEmailLog[communicationDocid].push(email);
       }
+    }
 
-    });
     this.emailArchieve = emailArchieve;
     this.communicationEmailLog = communicationEmailLog;
-    this.loadingStatus.emailArchieve = false;
   }
 
   // fetch wati archieve data
   async fetchWatiArchieve() {
     this.loadingStatus.watiArchieve = true;
     const { start, end } = this.getCurrentMonthDateRange();
-    const watiArchieve = {};
-    const communicationwatilLog = {};
-    let wati = []
+    const watiQuery = query(collection(this.firestore, 'wati archive'), where('date', '>=', Timestamp.fromDate(start)), where('date', '<=', Timestamp.fromDate(end)))
 
-    if (this.isCurrentMonth()) {
-      wati = [...this.currentMonthWati];
-    } else {
-      const q = query(collection(this.firestore, 'wati archive'), where('date', '>=', Timestamp.fromDate(start)), where('date', '<=', Timestamp.fromDate(end)))
-      const watiSnap = await getDocs(q);
-      wati = watiSnap.docs.map((doc) => doc.data());
+    if (this.subscriptions['wati archive']) {
+      this.subscriptions['wati archive']?.unsubscribe();
     }
 
-    wati.forEach((wati) => {
+    if (this.isCurrentMonth()) {
+      this.subscriptions['wati archive'] = collectionData(watiQuery).subscribe((wati) => {
+        this.processWatiArchieve(wati);
+        this.loadingStatus.watiArchieve = false;
+      });
+    } else {
+      const watiSnap = await getDocs(watiQuery);
+      const wati = watiSnap.docs.map((doc) => doc.data());
+      this.processWatiArchieve(wati)
+      this.loadingStatus.watiArchieve = false;
+    }
+
+  }
+
+  processWatiArchieve(watiList){
+    const watiArchieve = {};
+    const communicationwatilLog = {};
+
+    for (const wati of watiList) {
       const date = wati['date']?.toDate();
       const key = date?.toLocaleDateString() ?? 'Unknown';
       const communicationDocid = wati['communicationplannerid'] ?? null;
@@ -731,30 +890,40 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
         communicationwatilLog[communicationDocid] = communicationwatilLog[communicationDocid] ?? [];
         communicationwatilLog[communicationDocid].push(wati);
       }
+    }
 
-    });
     this.watiArchieve = watiArchieve;
     this.communicationwatilLog = communicationwatilLog;
-    this.loadingStatus.watiArchieve = false;
   }
 
   // fetch app archive data
   async fetchAppNotification() {
     this.loadingStatus.appNotitication = true;
     const { start, end } = this.getCurrentMonthDateRange();
-    const appNotitication = {};
-    const communicationAppNotificationLog = {};
-    let appNotificationArray = [];
+    const appNotificationQuery = query(collection(this.firestore, 'notificationrecord'), where('date', '>=', Timestamp.fromDate(start)), where('date', '<=', Timestamp.fromDate(end)))
 
-    if (this.isCurrentMonth()) {
-      appNotificationArray = [...this.currentMonthAppNotification]
-    } else {
-      const q = query(collection(this.firestore, 'notificationrecord'), where('date', '>=', Timestamp.fromDate(start)), where('date', '<=', Timestamp.fromDate(end)))
-      const appNotificationSnap = await getDocs(q);
-      appNotificationArray = appNotificationSnap.docs.map((doc) => doc.data());
+    if (this.subscriptions['notificationrecord']) {
+      this.subscriptions['notificationrecord'].unsubscribe();
     }
 
-    appNotificationArray.forEach((app) => {
+    if (this.isCurrentMonth()) {
+      this.subscriptions['notificationrecord'] = collectionData(appNotificationQuery).subscribe((app) => {
+        this.processAppNotification(app);
+        this.loadingStatus.appNotitication = false;
+      });
+    } else {
+      const appNotificationSnap = await getDocs(appNotificationQuery);
+      const appNotificationArray = appNotificationSnap.docs.map((doc) => doc.data());
+      this.processAppNotification(appNotificationArray);
+      this.loadingStatus.appNotitication = false;
+    }
+  }
+
+  processAppNotification(appNotificationArray) {
+    const appNotitication = {};
+    const communicationAppNotificationLog = {};
+
+    for (const app of appNotificationArray) {
       const date = app['date']?.toDate();
       const key = date?.toLocaleDateString() ?? 'Unknown';
       const communicationDocid = app['communicationplannerid'] ?? null;
@@ -768,11 +937,10 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
         communicationAppNotificationLog[communicationDocid] = communicationAppNotificationLog[communicationDocid] ?? [];
         communicationAppNotificationLog[communicationDocid].push(app);
       }
+    }
 
-    });
     this.appNotitication = appNotitication;
     this.communicationAppNotificationLog = communicationAppNotificationLog;
-    this.loadingStatus.appNotitication = false;
   }
 
   // fetch email templates
@@ -821,6 +989,21 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
       watiTemplateMap[template['templateid']] = template;
     });
     this.watiTemplateMap = watiTemplateMap;
+  }
+
+  async fetchAppNotificationTemplates() {
+    const q = query(collection(this.firestore, 'savednotifications'));
+    const appNotificationTemplate = [];
+    const appNotificationTemplateMap = {}
+    const templatesSnap = await getDocs(q);
+    templatesSnap.docs.forEach((templateDoc) => {
+      const template = templateDoc.data();
+      template['docid'] = templateDoc.id;
+      appNotificationTemplate.push(template);
+      appNotificationTemplateMap[templateDoc.id] = template;
+    });
+    this.appNotificationTemplate = appNotificationTemplate;
+    this.appNotificationTemplateMap = appNotificationTemplateMap;
   }
 
   // load wati templates from all server
@@ -1157,6 +1340,7 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
   }
 
   onCummunicationClick(comm) {
+    this.expandedCommunication = null;
     this.onActiveTabChange('library');
     this.toggleCommunications(comm?.docid);
     setTimeout(() => this.scrollToCommunication(comm?.docid))
@@ -1483,9 +1667,125 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
     return labels[status] || status;
   }
 
+  getFilteredEvents(eventSearch = ''){
+    const search = eventSearch?.trim().toLocaleLowerCase();
+    if (search.length > 0) {
+      return this.eventList.filter((event) => {
+        const eventName = event?.name?.trim()?.toLocaleLowerCase() ?? '';
+
+        return eventName.includes(search);
+      });
+    } 
+    return [...this.eventList]; 
+  }
+
   refresPage() {
     this.fetchEmailArchieve();
     this.fetchWatiArchieve();
     this.fetchAppNotification();
+  }
+
+  getFilteredParticipants(){
+    const participants = Object.values(this.mapProfile);
+    const search = this.participantSearch?.trim()?.toLocaleLowerCase();
+    if (search?.length > 0) {
+      return participants.filter((p : any)=>{
+        const name = p?.name?.trim()?.toLocaleLowerCase() ?? '';
+        return name?.includes(search);
+      });
+    }
+    return participants
+  }
+
+  // SIDE PANEL
+
+  openCommunicationDaySidePanel(date : Date){
+    const communications = this.getCommunicationForDay(date);
+    let email = 0;
+    let wati = 0;
+    let notification = 0;
+    
+    for (const comm of communications) {
+      const emailCount = ( this.communicationEmailLog[comm?.docid ?? ''] ?? [] ).length;
+      const watiCount = ( this.communicationwatilLog[comm?.docid ?? ''] ?? [] ).length;
+      email += emailCount;
+      wati += watiCount;
+    }
+    
+    
+    const expandedCommunication = {
+      date : new Date(date),
+      communications : [...communications],
+      communicationSearch : '',
+      email , wati , notification
+    };
+
+    this.expandedCommunication = expandedCommunication;
+  }
+
+  closeCommunicationDaySidePanel(){
+    this.expandedCommunication = null;
+  }
+
+  getCommunicationsForSidePanel(){
+    // console.log('comes in')
+    if (this.expandedCommunication) {
+      const communications = this.expandedCommunication?.communications;
+      const search = this.expandedCommunication?.communicationSearch?.trim().toLocaleLowerCase() ?? '';
+      const eventBasedMap = {};
+
+      for (const communication of communications) {
+        const eventId = communication?.eventref?.id ?? 'Unknown';
+        const eventName = this.eventMap[eventId]?.name?.trim().toLocaleLowerCase() ?? '' ;
+        const communicationName = communication?.title?.trim().toLocaleLowerCase() ?? '';
+
+        if (eventId && (search?.length === 0 || eventName.includes(search) || communicationName.includes(search)) ) {
+          if (Object.hasOwn(eventBasedMap, eventId)) {
+            eventBasedMap[eventId].push(communication);
+          } else {
+            eventBasedMap[eventId] = [communication];
+          }
+        };
+
+      };
+      return eventBasedMap
+    }
+    return {}
+  }
+
+  onPreSidePanelClick(){
+    if (this.expandedCommunication) {
+      const currentDate = new Date(this.expandedCommunication?.date);
+      currentDate.setDate(currentDate.getDate() - 1);
+      this.openCommunicationDaySidePanel(currentDate);
+    }
+  }
+
+  onNextSidePanelClick(){
+    if (this.expandedCommunication) {
+      const currentDate = new Date(this.expandedCommunication?.date);
+      currentDate.setDate(currentDate.getDate() + 1);
+      this.openCommunicationDaySidePanel(currentDate);
+    }
+  }
+
+  showPreSidePanel(){
+    if (this.expandedCommunication) {
+      const currentDate = new Date(this.expandedCommunication?.date);
+      return currentDate.getDate() !== 1;
+    }
+    return true
+  }
+
+  showNextSidePanel(){
+    if (this.expandedCommunication) {
+      const currentDate = new Date(this.expandedCommunication?.date);
+      const lastDate = new Date(currentDate);
+      lastDate.setDate(1);
+      lastDate.setMonth(lastDate.getMonth() + 1);
+      lastDate.setDate(0);
+      return currentDate.getDate() !== lastDate.getDate();
+    }
+    return true
   }
 }

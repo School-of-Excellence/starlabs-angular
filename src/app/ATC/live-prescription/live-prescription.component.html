@@ -2,22 +2,22 @@
 
   <h4>ATC Prescription</h4>
 
-  <label>{{status}}</label>
+  <label data-testid="lrx-status">{{status}}</label>
   <div *ngIf="status == null">
     <label><b>Date:</b> {{atcReport.date | date}}</label>
     <br>
-    <label><b>ATC For:</b> {{mapProfiles[atcReport.atcowner]}}</label>
+    <label data-testid="lrx-owner"><b>ATC For:</b> {{mapProfiles[atcReport.atcowner]}}</label>
     <br>
-    <label><b>Product:</b> {{atcReport.product}}</label>
+    <label data-testid="lrx-product"><b>Product:</b> {{atcReport.product}}</label>
     <br>
-    <label><b>Prescribed By:</b> {{returnNameList(atcReport.atcprescriber)}}</label>
+    <label data-testid="lrx-prescribers"><b>Prescribed By:</b> {{returnNameList(atcReport.atcprescriber)}}</label>
     <br>
     <label><b>Observers:</b> {{returnNameList(atcReport.atcobserver)}}</label>
     <h5 class="heading">Adjustments and Procedures</h5>
-    <div class="adjustmentbox" *ngFor="let atc of atcReport.atc; let i = index">
+    <div data-testid="lrx-adj" class="adjustmentbox" *ngFor="let atc of atcReport.atc; let i = index">
       <label><b>{{i+1}}.</b> {{atc.adjustment}}</label>
       <div class="procedurebox" *ngFor="let procedure of atc.procedure">
-        <label>- {{mapProcedures[procedure.name]}}</label>
+        <label data-testid="lrx-proc">- {{mapProcedures[procedure.name]}}</label>
         <label class="mandatory" *ngIf="procedure.mandatory">*</label>
         <label class="changeagent">({{returnNameList(procedure.changeagent)}})</label>
       </div>
@@ -27,7 +27,7 @@
     <br>
     <label><b>Consultation Points:</b> {{atcReport.notes.points}}</label>
     <br>
-    <label><b>Case Notes:</b> {{atcReport.notes.notes}}</label>
+    <label data-testid="lrx-casenotes"><b>Case Notes:</b> {{atcReport.notes.notes}}</label>
     <br>
     <label><b>Mentor Notes</b> {{atcReport.notes.mentornotes}}</label>
   </div>

@@ -118,6 +118,18 @@
   color: #fff !important;
   box-shadow: 0 2px 8px rgba(26,60,94,.25) !important;
 }
+.actions-caret {
+  margin-left: -2px;
+  opacity: .85;
+}
+.actions-item {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13.5px;
+  min-width: 210px;
+}
+.actions-item mat-icon {
+  color: var(--primary);
+}
 .primary-btn:hover {
   background: var(--primary-light) !important;
   box-shadow: 0 4px 14px rgba(26,60,94,.35) !important;
@@ -293,7 +305,9 @@
 .col-center {
   text-align: center !important;
 }
-.col-active  { width: 80px; }
+.col-active  { width: 196px; }
+.workshops-table td.col-active,
+.workshops-table th.col-active { padding-left: 8px; padding-right: 8px; }
 .col-actions { width: 130px; }
 .workshops-table th.col-center .mat-sort-header-container,
 .workshops-table th.col-center {
@@ -310,6 +324,27 @@
   font-size: 13.5px;
   color: var(--text-primary);
   line-height: 1.3;
+}
+.active-chip {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: var(--success-bg);
+  color: var(--success);
+  border: 1px solid #b9dcc6;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.active-chip::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success);
 }
 .workshop-id {
   font-size: 10.5px;
@@ -373,6 +408,35 @@
   color: var(--text-muted);
 }
 .completed-label.done { color: var(--info); }
+/* Breakthroughs App / Web / EiFlix Mobile side by side: a small name over each switch, one switch tall. */
+.live-toggles {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.live-toggle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.live-toggle-name {
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.completed-pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  background: var(--info-bg);
+  color: var(--info);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
 
 .action-cell {
   display: flex;

@@ -1,6 +1,6 @@
 
 <div *ngIf="loading">
-    <mat-progress-spinner mode="indeterminate" class="loading-bar"></mat-progress-spinner>
+    <mat-progress-spinner data-testid="eatc-loading" mode="indeterminate" class="loading-bar"></mat-progress-spinner>
   </div>
   
   <div *ngIf="temporaryFunctionAccess.length > 0 && temporaryFunctionAccess.includes(loggedProfileID)" class="d-flex flex-row justify-content-center">
@@ -22,7 +22,7 @@
       <div class="status-row">
         <span class="icon-text-container" (click)="autoSave()">
           <mat-icon [ngClass]="draftStatus.code == 1 ? 'text-success' : draftStatus.code == 0 ? 'text-warning' : 'text-danger'">sync</mat-icon>
-          <span>{{draftStatus.message}}</span>
+          <span data-testid="eatc-draft-status">{{draftStatus.message}}</span>
           <span class="ml-2 text-secondary" *ngIf="draftStatus.code == 1 && lastDraftSavedOn">({{lastDraftSavedOn | date: 'medium'}})</span>
         </span>
         <!-- explicit retry shown only when a save failed -->
@@ -53,7 +53,7 @@
         <div class="info-grid">
           <div class="info-box">
             <span class="info-label">Participant's Name</span>
-            <span class="info-value">{{reportATC.profile_name}}</span>
+            <span data-testid="eatc-participant" class="info-value">{{reportATC.profile_name}}</span>
   
             <div *ngIf="selectedParticipant['profileimg'] || selectedParticipant['profile']" class="profile-image-container">
               <img class="profile-image" [src]="selectedParticipant['profileimg'] || selectedParticipant['profile']">
@@ -61,7 +61,7 @@
           </div>
           <div class="info-box">
             <span class="info-label">Product</span>
-            <span class="info-value">{{reportATC.product}}</span>
+            <span data-testid="eatc-product" class="info-value">{{reportATC.product}}</span>
           </div>
           <div class="info-box">
             <span class="info-label">Prescribed Date</span>
@@ -75,9 +75,9 @@
         <h2 class="section-heading">ATC DIRECTIVE</h2>
         <div class="directive-container">
           <div class="directive-text">
-            <label>{{reportATC.directive == null ? "Directive not provided" : reportATC.directive}}</label>
+            <label data-testid="eatc-directive-text">{{reportATC.directive == null ? "Directive not provided" : reportATC.directive}}</label>
           </div>
-          <button class="edit-button primary-button" mat-button (click)="editDirective()">Update Directive</button>
+          <button data-testid="eatc-directive-btn" class="edit-button primary-button" mat-button (click)="editDirective()">Update Directive</button>
         </div>
       </section>
   
@@ -98,7 +98,7 @@
             </div>
             <div class="field-person">
               <mat-form-field appearance="outline" class="flat-field">
-                <mat-select placeholder="Select Specialist" [(ngModel)]="reportATC.bigactivity[activity['docid']]" (selectionChange)="autoSave()" multiple>
+                <mat-select [attr.data-testid]="'eatc-person-' + activity['docid']" placeholder="Select Specialist" [(ngModel)]="reportATC.bigactivity[activity['docid']]" (selectionChange)="autoSave()" multiple>
                   <mat-option>
                     <ngx-mat-select-search [(ngModel)]="filteredSpecialist" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
                   </mat-option>
@@ -129,7 +129,7 @@
             </div>
             <div class="field-person">
               <mat-form-field appearance="outline" class="flat-field">
-                <mat-select placeholder="Select Specialist" [(ngModel)]="reportATC.bigactivity[activity['docid']]" (selectionChange)="autoSave()" multiple>
+                <mat-select [attr.data-testid]="'eatc-person-' + activity['docid']" placeholder="Select Specialist" [(ngModel)]="reportATC.bigactivity[activity['docid']]" (selectionChange)="autoSave()" multiple>
                   <mat-option>
                     <ngx-mat-select-search [(ngModel)]="filteredSpecialist" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
                   </mat-option>
@@ -160,7 +160,7 @@
             </div>
             <div class="field-person">
               <mat-form-field appearance="outline" class="flat-field">
-                <mat-select placeholder="Select Specialist" [(ngModel)]="reportATC.bigactivity[activity['docid']]" (selectionChange)="autoSave()" multiple>
+                <mat-select [attr.data-testid]="'eatc-person-' + activity['docid']" placeholder="Select Specialist" [(ngModel)]="reportATC.bigactivity[activity['docid']]" (selectionChange)="autoSave()" multiple>
                   <mat-option>
                     <ngx-mat-select-search [(ngModel)]="filteredSpecialist" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
                   </mat-option>
@@ -219,13 +219,13 @@
             <div class="procedure-column">PROCEDURES</div>
           </div>
           
-          <div *ngFor="let prescription of reportATC.transcription; let i = index" class="table-row">
+          <div *ngFor="let prescription of reportATC.transcription; let i = index" class="table-row" [attr.data-testid]="'eatc-exadj-' + i">
             <div class="adjustment-column">
               <div class="adjustment-content">
                 <div class="adjustment-text" [ngClass]="prescription.adjustmentdelete ? 'text-deleted' : ''">
                   <label [ngClass]="prescription.adjustmentdelete ? 'strikeDelete' : null">{{i+1}}. {{prescription.adjustmentedit}}</label>
                   <!-- *ngIf="editable || roles['mentor'] || roles['ah'] || roles['developer'] || roles['admin']" -->
-                  <button mat-icon-button class="edit-icon" (click)="editAdjustment(i); autoSave()">
+                  <button data-testid="eatc-exadj-edit" mat-icon-button class="edit-icon" (click)="editAdjustment(i); autoSave()">
                     <mat-icon>edit</mat-icon>
                   </button>
                 </div>
@@ -233,7 +233,7 @@
                 <div class="awareness-field">
                   <mat-label>{{adjustmentAwarenessDetail.label}}</mat-label>
                   <mat-form-field appearance="outline" class="flat-field">
-                    <mat-select [name]="'awarenessdetail'+i" [compareWith]="compareFnc" [(ngModel)]="prescription.awarenessdetail" (selectionChange)="updateExistingAwarenessDetail(i,$event)" [required]="true" [errorStateMatcher]="requiredMatcher">
+                    <mat-select data-testid="eatc-exadj-awareness" [name]="'awarenessdetail'+i" [compareWith]="compareFnc" [(ngModel)]="prescription.awarenessdetail" (selectionChange)="updateExistingAwarenessDetail(i,$event)" [required]="true" [errorStateMatcher]="requiredMatcher">
                       <mat-option *ngFor="let item of adjustmentAwarenessDetail['awarenesslist']" [value]="item">
                         {{item.value}}
                       </mat-option>
@@ -245,12 +245,12 @@
                 <div class="potential-years">
                   <mat-label>{{adjustmentAwarenessDetail.potentialyearlabel}}</mat-label>
                   <mat-form-field appearance="outline" class="year-field">
-                    <input type="number" (focusout)="autoSave()" [(ngModel)]="prescription.potentialyears" matInput [required]="true" [errorStateMatcher]="requiredMatcher">
+                    <input data-testid="eatc-exadj-years" type="number" (focusout)="autoSave()" [(ngModel)]="prescription.potentialyears" matInput [required]="true" [errorStateMatcher]="requiredMatcher">
                     <mat-error>This field is required</mat-error>
                   </mat-form-field>
                 </div>
                 
-                <button mat-button class="delete-button" [ngClass]="prescription.adjustmentdelete ? 'deleted-state' : ''" (click)="onAdjustmentUpdate(i); autoSave()">
+                <button data-testid="eatc-exadj-delete" mat-button class="delete-button" [ngClass]="prescription.adjustmentdelete ? 'deleted-state' : ''" (click)="onAdjustmentUpdate(i); autoSave()">
                   {{prescription.adjustmentdelete ? 'Deleted' : 'Delete Adjustment Completely'}}
                 </button>
               </div>
@@ -258,12 +258,12 @@
             
             <div class="procedure-column">
               <div class="procedure-list">
-                <div *ngFor="let procedure of prescription.procedure; let j = index" class="procedure-item">
+                <div *ngFor="let procedure of prescription.procedure; let j = index" class="procedure-item" [attr.data-testid]="'eatc-exproc-' + j">
                   <div *ngIf="!procedure.newprocedure" class="existing-procedure">
                     <span [ngClass]="procedure.proceduredelete ? 'text-deleted' : ''">
                       - {{procedure.name}}
                     </span>
-                    <button mat-icon-button (click)="onProcedureUpdated(i, j); autoSave()">
+                    <button data-testid="eatc-exproc-toggle" mat-icon-button (click)="onProcedureUpdated(i, j); autoSave()">
                       <mat-icon class="delete-icon" *ngIf="procedure.proceduredelete">remove_circle</mat-icon>
                       <mat-icon class="delete-icon" *ngIf="!procedure.proceduredelete">remove_circle_outline</mat-icon>
                     </button>
@@ -274,7 +274,7 @@
                     
                     <mat-form-field appearance="outline" class="procedure-field">
                       <mat-label>Procedure</mat-label>
-                      <mat-select [(ngModel)]="procedure.name" (selectionChange)="autoSave()" [required]="true" [errorStateMatcher]="requiredMatcher">
+                      <mat-select data-testid="eatc-proc-name" [(ngModel)]="procedure.name" (selectionChange)="autoSave()" [required]="true" [errorStateMatcher]="requiredMatcher">
                         <mat-option *ngFor="let pro of procedureList" [value]="pro.path">{{pro.name}}</mat-option>
                       </mat-select>
                       <mat-error>This field is required</mat-error>
@@ -290,7 +290,7 @@
                     
                     <mat-form-field *ngFor="let activity of assignedtoActivity" appearance="outline" class="procedure-field">
                       <mat-label>{{activity.activity}}</mat-label>
-                      <mat-select [(ngModel)]="procedure.bigactivity[activity.docid]" multiple>
+                      <mat-select [attr.data-testid]="'eatc-proc-assigned-' + activity.docid" [(ngModel)]="procedure.bigactivity[activity.docid]" multiple>
                         <mat-option>
                           <ngx-mat-select-search [(ngModel)]="filteredSpecialist" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
                         </mat-option>
@@ -301,7 +301,7 @@
                       </mat-select>
                     </mat-form-field>
         
-                    <mat-checkbox class="procedure-checkbox" [(ngModel)]="procedure.mandatory">Mandatory</mat-checkbox>
+                    <mat-checkbox data-testid="eatc-proc-mandatory" class="procedure-checkbox" [(ngModel)]="procedure.mandatory">Mandatory</mat-checkbox>
                     <mat-checkbox class="procedure-checkbox" [(ngModel)]="procedure.completed">Mark as Completed</mat-checkbox>
         
                     <button class="remove-button" mat-icon-button (click)="removeAdditionalProcedure(i,j); autoSave()">
@@ -310,7 +310,7 @@
                   </div>
                 </div>
                 
-                <button mat-button class="add-procedure-button primary-button" (click)="addAdditionalProcedure(i)">
+                <button data-testid="eatc-exadj-addproc" mat-button class="add-procedure-button primary-button" (click)="addAdditionalProcedure(i)">
                   Add Procedure
                 </button>
               </div>
@@ -322,11 +322,34 @@
       <!-- New Transcription Section -->
       <section class="content-section">
         <h2 class="section-heading">NEW ADJUSTMENTS</h2>
+        <!-- one section per assigned_to activity: pick agents once and apply them to every new-adjustment procedure (page-only, not saved to draft) -->
+        <!-- shown only while there is at least one new adjustment -->
+        <ng-container *ngIf="(newTranscription ?? []).length != 0">
+          <div *ngFor="let assigned of assignedtoActivity" class="bulk-assign-section">
+            <div class="bulk-assign-title">{{assigned.activity}} — set for all procedures</div>
+            <div class="bulk-assign-row">
+              <mat-form-field appearance="outline" class="procedure-field">
+                <mat-label>{{assigned.activity}}</mat-label>
+                <mat-select [attr.data-testid]="'eatc-bulk-select-' + assigned.docid" [(ngModel)]="bulkAssignedSelection[assigned.docid]" multiple>
+                  <mat-option>
+                    <ngx-mat-select-search [(ngModel)]="bulkAssignedFilter[assigned.docid]" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+                  </mat-option>
+                  <mat-option *ngFor="let name of availableBulkSpecialistList(assigned.docid)" [value]="name.authorpath">
+                    <span class="person-chip">{{name.authorname}}</span>
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+              <button [attr.data-testid]="'eatc-bulk-apply-' + assigned.docid" mat-button class="primary-button bulk-assign-apply" [disabled]="!(bulkAssignedSelection[assigned.docid]?.length)" (click)="applyAssignedToAllProcedures(assigned)">
+                Apply to all procedures
+              </button>
+            </div>
+          </div>
+        </ng-container>
         <div class="new-adjustments">
-          <div *ngFor="let transcript of newTranscription; let i=index" class="new-adjustment-item">
+          <div *ngFor="let transcript of newTranscription; let i=index" class="new-adjustment-item" [attr.data-testid]="'eatc-newadj-' + i">
             <div class="new-adjustment-header">
               <span class="adjustment-number">{{i+1}}.</span>
-              <textarea class="adjustment-textarea" rows="6" [(ngModel)]="transcript.adjustment" (focusout)="autoSave()" placeholder="Adjustment"></textarea>
+              <textarea data-testid="eatc-newadj-text" class="adjustment-textarea" rows="6" [(ngModel)]="transcript.adjustment" (focusout)="autoSave()" placeholder="Adjustment"></textarea>
               <button mat-icon-button class="remove-button" (click)="removenewAdjustment(i); autoSave()">
                 <mat-icon>remove_circle</mat-icon>
               </button>
@@ -336,7 +359,7 @@
             <div class="awareness-field">
               <mat-form-field appearance="outline" class="flat-field">
                 <mat-label>{{adjustmentAwarenessDetail.label}}</mat-label>
-                <mat-select [compareWith]="compareFnc" [(ngModel)]="newTranscription[i]['awarenessdetail']" (selectionChange)="onAwarenessSubmit(i,$event)" [required]="true" [errorStateMatcher]="requiredMatcher">
+                <mat-select data-testid="eatc-newadj-awareness" [compareWith]="compareFnc" [(ngModel)]="newTranscription[i]['awarenessdetail']" (selectionChange)="onAwarenessSubmit(i,$event)" [required]="true" [errorStateMatcher]="requiredMatcher">
                   <mat-option *ngFor="let item of adjustmentAwarenessDetail['awarenesslist']" [value]="item">{{item.value}}</mat-option>
                 </mat-select>
                 <mat-error>This field is required</mat-error>
@@ -347,18 +370,18 @@
             <div class="potential-years">
               <mat-label>{{adjustmentAwarenessDetail.potentialyearlabel}}</mat-label>
               <mat-form-field appearance="outline" class="year-field">
-                <input type="number" [(ngModel)]="newTranscription[i].potentialyears" matInput [required]="true" [errorStateMatcher]="requiredMatcher">
+                <input data-testid="eatc-newadj-years" type="number" [(ngModel)]="newTranscription[i].potentialyears" matInput [required]="true" [errorStateMatcher]="requiredMatcher">
                 <mat-error>This field is required</mat-error>
               </mat-form-field>
             </div>
             
             <!-- Procedures for new adjustments -->
-            <div *ngFor="let procedure of transcript.procedure; let j = index" class="new-procedure-item">
+            <div *ngFor="let procedure of transcript.procedure; let j = index" class="new-procedure-item" [attr.data-testid]="'eatc-newproc-' + j">
               <div class="new-procedure-form">
                 <span class="procedure-marker">*</span>
                 <mat-form-field appearance="outline" class="procedure-field">
                   <mat-label>Procedure</mat-label>
-                  <mat-select [(ngModel)]="procedure.name" (selectionChange)="autoSave()" [required]="true" [errorStateMatcher]="requiredMatcher">
+                  <mat-select data-testid="eatc-proc-name" [(ngModel)]="procedure.name" (selectionChange)="autoSave()" [required]="true" [errorStateMatcher]="requiredMatcher">
                     <mat-option *ngFor="let pro of procedureList" [value]="pro.path">{{pro.name}}</mat-option>
                   </mat-select>
                   <mat-error>This field is required</mat-error>
@@ -374,7 +397,7 @@
   
                 <mat-form-field *ngFor="let activity of assignedtoActivity" appearance="outline" class="procedure-field">
                   <mat-label>{{activity.activity}}</mat-label>
-                  <mat-select [(ngModel)]="procedure.bigactivity[activity.docid]" multiple>
+                  <mat-select [attr.data-testid]="'eatc-proc-assigned-' + activity.docid" [(ngModel)]="procedure.bigactivity[activity.docid]" multiple>
                     <mat-option>
                       <ngx-mat-select-search [(ngModel)]="filteredSpecialist" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
                     </mat-option>
@@ -385,11 +408,11 @@
                   </mat-select>
                 </mat-form-field>
     
-                <mat-checkbox class="procedure-checkbox" [(ngModel)]="procedure.mandatory">Mandatory</mat-checkbox>
+                <mat-checkbox data-testid="eatc-proc-mandatory" class="procedure-checkbox" [(ngModel)]="procedure.mandatory">Mandatory</mat-checkbox>
                 <mat-checkbox class="procedure-checkbox" [(ngModel)]="procedure.completed">Mark as Completed</mat-checkbox>
     
                 <div class="procedure-actions">
-                  <button class="action-button add-button" mat-icon-button (click)="addnewProcedure(i); autoSave()">
+                  <button data-testid="eatc-newproc-add" class="action-button add-button" mat-icon-button (click)="addnewProcedure(i); autoSave()">
                     <mat-icon>add</mat-icon>
                   </button>
                   <button class="action-button remove-button" mat-icon-button *ngIf="j!=0" (click)="removeProcedure(i,j); autoSave()">
@@ -401,7 +424,7 @@
           </div>
         </div>
         <div class="add-adjustment">
-          <button mat-button class="primary-button" (click)="addnewAdjustment()">
+          <button data-testid="eatc-newadj-add" mat-button class="primary-button" (click)="addnewAdjustment()">
             Add New Adjustment
           </button>
         </div>
@@ -412,7 +435,7 @@
         <h2 class="section-heading">CHANGEWORK BRIEF</h2>
         <div class="audio-container">
           <div *ngFor="let audio of audioBlobURL; let i = index" class="audio-item">
-            <audio controls class="audio-player" [src]="audio"></audio>
+            <audio data-testid="eatc-audio-item" controls class="audio-player" [src]="audio"></audio>
             <button class="remove-button" mat-icon-button (click)="removeAudio(i)">
               <mat-icon>close</mat-icon>
             </button>
@@ -422,7 +445,7 @@
             <button *ngIf="!recording" mat-stroked-button class="record-button" (click)="initiateRecording()">
               Add Recording <mat-icon>fiber_manual_record</mat-icon>
             </button>
-            <input #file type="file" accept="audio/*" (change)="audioUpload(file.files)" hidden multiple>
+            <input data-testid="eatc-audio-input" #file type="file" accept="audio/*" (change)="audioUpload(file.files)" hidden multiple>
             <button *ngIf="!recording" mat-stroked-button class="upload-button" (click)="file.click()">
               Upload Audio <mat-icon>record_voice_over</mat-icon>
             </button>
@@ -441,7 +464,7 @@
         <!-- Notes Images -->
         <div class="image-section">
           <h3 class="subsection-heading">Upload Images Notes</h3>
-          <input #noteFileInput class="file-input" type="file" accept="image/*" multiple
+          <input data-testid="eatc-noteimg-input" #noteFileInput class="file-input" type="file" accept="image/*" multiple
             (change)="importImages(noteFileInput.files)">
           <div class="image-previews">
             <div class="preview-item" *ngFor="let preview of previewNoteImages; let imgIndex = index">
@@ -454,7 +477,7 @@
         <!-- ATC Images -->
         <div class="image-section">
           <h3 class="subsection-heading">Upload Prescribed ATC Images</h3>
-          <input class="file-input" type="file" accept="image/*" #atcFileInput multiple (change)="importATCImages(atcFileInput.files)">
+          <input data-testid="eatc-atcimg-input" class="file-input" type="file" accept="image/*" #atcFileInput multiple (change)="importATCImages(atcFileInput.files)">
           <div class="image-previews">
             <div class="preview-item" *ngFor="let preview of previewATCImages; let imgIndex = index">
               <img [src]="preview" class="preview-img">
@@ -471,21 +494,21 @@
           <div class="note-field">
             <h3 class="field-label">Consultation Summary</h3>
             <mat-form-field appearance="outline" class="note-textarea">
-              <textarea matInput rows="6" [(ngModel)]="editNotes['consultationsummary']" (ngModelChange)="editNotes['notesedited'] = true" (focusout)="autoSave()"></textarea>
+              <textarea data-testid="eatc-summary" matInput rows="6" [(ngModel)]="editNotes['consultationsummary']" (ngModelChange)="editNotes['notesedited'] = true" (focusout)="autoSave()"></textarea>
             </mat-form-field>
           </div>
         
           <div class="note-field">
             <h3 class="field-label">Consultation Point</h3>
             <mat-form-field appearance="outline" class="note-textarea">
-              <textarea matInput rows="6" [(ngModel)]="editNotes['consultationpoint']" (ngModelChange)="editNotes['notesedited'] = true" (focusout)="autoSave()"></textarea>
+              <textarea data-testid="eatc-points" matInput rows="6" [(ngModel)]="editNotes['consultationpoint']" (ngModelChange)="editNotes['notesedited'] = true" (focusout)="autoSave()"></textarea>
             </mat-form-field>
           </div>
         
           <div class="note-field">
             <h3 class="field-label">Case Notes</h3>
             <mat-form-field appearance="outline" class="note-textarea">
-              <textarea matInput rows="6" [(ngModel)]="editNotes['notes']" (ngModelChange)="editNotes['notesedited'] = true" (focusout)="autoSave()"></textarea>
+              <textarea data-testid="eatc-casenotes" matInput rows="6" [(ngModel)]="editNotes['notes']" (ngModelChange)="editNotes['notesedited'] = true" (focusout)="autoSave()"></textarea>
             </mat-form-field>
           </div>
         </div>
@@ -521,7 +544,7 @@
       
       <!-- Submit Section -->
       <section class="submit-section">
-        <button *ngIf="!uploading" mat-raised-button class="submit-button" (click)="submit()">
+        <button data-testid="eatc-submit" *ngIf="!uploading" mat-raised-button class="submit-button" (click)="submit()">
           Update Changes in ATC
         </button>
         <mat-progress-spinner *ngIf="uploading" mode="indeterminate"></mat-progress-spinner>
