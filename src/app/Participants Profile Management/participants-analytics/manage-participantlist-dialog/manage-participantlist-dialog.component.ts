@@ -649,8 +649,9 @@ scrollLogTop(): void {
     const listsRef = collection(this.firestore, 'participant list');
     const listsSnapshot = await getDocs(query(listsRef));
 
+    // soft-deleted (isdeleted, set by Participant Intelligence) counts as deleted
     this.participantLists = await Promise.all(
-      listsSnapshot.docs.map(async (docSnapshot) => {
+      listsSnapshot.docs.filter(d => d.data()['isdeleted'] !== true).map(async (docSnapshot) => {
         const data = docSnapshot.data();
         const profileids = data['profilelist'] || [];
 
@@ -725,7 +726,7 @@ scrollLogTop(): void {
     if (liveSegmentIds.size > 0) {
       await Promise.all(Array.from(liveSegmentIds).map(async segmentId => {
         const segDoc = await getDoc(doc(this.firestore, 'segments', segmentId));
-        if (!segDoc.exists()) return;
+        if (!segDoc.exists() || segDoc.data()['isdeleted'] === true) return; // soft-deleted (isdeleted, set by Participant Intelligence) counts as deleted
         const segData = segDoc.data();
         const segmentName: string = segData['segmentname'] || segmentId;
         this.segmentNameMap.set(segmentId, segmentName);
@@ -748,7 +749,7 @@ scrollLogTop(): void {
 
     await Promise.all(Array.from(liveListMeta.entries()).map(async ([listId, label]) => {
       const listDoc = await getDoc(doc(this.firestore, 'participant list', listId));
-      if (!listDoc.exists()) return;
+      if (!listDoc.exists() || listDoc.data()['isdeleted'] === true) return; // soft-deleted (isdeleted, set by Participant Intelligence) counts as deleted
       const listName = this.participantLists.find(l => l.docid === listId)?.name || listId;
       const profileIds: string[] = listDoc.data()['profilelist'] || [];
       profileIds.forEach(profileId => {
@@ -1607,7 +1608,7 @@ toggleAllMergeConflicts(event: Event): void {
   if (liveSegmentIds.size > 0) {
     await Promise.all(Array.from(liveSegmentIds).map(async segmentId => {
       const segDoc = await getDoc(doc(this.firestore, 'segments', segmentId));
-      if (!segDoc.exists()) return;
+      if (!segDoc.exists() || segDoc.data()['isdeleted'] === true) return; // soft-deleted (isdeleted, set by Participant Intelligence) counts as deleted
       const segData = segDoc.data();
       const segmentName: string = segData['segmentname'] || segmentId;
       const listIds: string[] = segData['participantlistid'] || [];
@@ -1629,7 +1630,7 @@ toggleAllMergeConflicts(event: Event): void {
 
   await Promise.all(Array.from(liveListMeta.entries()).map(async ([listId, segmentName]) => {
     const listDoc = await getDoc(doc(this.firestore, 'participant list', listId));
-    if (!listDoc.exists()) return;
+    if (!listDoc.exists() || listDoc.data()['isdeleted'] === true) return; // soft-deleted (isdeleted, set by Participant Intelligence) counts as deleted
     const existingProfiles: string[] = listDoc.data()['profilelist'] || [];
     const listName = this.participantLists.find(l => l.docid === listId)?.name || listId;
     for (const profileIdObj of profileIdsToMerge) {

@@ -486,7 +486,8 @@ export class ParticipantsAnalyticsComponent {
     ]);
 
     // Saved filters
-    this.savedfilterquery = savedFiltersSnap.docs.map(d => d.data());
+    // soft-deleted (isdeleted, set by Participant Intelligence) counts as deleted
+    this.savedfilterquery = savedFiltersSnap.docs.map(d => d.data()).filter(d => d['isdeleted'] !== true);
 
     // Event collection
     this.productEventList = eventSnap.docs.map(e => {
@@ -1004,6 +1005,11 @@ export class ParticipantsAnalyticsComponent {
       if (snap?.data()['defaultsearchref'] != null || snap?.data()['defaultsearchref'] != undefined) {
         this.defaultSearchDocId = snap.data()['defaultsearchref'].id
         getDoc(doc(this.firestore, snap.data()['defaultsearchref'].path)).then(searchsnap => {
+          // soft-deleted (isdeleted, set by Participant Intelligence) counts as deleted: fall back to the plain search
+          if (searchsnap.data()?.['isdeleted'] === true) {
+            this.onDataSearch()
+            return
+          }
           this.loadtabledata(searchsnap.data())
         })
       } else {

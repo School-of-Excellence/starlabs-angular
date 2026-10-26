@@ -2977,7 +2977,8 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     const catFromEnrolled = this.enrolledParticipants.find(e => e.profileid === id)?.workshopcategory || null;
     const categoryId = catFromDoc || catFromEnrolled || null;
     return {
-      profileid: id, name: this.mapProfile[id]?.name || 'Unknown', metadata: this.mapProfile[id],
+      // Moved-to-existing people without a participant metadata doc yet are only in new_user_data.
+      profileid: id, name: this.mapProfile[id]?.name || this.mapProfileNew[id]?.name || 'Unknown', metadata: this.mapProfile[id],
       isFacilitator: facilitatorProfiles.includes(id),
       isCohort: this.participantCohortMap.get(id) === true,
       categoryId,
@@ -3578,14 +3579,19 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       this.downloadCSV(this.createCSVContent(rows), name);
       return;
     }
-    const csvData = this.filteredParticipants.map((p: any) => ({
-      'Participant Name': p.name || 'N/A',
-      'Email': p['metadata']['email'] || '',
-      'Phone': p['metadata']['phonenumber'] || '',
-      'Active Journey': this.JourneyMap[p['metadata']['activejourney']] || '',
-      'Last Journey': this.JourneyMap[p['metadata']['lastcompletedjourney']] || '',
-      'Subscription End': this.formatDate(p['metadata']['subscriptionend']) || '',
-    }));
+    const csvData = this.filteredParticipants.map((p: any) => {
+      // Some panels attach only participant metadata; a new user who lives only in new_user_data had
+      // none and the export threw on `.email` (operator 2026-10-20). Fall back to either directory.
+      const m = p?.['metadata'] || this.mapProfile?.[p?.profileid] || this.mapProfileNew?.[p?.profileid] || {};
+      return {
+        'Participant Name': (p.name && p.name !== 'Unknown') ? p.name : (m['name'] || p.name || 'N/A'),
+        'Email': m['email'] || '',
+        'Phone': m['phonenumber'] || '',
+        'Active Journey': this.JourneyMap[m['activejourney']] || '',
+        'Last Journey': this.JourneyMap[m['lastcompletedjourney']] || '',
+        'Subscription End': this.formatDate(m['subscriptionend']) || '',
+      };
+    });
     const csvContent = this.createCSVContent(csvData);
     const fileName = `workshop-participants-${this.workshopData?.detailpage?.title || 'workshop'}-${new Date().toISOString().split('T')[0]}.csv`;
     this.downloadCSV(csvContent, fileName);

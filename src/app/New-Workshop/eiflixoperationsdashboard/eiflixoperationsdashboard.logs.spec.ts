@@ -840,6 +840,21 @@ describe('EiflixoperationsdashboardComponent — Master Class Purchase', () => {
     expect(card(c).breakdown).toEqual([{ label: 'new users', count: 1 }]);
   });
 
+  it('a payer moved to existing (movedtoexist) is NOT a New User — row, count and export agree', () => {
+    const c = make();
+    c.pmMap.set('moved', { name: 'Mohan Moved', activejourney: 'j1' });
+    c.nudMap.set('moved', { name: 'Mohan Moved', movedtoexist: true });
+    c.mcPayments.push({ id: 'd', profileid: 'moved', amountRupees: 1999, datetime: daysAgo(1), workshopref: ref('ws1') });
+    c.rebuildMasterclassCard();
+    expect(row(c, 'd').sourceTag).withContext('in both, moved -> existing').toBeUndefined();
+    expect(row(c, 'd').journeyTag).toBe('B!G Journey One');
+    expect(card(c).breakdown).withContext('still one new user (a)').toEqual([{ label: 'new users', count: 1 }]);
+    const sheet = c.panelExportRows({ viewRows: card(c).users });
+    const typeCol = sheet[0].indexOf('User Type');
+    expect(sheet.find((r: any[]) => r[0] === 'Mohan Moved')[typeCol]).toBe('Existing');
+    expect(sheet.find((r: any[]) => r[0] === 'Nila Newcomer')[typeCol]).toBe('New User');
+  });
+
   it('resolves names from participant metadata, then new_user_data, else the raw id', () => {
     const c = make();
     expect(row(c, 'a').name).toBe('Nila Newcomer');
@@ -1025,6 +1040,22 @@ describe('EiflixoperationsdashboardComponent — Watson total amount', () => {
     expect(label(c, 'notInWatson')).withContext('not found in Watson').toBe('—');
     expect(card(c).highlight).toBe('₹27,25,000');
     expect(card(c).highlightLabel).withContext('no label text in the pill').toBeUndefined();
+  });
+
+  it('moved to existing is never a New User: paid rows and the shared resolver (operator 2026-10-17)', async () => {
+    const c = make('ready', [['moved1', 1000]]);
+    // Paid card: every row has moved — none carries the New User tag, even with no participant metadata.
+    expect(card(c).users.every((r: any) => !r.sourceTag)).withContext('no New User on New Users to Paid').toBeTrue();
+    // Resolver (Viewers / Hot Leads / Non-Active panels): moved -> no tag; still-new -> tagged.
+    c.pmReady = Promise.resolve(); c.nudReady = Promise.resolve();
+    const rows = await c.resolveProfiles(['moved1', 'stillNew']);
+    expect(rows.find((r: any) => r.id === 'moved1').sourceTag).toBeUndefined();
+    expect(rows.find((r: any) => r.id === 'stillNew').sourceTag).toBe('New User');
+    // Export User Type follows the tag.
+    const sheet = c.panelExportRows({ viewRows: rows });
+    const typeCol = sheet[0].indexOf('User Type');
+    expect(sheet.find((r: any[]) => r[0] === 'Moved One')[typeCol]).toBe('Existing');
+    expect(sheet.find((r: any[]) => r[0] === 'Still New')[typeCol]).toBe('New User');
   });
 
   it('never shows ₹0 when nobody in the card is in Watson', () => {
