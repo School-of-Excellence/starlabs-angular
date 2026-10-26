@@ -506,7 +506,7 @@ export class ViewAssignedATCComponent {
     this.newProcedureValue = {
       type: updateType,
       bigactivity: assigned,
-      lastactivity: this.datepipe.transform(typeof procedureData["last_activity"] == 'string' ? new Date(procedureData["last_activity"]) : (procedureData["last_activity"]?.toDate() ?? new Date()), "yyyy-MM-ddThh:mm"),
+      lastactivity: this.datepipe.transform(typeof procedureData["last_activity"] == 'string' ? new Date(procedureData["last_activity"]) : (procedureData["last_activity"]?.toDate() ?? new Date()), "yyyy-MM-ddTHH:mm"),
     }    
   }
 
