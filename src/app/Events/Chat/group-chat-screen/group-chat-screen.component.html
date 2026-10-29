@@ -874,24 +874,26 @@
         <!-- Provenance -->
         <div class="wc-block">
           <!-- Linked event — the app's `linked_event`, also shown under the chat name in the thread header. -->
-          <div class="wc-kv" *ngIf="a.eventName && !editingEvent">
+          <div class="wc-kv" *ngIf="a.eventId && !editingEvent">
             <mat-icon>event</mat-icon>
             <div class="grow">
               <div class="wc-kv-label">Linked event</div>
-              <div class="wc-kv-value">{{ a.eventName }}</div>
+              <div class="wc-kv-value">{{ a.eventName || 'Loading…' }}</div>
             </div>
             <button data-testid="gcs-info-event-edit" class="wc-slide-editbtn" *ngIf="canEditChat && !isChannel(a)"
                     (click)="startEditEvent()" matTooltip="Edit linked event">
               <mat-icon>edit</mat-icon>
             </button>
           </div>
-          <button data-testid="gcs-info-event-add" class="wc-slide-adddesc" *ngIf="!a.eventName && !editingEvent && canEditChat && !isChannel(a)"
+          <button data-testid="gcs-info-event-add" class="wc-slide-adddesc" *ngIf="!a.eventId && !editingEvent && canEditChat && !isChannel(a)"
                   (click)="startEditEvent()">
             <mat-icon>add</mat-icon> Add linked event
           </button>
           <div class="wc-slide-rename" *ngIf="editingEvent">
-            <input data-testid="gcs-info-event-input" [(ngModel)]="eventDraft" (keydown.enter)="saveLinkedEvent()" (keydown.escape)="cancelEditEvent()"
-                   [attr.maxlength]="EVENT_MAX" placeholder="uP! Marathon 12 · Session 4"/>
+            <select data-testid="gcs-info-event-input" [(ngModel)]="eventDraftId" (keydown.escape)="cancelEditEvent()" [disabled]="!linkEvents">
+              <option value="">{{ linkEvents ? '— No linked event —' : 'Loading events…' }}</option>
+              <option *ngFor="let e of linkEvents || []; trackBy: trackById" [value]="e.id">{{ e.name }}{{ e.dates ? ' · ' + e.dates : '' }}</option>
+            </select>
             <button data-testid="gcs-info-event-save" class="wc-icon-btn on" (click)="saveLinkedEvent()" matTooltip="Save"><mat-icon>check</mat-icon></button>
             <button data-testid="gcs-info-event-cancel" class="wc-icon-btn" (click)="cancelEditEvent()" matTooltip="Cancel"><mat-icon>close</mat-icon></button>
           </div>
@@ -1395,11 +1397,12 @@
             <button data-testid="gcs-create-image-remove" class="wc-link-btn" *ngIf="cImagePreview" (click)="clearGroupImage()">Remove</button>
           </div>
         </div>
-        <div class="wc-field">
-          <label>Created under event</label>
-          <select data-testid="gcs-create-event" [(ngModel)]="cEventId">
-            <option value="">— None —</option>
-            <option *ngFor="let e of events" [value]="e.id">{{ e.title }}</option>
+        <!-- The app's `linked_event_ref`: an event from `event collection`, newest first. Editable later from Info. -->
+        <div class="wc-field" *ngIf="isGroupCreate">
+          <label>Linked event (optional)</label>
+          <select data-testid="gcs-create-event" [(ngModel)]="cEventId" [disabled]="!linkEvents">
+            <option value="">{{ linkEvents ? '— No linked event —' : 'Loading events…' }}</option>
+            <option *ngFor="let e of linkEvents || []; trackBy: trackById" [value]="e.id">{{ e.name }}{{ e.dates ? ' · ' + e.dates : '' }}</option>
           </select>
         </div>
 

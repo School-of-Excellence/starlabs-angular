@@ -8,7 +8,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import {
   Firestore, CollectionReference, collection, collectionData, collectionSnapshots, doc, getDocs,
   query, where, orderBy, getDoc, setDoc, updateDoc, serverTimestamp, arrayRemove, arrayUnion, deleteField,
-  startAt, endAt, startAfter, limit,
+  startAt, endAt, startAfter, limit, docSnapshots,
 } from '@angular/fire/firestore';
 import { writeBatch, FieldPath, increment } from 'firebase/firestore';
 import { Storage } from '@angular/fire/storage';
@@ -352,6 +352,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   cEmoji = '💬';
   /** No description input any more — demo rows just carry an empty one. */
   readonly cDesc = '';
+  /** Event picked in the create dialog (an `event collection` doc id) — saved as `linked_event_ref`. */
   cEventId = '';
   cSaving = false;
   cImageFile: File | null = null;
@@ -947,13 +948,14 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       id: d.id,
       name: data['group_name'] || 'Untitled group',
       photoUrl: this.imageUrl(data['group_profile']),
-      // `description` and `linked_event` are the app's Group settings fields (msgChatInfo.dart).
+      // `description` and `linked_event_ref` are the app's Group settings fields (msgChatInfo.dart).
       // No emoji/category field exists in supportchat — those stay UI-only defaults.
       emoji: '💬',
       description: `${data['description'] ?? ''}`.trim(),
       category: null,
-      eventId: null,
-      eventName: `${data['linked_event'] ?? ''}`.trim() || null,
+      // Only the event's reference is stored; its name is read live from the event (watchEventName).
+      eventId: this.linkedEventId(data),
+      eventName: this.eventNameOf(this.linkedEventId(data)),
       createdBy: this.nameOfUid(data['creator_uid']),
       members: uids.map(uid => ({ id: uid, name: this.nameOfUid(uid), journey: null })),
       messages: existing?.messages || [],
@@ -3963,7 +3965,9 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     if (!this.isChannel(active) && !this.canManageGroupOf(active)) return;
     if (this.isLive(active)) {
       const isChan = this.isChannel(active);
-      updateDoc(active._ref, { isdelete: false })
+      // A group reopened clears who/when it was made inactive, as the app's Reopen does (msgChatInfo `_setInactive`).
+      updateDoc(active._ref, isChan ? { isdelete: false }
+        : { isdelete: false, inactive_at: deleteField(), inactive_by: deleteField() })
         .then(() => {
           this.notify(isChan ? 'Channel restored to Active' : 'Group restored to Active');
           // Channels have no listener, so nothing would move between the lists on its own.
@@ -3984,7 +3988,9 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     if (this.isLive(active)) {
       // chat-screen never hard-deletes a chat — it sets isdelete, which lands it in Archived.
       const isChan = this.isChannel(active);
-      updateDoc(active._ref, { isdelete: true })
+      // A group also records when and by whom, exactly as the app's Make inactive does (`_setInactive`).
+      updateDoc(active._ref, isChan ? { isdelete: true }
+        : { isdelete: true, inactive_at: serverTimestamp(), inactive_by: this.currentUid })
         .then(() => {
           this.notify(isChan ? 'Channel moved to Archived' : 'Group moved to Archived');
           if (isChan) this.reloadChannels();
@@ -4010,6 +4016,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     if (this.tab === 'channels') { this.openChannelCreate(); return; }
     this.createOpen = true;
     this.cName = ''; this.cEventId = '';
+    this.loadLinkEvents();
     this.cSearch = ''; this.cSelected = [];
     this.cImageFile = null; this.cImagePreview = null; this.createNameError = '';
     this.importReport = null;
@@ -4212,14 +4219,13 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     const existingIds = this.list.map(c => c.id);
     let id = this.slugify(this.cName.trim()) || `${this.tab}-${Date.now().toString(36)}`;
     while (existingIds.includes(id)) id += '-2';
-    const ev = this.events.find(e => e.id === this.cEventId);
     const item: ChatItem = {
       id,
       name: this.cName.trim(),
       emoji: this.cEmoji,
       description: this.cDesc.trim(),
-      eventId: ev ? ev.id : null,
-      eventName: ev ? ev.title : null,
+      eventId: this.cEventId || null,
+      eventName: this.linkEvents?.find(e => e.id === this.cEventId)?.name || null,
       createdBy: this.TEAM_NAME,
       messages: [], lastMessage: '', lastAt: this.stamp(), unread: 0, deletedLog: [],
       category: null,
@@ -4311,9 +4317,8 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   editingDesc = false;
   descDraft = '';
 
-  /** The app's limits (Group settings sheet): description 300, linked event 60. */
+  /** The app's limit (Group settings sheet) for the description. */
   readonly DESC_MAX = 300;
-  readonly EVENT_MAX = 60;
 
   startEditDesc(): void {
     if (!this.canEditChat) {
@@ -4344,26 +4349,94 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       .catch(e => { console.error('description', e); this.notify('Error saving description'); });
   }
 
-  /* ── Linked event (groups) — the app's `linked_event`: free text, shown under the chat's name ── */
+  /* ── Linked event (groups) ─────────────────────────────────────────────
+     `linked_event_ref` on the group: a reference into `event collection`, exactly what the app's Group
+     settings writes. ONLY the reference is stored — never the name (operator, 2026-10-29) — and the name
+     shown is read live from the event, so a renamed event shows its new name everywhere. The old
+     free-text `linked_event` is removed whenever the link is saved. */
   editingEvent = false;
-  eventDraft = '';
+  eventDraftId = '';
+  /** Picker list: every event, newest first (the app's picker shows the same). Loaded on first use. */
+  linkEvents: { id: string; name: string; dates: string }[] | null = null;
+  private loadingLinkEvents = false;
+  private eventNames: { [eventId: string]: string } = {};
+  private eventSubs = new Map<string, Subscription>();
+
+  private linkedEventId(data: any): string | null {
+    const ref = data?.['linked_event_ref'];
+    return ref && typeof ref.path === 'string' && ref.path.startsWith('event collection/') ? ref.id : null;
+  }
+
+  /** The event's current name; starts a live read the first time an event is seen. */
+  private eventNameOf(eventId: string | null): string | null {
+    if (!eventId) return null;
+    if (!this.eventSubs.has(eventId)) {
+      this.eventSubs.set(eventId, docSnapshots(doc(this.firestore, 'event collection', eventId))
+        .pipe(takeUntil(this.destroy$))
+        .subscribe({
+          next: snap => {
+            const name = snap.exists() ? `${snap.data()?.['name'] ?? ''}`.trim() || 'Untitled event' : 'Event not found';
+            this.eventNames[eventId] = name;
+            this.groups.filter(g => g.eventId === eventId).forEach(g => { g.eventName = name; });
+          },
+          error: e => console.error('group-chat: linked event', eventId, e),
+        }));
+    }
+    return this.eventNames[eventId] ?? null;
+  }
+
+  private async loadLinkEvents(): Promise<void> {
+    if (this.linkEvents || this.loadingLinkEvents) return;
+    this.loadingLinkEvents = true;
+    try {
+      const snap = await getDocs(query(collection(this.firestore, 'event collection'), orderBy('start_date', 'desc')));
+      this.linkEvents = snap.docs.map(d => {
+        const x: any = d.data();
+        return { id: d.id, name: `${x['name'] ?? ''}`.trim() || 'Untitled event', dates: this.eventDates(x) };
+      });
+    } catch (e) {
+      console.error('group-chat: events', e);
+      this.linkEvents = [];
+    } finally {
+      this.loadingLinkEvents = false;
+    }
+  }
+
+  /** "21 Aug – 24 Aug" this year, with the year otherwise — the app's msgShortDate. */
+  private eventDates(x: any): string {
+    const d = (v: any): Date | null => v?.toDate ? v.toDate() : null;
+    const short = (t: Date) => t.toLocaleDateString('en-GB', t.getFullYear() === new Date().getFullYear()
+      ? { day: 'numeric', month: 'short' } : { day: 'numeric', month: 'short', year: 'numeric' });
+    const start = d(x?.['start_date']), end = d(x?.['end_date']);
+    if (!start) return '';
+    return !end || short(end) === short(start) ? short(start) : `${short(start)} – ${short(end)}`;
+  }
 
   startEditEvent(): void {
     if (!this.canEditChat || this.isChannel(this.active)) return;
-    this.eventDraft = this.active?.eventName || '';
+    this.loadLinkEvents();
+    this.eventDraftId = this.active?.eventId || '';
     this.editingEvent = true;
   }
 
-  cancelEditEvent(): void { this.editingEvent = false; this.eventDraft = ''; }
+  cancelEditEvent(): void { this.editingEvent = false; this.eventDraftId = ''; }
 
   saveLinkedEvent(): void {
     const active = this.active;
-    const event = this.eventDraft.trim().slice(0, this.EVENT_MAX);
-    if (!active || event === (active.eventName || '')) { this.cancelEditEvent(); return; }
+    const id = this.eventDraftId;
+    if (!active || id === (active.eventId || '')) { this.cancelEditEvent(); return; }
     this.editingEvent = false;
-    if (!this.isLive(active)) { this.sourceOf(active).eventName = event || null; return; }
-    updateDoc(active._ref, { linked_event: event || deleteField() })
-      .then(() => this.notify(event ? 'Linked event updated' : 'Linked event removed'))
+    if (!this.isLive(active)) {
+      const src = this.sourceOf(active);
+      src.eventId = id || null;
+      src.eventName = this.linkEvents?.find(e => e.id === id)?.name || null;
+      return;
+    }
+    updateDoc(active._ref, {
+      linked_event_ref: id ? doc(this.firestore, 'event collection', id) : deleteField(),
+      linked_event: deleteField(),
+    })
+      .then(() => this.notify(id ? 'Linked event updated' : 'Linked event removed'))
       .catch(e => { console.error('linked event', e); this.notify('Error saving linked event'); });
   }
 
@@ -4507,6 +4580,8 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
         created_on: serverTimestamp(),
         creator_uid: this.currentUid,
         id: docId,
+        // The picked event's reference only — the app's `linked_event_ref`; nothing when none was picked.
+        ...(this.cEventId ? { linked_event_ref: doc(this.firestore, 'event collection', this.cEventId) } : {}),
       }, { merge: true });
       this.createOpen = false;
       this.groupsSub = 'mine';                     // the creator is always a member

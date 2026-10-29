@@ -1120,6 +1120,10 @@
   border-radius: 8px; border: 1px solid var(--border); background: var(--field); color: var(--t1); outline: none;
 }
 .wc-slide-rename textarea:focus { border-color: var(--blue-text); }
+.wc-slide-rename select {
+  flex: 1; min-width: 0; height: 32px; padding: 0 8px; border-radius: 10px;
+  border: 1px solid var(--line3); background: var(--field); color: var(--ink); font-size: 13px;
+}
 
 /* Caps a long participant list at ~6 rows and scrolls it, so Media/links/docs and the footer stay
    reachable without scrolling past every member. */
