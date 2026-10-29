@@ -140,6 +140,8 @@ export class DeliverySequenceComponent {
     var reportList = []
     var queueList = []
     var fieldworkList = []
+    var videoaskList = []
+
     // Appointment
     const appointmenttypeRef = collection(this.firestore,'appointmenttype')
     const appointmenttypeQuery = query(appointmenttypeRef,orderBy('appointmenttype'))
@@ -155,7 +157,7 @@ export class DeliverySequenceComponent {
         this.mapdeliveries[apptDoc.ref.path] = apptDoc.data()["appointmenttype"]
       }
       apptList = data
-      var list = [...apptList, ...eventList, ... formList, ...reportList, ...queueList, ...fieldworkList]
+      var list = [...apptList, ...eventList, ... formList, ...reportList, ...queueList, ...fieldworkList, ...videoaskList]
       this.deliveryList = list
     })
 
@@ -174,7 +176,7 @@ export class DeliverySequenceComponent {
         this.mapdeliveries[formDoc.ref.path] = formDoc.data()["formname"]
       }
       formList = data
-      var list = [...apptList, ...eventList, ... formList, ...reportList, ...queueList, ...fieldworkList]
+      var list = [...apptList, ...eventList, ... formList, ...reportList, ...queueList, ...fieldworkList, ...videoaskList]
       this.deliveryList = list
     })
 
@@ -193,7 +195,7 @@ export class DeliverySequenceComponent {
         this.mapdeliveries[reportDoc.ref.path] = reportDoc.data()["reportname"]
       }
       reportList = data
-      var list = [...apptList, ...eventList, ... formList, ...reportList, ...queueList, ...fieldworkList]
+      var list = [...apptList, ...eventList, ... formList, ...reportList, ...queueList, ...fieldworkList, ...videoaskList]
       this.deliveryList = list
     })
 
@@ -212,7 +214,7 @@ export class DeliverySequenceComponent {
         this.mapdeliveries[eventDoc.ref.path] = eventDoc.data()["eventname"]
       }
       eventList = data
-      var list = [...apptList, ...eventList, ... formList, ...reportList, ...queueList, ...fieldworkList]
+      var list = [...apptList, ...eventList, ... formList, ...reportList, ...queueList, ...fieldworkList, ...videoaskList]
       this.deliveryList = list
     })
 
@@ -231,10 +233,29 @@ export class DeliverySequenceComponent {
         this.mapdeliveries[queueDoc.ref.path] = queueDoc.data()["queuename"]
       }
       queueList = data
-      var list = [...apptList, ...eventList, ... formList, ...reportList, ...queueList, ...fieldworkList]
+      var list = [...apptList, ...eventList, ... formList, ...reportList, ...queueList, ...fieldworkList, ...videoaskList]
       this.deliveryList = list
     })
 
+    // Videoask
+    const arenavideoaskRef = collection(this.firestore,'arenavideoask')
+    const arenavideoaskQuery = query(arenavideoaskRef,orderBy('title'))
+    collectionSnapshots(arenavideoaskQuery).pipe(takeUntil(this.subscription)).subscribe(videoask=>{
+      var data = []
+      for (let i = 0; i < videoask.length; i++) {
+        const videoaskDoc = videoask[i];
+        data.push({
+          type: "videoask",
+          deliveryname: videoaskDoc.data()["title"],
+          path: videoaskDoc.ref.path
+        })
+        this.mapdeliveries[videoaskDoc.ref.path] = videoaskDoc.data()["title"]
+      }
+      videoaskList = data
+      var list = [...apptList, ...eventList, ... formList, ...reportList, ...queueList, ...fieldworkList, ...videoaskList]
+      this.deliveryList = list
+    })
+    
      // Field Work
     const deliveryfieldworkRef = collection(this.firestore,'delivery fieldwork')
     const deliveryfieldworkQuery = query(deliveryfieldworkRef,orderBy('fieldworkname'))
@@ -250,7 +271,7 @@ export class DeliverySequenceComponent {
         this.mapdeliveries[workDoc.ref.path] = workDoc.data()["fieldworkname"]
       }
       fieldworkList = data
-      var list = [...apptList, ...eventList, ... formList, ...reportList, ...queueList, ...fieldworkList]
+      var list = [...apptList, ...eventList, ... formList, ...reportList, ...queueList, ...fieldworkList, ...videoaskList]
       this.deliveryList = list
     })
   }

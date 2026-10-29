@@ -1,0 +1,756 @@
+<div class="head"><b>STARLABS</b><span class="small">Delivery Dashboard · Business/Career Accelerator</span></div>
+
+<div class="wrap">
+
+  <!-- ========== PAGE HEADER ========== -->
+  <header class="page-head">
+    <div>
+      <h1>{{ curP() ? curP().name : 'Delivery Dashboard · all products' }}</h1>
+      <p class="sub">Data as of {{ fmt(TODAY) }} · participant table uses {{ PEOPLE.length }} sample records</p>
+    </div>
+    <div class="toolbar nomargin">
+      <ng-container *ngIf="curP() as cp">
+        <span class="badge b-blue">{{ cp.short }}</span>
+        <button (click)="setProd('all')">Show all products</button>
+      </ng-container>
+
+      <span class="small muted">Date</span>
+      <button [class.on]="S.range === 'all'" (click)="S.range = 'all'">All time</button>
+      <button [class.on]="S.range === '30'" (click)="S.range = '30'">Last 30 days</button>
+      <button [class.on]="S.range === 'month'" (click)="S.range = 'month'">This month</button>
+      <button [class.on]="S.range === 'custom'" (click)="S.range = 'custom'">Date range</button>
+      <ng-container *ngIf="S.range === 'custom'">
+        <label class="field inline">From<input type="date" [(ngModel)]="S.rFrom"></label>
+        <label class="field inline">To<input type="date" [(ngModel)]="S.rTo"></label>
+      </ng-container>
+
+      <button [class.on]="S.showHidden" (click)="S.showHidden = !S.showHidden">{{ S.showHidden ? 'Hide' : 'Show' }} hidden products</button>
+      <button (click)="refresh()">Refresh</button>
+    </div>
+  </header>
+
+  <!-- ========== ONGOING BY PRODUCT ========== -->
+  <section class="section" id="sec-ongoing">
+    <div class="card dark">
+      <div class="small eyebrow">Ongoing by product · click to filter the screen</div>
+      <div class="ongoing">
+        <button class="prow" [class.sel]="S.prod === 'all'" (click)="setProd('all')">
+          <span class="small">All products</span>
+          <span class="bar2"><span style="width:100%;background:#8b87ff"></span></span>
+          <b>{{ SYS.inDelivery }}</b>
+        </button>
+        <button class="prow" *ngFor="let p of visibleProducts()" [class.sel]="S.prod === p.id" (click)="setProd(p.id)">
+          <span class="small">{{ p.short }}</span>
+          <span class="bar2"><span [style.width.%]="p.funnel[3] / maxOngoing() * 100" [style.background]="p.color"></span></span>
+          <b>{{ p.funnel[3] }}</b>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== KEY METRICS ========== -->
+  <section class="section" id="sec-kpis" *ngIf="kpis as k">
+    <div class="kpis">
+      <button class="kpi clickable" (click)="openPanel('ind')">
+        <div class="l">In delivery</div><div class="v">{{ k.inDel }}</div>
+        <div class="s">{{ curP() ? curP().short : 'All products' }} · in progress</div>
+      </button>
+      <button class="kpi clickable" (click)="openPanel('rdy')">
+        <div class="l">Ready to start</div><div class="v blue">{{ k.ready }}</div>
+        <div class="s">paid, not yet started</div>
+      </button>
+      <button class="kpi clickable" (click)="openPanel('stuck')">
+        <div class="l">Stuck</div><div class="v red">{{ k.stuck }}</div>
+        <div class="s">no progress in 14+ days{{ curP() ? ' (sample)' : '' }}</div>
+      </button>
+      <button class="kpi clickable" (click)="openPanel('await')">
+        <div class="l">Awaiting initiation</div><div class="v amber">{{ k.awaiting }}</div>
+        <div class="s">not paid yet{{ curP() ? ' (sample)' : '' }}</div>
+      </button>
+      <button class="kpi clickable" (click)="openPanel('nc')">
+        <div class="l">Initiated, not consuming</div><div class="v amber">{{ k.notC }}</div>
+        <div class="s">started, no usage yet{{ curP() ? ' (sample)' : '' }}</div>
+      </button>
+      <div class="kpi">
+        <div class="l">Average days to complete</div>
+        <div class="v">
+          <span *ngIf="k.avg === null" class="warn not-rec">Not recorded</span>
+          <ng-container *ngIf="k.avg !== null">{{ k.avg }}<small>d</small></ng-container>
+        </div>
+        <div class="s" [class.red]="k.avg && k.avg > SYS.target">target {{ SYS.target }} days</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== APPOINTMENT + COMPLETION TOTAL CARDS ========== -->
+  <div class="two-col">
+    <div>
+      <section class="section" id="sec-appointments">
+        <h2>Appointment dashboard</h2>
+        <p class="sub">Total specialist hours for the week of {{ fmt(weekStartDate) }}. Click to show each specialist below.</p>
+        <button class="total-card full" (click)="S.specSel = null; openPanel('appt')">
+          <div class="small lbl">Total specialist hours · all specialists</div>
+          <div class="trio">
+            <div><div class="small lbl">Available</div><div class="n">{{ apptTotal('av') }}</div><div class="small lbl">hours</div></div>
+            <div><div class="small lbl">Consumed</div><div class="n green-t">{{ apptTotal('co') }}</div><div class="small lbl">hours</div></div>
+            <div><div class="small lbl">Unconsumed</div><div class="n amber-t">{{ apptTotal('un') }}</div><div class="small lbl">hours</div></div>
+          </div>
+          <div class="small cancelled">Cancelled: <b>{{ apptTotal('cx') }}</b> appointments · <b>{{ apptTotal('cx') }}</b> hours</div>
+        </button>
+      </section>
+    </div>
+
+    <div>
+      <section class="section" id="sec-completion">
+        <h2>Completion history</h2>
+        <p class="sub">Total completed across all products. Click to show the completed participants below.</p>
+        <button class="total-card" (click)="openPanel('compl')">
+          <div class="small lbl">Total completed · all products</div>
+          <div class="big">{{ completedTotal }}</div>
+        </button>
+      </section>
+    </div>
+  </div>
+
+  <!-- ========== TABS ========== -->
+  <div class="toolbar tabs">
+    <button class="tab-btn" [class.on]="activeTab === 'pipeline'" (click)="setTab('pipeline')">Product pipeline</button>
+    <button class="tab-btn" [class.on]="activeTab === 'participants'" (click)="setTab('participants')">Participants</button>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- PIPELINE TAB                                              -->
+  <!-- ========================================================= -->
+  <ng-container *ngIf="activeTab === 'pipeline'">
+
+    <!-- Product pipeline table -->
+    <section class="section" id="sec-pipeline">
+      <h2>Product pipeline</h2>
+      <p class="sub">Eligibility, journey and bonuses by product. Click a product to filter the screen.</p>
+      <div class="filterbar flush">
+        <label class="field">Event
+          <select><option value="bca">{{ EVENT }}</option></select>
+        </label>
+      </div>
+
+      <div class="card fit">
+        <table class="fit-t">
+          <thead>
+            <tr>
+              <th>Total</th><th>Product</th><th>Eligible</th><th>Ineligible</th><th>Purchased</th><th>Purchased %</th>
+              <th>Yet to start</th><th>Ongoing</th><th>Done</th><th>Done %</th>
+              <th style="min-width:160px">Stage mix
+                <div class="legend">
+                  <span><i style="background:#9aa3b5"></i>Yet to start</span>
+                  <span><i style="background:#6b7388"></i>Started</span>
+                  <span><i style="background:#f59e0b"></i>Ongoing</span>
+                  <span><i style="background:#4f46e5"></i>Done</span>
+                </div>
+              </th>
+              <th>Init→start · Start→done</th><th>Bonus given</th><th>Subscription ended</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="click" *ngFor="let p of visibleProducts(); trackBy: trackById" [class.sel]="S.prod === p.id" (click)="setProd(p.id)">
+              <td><b>{{ p.total }}</b></td>
+              <td><span class="dot-sw" [style.background]="p.color"></span><b>{{ p.short }}</b></td>
+              <td>{{ p.eligible }}</td>
+              <td>{{ p.ineligible }}</td>
+              <td>{{ p.purch }}</td>
+              <td>{{ pct(p.purch, p.eligible) }}%</td>
+              <td>{{ p.funnel[0] }}</td>
+              <td>{{ p.funnel[3] }}</td>
+              <td>{{ p.funnel[4] }}</td>
+              <td>{{ pct(p.funnel[4], stageTotal(p)) }}%</td>
+              <td>
+                <div class="mix">
+                  <div class="seg" *ngFor="let m of stageMix(p)" [title]="m.name + ': ' + m.count" [style.flex]="m.count + ' 1 0'">
+                    <span class="c">{{ m.count }}</span>
+                    <span class="b" [style.background]="m.color"></span>
+                  </div>
+                  <span class="muted small" *ngIf="stageMix(p).length === 0">no records</span>
+                </div>
+              </td>
+              <td>
+                <div class="small">Init→start: <span class="warn">0d · missing</span></div>
+                <div class="small">Start→done:
+                  <span *ngIf="p.avgDone === '0d'" class="warn">0d · missing</span>
+                  <span *ngIf="p.avgDone === 'none'" class="muted">no completions</span>
+                  <ng-container *ngIf="p.avgDone !== '0d' && p.avgDone !== 'none'">{{ p.avgDone }}</ng-container>
+                </div>
+              </td>
+              <td><b>{{ p.bonus }}</b></td>
+              <td>{{ p.ended }}</td>
+            </tr>
+            <tr *ngIf="visibleProducts().length === 0"><td colspan="14" class="muted">No products to show.</td></tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td>{{ sumKey('total') }}</td>
+              <td>Total · {{ visibleProducts().length }} products</td>
+              <td>{{ sumKey('eligible') }}</td>
+              <td>{{ sumKey('ineligible') }}</td>
+              <td>{{ sumKey('purch') }}</td>
+              <td>{{ pct(sumKey('purch'), sumKey('eligible')) }}%</td>
+              <td>{{ sumFunnel(0) }}</td>
+              <td>{{ sumFunnel(3) }}</td>
+              <td>{{ sumFunnel(4) }}</td>
+              <td>{{ pct(sumFunnel(4), sumStageTotal()) }}%</td>
+              <td></td><td></td>
+              <td>{{ sumKey('bonus') }}</td>
+              <td>{{ sumKey('ended') }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <p class="note">Total is the participant count per product. Stage mix: grey = yet to start, dark grey = started, amber = ongoing, purple = done. Bonus given counts participants who received the product as a bonus.</p>
+    </section>
+
+    <!-- Stages board -->
+    <section class="section" id="sec-stages">
+      <h2>Stages</h2>
+      <p class="sub">
+        {{ PB[S.stageProd]?.name }}.
+        {{ captured ? 'Counts from the system.' : 'Stage counts for this product are not captured yet, so the counts shown are from the sample.' }}
+      </p>
+      <div class="toolbar">
+        <button *ngFor="let t of STAGE_TABS" [class.on]="S.stageProd === t[0]" (click)="S.stageProd = t[0]">{{ t[1] }}</button>
+      </div>
+      <div class="scroll">
+        <div class="stage-grid">
+          <div class="stage-col" *ngFor="let c of stageCols()" [style.border-top-color]="c.color">
+            <div class="top"><b>{{ c.name }}</b><span class="badge solid" [style.background]="c.color">{{ c.badge }}</span></div>
+
+            <ng-container *ngIf="!c.first">
+              <div class="stage-2">
+                <div class="box"><b class="green-t">{{ c.completed }}</b><div class="small muted">completed</div></div>
+                <div class="box"><b>{{ c.cancelled }}</b><div class="small muted">cancelled</div></div>
+              </div>
+              <div class="stage-3">
+                <div class="box"><b>{{ c.all }}</b><div class="small muted">all</div></div>
+                <div class="box"><b>{{ c.sched }}</b><div class="small muted">scheduled</div></div>
+                <div class="box"><b>{{ c.wait }}</b><div class="small muted">waiting</div></div>
+              </div>
+            </ng-container>
+
+            <div class="mini-card" *ngFor="let p of c.items; trackBy: trackById">
+              <b>{{ p.name }}</b>
+              <div class="small muted">{{ p.id }} · {{ p.owner }}</div>
+              <div class="st"><span class="badge" [ngClass]="STATUS_CLS[p.status]">{{ STATUS[p.status] }}</span></div>
+              <div class="small muted st">{{ p.days }} days in stage<ng-container *ngIf="p.diagSpec"> · {{ p.diagSpec }}</ng-container></div>
+            </div>
+            <div class="small muted empty-col" *ngIf="c.items.length === 0">No data yet</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </ng-container>
+
+  <!-- ========================================================= -->
+  <!-- PARTICIPANTS TAB                                          -->
+  <!-- ========================================================= -->
+  <section class="section" id="sec-participants" *ngIf="activeTab === 'participants'">
+    <h2>{{ panelTitle }}</h2>
+    <p class="sub">One table for the whole worklist. Use the filters to narrow it; care, escalation and report views are filters, not separate tables.</p>
+
+    <div class="filterbar">
+      <label class="field">Search
+        <input type="search" class="w-190" placeholder="Name or ID" [(ngModel)]="S.q">
+      </label>
+      <label class="field">Product
+        <select [(ngModel)]="S.prod">
+          <option value="all">All products</option>
+          <option *ngFor="let p of visibleProducts()" [value]="p.id">{{ p.short }}</option>
+        </select>
+      </label>
+      <label class="field">Status
+        <select [(ngModel)]="S.status">
+          <option value="all">All statuses</option>
+          <option *ngFor="let s of STATUS_LIST" [value]="s.value">{{ s.label }}</option>
+        </select>
+      </label>
+      <label class="field">Event
+        <select [(ngModel)]="S.event">
+          <option value="all">All events</option>
+          <option value="bca">{{ EVENT }}</option>
+        </select>
+      </label>
+      <label class="field">Initiated date
+        <select [(ngModel)]="S.range">
+          <option value="all">All time</option>
+          <option value="30">Last 30 days</option>
+          <option value="month">This month</option>
+          <option value="custom">Custom range</option>
+        </select>
+      </label>
+      <ng-container *ngIf="S.range === 'custom'">
+        <label class="field">From<input type="date" [(ngModel)]="S.rFrom"></label>
+        <label class="field">To<input type="date" [(ngModel)]="S.rTo"></label>
+      </ng-container>
+      <label class="field">Customer
+        <select [(ngModel)]="S.cust"><option value="all">All</option><option value="Active">Active</option><option value="Ended">Ended</option></select>
+      </label>
+      <label class="field">Financial
+        <select [(ngModel)]="S.fin"><option value="all">All</option><option value="Paid">Paid</option><option value="Pending">Pending</option></select>
+      </label>
+      <label class="field">Parallel product
+        <select [(ngModel)]="S.par">
+          <option value="all">All</option>
+          <option *ngFor="let p of ACTIVE" [value]="p.short">{{ p.short }}</option>
+        </select>
+      </label>
+      <label class="field">Tag
+        <select [(ngModel)]="S.tagF">
+          <option value="all">Any tag</option>
+          <option value="none">No tag</option>
+          <option *ngFor="let t of TAGS" [value]="t">{{ t }}</option>
+        </select>
+      </label>
+      <label class="field">Subscription ends
+        <select [(ngModel)]="S.win">
+          <option value="all">Any time</option>
+          <option value="30">Within 30 days</option>
+          <option value="60">Within 60 days</option>
+          <option value="90">Within 90 days</option>
+        </select>
+      </label>
+      <label class="field">Action
+        <select [ngModel]="S.action" (ngModelChange)="onAction($event)">
+          <option *ngFor="let a of ACTION_LIST" [value]="a.value">{{ a.label }}</option>
+        </select>
+      </label>
+      <label class="field" *ngIf="ACTIONS[S.action].n !== null">Threshold
+        <input type="number" min="0" class="w-90" [(ngModel)]="S.actN">
+      </label>
+    </div>
+
+    <div class="toolbar">
+      <button [class.on]="S.showRep" (click)="S.showRep = !S.showRep">Show report columns</button>
+      <button (click)="clearParticipantFilters()">Clear filters</button>
+      <button (click)="exportTable()">Export</button>
+      <button [class.on]="S.panel === 'weekly'" (click)="toggleWeekly()">{{ S.panel === 'weekly' ? 'Back to participants' : 'Weekly report' }}</button>
+      <span class="small muted ml-auto">Showing {{ participantRows().length }} of {{ PEOPLE.length }} sample records (system: {{ SYS.systemTotal }})</span>
+    </div>
+
+    <ng-container [ngSwitch]="S.panel">
+
+      <!-- ===== Weekly report ===== -->
+      <div class="card" *ngSwitchCase="'weekly'">
+        <h2>Weekly report</h2>
+        <p class="sub">Initiated participants in the current scope, with specialists and dates. Follows the table filters above.</p>
+        <div class="filterbar flush">
+          <label class="field">Initiated from<input type="date" [(ngModel)]="S.wFrom"></label>
+          <label class="field">Initiated to<input type="date" [(ngModel)]="S.wTo"></label>
+          <label class="field">Diagnostics from<input type="date" [(ngModel)]="S.dFrom"></label>
+          <label class="field">Diagnostics to<input type="date" [(ngModel)]="S.dTo"></label>
+          <button (click)="clearWeekly()">Clear date filter</button>
+        </div>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>S.No</th><th>Participant</th><th>Diagnostics specialist</th><th>Implementation specialist</th><th>Initiation date</th><th>Diagnostics date</th><th>Current status</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let p of weeklyRows(); let i = index">
+                <td>{{ i + 1 }}</td>
+                <td><b>{{ p.name }}</b><div class="small muted">{{ p.id }}</div></td>
+                <td>{{ p.diagSpec || '—' }}</td>
+                <td>{{ p.implSpec || '—' }}</td>
+                <td>{{ fmt(ago(p.initAgo)) }}</td>
+                <td>{{ p.diagAgo !== null ? fmt(ago(p.diagAgo)) : '—' }}</td>
+                <td><span class="badge" [ngClass]="STATUS_CLS[p.status]">{{ STATUS[p.status] }}</span></td>
+              </tr>
+              <tr *ngIf="weeklyRows().length === 0"><td colspan="7" class="muted">No initiated participants match.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>Validation tests ({{ weeklyAllCount() }} initiated participants in scope)</h3>
+        <div class="check" *ngFor="let t of weeklyTests()">
+          <span>{{ t.t }}</span>
+          <span class="badge" [ngClass]="t.ok === 'info' ? 'b-amber' : t.ok ? 'b-green' : 'b-red'">{{ t.ok === 'info' ? 'Full export needed' : t.ok ? 'Pass' : 'Fail' }}</span>
+        </div>
+        <p class="note">The full export is needed for the completed-total test.</p>
+      </div>
+
+      <!-- ===== Completion history ===== -->
+      <div class="card" *ngSwitchCase="'compl'">
+        <h2>Completion history</h2>
+        <p class="sub">Completions by product, with the time from start to done.</p>
+        <div class="toolbar"><button (click)="backToParticipants()">Back to participants</button></div>
+        <div class="card mb">
+          <div class="kv">
+            <div>Total completed</div><div><b>{{ completedTotal }}</b></div>
+            <div>Products with completions</div><div>{{ productsWithCompletions }}</div>
+          </div>
+        </div>
+        <div class="cards-row">
+          <div class="pcard" *ngFor="let p of visibleProducts()">
+            <div class="t"><span class="sw" [style.background]="p.color"></span><b>{{ p.short }}</b></div>
+            <div class="n">{{ p.funnel[4] }}</div>
+            <div class="small muted">completed</div>
+            <div class="kv">
+              <div>Purchased</div><div>{{ p.purch }}</div>
+              <div>Bonus</div><div>{{ p.bonus }}</div>
+              <div>Start→done</div>
+              <div>
+                <span *ngIf="p.avgDone === '0d'" class="warn">0d · missing</span>
+                <ng-container *ngIf="p.avgDone === 'none'">—</ng-container>
+                <ng-container *ngIf="p.avgDone !== '0d' && p.avgDone !== 'none'">{{ p.avgDone }}</ng-container>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== Appointment dashboard ===== -->
+      <ng-container *ngSwitchCase="'appt'">
+
+        <!-- one specialist -->
+        <div class="card" *ngIf="S.specSel; else apptOverview">
+          <ng-container *ngIf="specDetail(S.specSel) as d">
+            <div class="spec-head">
+              <div>
+                <b style="font-size:16px">{{ d.sp.name }}</b>
+                <div class="small muted">{{ d.sp.team }}</div>
+                <div style="margin-top:6px"><span class="badge b-blue" style="margin:2px" *ngFor="let n of d.products">{{ n }}</span></div>
+              </div>
+              <button (click)="S.specSel = null">Back to specialists</button>
+            </div>
+            <div class="spec-kpis">
+              <div class="kpi"><div class="l">Available</div><div class="v sm">{{ d.sum.av }}</div><div class="s">hours</div></div>
+              <div class="kpi"><div class="l">Booked</div><div class="v sm">{{ d.sum.booked }}</div><div class="s">hours</div></div>
+              <div class="kpi"><div class="l">Open</div><div class="v sm green">{{ d.sum.open }}</div><div class="s">hours</div></div>
+            </div>
+            <div class="day" *ngFor="let day of d.days">
+              <div class="day-head">
+                <b>{{ DOW[day.date.getDay()] }} {{ fmt(day.date) }}</b>
+                <span class="small muted">
+                  <ng-container *ngIf="day.cap">{{ day.open }} open · {{ day.booked }} booked</ng-container>
+                  <ng-container *ngIf="!day.cap">{{ day.onLeave ? 'On leave' : 'No availability' }}</ng-container>
+                </span>
+              </div>
+              <div class="slots" *ngIf="day.cap">
+                <div class="slot" *ngFor="let s of day.slots" [ngClass]="s.booked ? 'booked' : 'open'">
+                  {{ s.label }}<div class="s">{{ s.booked ? 'booked' : 'open' }}</div>
+                </div>
+              </div>
+            </div>
+            <p class="note">Each slot is one hour. Green slots are open availability given by this specialist for the week.</p>
+          </ng-container>
+        </div>
+
+        <!-- all specialists -->
+        <ng-template #apptOverview>
+          <div class="card">
+            <h2>Appointment dashboard</h2>
+            <p class="sub">Specialist hours for the week of {{ fmt(weekStartDate) }}. One slot counts as one hour.</p>
+            <div class="filterbar flush">
+              <label class="field">Week starting<input type="date" [(ngModel)]="S.weekStart"></label>
+              <button (click)="backToParticipants()">Back to participants</button>
+              <div class="ml-auto">
+                <a *ngIf="SPECIALIST_STUDIO_URL" class="badge b-blue studio" [href]="SPECIALIST_STUDIO_URL" target="_blank" rel="noopener">Open Specialist Studio ↗</a>
+                <button *ngIf="!SPECIALIST_STUDIO_URL" disabled title="Add the Specialist Studio link in the component">Open Specialist Studio</button>
+              </div>
+            </div>
+            <div class="spec-cards">
+              <div class="card spec-card" *ngFor="let r of apptRows()" (click)="S.specSel = r.sp.id">
+                <b>{{ r.sp.name }}</b>
+                <div class="small muted" style="margin-bottom:10px">{{ r.sp.team }}</div>
+                <div class="trio">
+                  <div><div class="small muted">Available</div><div class="n">{{ r.av }}</div><div class="small muted">hours</div></div>
+                  <div><div class="small muted">Consumed</div><div class="n green-t">{{ r.co }}</div><div class="small muted">hours</div></div>
+                  <div><div class="small muted">Unconsumed</div><div class="n amber-t">{{ r.un }}</div><div class="small muted">hours</div></div>
+                  <div class="small cx">Cancelled: <b>{{ r.cx }}</b> appointments · <b>{{ r.cx }}</b> hours</div>
+                </div>
+              </div>
+            </div>
+            <p class="note">Calendar and appointment detail are in the Specialist Studio.<ng-container *ngIf="!SPECIALIST_STUDIO_URL"> The link is not set yet.</ng-container></p>
+          </div>
+        </ng-template>
+      </ng-container>
+
+      <!-- ===== Awaiting initiation ===== -->
+      <div class="card scroll" *ngSwitchCase="'await'">
+        <div class="toolbar flush">
+          <button (click)="backToParticipants()">Back to participants</button>
+          <span class="small muted ml-auto">{{ panelRows('awaiting-payment').length }} awaiting initiation in scope (sample)</span>
+        </div>
+        <table>
+          <thead><tr><th>Priority</th><th>Name</th><th>Mobile</th><th>Journey</th><th>Parallel product</th><th>Onboarded</th><th>Days waiting</th><th>Payment status</th><th>Last payment</th><th>Subscription start</th><th>Subscription end</th><th>Bottleneck</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let p of panelRows('awaiting-payment')">
+              <td><span class="badge" [ngClass]="prio(p.days)[1]">{{ prio(p.days)[0] }}</span></td>
+              <td><b>{{ p.name }}</b><div class="small muted">{{ p.id }}</div></td>
+              <td class="small muted">Not in sample</td>
+              <td>{{ STAGES[0] }}</td>
+              <td>{{ p.parallel }}</td>
+              <td class="muted">—</td>
+              <td><span class="badge b-red">{{ p.days }} days</span></td>
+              <td><span class="badge b-amber">Pending</span></td>
+              <td class="muted">—</td>
+              <td class="muted">—</td>
+              <td>{{ fmt(addDays(p.subEnd)) }}</td>
+              <td class="small">Payment not confirmed</td>
+            </tr>
+            <tr *ngIf="panelRows('awaiting-payment').length === 0"><td colspan="12" class="muted">No participants awaiting initiation in scope.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ===== Ready to start ===== -->
+      <div class="card scroll" *ngSwitchCase="'rdy'">
+        <div class="toolbar flush">
+          <button (click)="backToParticipants()">All {{ countAllInScope }}</button>
+          <button (click)="openPanel('await')">Awaiting Initiation <b style="margin-left:4px">{{ countStatus('awaiting-payment') }}</b></button>
+          <button (click)="openPanel('nc')">Initiated – Not Consuming <b style="margin-left:4px">{{ countStatus('not-consuming') }}</b></button>
+          <button (click)="openPanel('stuck')">Stuck Cases <b style="margin-left:4px">{{ countStatus('stuck') }}</b></button>
+        </div>
+        <div class="banner grad">
+          <span>Showing only participants with cleared payment ({{ panelRows('ready').length }})</span>
+          <button (click)="backToParticipants()">Clear Filter</button>
+        </div>
+        <table>
+          <thead><tr><th>Priority</th><th>Name</th><th>Mobile</th><th>Journey</th><th>Parallel product</th><th>Onboarded</th><th>Days waiting</th><th>Payment status</th><th>Last payment</th><th>Subscription start</th><th>Subscription end</th><th>Bottleneck</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let p of panelRows('ready')">
+              <td><span class="badge" [ngClass]="prio(p.days)[1]">{{ prio(p.days)[0] }}</span></td>
+              <td><b>{{ p.name }}</b><div class="small muted">{{ p.id }}</div></td>
+              <td class="small muted">Not in sample</td>
+              <td>{{ STAGES[0] }}</td>
+              <td>{{ p.parallel }}</td>
+              <td class="muted">—</td>
+              <td><span class="badge b-red">{{ p.days }} days</span></td>
+              <td><span class="badge b-green">Eligible</span></td>
+              <td class="muted">—</td>
+              <td class="muted">—</td>
+              <td>{{ fmt(addDays(p.subEnd)) }}</td>
+              <td class="small">Ready for initiation</td>
+            </tr>
+            <tr *ngIf="panelRows('ready').length === 0"><td colspan="12" class="muted">No participants waiting to start in scope.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ===== Initiated, not consuming ===== -->
+      <div class="card scroll" *ngSwitchCase="'nc'">
+        <div class="toolbar flush">
+          <button (click)="backToParticipants()">Back to participants</button>
+          <span class="small muted ml-auto">{{ panelRows('not-consuming').length }} initiated, not consuming in scope (sample)</span>
+        </div>
+        <table>
+          <thead><tr><th>Status</th><th>Name</th><th>Journey</th><th>Parallel product</th><th>Product</th><th>Mobile</th><th>Initiated date</th><th>Days waiting</th><th>Subscription start</th><th>Subscription end</th><th>Notes</th><th></th></tr></thead>
+          <tbody>
+            <tr *ngFor="let p of panelRows('not-consuming')">
+              <td>
+                <span *ngIf="p.days >= 14" class="badge b-red">URGENT</span>
+                <span *ngIf="p.days < 14" class="badge b-blue">NORMAL</span>
+              </td>
+              <td><b>{{ p.name }}</b><div class="small muted">{{ p.id }}</div></td>
+              <td>{{ STAGES[p.stage] }}</td>
+              <td>{{ p.parallel }}</td>
+              <td>{{ PB[p.product].name }}</td>
+              <td class="small muted">Not in sample</td>
+              <td>{{ p.initAgo !== null ? fmt(ago(p.initAgo)) : '—' }}</td>
+              <td><span class="badge b-red">{{ p.days }} days</span></td>
+              <td class="muted">—</td>
+              <td>{{ fmt(addDays(p.subEnd)) }}</td>
+              <td class="small">{{ p.notes[0] }}</td>
+              <td><button (click)="openDrawer(p.id)">Open</button></td>
+            </tr>
+            <tr *ngIf="panelRows('not-consuming').length === 0"><td colspan="12" class="muted">No participants in this status in scope.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ===== Stuck ===== -->
+      <div class="card scroll" *ngSwitchCase="'stuck'">
+        <div class="toolbar flush">
+          <button (click)="backToParticipants()">Back to participants</button>
+          <span class="small muted ml-auto">{{ panelRows('stuck').length }} stuck in scope (sample)</span>
+        </div>
+        <table>
+          <thead><tr><th>Escalation level</th><th>Name</th><th>Journey</th><th>Parallel product</th><th>Product</th><th>Appointment</th><th>Appointment status</th><th>Issue type</th><th>Last appointment date</th><th>Days</th><th>Subscription start</th><th>Subscription end</th><th>Last action</th><th>Assigned to</th><th>Resolution</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let p of panelRows('stuck')">
+              <td>
+                <span *ngIf="tagOf(p)" class="badge" [ngClass]="TAG_CLS[tagOf(p)]">{{ tagOf(p) }}</span>
+                <span *ngIf="!tagOf(p)" class="muted">None</span>
+              </td>
+              <td><b>{{ p.name }}</b><div class="small muted">{{ p.id }}</div></td>
+              <td>{{ STAGES[p.stage] }}</td>
+              <td>{{ stuckParallel(p) }}</td>
+              <td>{{ PB[p.product].name }}</td>
+              <td>—</td><td>—</td>
+              <td>Stuck mid-flow</td>
+              <td>{{ fmt(ago(p.days)) }}</td>
+              <td>{{ p.days }}</td>
+              <td>{{ p.initAgo !== null ? fmt(ago(p.initAgo)) : '—' }}</td>
+              <td>{{ fmt(addDays(p.subEnd)) }}</td>
+              <td>ongoing</td>
+              <td>{{ ownerOf(p) }}</td>
+              <td>—</td>
+            </tr>
+            <tr *ngIf="panelRows('stuck').length === 0"><td colspan="15" class="muted">No stuck participants in scope.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ===== In delivery ===== -->
+      <div class="card scroll" *ngSwitchCase="'ind'">
+        <div class="toolbar flush">
+          <button (click)="backToParticipants()">Back to participants</button>
+          <span class="small muted ml-auto">{{ panelRows('in-delivery', 'stuck').length }} in delivery in scope (sample)</span>
+        </div>
+        <div class="banner accent">In delivery {{ panelRows('in-delivery').length }} · Stuck {{ panelRows('stuck').length }}</div>
+        <table>
+          <thead><tr><th>Status</th><th>Name</th><th>Journey</th><th>Parallel product</th><th>Product</th><th>Days in stage</th><th>Initiated date</th><th>Subscription start</th><th>Subscription end</th><th>Owner</th><th>Tag</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let p of panelRows('in-delivery', 'stuck')">
+              <td><span class="badge" [ngClass]="STATUS_CLS[p.status]">{{ STATUS[p.status] }}</span></td>
+              <td><b>{{ p.name }}</b><div class="small muted">{{ p.id }}</div></td>
+              <td>{{ STAGES[p.stage] }}</td>
+              <td>{{ p.parallel }}</td>
+              <td>{{ PB[p.product].name }}</td>
+              <td><span class="badge b-green">{{ p.days }} days</span></td>
+              <td>{{ p.initAgo !== null ? fmt(ago(p.initAgo)) : '—' }}</td>
+              <td class="muted">—</td>
+              <td>{{ fmt(addDays(p.subEnd)) }}</td>
+              <td>{{ ownerOf(p) }}</td>
+              <td>
+                <span *ngIf="tagOf(p)" class="badge" [ngClass]="TAG_CLS[tagOf(p)]">{{ tagOf(p) }}</span>
+                <span *ngIf="!tagOf(p)" class="muted">—</span>
+              </td>
+            </tr>
+            <tr *ngIf="panelRows('in-delivery', 'stuck').length === 0"><td colspan="11" class="muted">No participants in delivery in scope.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ===== Default: the single participants table ===== -->
+      <div class="card scroll" *ngSwitchDefault>
+        <ng-container *ngIf="participantRows() as rows">
+          <p class="muted" style="padding:10px 0" *ngIf="rows.length === 0">No participants match these filters.</p>
+          <table *ngIf="rows.length > 0">
+            <thead>
+              <tr>
+                <th>Participant</th><th>Product</th><th>Status</th><th>Stage</th><th>Days in stage</th><th>Owner</th>
+                <th>Subscription end</th><th>Usage</th><th>Tag</th><th>Ticket</th>
+                <ng-container *ngIf="S.showRep">
+                  <th>Diagnostics specialist</th><th>Implementation specialist</th><th>Initiated</th><th>Diagnostics date</th>
+                </ng-container>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="click" *ngFor="let p of rows; trackBy: trackById" (click)="openDrawer(p.id)">
+                <td><b>{{ p.name }}</b><div class="small muted">{{ p.id }}</div></td>
+                <td>{{ PB[p.product].short }}</td>
+                <td><span class="badge" [ngClass]="STATUS_CLS[p.status]">{{ STATUS[p.status] }}</span></td>
+                <td>{{ STAGES[stageDone(p)] }}</td>
+                <td>{{ p.days }} d</td>
+                <td>{{ ownerOf(p) }}</td>
+                <td [class.warn]="p.subEnd <= 30">{{ fmt(addDays(p.subEnd)) }}</td>
+                <td [class.warn]="isLowUse(p)">{{ p.usage }}%</td>
+                <td>
+                  <span *ngIf="tagOf(p)" class="badge" [ngClass]="TAG_CLS[tagOf(p)]">{{ tagOf(p) }}</span>
+                  <span *ngIf="!tagOf(p)" class="muted">—</span>
+                </td>
+                <td>
+                  <b *ngIf="S.tickets[p.id]">{{ S.tickets[p.id] }}</b>
+                  <span *ngIf="!S.tickets[p.id]" class="muted">none</span>
+                </td>
+                <ng-container *ngIf="S.showRep">
+                  <td>{{ p.diagSpec || '—' }}</td>
+                  <td>{{ p.implSpec || '—' }}</td>
+                  <td>{{ p.initAgo !== null ? fmt(ago(p.initAgo)) : '—' }}</td>
+                  <td>{{ p.diagAgo !== null ? fmt(ago(p.diagAgo)) : '—' }}</td>
+                </ng-container>
+              </tr>
+            </tbody>
+          </table>
+        </ng-container>
+      </div>
+    </ng-container>
+
+    <p class="note">Click a participant to open the profile. The profile shows the care details, journey, tag and notes.</p>
+  </section>
+</div>
+
+<!-- ========== PARTICIPANT PROFILE DRAWER ========== -->
+<div class="scrim" *ngIf="drawerP as p" (click)="closeDrawer()">
+  <div class="panel" (click)="$event.stopPropagation()">
+    <div class="panel-head">
+      <div>
+        <b style="font-size:17px">{{ p.name }}</b>
+        <div class="small muted">{{ p.id }} · {{ PB[p.product].name }}</div>
+      </div>
+      <button (click)="closeDrawer()">Close</button>
+    </div>
+
+    <div style="margin-bottom:14px">
+      <span class="badge" [ngClass]="STATUS_CLS[p.status]">{{ STATUS[p.status] }}</span>
+      <span class="badge" *ngIf="tagOf(p)" [ngClass]="TAG_CLS[tagOf(p)]" style="margin-left:6px">{{ tagOf(p) }}</span>
+    </div>
+
+    <div class="card mb">
+      <b>Care</b>
+      <div class="small care-line" *ngFor="let c of careList(p)"><span class="warn">●</span> {{ c }}</div>
+      <div class="small muted care-line" *ngIf="careList(p).length === 0">No care flags.</div>
+      <div class="toolbar" style="margin:8px 0 0">
+        <button (click)="sendReminder()">Send reminder</button>
+        <button (click)="bookCall()">Book call</button>
+      </div>
+    </div>
+
+    <div class="card mb">
+      <b>Journey</b>
+      <ul class="timeline">
+        <li *ngFor="let i of drawerItems(p)">
+          <span class="dot" [ngClass]="i.state"></span>
+          <div><b>{{ i.name }}</b></div>
+          <span class="small muted">{{ i.label }}</span>
+        </li>
+      </ul>
+      <p class="note">Next action: <b>{{ NEXT[p.status] }}</b></p>
+    </div>
+
+    <div class="card mb">
+      <b>Subscription &amp; usage</b>
+      <div class="kv" style="margin-top:8px">
+        <div>Ends</div><div>{{ fmt(addDays(p.subEnd)) }}</div>
+        <div>Customer</div><div>{{ p.customer }}</div>
+        <div>Financial</div><div>{{ p.financial }}</div>
+        <div>Usage</div><div>{{ p.usage }}%</div>
+      </div>
+      <div class="usage"><span [style.width.%]="p.usage"></span></div>
+    </div>
+
+    <div class="card mb">
+      <b>Team tag &amp; ticket</b>
+      <div class="kv" style="margin-top:8px">
+        <div>Ticket</div><div>{{ S.tickets[p.id] || 'none' }}</div>
+        <div>Tag</div><div>{{ tagOf(p) || 'none' }}</div>
+      </div>
+      <div class="toolbar" style="margin:10px 0 0">
+        <select [ngModel]="tagOf(p)" (ngModelChange)="setTag(p.id, $event)">
+          <option value="">No tag</option>
+          <option *ngFor="let t of TAGS" [value]="t">{{ t }}</option>
+        </select>
+        <button (click)="raiseTicket(p.id)">{{ S.tickets[p.id] ? 'Ticket raised' : 'Raise ticket' }}</button>
+      </div>
+    </div>
+
+    <div class="card mb">
+      <b>Owner</b>
+      <select class="w-full" [ngModel]="ownerOf(p)" (ngModelChange)="setOwner(p.id, $event)">
+        <option *ngFor="let o of OWNERS" [value]="o">{{ o }}</option>
+      </select>
+    </div>
+
+    <div class="card">
+      <b>Notes</b>
+      <div class="small note-line" *ngFor="let n of allNotes(p)">{{ n }}</div>
+      <textarea style="margin-top:10px" placeholder="Add a note for the handover" [(ngModel)]="noteText"></textarea>
+      <div style="margin-top:8px"><button class="on" (click)="addNote(p.id)">Add note</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" [class.show]="toastShow">{{ toastMsg }}</div>
