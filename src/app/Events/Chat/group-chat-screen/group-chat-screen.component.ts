@@ -4015,7 +4015,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   openCreate(): void {
     if (this.tab === 'channels') { this.openChannelCreate(); return; }
     this.createOpen = true;
-    this.cName = ''; this.cEventId = '';
+    this.cName = ''; this.cEventId = ''; this.cEventSearch = '';
     this.loadLinkEvents();
     this.cSearch = ''; this.cSelected = [];
     this.cImageFile = null; this.cImagePreview = null; this.createNameError = '';
@@ -4356,6 +4356,9 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
      free-text `linked_event` is removed whenever the link is saved. */
   editingEvent = false;
   eventDraftId = '';
+  /** Search boxes over the event list — Info's and the create dialog's (the app's picker has one too). */
+  eventSearch = '';
+  cEventSearch = '';
   /** Picker list: every event, newest first (the app's picker shows the same). Loaded on first use. */
   linkEvents: { id: string; name: string; dates: string }[] | null = null;
   private loadingLinkEvents = false;
@@ -4402,6 +4405,13 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     }
   }
 
+  /** Events whose name or dates contain the search, in list order. */
+  eventsMatching(q: string): { id: string; name: string; dates: string }[] {
+    const s = (q || '').trim().toLowerCase();
+    const all = this.linkEvents || [];
+    return s ? all.filter(e => e.name.toLowerCase().includes(s) || e.dates.toLowerCase().includes(s)) : all;
+  }
+
   /** "21 Aug – 24 Aug" this year, with the year otherwise — the app's msgShortDate. */
   private eventDates(x: any): string {
     const d = (v: any): Date | null => v?.toDate ? v.toDate() : null;
@@ -4416,10 +4426,11 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     if (!this.canEditChat || this.isChannel(this.active)) return;
     this.loadLinkEvents();
     this.eventDraftId = this.active?.eventId || '';
+    this.eventSearch = '';
     this.editingEvent = true;
   }
 
-  cancelEditEvent(): void { this.editingEvent = false; this.eventDraftId = ''; }
+  cancelEditEvent(): void { this.editingEvent = false; this.eventDraftId = ''; this.eventSearch = ''; }
 
   saveLinkedEvent(): void {
     const active = this.active;

@@ -1120,6 +1120,23 @@
   border-radius: 8px; border: 1px solid var(--border); background: var(--field); color: var(--t1); outline: none;
 }
 .wc-slide-rename textarea:focus { border-color: var(--blue-text); }
+/* Event picker — a search box over a scrolling list, like the app's Group settings sheet. */
+.wc-evpick { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; align-self: stretch; text-align: left; }
+.wc-evlist { max-height: 240px; overflow-y: auto; border: 1px solid var(--line3); border-radius: 10px; background: var(--field); }
+.wc-evrow {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: none;
+  border-bottom: 1px solid var(--line2); background: transparent; color: var(--ink); text-align: left; cursor: pointer;
+}
+.wc-evrow:last-child { border-bottom: none; }
+.wc-evrow:hover { background: var(--sunken); }
+.wc-evrow.on { background: var(--blue-tint2); }
+.wc-evrow mat-icon { font-size: 16px; width: 16px; height: 16px; color: var(--ink3); flex-shrink: 0; }
+.wc-evrow.on mat-icon { color: var(--blue-text); }
+.wc-evmain { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.wc-evname { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wc-evdates { font-size: 11.5px; color: var(--ink3); }
+.wc-evactions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+.wc-evactions .wc-primary-btn { height: 30px; padding: 0 14px; font-size: 14px; }
 .wc-slide-rename select {
   flex: 1; min-width: 0; height: 32px; padding: 0 8px; border-radius: 10px;
   border: 1px solid var(--line3); background: var(--field); color: var(--ink); font-size: 13px;

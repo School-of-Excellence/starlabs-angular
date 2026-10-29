@@ -889,13 +889,43 @@
                   (click)="startEditEvent()">
             <mat-icon>add</mat-icon> Add linked event
           </button>
-          <div class="wc-slide-rename" *ngIf="editingEvent">
-            <select data-testid="gcs-info-event-input" [(ngModel)]="eventDraftId" (keydown.escape)="cancelEditEvent()" [disabled]="!linkEvents">
-              <option value="">{{ linkEvents ? '— No linked event —' : 'Loading events…' }}</option>
-              <option *ngFor="let e of linkEvents || []; trackBy: trackById" [value]="e.id">{{ e.name }}{{ e.dates ? ' · ' + e.dates : '' }}</option>
-            </select>
-            <button data-testid="gcs-info-event-save" class="wc-icon-btn on" (click)="saveLinkedEvent()" matTooltip="Save"><mat-icon>check</mat-icon></button>
-            <button data-testid="gcs-info-event-cancel" class="wc-icon-btn" (click)="cancelEditEvent()" matTooltip="Cancel"><mat-icon>close</mat-icon></button>
+          <!-- Event picker: search + every event, newest first — the app's Group settings picker. -->
+          <div *ngIf="editingEvent" (keydown.escape)="cancelEditEvent()">
+          <div class="wc-evpick">
+            <div class="wc-search plain">
+              <mat-icon>search</mat-icon>
+              <input data-testid="gcs-info-event-search" [(ngModel)]="eventSearch" placeholder="Search events"/>
+              <button data-testid="gcs-info-event-search-clear" class="wc-search-clear" *ngIf="eventSearch" (click)="eventSearch = ''" matTooltip="Clear">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+            <div class="wc-evlist">
+              <div class="wc-note center" *ngIf="!linkEvents">Loading events…</div>
+              <button data-testid="gcs-info-event-none" type="button" class="wc-evrow" *ngIf="linkEvents && !eventSearch"
+                      [class.on]="!eventDraftId" (click)="eventDraftId = ''">
+                <mat-icon>event_busy</mat-icon>
+                <span class="wc-evmain"><span class="wc-evname">No linked event</span></span>
+                <mat-icon class="wc-evcheck" *ngIf="!eventDraftId">check</mat-icon>
+              </button>
+              <button data-testid="gcs-info-event-option" type="button" class="wc-evrow"
+                      *ngFor="let e of eventsMatching(eventSearch); trackBy: trackById"
+                      [class.on]="eventDraftId === e.id" (click)="eventDraftId = e.id">
+                <mat-icon>event</mat-icon>
+                <span class="wc-evmain">
+                  <span class="wc-evname">{{ e.name }}</span>
+                  <span class="wc-evdates" *ngIf="e.dates">{{ e.dates }}</span>
+                </span>
+                <mat-icon class="wc-evcheck" *ngIf="eventDraftId === e.id">check</mat-icon>
+              </button>
+              <div class="wc-note center" *ngIf="linkEvents && eventSearch && !eventsMatching(eventSearch).length">
+                Nothing matches “{{ eventSearch }}”
+              </div>
+            </div>
+            <div class="wc-evactions">
+              <button data-testid="gcs-info-event-cancel" class="wc-ghost-btn" (click)="cancelEditEvent()">Cancel</button>
+              <button data-testid="gcs-info-event-save" class="wc-primary-btn" (click)="saveLinkedEvent()">Save</button>
+            </div>
+          </div>
           </div>
           <div class="wc-kv">
             <mat-icon>account_circle</mat-icon>
@@ -1400,10 +1430,37 @@
         <!-- The app's `linked_event_ref`: an event from `event collection`, newest first. Editable later from Info. -->
         <div class="wc-field" *ngIf="isGroupCreate">
           <label>Linked event (optional)</label>
-          <select data-testid="gcs-create-event" [(ngModel)]="cEventId" [disabled]="!linkEvents">
-            <option value="">{{ linkEvents ? '— No linked event —' : 'Loading events…' }}</option>
-            <option *ngFor="let e of linkEvents || []; trackBy: trackById" [value]="e.id">{{ e.name }}{{ e.dates ? ' · ' + e.dates : '' }}</option>
-          </select>
+          <div class="wc-evpick">
+            <div class="wc-search plain">
+              <mat-icon>search</mat-icon>
+              <input data-testid="gcs-create-event-search" [(ngModel)]="cEventSearch" placeholder="Search events"/>
+              <button data-testid="gcs-create-event-search-clear" class="wc-search-clear" *ngIf="cEventSearch" (click)="cEventSearch = ''" matTooltip="Clear">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+            <div class="wc-evlist">
+              <div class="wc-note center" *ngIf="!linkEvents">Loading events…</div>
+              <button data-testid="gcs-create-event-none" type="button" class="wc-evrow" *ngIf="linkEvents && !cEventSearch"
+                      [class.on]="!cEventId" (click)="cEventId = ''">
+                <mat-icon>event_busy</mat-icon>
+                <span class="wc-evmain"><span class="wc-evname">No linked event</span></span>
+                <mat-icon class="wc-evcheck" *ngIf="!cEventId">check</mat-icon>
+              </button>
+              <button data-testid="gcs-create-event-option" type="button" class="wc-evrow"
+                      *ngFor="let e of eventsMatching(cEventSearch); trackBy: trackById"
+                      [class.on]="cEventId === e.id" (click)="cEventId = e.id">
+                <mat-icon>event</mat-icon>
+                <span class="wc-evmain">
+                  <span class="wc-evname">{{ e.name }}</span>
+                  <span class="wc-evdates" *ngIf="e.dates">{{ e.dates }}</span>
+                </span>
+                <mat-icon class="wc-evcheck" *ngIf="cEventId === e.id">check</mat-icon>
+              </button>
+              <div class="wc-note center" *ngIf="linkEvents && cEventSearch && !eventsMatching(cEventSearch).length">
+                Nothing matches “{{ cEventSearch }}”
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="wc-field" *ngIf="isGroupCreate">
