@@ -842,11 +842,13 @@
             </button>
           </div>
           <div class="wc-slide-rename" *ngIf="editingName">
-            <input data-testid="gcs-info-name-input" [(ngModel)]="nameDraft" (keydown.enter)="saveGroupName()" (keydown.escape)="cancelEditName()"
+            <input data-testid="gcs-info-name-input" [(ngModel)]="nameDraft" (ngModelChange)="nameError = ''"
+                   (keydown.enter)="saveGroupName()" (keydown.escape)="cancelEditName()"
                    placeholder="Group name" autofocus/>
             <button data-testid="gcs-info-name-save" class="wc-icon-btn on" (click)="saveGroupName()" matTooltip="Save"><mat-icon>check</mat-icon></button>
             <button data-testid="gcs-info-name-cancel" class="wc-icon-btn" (click)="cancelEditName()" matTooltip="Cancel"><mat-icon>close</mat-icon></button>
           </div>
+          <div class="wc-field-error" *ngIf="editingName && nameError">{{ nameError }}</div>
           <div class="wc-slide-desc" *ngIf="a.description && !editingDesc">
             {{ a.description }}
             <button data-testid="gcs-info-desc-edit" class="wc-slide-editbtn" *ngIf="canEditChat"
@@ -1376,7 +1378,8 @@
       <div class="wc-dialog-body">
         <div class="wc-field">
           <label>{{ isGroupCreate ? 'Group Name' : 'Channel Name' }} *</label>
-          <input data-testid="gcs-create-name" [(ngModel)]="cName" [placeholder]="isGroupCreate ? 'e.g. uP! Chennai Cohort' : 'e.g. A&amp;H Announcements'"/>
+          <input data-testid="gcs-create-name" [(ngModel)]="cName" (ngModelChange)="createNameError = ''" [placeholder]="isGroupCreate ? 'e.g. uP! Chennai Cohort' : 'e.g. A&amp;H Announcements'"/>
+          <div class="wc-field-error" *ngIf="createNameError">{{ createNameError }}</div>
         </div>
         <div class="wc-field">
           <label>Group picture</label>

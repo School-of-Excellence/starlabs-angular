@@ -29,7 +29,9 @@
 
 | 15 | uncommitted (on `feature-test`) | **Group settings like the app** (msgChatInfo.dart): groups now read/show/edit `description` (multi-line, max 300; cleared → field removed) and `linked_event` (free text, max 60; shown in info as "Linked event" and under the name in the thread header). Group management (`canManageGroupOf`) now = (`ahmember` OR `chatxadmin`) AND member — the app's `isTeam`; this also gives chatxadmin add/remove members, rename, picture, archive/restore. `canEditChat` is false for archived groups (rename, picture, description, event hidden), as the app hides Group settings on inactive groups; restore unaffected. `saveChannelDesc` → `saveDescription` (both kinds). New hooks `gcs-info-event-edit/-add/-input/-save/-cancel` | `.ts`, `.html`, `.css` | reverts with the rest |
 
-#1–#7, #9, #12, #13, #14 and #15 live in the same component files; reverting one alone means hand-editing. #8, #10, #11 are other repos.
+| 16 | uncommitted (on `feature-test`) | **Unique group names, case kept.** Create and rename (groups only) refuse a name another chat already uses — every `supportchat` doc, any type, active or archived, except the one being renamed — compared ignoring case and repeated spaces; "Another chat already has this name." shows under the field and the field stays open. Names are saved as typed (operator: NOT lowercased like the app). Case-insensitive because the app stores lowercase: "Test 123" must clash with the app's "test 123". starlabs-test already holds 7 clashing names (e.g. 8 groups called "test"); existing ones are left alone, only new creates/renames are checked | `.ts`, `.html`, `.css` | reverts with the rest |
+
+#1–#7, #9, #12–#16 live in the same component files; reverting one alone means hand-editing. #8, #10, #11 are other repos.
 
 ## Announcements — why it matches Flutter exactly
 Flutter (`harish-development`, `lib/Messages/msgThread.dart` `_sendDraft`) writes `announcement: true` on the

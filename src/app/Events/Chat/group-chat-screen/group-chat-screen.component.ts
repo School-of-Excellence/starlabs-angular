@@ -4011,7 +4011,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     this.createOpen = true;
     this.cName = ''; this.cEventId = '';
     this.cSearch = ''; this.cSelected = [];
-    this.cImageFile = null; this.cImagePreview = null;
+    this.cImageFile = null; this.cImagePreview = null; this.createNameError = '';
     this.importReport = null;
   }
 
@@ -4249,14 +4249,50 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     this.editingName = true;
   }
 
-  cancelEditName(): void { this.editingName = false; this.nameDraft = ''; }
+  cancelEditName(): void { this.editingName = false; this.nameDraft = ''; this.nameError = ''; }
 
-  saveGroupName(): void {
+  /** Shown under the name field when the name is already used by another chat. */
+  nameError = '';
+  createNameError = '';
+  private checkingName = false;
+
+  /**
+   * Group names must be unique, as in the app (msgChatInfo `_save`, which checks every `supportchat`
+   * doc). The web keeps the name's case as typed (operator, 2026-10-29), so the comparison ignores
+   * case and repeated spaces — otherwise "Test 123" here and the app's lower-case "test 123" would both
+   * exist. Every chat counts, active or archived, group or channel, except the one being renamed.
+   * Reads the whole collection: only on create/rename, and supportchat is a few hundred small docs.
+   */
+  private async groupNameTaken(name: string, exceptId?: string): Promise<boolean> {
+    const key = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase();
+    const want = key(name);
+    const snap = await getDocs(this.supportchat);
+    return snap.docs.some(d => d.id !== exceptId && key(`${d.data()['group_name'] ?? ''}`) === want);
+  }
+
+  async saveGroupName(): Promise<void> {
     const active = this.active;
     const name = this.nameDraft.trim();
+    this.nameError = '';
     if (!active || !name || name === active.name) { this.cancelEditName(); return; }
-    this.editingName = false;
     const isChan = this.isChannel(active);
+    if (this.isLive(active) && !isChan) {
+      if (this.checkingName) return;
+      this.checkingName = true;
+      try {
+        if (await this.groupNameTaken(name, active.id)) {
+          this.nameError = 'Another chat already has this name.';
+          return;                                   // stay in the field so the name can be changed
+        }
+      } catch (e) {
+        console.error('group name check', e);
+        this.nameError = 'Couldn’t check the name. Try again.';
+        return;
+      } finally {
+        this.checkingName = false;
+      }
+    }
+    this.editingName = false;
     if (this.isLive(active)) {
       // Channels have no listener, so the local copy is updated too or the change would not show.
       updateDoc(active._ref, { group_name: name })
@@ -4436,6 +4472,19 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     if (members.length < 2) { this.notify('Select at least 2 members to create a group'); return; }
 
     this.cSaving = true;
+    this.createNameError = '';
+    try {
+      if (await this.groupNameTaken(this.cName)) {
+        this.createNameError = 'Another chat already has this name.';
+        this.cSaving = false;
+        return;
+      }
+    } catch (e) {
+      console.error('group name check', e);
+      this.createNameError = 'Couldn’t check the name. Try again.';
+      this.cSaving = false;
+      return;
+    }
     const docId = doc(collection(this.firestore, 'temp')).id;
     try {
       // Same Storage path shape chat-screen's buildGroup uses, so both screens read one picture.

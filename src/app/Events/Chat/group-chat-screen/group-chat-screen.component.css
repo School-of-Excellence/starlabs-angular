@@ -1109,6 +1109,8 @@
 .wc-kv-label { font-size: 10px; font-weight: 700; color: var(--t3); text-transform: uppercase; letter-spacing: 0.3px; }
 .wc-kv-value { font-size: 12px; font-weight: 600; color: var(--t1); }
 .wc-kv .grow { flex: 1; min-width: 0; }
+/* "Another chat already has this name." — under the rename and create name fields. */
+.wc-field-error { margin-top: 5px; font-size: 12px; font-weight: 600; color: var(--red); text-align: left; }
 /* A group description keeps the author's line breaks (the app shows it as written). */
 .wc-slide-desc { white-space: pre-line; text-align: center; }
 /* Description editing is several lines, like the app's Group settings sheet. */
