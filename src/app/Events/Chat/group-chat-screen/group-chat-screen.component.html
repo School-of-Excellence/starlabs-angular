@@ -364,62 +364,69 @@
             </div>
 
             <ng-template #chatMessage>
-            <!-- Announcement -->
+            <!-- Announcement — the app's MsgAnnouncementCard (msgBubble.dart): a blue card with a gold megaphone
+                 disc on its top edge, "ANNOUNCEMENT", the words bold and centred, sender · time underneath,
+                 reactions hugging the bottom edge. Actions come from a hover strip, the web's long-press. -->
             <div class="wc-ann-wrap" *ngIf="m.kind === 'announcement'; else normalBubble"
-                 [id]="'msg-' + m.id" (dblclick)="onBubbleDblClick(m)">
-              <div class="wc-ann" [class.deleted]="m._deleted">
-                <div class="wc-ann-head">
-                  <mat-icon>campaign</mat-icon>
-                  <span class="wc-ann-label">Announcement</span>
-                  <mat-icon class="wc-ann-pin" *ngIf="m.pinned">push_pin</mat-icon>
-                  <span class="wc-ann-time">{{ clockTime(m.at) }}</span>
-                </div>
-                <div class="wc-deleted-note" *ngIf="m._deleted">
-                  <mat-icon>delete_outline</mat-icon> {{ m._deleted }}
-                </div>
-                <div class="wc-ann-body">
-                  <ng-container *ngTemplateOutlet="richBody; context: { $implicit: parsedOf(m).blocks, light: false }"></ng-container>
-                </div>
-                <div class="wc-ann-ctas" *ngIf="ctasOf(m).length">
-                  <a data-testid="gcs-ann-cta" *ngFor="let c of ctasOf(m); trackBy: trackByIndex" [href]="c.href" target="_blank"
-                     rel="noreferrer" [title]="c.href" (click)="$event.stopPropagation()">
-                    <mat-icon>open_in_new</mat-icon> {{ c.label }}
-                  </a>
-                </div>
-                <div class="wc-ann-foot">
-                  <span class="wc-avatar xs" [style.background]="avatarBg(m.senderName)">
-                    <img *ngIf="photoOf(m.senderName) as url" [src]="url" [alt]="m.senderName"/>
-                    <ng-container *ngIf="!photoOf(m.senderName)">{{ initials(m.senderName) }}</ng-container>
-                  </span>
-                  <span class="wc-ann-sender">{{ senderLabel(m) }}</span>
-                  <div class="wc-reactions" *ngIf="reactionEntries(m).length">
-                    <button data-testid="gcs-ann-reaction" *ngFor="let r of reactionEntries(m); trackBy: trackByIndex" class="wc-chip"
-                            [class.mine]="r.mine" [class.static]="!features.react" [title]="r.users.join(', ')"
-                            (click)="toggleReaction(m.id, r.emoji)">
-                      <span>{{ r.emoji }}</span><ng-container *ngIf="r.users.length > 1">{{ r.users.length }}</ng-container>
+                 [id]="'msg-' + m.id" (dblclick)="onBubbleDblClick(m)"
+                 (mouseenter)="hoverId = m.id" (mouseleave)="hoverId = null; pickerId = null">
+              <div class="wc-ann-col">
+                <div class="wc-ann" [class.deleted]="m._deleted">
+                  <div class="wc-ann-disc" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+                         stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M4 10v4h3l7 4V6L7 10z"/><path d="M17 9a4 4 0 010 6"/>
+                    </svg>
+                  </div>
+
+                  <div class="wc-hover ann" *ngIf="hoverId === m.id && !selectMode && !m._deleted">
+                    <button data-testid="gcs-ann-react" *ngIf="features.react" [class.on]="pickerId === m.id" matTooltip="React"
+                            (click)="pickerId = pickerId === m.id ? null : m.id">
+                      <mat-icon>add_reaction</mat-icon>
+                    </button>
+                    <button data-testid="gcs-ann-info" *ngIf="m.from === 'team' && features.info" matTooltip="Message info" (click)="openMessageInfo(m)">
+                      <mat-icon>info</mat-icon>
+                    </button>
+                    <button data-testid="gcs-ann-edit" *ngIf="!viewOnly && !features.readOnly && m.from === 'team'" matTooltip="Edit"
+                            (click)="handleMenuAction('edit', m)">
+                      <mat-icon>edit</mat-icon>
+                    </button>
+                    <button data-testid="gcs-ann-pin" *ngIf="!viewOnly && !features.readOnly" [class.on]="m.pinned" [matTooltip]="m.pinned ? 'Unpin' : 'Pin'" (click)="togglePin(m)">
+                      <mat-icon>push_pin</mat-icon>
+                    </button>
+                    <button data-testid="gcs-ann-delete" *ngIf="!viewOnly && !features.readOnly" class="danger" matTooltip="Delete" (click)="confirmDelete = { msgs: [m] }">
+                      <mat-icon>delete_outline</mat-icon>
                     </button>
                   </div>
+                  <div class="wc-picker ann" *ngIf="pickerId === m.id">
+                    <button data-testid="gcs-ann-picker-emoji" *ngFor="let e of QUICK_EMOJIS; trackBy: trackByIndex" (click)="toggleReaction(m.id, e)">{{ e }}</button>
+                  </div>
+
+                  <div class="wc-ann-label">ANNOUNCEMENT</div>
+                  <div class="wc-ann-deleted" *ngIf="m._deleted">{{ m._deleted }}</div>
+                  <div class="wc-ann-body">
+                    <ng-container *ngTemplateOutlet="richBody; context: { $implicit: parsedOf(m).blocks, light: false }"></ng-container>
+                  </div>
+                  <div class="wc-ann-ctas" *ngIf="ctasOf(m).length">
+                    <a data-testid="gcs-ann-cta" *ngFor="let c of ctasOf(m); trackBy: trackByIndex" [href]="c.href" target="_blank"
+                       rel="noreferrer" [title]="c.href" (click)="$event.stopPropagation()">
+                      <mat-icon>open_in_new</mat-icon> {{ c.label }}
+                    </a>
+                  </div>
+                  <div class="wc-ann-foot">
+                    <span class="wc-ann-sender">{{ senderLabel(m) }}</span>
+                    <span class="wc-ann-dot">·</span>
+                    <span>{{ clockTime(m.at) }}</span>
+                    <mat-icon class="wc-ann-pin" *ngIf="m.pinned" matTooltip="Pinned">push_pin</mat-icon>
+                    <mat-icon class="wc-ann-edited" *ngIf="m.edited" matTooltip="Edited">edit</mat-icon>
+                  </div>
                 </div>
-                <div class="wc-picker ann" *ngIf="pickerId === m.id">
-                  <button data-testid="gcs-ann-picker-emoji" *ngFor="let e of QUICK_EMOJIS; trackBy: trackByIndex" (click)="toggleReaction(m.id, e)">{{ e }}</button>
-                </div>
-                <div class="wc-ann-actions" *ngIf="!selectMode && !m._deleted">
-                  <button data-testid="gcs-ann-react" *ngIf="features.react" [class.on]="pickerId === m.id" matTooltip="React"
-                          (click)="pickerId = pickerId === m.id ? null : m.id">
-                    <mat-icon>add_reaction</mat-icon>
-                  </button>
-                  <button data-testid="gcs-ann-info" *ngIf="m.from === 'team' && features.info" matTooltip="Message info" (click)="openMessageInfo(m)">
-                    <mat-icon>info</mat-icon>
-                  </button>
-                  <button data-testid="gcs-ann-edit" *ngIf="!viewOnly && !features.readOnly && m.from === 'team'" matTooltip="Edit"
-                          (click)="handleMenuAction('edit', m)">
-                    <mat-icon>edit</mat-icon>
-                  </button>
-                  <button data-testid="gcs-ann-pin" *ngIf="!viewOnly && !features.readOnly" [class.on]="m.pinned" [matTooltip]="m.pinned ? 'Unpin' : 'Pin'" (click)="togglePin(m)">
-                    <mat-icon>push_pin</mat-icon>
-                  </button>
-                  <button data-testid="gcs-ann-delete" *ngIf="!viewOnly && !features.readOnly" class="danger" matTooltip="Delete" (click)="confirmDelete = { msgs: [m] }">
-                    <mat-icon>delete_outline</mat-icon>
+
+                <div class="wc-reactions ann" *ngIf="reactionEntries(m).length">
+                  <button data-testid="gcs-ann-reaction" *ngFor="let r of reactionEntries(m); trackBy: trackByIndex" class="wc-chip"
+                          [class.mine]="r.mine" [class.static]="!features.react" [title]="r.users.join(', ')"
+                          (click)="toggleReaction(m.id, r.emoji)">
+                    <span>{{ r.emoji }}</span><ng-container *ngIf="r.users.length > 1">{{ r.users.length }}</ng-container>
                   </button>
                 </div>
               </div>
@@ -842,20 +849,21 @@
           </div>
           <div class="wc-slide-desc" *ngIf="a.description && !editingDesc">
             {{ a.description }}
-            <button data-testid="gcs-info-desc-edit" class="wc-slide-editbtn" *ngIf="isChannel(a) && canManageChannel"
+            <button data-testid="gcs-info-desc-edit" class="wc-slide-editbtn" *ngIf="canEditChat"
                     (click)="startEditDesc()" matTooltip="Edit description">
               <mat-icon>edit</mat-icon>
             </button>
           </div>
           <!-- With no description yet there is nothing to hang an edit button off, so offer one -->
-          <button data-testid="gcs-info-desc-add" class="wc-slide-adddesc" *ngIf="isChannel(a) && !a.description && !editingDesc && canManageChannel"
+          <button data-testid="gcs-info-desc-add" class="wc-slide-adddesc" *ngIf="!a.description && !editingDesc && canEditChat"
                   (click)="startEditDesc()">
-            <mat-icon>add</mat-icon> Add a description
+            <mat-icon>add</mat-icon> {{ isChannel(a) ? 'Add a description' : 'Add group description' }}
           </button>
-          <div class="wc-slide-rename" *ngIf="editingDesc">
-            <input data-testid="gcs-info-desc-input" [(ngModel)]="descDraft" (keydown.enter)="saveChannelDesc()" (keydown.escape)="cancelEditDesc()"
-                   placeholder="Channel description"/>
-            <button data-testid="gcs-info-desc-save" class="wc-icon-btn on" (click)="saveChannelDesc()" matTooltip="Save"><mat-icon>check</mat-icon></button>
+          <!-- Several lines, as in the app (Shift+Enter or just Enter for a new line; ✓ saves). -->
+          <div class="wc-slide-rename desc" *ngIf="editingDesc">
+            <textarea data-testid="gcs-info-desc-input" [(ngModel)]="descDraft" (keydown.escape)="cancelEditDesc()" rows="4"
+                      [attr.maxlength]="DESC_MAX" [placeholder]="isChannel(a) ? 'What followers get here' : 'What this chat is for'"></textarea>
+            <button data-testid="gcs-info-desc-save" class="wc-icon-btn on" (click)="saveDescription()" matTooltip="Save"><mat-icon>check</mat-icon></button>
             <button data-testid="gcs-info-desc-cancel" class="wc-icon-btn" (click)="cancelEditDesc()" matTooltip="Cancel"><mat-icon>close</mat-icon></button>
           </div>
           <div class="wc-slide-meta" *ngIf="isChannel(a)">One-way broadcast channel</div>
@@ -863,12 +871,27 @@
 
         <!-- Provenance -->
         <div class="wc-block">
-          <div class="wc-kv" *ngIf="a.eventName">
+          <!-- Linked event — the app's `linked_event`, also shown under the chat name in the thread header. -->
+          <div class="wc-kv" *ngIf="a.eventName && !editingEvent">
             <mat-icon>event</mat-icon>
-            <div>
-              <div class="wc-kv-label">Created under event</div>
+            <div class="grow">
+              <div class="wc-kv-label">Linked event</div>
               <div class="wc-kv-value">{{ a.eventName }}</div>
             </div>
+            <button data-testid="gcs-info-event-edit" class="wc-slide-editbtn" *ngIf="canEditChat && !isChannel(a)"
+                    (click)="startEditEvent()" matTooltip="Edit linked event">
+              <mat-icon>edit</mat-icon>
+            </button>
+          </div>
+          <button data-testid="gcs-info-event-add" class="wc-slide-adddesc" *ngIf="!a.eventName && !editingEvent && canEditChat && !isChannel(a)"
+                  (click)="startEditEvent()">
+            <mat-icon>add</mat-icon> Add linked event
+          </button>
+          <div class="wc-slide-rename" *ngIf="editingEvent">
+            <input data-testid="gcs-info-event-input" [(ngModel)]="eventDraft" (keydown.enter)="saveLinkedEvent()" (keydown.escape)="cancelEditEvent()"
+                   [attr.maxlength]="EVENT_MAX" placeholder="uP! Marathon 12 · Session 4"/>
+            <button data-testid="gcs-info-event-save" class="wc-icon-btn on" (click)="saveLinkedEvent()" matTooltip="Save"><mat-icon>check</mat-icon></button>
+            <button data-testid="gcs-info-event-cancel" class="wc-icon-btn" (click)="cancelEditEvent()" matTooltip="Cancel"><mat-icon>close</mat-icon></button>
           </div>
           <div class="wc-kv">
             <mat-icon>account_circle</mat-icon>

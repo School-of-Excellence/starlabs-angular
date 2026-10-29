@@ -947,12 +947,13 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       id: d.id,
       name: data['group_name'] || 'Untitled group',
       photoUrl: this.imageUrl(data['group_profile']),
-      // No emoji/description/category field exists in supportchat — these stay UI-only defaults.
+      // `description` and `linked_event` are the app's Group settings fields (msgChatInfo.dart).
+      // No emoji/category field exists in supportchat — those stay UI-only defaults.
       emoji: '💬',
-      description: '',
+      description: `${data['description'] ?? ''}`.trim(),
       category: null,
       eventId: null,
-      eventName: null,
+      eventName: `${data['linked_event'] ?? ''}`.trim() || null,
       createdBy: this.nameOfUid(data['creator_uid']),
       members: uids.map(uid => ({ id: uid, name: this.nameOfUid(uid), journey: null })),
       messages: existing?.messages || [],
@@ -2081,7 +2082,8 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   canManageGroupOf(g?: ChatItem | null): boolean {
     if (!g || this.isChannel(g)) return false;
     if (!this.isLive(g)) return true;               // demo rows stay fully editable
-    return this.ahMember && this.isMine(g);
+    // The app's "team" (MessagesService.isTeam): `ahmember` OR `chatxadmin` — both manage the groups they are in.
+    return (this.ahMember || this.chatAdmin) && this.isMine(g);
   }
 
   get canManageGroup(): boolean { return this.canManageGroupOf(this.active); }
@@ -2156,7 +2158,8 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   /** One gate for the info panel, whichever kind of chat is open. */
   get canEditChat(): boolean {
-    return this.isChannel(this.active) ? this.canManageChannel : this.canManageGroup;
+    // An archived (inactive) group can't be edited, as in the app; restoring it is a separate action.
+    return this.isChannel(this.active) ? this.canManageChannel : (this.canManageGroup && !this.active?.archived);
   }
 
   /** A&H members post on behalf of the team. */
@@ -4272,23 +4275,60 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   editingDesc = false;
   descDraft = '';
 
+  /** The app's limits (Group settings sheet): description 300, linked event 60. */
+  readonly DESC_MAX = 300;
+  readonly EVENT_MAX = 60;
+
   startEditDesc(): void {
-    if (!this.canManageChannel) { this.notify('Only a channel admin can edit the description'); return; }
+    if (!this.canEditChat) {
+      this.notify(this.isChannel(this.active) ? 'Only a channel admin can edit the description'
+                                              : 'Only the A&H team in this group can edit the description');
+      return;
+    }
     this.descDraft = this.active?.description || '';
     this.editingDesc = true;
   }
 
   cancelEditDesc(): void { this.editingDesc = false; this.descDraft = ''; }
 
-  saveChannelDesc(): void {
+  /**
+   * Channels and groups share `description`. For a group, a cleared description is REMOVED, as the app
+   * does, so the old About Group screen still says "No Description Added".
+   */
+  saveDescription(): void {
     const active = this.active;
-    const desc = this.descDraft.trim();
+    const desc = this.descDraft.trim().slice(0, this.DESC_MAX);
     if (!active || desc === (active.description || '')) { this.cancelEditDesc(); return; }
     this.editingDesc = false;
     if (!this.isLive(active)) { this.sourceOf(active).description = desc; return; }
-    updateDoc(active._ref, { description: desc })
-      .then(() => { this.sourceOf(active).description = desc; this.notify('Description updated'); })
-      .catch(e => { console.error('channel description', e); this.notify('Error saving description'); });
+    const isChan = this.isChannel(active);
+    updateDoc(active._ref, { description: !desc && !isChan ? deleteField() : desc })
+      // Channels have no listener, so their local copy is updated by hand; groups stream it back.
+      .then(() => { if (isChan) this.sourceOf(active).description = desc; this.notify('Description updated'); })
+      .catch(e => { console.error('description', e); this.notify('Error saving description'); });
+  }
+
+  /* ── Linked event (groups) — the app's `linked_event`: free text, shown under the chat's name ── */
+  editingEvent = false;
+  eventDraft = '';
+
+  startEditEvent(): void {
+    if (!this.canEditChat || this.isChannel(this.active)) return;
+    this.eventDraft = this.active?.eventName || '';
+    this.editingEvent = true;
+  }
+
+  cancelEditEvent(): void { this.editingEvent = false; this.eventDraft = ''; }
+
+  saveLinkedEvent(): void {
+    const active = this.active;
+    const event = this.eventDraft.trim().slice(0, this.EVENT_MAX);
+    if (!active || event === (active.eventName || '')) { this.cancelEditEvent(); return; }
+    this.editingEvent = false;
+    if (!this.isLive(active)) { this.sourceOf(active).eventName = event || null; return; }
+    updateDoc(active._ref, { linked_event: event || deleteField() })
+      .then(() => this.notify(event ? 'Linked event updated' : 'Linked event removed'))
+      .catch(e => { console.error('linked event', e); this.notify('Error saving linked event'); });
   }
 
   /** Admin picker — the same directory the audience picker uses, keyed by profile doc id. */

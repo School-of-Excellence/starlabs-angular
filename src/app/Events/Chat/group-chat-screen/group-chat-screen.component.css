@@ -353,7 +353,7 @@
 .wc-danger-btn.full { width: 100%; height: 36px; border-radius: 9px; font-size: 12.5px; gap: 7px; }
 
 /* ── Messages ──────────────────────────────────────────────────────── */
-.wc-messages { flex: 1; overflow-y: auto; overflow-x: clip; padding: 16px 24px; display: flex; flex-direction: column; gap: 0; background: var(--canvas); }
+.wc-messages { flex: 1; overflow-y: auto; overflow-x: clip; padding: 16px 24px; display: flex; flex-direction: column; gap: 0; background-color: var(--chat-wall); background-image: var(--chat-doodle); background-repeat: repeat; background-size: 240px 240px; }
 /* Day separator — sticks to the top of the thread while that day is on screen. */
 .wc-day { position: sticky; top: 0; z-index: 3; align-self: center; padding: 2px 0 4px; }
 .wc-day span {
@@ -523,22 +523,67 @@
 .wc-slide-desc .wc-slide-editbtn { flex-shrink: 0; }
 
 /* Announcement */
-.wc-ann-wrap { display: flex; justify-content: center; padding: 4px 0; }
-.wc-ann { position: relative; width: 100%; max-width: 520px; background: var(--amber-tint2); border: 1.5px solid var(--amber-line); border-radius: 12px; padding: 12px 16px; box-shadow: 0 2px 10px rgba(217,119,6,0.10); }
-.wc-ann-head { display: flex; align-items: center; gap: 6px; margin-bottom: 7px; }
-.wc-ann-head mat-icon { color: var(--amber-text); font-size: 12px; width: 12px; height: 12px; }
-.wc-ann-label { font-size: 10px; font-weight: 800; color: var(--amber-text); text-transform: uppercase; letter-spacing: 0.6px; flex: 1; }
-.wc-ann-time { font-size: 10px; color: var(--amber-meta); }
-.wc-ann-body { font-size: 13.5px; line-height: 1.6; color: var(--ink); text-align: center; }
-.wc-ann-ctas { margin: 10px -16px -12px; }
-.wc-ann-ctas a { display: flex; align-items: center; justify-content: center; gap: 7px; padding: 10px 12px; text-decoration: none; font-size: 13px; font-weight: 700; color: var(--amber-meta); border-top: 1px solid var(--amber-line); }
-.wc-ann-foot { display: flex; align-items: center; gap: 7px; margin-top: 9px; justify-content: center; }
-.wc-ann-sender { font-size: 10px; color: var(--amber-meta); font-weight: 700; }
-.wc-ann-actions { display: flex; justify-content: center; gap: 5px; margin-top: 8px; }
-.wc-ann-actions button { width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--amber-line); background: var(--field); display: flex; align-items: center; justify-content: center; color: var(--amber-text); }
-.wc-ann-actions button.on { background: var(--amber-tint); }
-.wc-ann-actions button.danger { border-color: var(--red-line); color: var(--red-fill); }
-.wc-ann-actions mat-icon { font-size: 12px; width: 12px; height: 12px; }
+/* Announcement — the app's MsgAnnouncementCard (msgBubble.dart, colours from messagesTheme.dart):
+   blue #155E89 card, radius 24, a 46px gold #F4B63F megaphone disc centred on its top edge in a ring of
+   the chat wall (so it looks cut into the background), "ANNOUNCEMENT" in gold, bold centred white words,
+   sender · time in 75% white. Deleted ones (team only) turn slate #637280 with a pale disc. Same in both
+   themes: the card carries its own colours, only the ring follows the wall. */
+.wc-ann-wrap { display: flex; justify-content: center; padding: 12px 16px 6px; }
+.wc-ann-col { width: 100%; max-width: 440px; display: flex; flex-direction: column; }
+.wc-ann {
+  --ann-fill: #155E89; --ann-gold: #F4B63F;
+  position: relative; margin-top: 23px; padding: 37px 22px 12px; border-radius: 24px;
+  background: var(--ann-fill); color: #fff; text-align: center;
+  box-shadow: 0 6px 18px rgba(0,0,0,.15);
+}
+.wc-ann.deleted { --ann-fill: #637280; --ann-gold: #DEE6EC; }
+.wc-ann-disc {
+  position: absolute; top: -27px; left: 50%; transform: translateX(-50%);
+  width: 46px; height: 46px; border-radius: 50%; border: 4px solid var(--chat-wall);
+  background: var(--ann-gold); color: #16232E; display: flex; align-items: center; justify-content: center;
+}
+.wc-ann.deleted .wc-ann-disc { color: #637280; }
+.wc-ann-disc svg { width: 21px; height: 21px; }
+.wc-ann-label { font-size: 11.5px; font-weight: 700; letter-spacing: 2.2px; color: var(--ann-gold); }
+.wc-ann-deleted { margin-top: 6px; font-size: 11.5px; font-weight: 600; font-style: italic; color: rgba(255,255,255,.85); }
+.wc-ann-body { margin-top: 8px; font-size: 16px; line-height: 1.4; font-weight: 700; color: #fff; }
+.wc-ann.deleted .wc-ann-body { opacity: .7; }
+/* Mentions and links inside the blue card read as white (the app's onAccent). */
+.wc-ann .wc-inline-link { color: #fff; text-decoration: underline; }
+.wc-ann .wc-mention-tag { color: #fff; background: rgba(255,255,255,.18); }
+.wc-ann-ctas { margin: 10px -22px 0; }
+.wc-ann-ctas a {
+  display: flex; align-items: center; justify-content: center; gap: 7px; padding: 10px 12px;
+  text-decoration: none; font-size: 13px; font-weight: 700; color: #fff; border-top: 1px solid rgba(255,255,255,.22);
+}
+.wc-ann-ctas a:hover { background: rgba(255,255,255,.08); }
+.wc-ann-ctas mat-icon { font-size: 15px; width: 15px; height: 15px; }
+.wc-ann-foot {
+  margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 5px;
+  font-size: 11px; color: rgba(255,255,255,.75);
+}
+.wc-ann-sender { font-weight: 600; max-width: 70%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wc-ann-dot { padding: 0 2px; }
+.wc-ann-foot mat-icon { font-size: 12px; width: 12px; height: 12px; }
+/* Reactions hug the card's bottom edge, 16px in from the left (the app's MsgPullUp by 12). */
+.wc-reactions.ann { margin: -12px 0 0 16px; position: relative; z-index: 1; }
+/* Actions: the normal bubble's hover strip, on the card's top-right corner, clear of the disc. */
+.wc-hover.ann { bottom: auto; top: -16px; right: 14px; left: auto; }
+.wc-picker.ann { top: -60px; bottom: auto; right: 14px; left: auto; transform: none; }
+
+/* Chat background — the app's MsgChatWallpaper (msgMedia.dart): the #EBEFF2 wall with a fixed doodle of
+   the app's own line icons. The 240px tile below is generated from the app's code — same icons, same
+   seeded jitter (Random(11)), stroke 1.6 — so it is the same pattern, not a look-alike. It stays put
+   while the messages scroll, as in the app. Dark theme: the same tile in faint white on the dark ground. */
+:host {
+  --chat-wall: #EBEFF2;
+  --chat-doodle: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22240%22 height=%22240%22 viewBox=%220 0 240 240%22%3E%3Cg fill=%22none%22 stroke=%22%2316232E%22 stroke-opacity=%220.078%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cg transform=%22translate%2810.46 15.99%29 rotate%28-19.78 10.38 10.38%29 scale%280.8653%29%22 stroke-width=%221.6%22%3E%3Cpath d=%22M7.9 20A9 9 0 104 16.1L2 22z%22/%3E%3Cpath d=%22M8 12h.01M12 12h.01M16 12h.01%22/%3E%3C/g%3E%3Cg transform=%22translate%2853.35 25.70%29 rotate%283.75 9.00 9.00%29 scale%280.7499%29%22 stroke-width=%221.6%22%3E%3Cpath d=%22M6 16v-5a6 6 0 0112 0v5l1.5 2h-15z%22/%3E%3Cpath d=%22M10 20.5a2 2 0 004 0%22/%3E%3C/g%3E%3Cg transform=%22translate%28108.20 3.36%29 rotate%2831.05 11.20 11.20%29 scale%280.9334%29%22 stroke-width=%221.6%22%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%229%22/%3E%3Cpath d=%22M12 7v5.5l3.5 2%22/%3E%3C/g%3E%3Cg transform=%22translate%28163.45 15.40%29 rotate%288.55 8.85 8.85%29 scale%280.7376%29%22 stroke-width=%221.6%22%3E%3Crect x=%223%22 y=%225%22 width=%2218%22 height=%2214%22 rx=%223%22/%3E%3Cpath d=%22M10 9l5 3-5 3z%22/%3E%3C/g%3E%3Cg transform=%22translate%28210.56 27.17%29 rotate%287.80 8.78 8.78%29 scale%280.7320%29%22 stroke-width=%221.6%22%3E%3Crect x=%223%22 y=%228%22 width=%2218%22 height=%224%22 rx=%221%22/%3E%3Cpath d=%22M5 12v9h14v-9M12 8v13M12 8S10.5 3 8 4s0 4 4 4zM12 8s1.5-5 4-4 0 4-4 4z%22/%3E%3C/g%3E%3Cg transform=%22translate%2816.46 77.41%29 rotate%2828.55 8.98 8.98%29 scale%280.7482%29%22 stroke-width=%221.6%22%3E%3Cpath d=%22M12 21s-7-6.2-7-11.5a7 7 0 0114 0C19 14.8 12 21 12 21z%22/%3E%3Ccircle cx=%2212%22 cy=%229.5%22 r=%222.5%22/%3E%3C/g%3E%3Cg transform=%22translate%2848.14 52.26%29 rotate%28-25.71 9.91 9.91%29 scale%280.8260%29%22 stroke-width=%221.6%22%3E%3Crect x=%222%22 y=%225%22 width=%2214%22 height=%2214%22 rx=%223%22/%3E%3Cpath d=%22M16 10l6-3.5v11L16 14%22/%3E%3C/g%3E%3Cg transform=%22translate%28115.07 59.21%29 rotate%28-18.76 11.87 11.87%29 scale%280.9890%29%22 stroke-width=%221.6%22%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%228.5%22/%3E%3Cpath d=%22M12 7.3v9.4M14.4 9.2c0-1-1.1-1.9-2.4-1.9s-2.4.8-2.4 1.8c0 2.4 4.8 1.4 4.8 3.8 0 1-1.1 1.8-2.4 1.8s-2.4-.8-2.4-1.9%22/%3E%3C/g%3E%3Cg transform=%22translate%28152.35 64.52%29 rotate%2811.24 11.90 11.90%29 scale%280.9918%29%22 stroke-width=%221.6%22%3E%3Crect x=%229%22 y=%223%22 width=%226%22 height=%2211%22 rx=%223%22/%3E%3Cpath d=%22M5.5 11a6.5 6.5 0 0013 0M12 17.5V21%22/%3E%3C/g%3E%3Cg transform=%22translate%28214.03 51.22%29 rotate%2816.60 9.32 9.32%29 scale%280.7763%29%22 stroke-width=%221.6%22%3E%3Crect x=%227%22 y=%222.8%22 width=%2210%22 height=%2218.4%22 rx=%222.4%22/%3E%3Cpath d=%22M10.5 18h3%22/%3E%3C/g%3E%3Cg transform=%22translate%2825.57 99.05%29 rotate%28-23.38 10.65 10.65%29 scale%280.8876%29%22 stroke-width=%221.6%22%3E%3Ccircle cx=%229%22 cy=%228%22 r=%223%22/%3E%3Ccircle cx=%2217%22 cy=%229%22 r=%222.5%22/%3E%3Cpath d=%22M3 19a6 6 0 0112 0M15 19a5 5 0 016-4%22/%3E%3C/g%3E%3Cg transform=%22translate%2871.71 116.63%29 rotate%282.27 9.96 9.96%29 scale%280.8301%29%22 stroke-width=%221.6%22%3E%3Cpath d=%22M12 3l2.8 5.8 6.2.9-4.5 4.4 1 6.2L12 17.4 6.5 20.3l1-6.2L3 9.7l6.2-.9z%22/%3E%3C/g%3E%3Cg transform=%22translate%2897.30 105.13%29 rotate%28-27.09 8.51 8.51%29 scale%280.7095%29%22 stroke-width=%221.6%22%3E%3Cpath d=%22M9 3h6l-1 6 4 4H6l4-4z%22/%3E%3Cpath d=%22M12 13v8%22/%3E%3C/g%3E%3Cg transform=%22translate%28155.51 101.97%29 rotate%28-24.19 11.18 11.18%29 scale%280.9320%29%22 stroke-width=%221.6%22%3E%3Cpath d=%22M4 10v4h3l7 4V6L7 10z%22/%3E%3Cpath d=%22M17 9a4 4 0 010 6%22/%3E%3C/g%3E%3Cg transform=%22translate%28213.04 98.59%29 rotate%28-26.29 11.51 11.51%29 scale%280.9593%29%22 stroke-width=%221.6%22%3E%3Cpath d=%22M20 11.5l-7.8 7.8a5 5 0 01-7.1-7.1L13 4.3a3.3 3.3 0 014.7 4.7l-7.9 7.9a1.7 1.7 0 01-2.4-2.4l7.3-7.3%22/%3E%3C/g%3E%3Cg transform=%22translate%2811.71 149.46%29 rotate%28-14.06 10.91 10.91%29 scale%280.9089%29%22 stroke-width=%221.6%22%3E%3Cpath d=%22M4 8a2 2 0 012-2h2l1.5-2h5L16 6h2a2 2 0 012 2v9a2 2 0 01-2 2H6a2 2 0 01-2-2z%22/%3E%3Ccircle cx=%2212%22 cy=%2212.5%22 r=%223.2%22/%3E%3C/g%3E%3Cg transform=%22translate%2863.51 163.12%29 rotate%2829.47 11.23 11.23%29 scale%280.9358%29%22 stroke-width=%221.6%22%3E%3Cpath d=%22M4 14v-2a8 8 0 0116 0v2%22/%3E%3Crect x=%223%22 y=%2213%22 width=%224%22 height=%227%22 rx=%222%22/%3E%3Crect x=%2217%22 y=%2213%22 width=%224%22 height=%227%22 rx=%222%22/%3E%3C/g%3E%3Cg transform=%22translate%28118.04 161.39%29 rotate%28-18.23 10.89 10.89%29 scale%280.9071%29%22 stroke-width=%221.6%22%3E%3Cpath d=%22M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1%22/%3E%3Cpath d=%22M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1%22/%3E%3C/g%3E%3Cg transform=%22translate%28144.77 157.85%29 rotate%28-7.28 11.66 11.66%29 scale%280.9716%29%22 stroke-width=%221.6%22%3E%3Cpath d=%22M12 20s-7-4.4-7-9.3A4.2 4.2 0 0112 8a4.2 4.2 0 017 2.7C19 15.6 12 20 12 20z%22/%3E%3C/g%3E%3Cg transform=%22translate%28199.56 155.86%29 rotate%28-0.27 11.23 11.23%29 scale%280.9360%29%22 stroke-width=%221.6%22%3E%3Crect x=%223%22 y=%225%22 width=%2218%22 height=%2214%22 rx=%222.5%22/%3E%3Ccircle cx=%229%22 cy=%2210%22 r=%221.6%22/%3E%3Cpath d=%22M21 16l-5-5-8 8%22/%3E%3C/g%3E%3Cg transform=%22translate%287.45 204.49%29 rotate%2830.80 9.13 9.13%29 scale%280.7607%29%22 stroke-width=%221.6%22%3E%3Cpath d=%22M4 12l16-8-6 16-2.5-6.5z%22/%3E%3Cpath d=%22M11.5 13.5L20 4%22/%3E%3C/g%3E%3Cg transform=%22translate%2860.35 197.36%29 rotate%28-7.78 8.59 8.59%29 scale%280.7160%29%22 stroke-width=%221.6%22%3E%3Cpath d=%22M5 21V4%22/%3E%3Cpath d=%22M5 4h11l-2 4 2 4H5%22/%3E%3C/g%3E%3Cg transform=%22translate%28111.66 215.91%29 rotate%289.91 8.80 8.80%29 scale%280.7336%29%22 stroke-width=%221.6%22%3E%3Crect x=%223%22 y=%225%22 width=%2218%22 height=%2216%22 rx=%223%22/%3E%3Cpath d=%22M3 10h18M8 3v4M16 3v4%22/%3E%3C/g%3E%3Cg transform=%22translate%28152.78 197.23%29 rotate%280.96 10.27 10.27%29 scale%280.8561%29%22 stroke-width=%221.6%22%3E%3Ccircle cx=%226%22 cy=%2219%22 r=%222.5%22/%3E%3Ccircle cx=%2218%22 cy=%225%22 r=%222.5%22/%3E%3Cpath d=%22M8.5 19H16a3.5 3.5 0 000-7H8a3.5 3.5 0 010-7h7.5%22/%3E%3C/g%3E%3Cg transform=%22translate%28201.79 219.45%29 rotate%28-22.95 8.92 8.92%29 scale%280.7436%29%22 stroke-width=%221.6%22%3E%3Cpath d=%22M13 2.5L4.5 14H11l-1.5 7.5L19.5 10h-7z%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+:host([data-theme="dark"]),
+:host-context(html[data-theme="dark"]) {
+  --chat-wall: #0B0C0F;
+  --chat-doodle: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22240%22 height=%22240%22 viewBox=%220 0 240 240%22%3E%3Cg fill=%22none%22 stroke=%22%23FFFFFF%22 stroke-opacity=%220.06%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cg transform=%22translate%2810.46 15.99%29 rotate%28-19.78 10.38 10.38%29 scale%280.8653%29%22 stroke-width=%221.6%22%3E%3Cpath d=%22M7.9 20A9 9 0 104 16.1L2 22z%22/%3E%3Cpath d=%22M8 12h.01M12 12h.01M16 12h.01%22/%3E%3C/g%3E%3Cg transform=%22translate%2853.35 25.70%29 rotate%283.75 9.00 9.00%29 scale%280.7499%29%22 stroke-width=%221.6%22%3E%3Cpath d=%22M6 16v-5a6 6 0 0112 0v5l1.5 2h-15z%22/%3E%3Cpath d=%22M10 20.5a2 2 0 004 0%22/%3E%3C/g%3E%3Cg transform=%22translate%28108.20 3.36%29 rotate%2831.05 11.20 11.20%29 scale%280.9334%29%22 stroke-width=%221.6%22%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%229%22/%3E%3Cpath d=%22M12 7v5.5l3.5 2%22/%3E%3C/g%3E%3Cg transform=%22translate%28163.45 15.40%29 rotate%288.55 8.85 8.85%29 scale%280.7376%29%22 stroke-width=%221.6%22%3E%3Crect x=%223%22 y=%225%22 width=%2218%22 height=%2214%22 rx=%223%22/%3E%3Cpath d=%22M10 9l5 3-5 3z%22/%3E%3C/g%3E%3Cg transform=%22translate%28210.56 27.17%29 rotate%287.80 8.78 8.78%29 scale%280.7320%29%22 stroke-width=%221.6%22%3E%3Crect x=%223%22 y=%228%22 width=%2218%22 height=%224%22 rx=%221%22/%3E%3Cpath d=%22M5 12v9h14v-9M12 8v13M12 8S10.5 3 8 4s0 4 4 4zM12 8s1.5-5 4-4 0 4-4 4z%22/%3E%3C/g%3E%3Cg transform=%22translate%2816.46 77.41%29 rotate%2828.55 8.98 8.98%29 scale%280.7482%29%22 stroke-width=%221.6%22%3E%3Cpath d=%22M12 21s-7-6.2-7-11.5a7 7 0 0114 0C19 14.8 12 21 12 21z%22/%3E%3Ccircle cx=%2212%22 cy=%229.5%22 r=%222.5%22/%3E%3C/g%3E%3Cg transform=%22translate%2848.14 52.26%29 rotate%28-25.71 9.91 9.91%29 scale%280.8260%29%22 stroke-width=%221.6%22%3E%3Crect x=%222%22 y=%225%22 width=%2214%22 height=%2214%22 rx=%223%22/%3E%3Cpath d=%22M16 10l6-3.5v11L16 14%22/%3E%3C/g%3E%3Cg transform=%22translate%28115.07 59.21%29 rotate%28-18.76 11.87 11.87%29 scale%280.9890%29%22 stroke-width=%221.6%22%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%228.5%22/%3E%3Cpath d=%22M12 7.3v9.4M14.4 9.2c0-1-1.1-1.9-2.4-1.9s-2.4.8-2.4 1.8c0 2.4 4.8 1.4 4.8 3.8 0 1-1.1 1.8-2.4 1.8s-2.4-.8-2.4-1.9%22/%3E%3C/g%3E%3Cg transform=%22translate%28152.35 64.52%29 rotate%2811.24 11.90 11.90%29 scale%280.9918%29%22 stroke-width=%221.6%22%3E%3Crect x=%229%22 y=%223%22 width=%226%22 height=%2211%22 rx=%223%22/%3E%3Cpath d=%22M5.5 11a6.5 6.5 0 0013 0M12 17.5V21%22/%3E%3C/g%3E%3Cg transform=%22translate%28214.03 51.22%29 rotate%2816.60 9.32 9.32%29 scale%280.7763%29%22 stroke-width=%221.6%22%3E%3Crect x=%227%22 y=%222.8%22 width=%2210%22 height=%2218.4%22 rx=%222.4%22/%3E%3Cpath d=%22M10.5 18h3%22/%3E%3C/g%3E%3Cg transform=%22translate%2825.57 99.05%29 rotate%28-23.38 10.65 10.65%29 scale%280.8876%29%22 stroke-width=%221.6%22%3E%3Ccircle cx=%229%22 cy=%228%22 r=%223%22/%3E%3Ccircle cx=%2217%22 cy=%229%22 r=%222.5%22/%3E%3Cpath d=%22M3 19a6 6 0 0112 0M15 19a5 5 0 016-4%22/%3E%3C/g%3E%3Cg transform=%22translate%2871.71 116.63%29 rotate%282.27 9.96 9.96%29 scale%280.8301%29%22 stroke-width=%221.6%22%3E%3Cpath d=%22M12 3l2.8 5.8 6.2.9-4.5 4.4 1 6.2L12 17.4 6.5 20.3l1-6.2L3 9.7l6.2-.9z%22/%3E%3C/g%3E%3Cg transform=%22translate%2897.30 105.13%29 rotate%28-27.09 8.51 8.51%29 scale%280.7095%29%22 stroke-width=%221.6%22%3E%3Cpath d=%22M9 3h6l-1 6 4 4H6l4-4z%22/%3E%3Cpath d=%22M12 13v8%22/%3E%3C/g%3E%3Cg transform=%22translate%28155.51 101.97%29 rotate%28-24.19 11.18 11.18%29 scale%280.9320%29%22 stroke-width=%221.6%22%3E%3Cpath d=%22M4 10v4h3l7 4V6L7 10z%22/%3E%3Cpath d=%22M17 9a4 4 0 010 6%22/%3E%3C/g%3E%3Cg transform=%22translate%28213.04 98.59%29 rotate%28-26.29 11.51 11.51%29 scale%280.9593%29%22 stroke-width=%221.6%22%3E%3Cpath d=%22M20 11.5l-7.8 7.8a5 5 0 01-7.1-7.1L13 4.3a3.3 3.3 0 014.7 4.7l-7.9 7.9a1.7 1.7 0 01-2.4-2.4l7.3-7.3%22/%3E%3C/g%3E%3Cg transform=%22translate%2811.71 149.46%29 rotate%28-14.06 10.91 10.91%29 scale%280.9089%29%22 stroke-width=%221.6%22%3E%3Cpath d=%22M4 8a2 2 0 012-2h2l1.5-2h5L16 6h2a2 2 0 012 2v9a2 2 0 01-2 2H6a2 2 0 01-2-2z%22/%3E%3Ccircle cx=%2212%22 cy=%2212.5%22 r=%223.2%22/%3E%3C/g%3E%3Cg transform=%22translate%2863.51 163.12%29 rotate%2829.47 11.23 11.23%29 scale%280.9358%29%22 stroke-width=%221.6%22%3E%3Cpath d=%22M4 14v-2a8 8 0 0116 0v2%22/%3E%3Crect x=%223%22 y=%2213%22 width=%224%22 height=%227%22 rx=%222%22/%3E%3Crect x=%2217%22 y=%2213%22 width=%224%22 height=%227%22 rx=%222%22/%3E%3C/g%3E%3Cg transform=%22translate%28118.04 161.39%29 rotate%28-18.23 10.89 10.89%29 scale%280.9071%29%22 stroke-width=%221.6%22%3E%3Cpath d=%22M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1%22/%3E%3Cpath d=%22M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1%22/%3E%3C/g%3E%3Cg transform=%22translate%28144.77 157.85%29 rotate%28-7.28 11.66 11.66%29 scale%280.9716%29%22 stroke-width=%221.6%22%3E%3Cpath d=%22M12 20s-7-4.4-7-9.3A4.2 4.2 0 0112 8a4.2 4.2 0 017 2.7C19 15.6 12 20 12 20z%22/%3E%3C/g%3E%3Cg transform=%22translate%28199.56 155.86%29 rotate%28-0.27 11.23 11.23%29 scale%280.9360%29%22 stroke-width=%221.6%22%3E%3Crect x=%223%22 y=%225%22 width=%2218%22 height=%2214%22 rx=%222.5%22/%3E%3Ccircle cx=%229%22 cy=%2210%22 r=%221.6%22/%3E%3Cpath d=%22M21 16l-5-5-8 8%22/%3E%3C/g%3E%3Cg transform=%22translate%287.45 204.49%29 rotate%2830.80 9.13 9.13%29 scale%280.7607%29%22 stroke-width=%221.6%22%3E%3Cpath d=%22M4 12l16-8-6 16-2.5-6.5z%22/%3E%3Cpath d=%22M11.5 13.5L20 4%22/%3E%3C/g%3E%3Cg transform=%22translate%2860.35 197.36%29 rotate%28-7.78 8.59 8.59%29 scale%280.7160%29%22 stroke-width=%221.6%22%3E%3Cpath d=%22M5 21V4%22/%3E%3Cpath d=%22M5 4h11l-2 4 2 4H5%22/%3E%3C/g%3E%3Cg transform=%22translate%28111.66 215.91%29 rotate%289.91 8.80 8.80%29 scale%280.7336%29%22 stroke-width=%221.6%22%3E%3Crect x=%223%22 y=%225%22 width=%2218%22 height=%2216%22 rx=%223%22/%3E%3Cpath d=%22M3 10h18M8 3v4M16 3v4%22/%3E%3C/g%3E%3Cg transform=%22translate%28152.78 197.23%29 rotate%280.96 10.27 10.27%29 scale%280.8561%29%22 stroke-width=%221.6%22%3E%3Ccircle cx=%226%22 cy=%2219%22 r=%222.5%22/%3E%3Ccircle cx=%2218%22 cy=%225%22 r=%222.5%22/%3E%3Cpath d=%22M8.5 19H16a3.5 3.5 0 000-7H8a3.5 3.5 0 010-7h7.5%22/%3E%3C/g%3E%3Cg transform=%22translate%28201.79 219.45%29 rotate%28-22.95 8.92 8.92%29 scale%280.7436%29%22 stroke-width=%221.6%22%3E%3Cpath d=%22M13 2.5L4.5 14H11l-1.5 7.5L19.5 10h-7z%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
 
 /* Bubbles */
 .wc-msg { display: flex; gap: 7px; align-items: flex-start; justify-content: flex-start; border-radius: 8px; transition: background 0.2s; }
@@ -768,7 +813,7 @@
 .wc-chip.static { cursor: default; pointer-events: none; }
 
 /* Deleted messages — shown to the A&H team only, dimmed, as the Flutter app does. */
-.wc-bubble.deleted, .wc-ann.deleted { opacity: .6; border-style: dashed; }
+.wc-bubble.deleted { opacity: .6; border-style: dashed; }
 .wc-deleted-note { display: flex; align-items: center; gap: 4px; margin-bottom: 4px; font-size: 11px; font-weight: 600; color: var(--ink3); }
 .wc-deleted-note mat-icon { font-size: 13px; width: 13px; height: 13px; }
 /* A phone is still uploading this message's files. */
@@ -1063,6 +1108,16 @@
 .wc-kv mat-icon { color: var(--ink3); font-size: 12px; width: 12px; height: 12px; margin-top: 2px; flex-shrink: 0; }
 .wc-kv-label { font-size: 10px; font-weight: 700; color: var(--t3); text-transform: uppercase; letter-spacing: 0.3px; }
 .wc-kv-value { font-size: 12px; font-weight: 600; color: var(--t1); }
+.wc-kv .grow { flex: 1; min-width: 0; }
+/* A group description keeps the author's line breaks (the app shows it as written). */
+.wc-slide-desc { white-space: pre-line; text-align: center; }
+/* Description editing is several lines, like the app's Group settings sheet. */
+.wc-slide-rename.desc { align-items: flex-start; }
+.wc-slide-rename textarea {
+  flex: 1; min-width: 0; resize: vertical; font: inherit; font-size: 13px; line-height: 1.45; padding: 7px 9px;
+  border-radius: 8px; border: 1px solid var(--border); background: var(--field); color: var(--t1); outline: none;
+}
+.wc-slide-rename textarea:focus { border-color: var(--blue-text); }
 
 /* Caps a long participant list at ~6 rows and scrolls it, so Media/links/docs and the footer stay
    reachable without scrolling past every member. */
