@@ -13,7 +13,6 @@
   </div>
 </div>
 
-<!-- ══════ TOOLBAR ══════ -->
 <!-- ══════ TOOLBAR (redesign — mockup .top) ══════ -->
 <div class="top">
   <div class="brand"><div class="mk">JE</div><div><div class="t">Journey Experience</div><div class="s">Antano &amp; Harini · Overview</div></div></div>
@@ -117,7 +116,13 @@
     <!-- Detail zone: activity + efficiency tiles, then the by-product breakdown -->
     <div class="ob-tiles"><div data-testid="jcd-div-030" class="obt" (click)="openDialog('onboardingScheduled')"><div class="v">{{ getTotalOnboardingScheduledCount() }}</div><div class="k">OB Calls</div></div><div data-testid="jcd-div-031" class="obt" (click)="openDialog('coachingScheduled')"><div class="v">{{ getTotalCoachingScheduledCount() }}</div><div class="k">JC Calls</div></div><div data-testid="jcd-div-032" class="obt" (click)="openDialog('avgAssured')"><div class="v">{{ avgAssuredList.length > 0 ? avgAssured.toFixed(2) : 'N/A' }}</div><div class="k">Avg OB days</div></div><div data-testid="jcd-div-033" class="obt" (click)="openDialog('avgPurchase')"><div class="v">{{ avgPurchaseList.length > 0 ? avgPurchase.toFixed(2) : 'N/A' }}</div><div class="k">Avg purch days</div></div></div>
     <div class="prow head" *ngIf="onboardingProducts.length"><span class="hh l">Product / journey</span><span class="hh">To onboard</span><span class="hh">≤7d</span><span class="hh">7+ d</span><span class="hh">Not assured</span></div>
-    <div data-testid="jcd-div-onb-product" class="prow" *ngFor="let p of onboardingProducts" (click)="openOnboardingProduct(p)"><span class="pn">{{p.product}}</span><span class="cell dan">{{p.toOnboard}}</span><span class="cell mut">{{p.within7}}</span><span class="cell warn">{{p.plus7}}</span><span class="cell mut">{{p.notAssured}}</span></div>
+    <div data-testid="jcd-div-onb-product" class="prow" *ngFor="let p of onboardingProducts">
+      <span class="pn">{{p.product}}</span>
+      <span class="cell dan" data-testid="jcd-onb-cell-toonboard" style="cursor:pointer" (click)="openOnboardingProduct(p, 'toOnboard')">{{p.toOnboard}}</span>
+      <span class="cell mut" data-testid="jcd-onb-cell-within7" style="cursor:pointer" (click)="openOnboardingProduct(p, 'within7')">{{p.within7}}</span>
+      <span class="cell warn" data-testid="jcd-onb-cell-plus7" style="cursor:pointer" (click)="openOnboardingProduct(p, 'plus7')">{{p.plus7}}</span>
+      <span class="cell mut" data-testid="jcd-onb-cell-notassured" style="cursor:pointer" (click)="openOnboardingProduct(p, 'notAssured')">{{p.notAssured}}</span>
+    </div>
   </div>
 </div>
 <div class="rail a">
