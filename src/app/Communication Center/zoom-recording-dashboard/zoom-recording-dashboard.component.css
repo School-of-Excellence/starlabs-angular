@@ -407,6 +407,18 @@
 .size-ok { color: var(--ok); }
 .size-bad { color: var(--bad); font-weight: 600; }
 
+/* ===== multi-select / bulk trash ===== */
+.select-col { width: 36px; text-align: center; }
+.select-col input { width: 16px; height: 16px; cursor: pointer; accent-color: var(--bad); }
+.select-col input:disabled { cursor: default; opacity: .35; }
+.bulk-bar {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 14px;
+  padding: 10px 14px; border-radius: 12px; font-size: 13px;
+  background: var(--surface); border: 1px solid var(--bad);
+  position: sticky; top: 8px; z-index: 5;
+}
+.bulk-bar__progress { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; flex-basis: 100%; }
+
 /* ===== page notice ===== */
 .page-notice {
   display: flex; align-items: center; gap: 12px; margin-bottom: 14px;

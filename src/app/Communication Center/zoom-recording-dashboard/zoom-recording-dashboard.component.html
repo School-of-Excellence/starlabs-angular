@@ -257,8 +257,52 @@
   </section>
 
   <!-- ===== table ===== -->
+  <!-- ===== bulk move to Zoom trash ===== -->
+  @if (selectedIds.size > 0 || bulkTrash) {
+  <div class="bulk-bar">
+    @if (selectedIds.size > 0) {
+    <span><b>{{ selectedIds.size }}</b> selected · {{ formatBytes(selectedBytes) }}</span>
+    <button data-testid="zrd-bulk-trash" class="trash-btn" (click)="trashSelected()" [disabled]="bulkTrash?.running">
+      🗑 Move {{ selectedIds.size }} to Zoom trash
+    </button>
+    <button data-testid="zrd-bulk-clear" class="view-btn" (click)="clearSelection()" [disabled]="bulkTrash?.running">Clear</button>
+    }
+    @if (bulkTrash; as bt) {
+    <div class="bulk-bar__progress">
+      <div class="row-progress">
+        <div class="progress-bar"><div class="progress-fill progress-success" [style.width.%]="bt.total ? (bt.done / bt.total) * 100 : 0"></div></div>
+        <span class="mono progress-text">{{ bt.done }}/{{ bt.total }}</span>
+      </div>
+      <span class="verify-ok">🗑 {{ bt.moved }} moved to Zoom trash</span>
+      @if (bt.refused) { <span class="verify-bad">⚠ {{ bt.refused }} not moved</span> }
+      @if (!bt.running) {
+      <span class="action-muted">Done</span>
+      <button data-testid="zrd-bulk-dismiss" class="close-x" (click)="bulkTrash = null" title="Dismiss">✕</button>
+      }
+      @for (p of bt.problems; track $index) {
+      <div class="file-error">⚠ {{ p.topic }} — {{ p.text }}</div>
+      }
+    </div>
+    }
+  </div>
+  }
+
   <div class="table-card">
     <table mat-table [dataSource]="recordsBackup" matSort>
+      <ng-container matColumnDef="select">
+        <th mat-header-cell *matHeaderCellDef class="select-col">
+          <input data-testid="zrd-select-all" type="checkbox" [checked]="allSelectableSelected"
+                 [indeterminate]="selectedIds.size > 0 && !allSelectableSelected"
+                 [disabled]="selectableRows.length === 0 || bulkTrash?.running" (change)="toggleSelectAll()"
+                 [title]="'Select all ' + selectableRows.length + ' recording(s) that can be moved to Zoom trash (✓ verified and still in Zoom)'" />
+        </th>
+        <td mat-cell *matCellDef="let el" class="select-col">
+          <input data-testid="zrd-select-row" type="checkbox" [checked]="isSelected(el)"
+                 [disabled]="!canTrash(el) || bulkTrash?.running" (change)="toggleSelect(el)"
+                 [title]="canTrash(el) ? 'Select to move to Zoom trash' : (trashBlockedReason(el) || 'Already in Zoom trash')" />
+        </td>
+      </ng-container>
+
       <ng-container matColumnDef="meetingTopic">
         <th mat-header-cell *matHeaderCellDef mat-sort-header start="asc" title="Sort by meeting name">Meeting</th>
         <td mat-cell *matCellDef="let el">
