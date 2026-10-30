@@ -140,7 +140,7 @@
           </div>
           <div class="media-container">
             <video controls controlsList="nodownload" class="media-player">
-              <source [src]="form.options[0]" type="video/mp4">
+              <source [src]="videoUrl[i]" type="video/mp4">
               Your browser does not support the video tag or check the format should be "mp4".
             </video>
           </div>
@@ -680,6 +680,11 @@
         <mat-icon>visibility</mat-icon>
         Preview & Update
       </button> -->
+    <!-- ATC answer opened for Edit from View ATC (patchdata + atcid): update the same answer (B!G edit logic) -->
+    <button data-testid="for-on-update-16" *ngIf="formpatch && atcid" mat-raised-button color="primary" type="button" [disabled]="connectivityState === 'offline' || connectivityState === 'reconnecting'" (click)="onUpdate(this.deliveryForm.value)" class="submit-button">
+      <mat-icon>visibility</mat-icon>
+      Preview & Update
+    </button>
     </div>
   </div>
 </div>

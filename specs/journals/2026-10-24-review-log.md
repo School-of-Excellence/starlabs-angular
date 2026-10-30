@@ -1,5 +1,9 @@
 # 2026-10-24 — EI Solution Review log (View Prescribed + Edit ATC)
 
+> **Superseded access rule (2026-10-29):** `canWrite` (author / adjustment implementation agent / mentor-admin-developer)
+> was removed. Whoever can open the ATC may add / delete / undelete reviews (View: the list query already scopes
+> non-super users to their authored ATCs; Edit: only the retired-version guard stays). See `2026-10-29-atc-forms.md` §4–5.
+
 Plan: `specs/plans/2026-10-24-review-log.md` (operator: "implement"; open points 1–4 taken as recommended).
 
 ## Storage — why the ATC doc

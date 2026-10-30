@@ -333,8 +333,15 @@ export class EditAtcComponent {
 
   // A procedure was chosen in a NEW adjustment: every change-agent activity set for all procedures (Apply) fills it
   // too — only where it has nobody yet, so a manual per-procedure pick is kept (same as Prescribe)
+  // A new procedure picked on an existing adjustment: WiSH procedures are mandatory (same rule as Prescribe ATC)
+  onExistingAdjProcedureSelect(procedure) {
+    procedure.mandatory = this.isWiSH
+    this.autoSave()
+  }
+
   onNewProcedureSelect(i: number, j: number) {
     var procedure = this.newTranscription?.[i]?.procedure?.[j]
+    if (procedure) procedure.mandatory = this.isWiSH // WiSH procedures are mandatory (same rule as Prescribe ATC)
     if (procedure?.name) {
       procedure.bigactivity = procedure.bigactivity ?? {}
       Object.keys(this.bulkAppliedSelection ?? {}).forEach(activityId => {
@@ -414,11 +421,7 @@ export class EditAtcComponent {
     this.reviewShowDeleted = show
     this.refreshReviewRows()
   }
-  // involved (author / implementation agent) or mentor / admin / developer — and never on a retired version
-  get canWriteReview(): boolean {
-    return this.atcRetired == null &&
-      this.reviewLog.canWrite(this.loggedProfileID, this.roles, this.latestAtcData ?? this.reportATC?.atcData, this.reportATC?.transcription ?? [])
-  }
+  // No role check: whoever can open this ATC may add / delete / undelete reviews — only never on a retired version
   reviewerName(profileid: string): string { return this.profileMap[profileid] ?? profileid }
   reviewLogDate(value: any): Date | null { return this.reviewLog.toDate(value) }
   trackByReviewId(index: number, review: AtcReview): string { return review?.id ?? String(index) }
@@ -432,7 +435,7 @@ export class EditAtcComponent {
   }
   // reviews are written straight to the ATC (not the edit draft / save), like View Prescribed
   async addReview() {
-    if (!this.canWriteReview) return
+    if (this.atcRetired != null) return
     if (this.reviewDraft.trim().length == 0) { this.reviewError = "Write the review first."; return }
     this.reviewBusy = true
     try {
@@ -453,7 +456,7 @@ export class EditAtcComponent {
   }
   // undelete: straight back into the log, no confirmation (operator 2026-10-25)
   async restoreReview(review: AtcReview) {
-    if (!this.canWriteReview) return
+    if (this.atcRetired != null) return
     this.reviewBusy = true
     try {
       var result = await this.reviewLog.restore(this.firestoreATC, this.reportATC.atcpath, review.id)
@@ -467,7 +470,7 @@ export class EditAtcComponent {
     }
   }
   async confirmDeleteReview(review: AtcReview) {
-    if (!this.canWriteReview) return
+    if (this.atcRetired != null) return
     this.reviewBusy = true
     try {
       var result = await this.reviewLog.softDelete(this.firestoreATC, this.reportATC.atcpath, review.id, this.loggedProfileID)

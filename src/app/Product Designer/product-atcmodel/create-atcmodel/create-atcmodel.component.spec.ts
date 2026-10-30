@@ -201,6 +201,75 @@ describe('CreateAtcmodelComponent', () => {
       expect(component.form.value.videourl).toEqual([]);
     });
 
+    describe('forms config', () => {
+      const forms = [
+        { formid: 'f-life', formname: 'Life Report' },
+        { formid: 'f-clarity', formname: 'clarity Call' },
+        { formid: 'f-sleep', formname: 'Sleep Diary' },
+      ];
+      // the `delivery forms` docs as Firestore returns them, plus a soft-deleted one
+      const formDocs = [...forms, { formid: 'f-old', formname: 'Old Form', delete: true }]
+        .map(({ formid, ...data }) => ({ id: formid, data: () => data }));
+
+      it('edit mode: loads the saved forms in form-name order, unknown or soft-deleted ids last as "Form not found"', async () => {
+        await open({ type: 'edit', doc: { ...existing[0], forms: [
+          { formid: 'f-sleep', filledby: 'participant' },
+          { formid: 'f-gone', filledby: 'participant' },
+          { formid: 'f-old', filledby: 'participant' },
+          { formid: 'f-clarity', filledby: 'specialist' },
+        ] }, existing });
+        component.setDeliveryForms(formDocs);
+        component.addForm(forms[0]);
+        expect(component.formRows.map(r => r.formid)).toEqual(['f-clarity', 'f-life', 'f-sleep', 'f-gone', 'f-old']);
+        fixture.detectChanges();
+        expect(Array.from(fixture.nativeElement.querySelectorAll('[data-testid="ca-form-missing"]')).length).toBe(2);
+      });
+
+      it('only active forms are offered: a soft-deleted form is left out', async () => {
+        await open({ type: 'add', doc: null, existing: [] });
+        component.setDeliveryForms(formDocs);
+        expect(component.formOptions.map(f => f.formid)).toEqual(['f-life', 'f-clarity', 'f-sleep']);
+      });
+
+      it('a new form has no filled-by until one is picked, and Save stays off until then', async () => {
+        await open({ type: 'add', doc: null, existing: [] });
+        component.form.patchValue({ atcmodel: 'Forms model', evolutiontype: 'full' });
+        component.setDeliveryForms(formDocs);
+        component.addForm(forms[2]);
+        expect(component.formRows).toEqual([{ formid: 'f-sleep', name: 'Sleep Diary', filledby: null }]);
+        expect(component.formsIncomplete).toBeTrue();
+        expect(text('ca-form-filledby-required')).toBe('Choose who fills this form');
+        expect(fixture.nativeElement.querySelector('[data-testid="ca-on-submit-2"]').disabled).toBeTrue();
+
+        component.setFilledBy(component.formRows[0], 'participant');
+        expect(component.formsIncomplete).toBeFalse();
+        expect(text('ca-form-filledby-required')).toBe('');
+        expect(fixture.nativeElement.querySelector('[data-testid="ca-on-submit-2"]').disabled).toBeFalse();
+      });
+
+      it('search hides forms already added and matches by name, case-insensitively', async () => {
+        await open({ type: 'add', doc: null, existing: [] });
+        component.setDeliveryForms(formDocs);
+        component.addForm(forms[0]);
+        component.addForm(forms[0]);
+        expect(component.formRows.length).toBe(1);
+        expect(component.formOptions.map(f => f.formid)).toEqual(['f-clarity', 'f-sleep']);
+        component.searchForms('SLEEP');
+        expect(component.formOptions.map(f => f.formid)).toEqual(['f-sleep']);
+      });
+
+      it('remove takes the form out of the list', async () => {
+        await open({ type: 'add', doc: null, existing: [] });
+        component.setDeliveryForms(formDocs);
+        component.addForm(forms[0]);
+        component.addForm(forms[2]);
+        component.removeForm('f-life');
+        expect(component.formRows.map(r => r.formid)).toEqual(['f-sleep']);
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelectorAll('[data-testid="ca-form-row"]').length).toBe(1);
+      });
+    });
+
     it('edit mode: Remove clears the saved image from the preview', async () => {
       await open({ type: 'edit', doc: { ...existing[0], image: 'https://example.test/x.png' }, existing });
       expect(component.previewUrl).toBe('https://example.test/x.png');
@@ -294,6 +363,31 @@ describe('CreateAtcmodelComponent', () => {
       expect('image' in saved).toBeFalse();
       expect(saved['atcmodel']).toBe(`Remove ${RUN}`);
       expect(await fileExists(oldImage)).toBeFalse();
+    });
+
+    it('saves forms as [{ formid, filledby }] in form-name order; a new model with none saves []', async () => {
+      if (!up) { pending('demo emulator not running'); return; }
+      await setDoc(doc(firestore, 'delivery forms', `fa-${RUN}`), { formname: `B form ${RUN}` });
+      await setDoc(doc(firestore, 'delivery forms', `fb-${RUN}`), { formname: `A form ${RUN}` });
+      const id = `forms-${RUN}`;
+      await seedModel(id, `Forms ${RUN}`, false);
+      await open({ type: 'edit', doc: { id, docid: id, atcmodel: `Forms ${RUN}`, evolutiontype: 'full', forms: [{ formid: `fa-${RUN}`, filledby: 'participant' }] }, existing: [] });
+      await until(() => component.deliveryForms.some(f => f.formid === `fb-${RUN}`));
+      component.addForm({ formid: `fb-${RUN}`, formname: `A form ${RUN}` });
+      component.setFilledBy(component.formRows.find(r => r.formid === `fb-${RUN}`), 'specialist');
+      await component.onSubmit();
+
+      const saved = (await getDoc(doc(firestore, 'atc model', id))).data();
+      expect(saved['forms']).toEqual([
+        { formid: `fb-${RUN}`, filledby: 'specialist' },
+        { formid: `fa-${RUN}`, filledby: 'participant' },
+      ]);
+
+      TestBed.resetTestingModule();
+      await open({ type: 'add', doc: null, existing: [] });
+      await fill(`No forms ${RUN}`);
+      await component.onSubmit();
+      expect((await getDoc(doc(firestore, 'atc model', component.form.value.docid))).data()['forms']).toEqual([]);
     });
 
     it('edit without touching the image keeps it', async () => {

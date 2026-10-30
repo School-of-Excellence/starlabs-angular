@@ -217,6 +217,8 @@
                 </span>
                 <!-- EI Solution: reviews not deleted (prototype) -->
                 <span class="atc-tag tag-model nonprintable" data-testid="vatc-review-count" *ngIf="isEIModel(atcData['product'])">{{ reviewActiveCount(atc) }} reviews</span>
+                <!-- ATC forms (plan 2026-10-28): the model's forms answered on this ATC -->
+                <span class="atc-tag tag-model nonprintable" data-testid="vatc-forms-count" *ngIf="mapFormsCount[atc.id] as count">{{ count.done }} of {{ count.total }} forms submitted</span>
                 <label *ngIf="atcData['lasteditedon']" class="lastedittext nonprintable">
                   (Last Edit : {{(atcData['lasteditedon'] ? (atcData['lasteditedon']?.toDate() | date:'medium') : '')}})
                 </label>
@@ -301,6 +303,45 @@
               Loading Full ATC...
             </div>
 
+            <!-- ATC forms (plan 2026-10-28): validated ATCs whose model has forms; rows worked out in buildFormRows -->
+            <div class="vp-card nonprintable" data-testid="vatc-forms-card" *ngIf="mapFormView[atc.id] as formView">
+              <div class="forms-head">
+                <div class="vp-card-title">Forms</div>
+                <span class="forms-summary" data-testid="vatc-forms-summary">{{ formView.summary }}</span>
+              </div>
+              <ng-container *ngIf="formView.specialist.length">
+                <div class="forms-group" data-testid="vatc-forms-group-specialist"><mat-icon>how_to_reg</mat-icon> Forms you fill</div>
+                <ng-container *ngFor="let row of formView.specialist; trackBy: trackByFormId">
+                  <ng-container *ngTemplateOutlet="formRow; context: { $implicit: row }"></ng-container>
+                </ng-container>
+              </ng-container>
+              <ng-container *ngIf="formView.participant.length">
+                <div class="forms-group" data-testid="vatc-forms-group-participant"><mat-icon>smartphone</mat-icon> Forms the participant fills in the app</div>
+                <ng-container *ngFor="let row of formView.participant; trackBy: trackByFormId">
+                  <ng-container *ngTemplateOutlet="formRow; context: { $implicit: row }"></ng-container>
+                </ng-container>
+              </ng-container>
+              <ng-template #formRow let-row>
+                <div class="form-row" [class.form-row-off]="row.deleted" data-testid="vatc-form-row">
+                  <div class="form-name">
+                    <span>{{ row.name }}</span>
+                    <div class="form-line">
+                      <span class="form-status" [ngClass]="'form-status-' + row.tone"><mat-icon aria-hidden="true">{{ row.icon }}</mat-icon><span data-testid="vatc-form-status">{{ row.status }}</span></span>
+                      <span class="form-note" data-testid="vatc-form-note">{{ row.note }}</span>
+                    </div>
+                  </div>
+                  <div class="form-actions">
+                    <button *ngIf="row.canView" data-testid="vatc-form-view" mat-stroked-button type="button" (click)="viewAtcForm(atc, row)">View answer</button>
+                    <button *ngIf="row.canEdit" data-testid="vatc-form-edit" mat-stroked-button type="button" (click)="editAtcForm(atc, row)">Edit answer</button>
+                    <button *ngIf="row.canFill" data-testid="vatc-form-fill" mat-flat-button color="primary" type="button" (click)="fillAtcForm(atc, row)">Fill form</button>
+                    <button *ngIf="row.canSend" data-testid="vatc-form-send" mat-stroked-button type="button" (click)="sendAtcForm(atc, row)">Send to participant</button>
+                    <button *ngIf="row.canResend" data-testid="vatc-form-resend" mat-stroked-button type="button" (click)="sendAtcForm(atc, row)">Ask to update</button>
+                    <button *ngIf="row.canWithdraw" data-testid="vatc-form-revoke" mat-stroked-button type="button" (click)="revokeAtcForm(row)">Withdraw</button>
+                  </div>
+                </div>
+              </ng-template>
+            </div>
+
             <!-- Review log — EI Solution only (plan 2026-10-24): internal notes; add + soft delete for the involved
                  specialists (author / implementation agent) and mentor / admin / developer roles -->
             <div class="vp-card review-card nonprintable" data-testid="vatc-review-card" *ngIf="isEIModel(atcData['product'])">
@@ -311,7 +352,7 @@
                 </div>
                 <span class="review-tag">Hidden in the participant app</span>
               </div>
-              <div class="review-composer" *ngIf="canWriteReview(atc); else reviewReadOnly">
+              <div class="review-composer">
                 <span class="review-avatar">{{ initialsOf(myReviewerName) }}</span>
                 <div class="review-compose-body">
                   <textarea data-testid="vatc-review-text" class="review-textarea" rows="3" placeholder="What happened since the last review? Progress, blockers, next focus" [(ngModel)]="reviewDraft[atc.id]" (ngModelChange)="reviewError[atc.id] = null"></textarea>
@@ -322,9 +363,6 @@
                   <span data-testid="vatc-review-error" class="review-error" *ngIf="reviewError[atc.id]">{{ reviewError[atc.id] }}</span>
                 </div>
               </div>
-              <ng-template #reviewReadOnly>
-                <p data-testid="vatc-review-readonly" class="review-readonly">Only this ATC's authors, change agents, mentors and admins can add or delete reviews.</p>
-              </ng-template>
               <p data-testid="vatc-review-empty" class="review-empty" *ngIf="reviewRows(atc).length == 0">No reviews yet. Add the first one after the next appointment.</p>
               <div class="review-row" data-testid="vatc-review-row" [class.review-deleted]="review.isdelete" *ngFor="let review of reviewRows(atc); trackBy: trackByReviewId">
                 <span class="review-avatar">{{ initialsOf(reviewerName(review.createdby)) }}</span>
@@ -341,8 +379,8 @@
                     <button data-testid="vatc-review-confirm-delete" mat-flat-button class="review-delete-btn" [disabled]="reviewBusy[atc.id]" (click)="confirmDeleteReview(atc, review)">Delete</button>
                   </div>
                 </div>
-                <button data-testid="vatc-review-delete" mat-button class="review-delete-link" *ngIf="!review.isdelete && canWriteReview(atc) && reviewConfirm[atc.id] != review.id" (click)="reviewConfirm[atc.id] = review.id">Delete</button>
-                <button data-testid="vatc-review-undelete" mat-button class="review-delete-link" *ngIf="review.isdelete && canWriteReview(atc)" [disabled]="reviewBusy[atc.id]" (click)="restoreReview(atc, review)">Undelete</button>
+                <button data-testid="vatc-review-delete" mat-button class="review-delete-link" *ngIf="!review.isdelete && reviewConfirm[atc.id] != review.id" (click)="reviewConfirm[atc.id] = review.id">Delete</button>
+                <button data-testid="vatc-review-undelete" mat-button class="review-delete-link" *ngIf="review.isdelete" [disabled]="reviewBusy[atc.id]" (click)="restoreReview(atc, review)">Undelete</button>
               </div>
               <div class="review-show-deleted" *ngIf="reviewDeletedCount(atc) > 0">
                 <mat-checkbox data-testid="vatc-review-show-deleted" [(ngModel)]="reviewShowDeleted[atc.id]">Show deleted ({{ reviewDeletedCount(atc) }})</mat-checkbox>
@@ -565,3 +603,6 @@
     </mat-list>
   </div>
 </div>
+
+<!-- ATC forms: read-only view of a submitted form (the participant forms screen's overlay, reused as is) -->
+<app-form-overlay-view #formOverlay />

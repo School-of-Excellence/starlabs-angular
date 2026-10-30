@@ -332,7 +332,7 @@
                     
                     <mat-form-field appearance="outline" class="procedure-field">
                       <mat-label>Procedure</mat-label>
-                      <mat-select data-testid="eatc-proc-name" [(ngModel)]="procedure.name" (selectionChange)="autoSave()" [required]="true" [errorStateMatcher]="requiredMatcher">
+                      <mat-select data-testid="eatc-proc-name" [(ngModel)]="procedure.name" (selectionChange)="onExistingAdjProcedureSelect(procedure)" [required]="true" [errorStateMatcher]="requiredMatcher">
                         <mat-option *ngFor="let pro of procedureList" [value]="pro.path">{{pro.name}}</mat-option>
                       </mat-select>
                       <mat-error>This field is required</mat-error>
@@ -499,7 +499,7 @@
           <span class="review-tag">Hidden in the participant app</span>
         </div>
         <div class="personnel-container">
-          <div class="review-composer" *ngIf="canWriteReview; else reviewReadOnly">
+          <div class="review-composer" *ngIf="!atcRetired; else reviewReadOnly">
             <span class="review-avatar">{{ initialsOf(reviewerName(loggedProfileID)) }}</span>
             <div class="review-compose-body">
               <textarea data-testid="eatc-review-text" class="review-textarea" rows="3" placeholder="What happened since the last review? Progress, blockers, next focus" [(ngModel)]="reviewDraft" (ngModelChange)="reviewError = null"></textarea>
@@ -511,7 +511,7 @@
             </div>
           </div>
           <ng-template #reviewReadOnly>
-            <p data-testid="eatc-review-readonly" class="review-muted">{{ atcRetired ? 'This version can no longer be changed.' : "Only this ATC's authors, change agents, mentors and admins can add or delete reviews." }}</p>
+            <p data-testid="eatc-review-readonly" class="review-muted">This version can no longer be changed.</p>
           </ng-template>
           <p data-testid="eatc-review-empty" class="review-muted" *ngIf="reviewRowsList.length == 0">No reviews yet.</p>
           <div class="review-row" data-testid="eatc-review-row" [class.review-deleted]="review.isdelete" *ngFor="let review of reviewRowsList; trackBy: trackByReviewId">
@@ -529,8 +529,8 @@
                 <button data-testid="eatc-review-confirm-delete" mat-flat-button class="remove-button" [disabled]="reviewBusy" (click)="confirmDeleteReview(review)">Delete</button>
               </div>
             </div>
-            <button data-testid="eatc-review-delete" mat-button class="review-delete-link" *ngIf="!review.isdelete && canWriteReview && reviewConfirm != review.id" (click)="reviewConfirm = review.id">Delete</button>
-            <button data-testid="eatc-review-undelete" mat-button class="review-delete-link" *ngIf="review.isdelete && canWriteReview" [disabled]="reviewBusy" (click)="restoreReview(review)">Undelete</button>
+            <button data-testid="eatc-review-delete" mat-button class="review-delete-link" *ngIf="!review.isdelete && !atcRetired && reviewConfirm != review.id" (click)="reviewConfirm = review.id">Delete</button>
+            <button data-testid="eatc-review-undelete" mat-button class="review-delete-link" *ngIf="review.isdelete && !atcRetired" [disabled]="reviewBusy" (click)="restoreReview(review)">Undelete</button>
           </div>
           <div class="review-show-deleted" *ngIf="reviewDeleted > 0">
             <mat-checkbox data-testid="eatc-review-show-deleted" [ngModel]="reviewShowDeleted" (ngModelChange)="toggleReviewShowDeleted($event)">Show deleted ({{ reviewDeleted }})</mat-checkbox>

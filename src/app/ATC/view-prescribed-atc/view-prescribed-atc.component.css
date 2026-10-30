@@ -900,7 +900,7 @@ mat-list-item:hover {
 .review-add-btn { background-color: var(--so-accent) !important; color: #fff !important; border-radius: 8px !important; }
 .review-saved-as { color: var(--so-muted); }
 .review-error { display: block; margin-top: 6px; color: var(--so-danger); }
-.review-readonly, .review-empty { margin: 8px 0; color: var(--so-muted); }
+.review-empty { margin: 8px 0; color: var(--so-muted); }
 .review-row {
   display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 12px; align-items: start;
   padding: 12px 0; border-top: 1px solid var(--so-border);
@@ -916,3 +916,25 @@ mat-list-item:hover {
 .review-delete-btn { background-color: var(--so-danger) !important; color: #fff !important; border-radius: 8px !important; }
 .review-delete-link { color: var(--so-ink2) !important; }
 .review-show-deleted { padding-top: 8px; border-top: 1px solid var(--so-border); }
+
+/* ---- ATC forms (2026-10-28, redesigned 2026-10-29) — no font sizes set ---- */
+.forms-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.forms-summary { color: var(--so-muted); }
+.forms-group { display: flex; align-items: center; gap: 6px; margin-top: 14px; padding-bottom: 6px; color: var(--so-muted); }
+.forms-group mat-icon { width: 18px; height: 18px; font-size: 18px; }
+.form-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--so-border); }
+.form-row-off { color: var(--so-muted); }
+.form-name { display: flex; flex-direction: column; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
+.form-line { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.form-note { color: var(--so-muted); }
+.form-status { display: inline-flex; align-items: center; gap: 4px; padding: 1px 10px; border-radius: 999px; line-height: 20px; white-space: nowrap; }
+.form-status mat-icon { width: 16px; height: 16px; font-size: 16px; }
+.form-status-done { background: #dcfce7; color: #047857; }
+.form-status-wait { background: #fef3c7; color: #b45309; }
+.form-status-todo { background: var(--so-soft2); color: var(--so-ink2); }
+.form-status-off { background: transparent; color: var(--so-muted); border: 1px solid var(--so-border); }
+.form-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 600px) {
+  .form-row { grid-template-columns: minmax(0, 1fr); }
+  .form-actions { justify-content: flex-start; }
+}

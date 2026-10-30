@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component,OnInit,Inject } from '@angular/core';
-import { collection, deleteField, doc, Firestore, getDocs, setDoc } from '@angular/fire/firestore';
+import { collection, deleteField, doc, Firestore, getDocs, orderBy, query, setDoc } from '@angular/fire/firestore';
 import { deleteObject, getDownloadURL, ref, Storage, uploadBytes } from '@angular/fire/storage';
 import { AbstractControl, FormBuilder, FormGroup, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { COMMA, ENTER } from '@angular/cdk/keycodes';
@@ -13,6 +13,13 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
+
+// Forms config (operator, 2026-10-28): forms: [{ formid, filledby }] on the model; formid = `delivery forms`
+// doc id; filledby has no default (the admin must pick one); the list is kept in form-name order.
+export type FilledBy = 'specialist' | 'participant'
+// name: undefined while the forms load, null when the form isn't an active delivery form
+export interface ModelForm { formid: string; name?: string | null; filledby: FilledBy | null }
 
 // Image rules (operator, 2026-10-26): square (1:1) only, PNG / JPG / WebP, max 200 KB.
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
@@ -35,6 +42,7 @@ export function normaliseModelName(name: any): string {
     MatButtonModule,
     MatSelectModule,
     MatAutocompleteModule,
+    MatButtonToggleModule,
     TextFieldModule,
   ],
   templateUrl: './create-atcmodel.component.html',
@@ -60,6 +68,15 @@ export class CreateAtcmodelComponent {
   previewUrl: string | null = null
   imageRemoved = false
   imageError: string | null = null
+
+  // forms config, kept in variables and refreshed by updateForms() whenever something changes:
+  // deliveryForms = active `delivery forms` (not soft-deleted); formRows = this model's forms;
+  // formOptions = active forms not chosen yet that match the search; formsIncomplete = a row has no "filled by"
+  deliveryForms: { formid: string, formname: string }[] = []
+  formRows: ModelForm[] = []
+  formOptions: { formid: string, formname: string }[] = []
+  formSearch = ''
+  formsIncomplete = false
 
   constructor(
     private fb : FormBuilder,
@@ -87,10 +104,14 @@ export class CreateAtcmodelComponent {
       })
     })
 
+    getDocs(query(collection(this.firestore, 'delivery forms'), orderBy('formname'))).then(snap => this.setDeliveryForms(snap.docs))
+
     if(this.isEdit){
       this.form.patchValue(this.data.doc)
       this.originalImage = this.data.doc?.image || null
       this.previewUrl = this.originalImage
+      this.formRows = (this.data.doc?.forms || []).map((f: any) => ({ formid: f.formid, name: undefined, filledby: f.filledby ?? null }))
+      this.updateForms()
     }
 
     this.setExistingNames(this.data.existing || [])
@@ -164,6 +185,53 @@ export class CreateAtcmodelComponent {
     this.form.get('videourl').setValue(current)
   }
 
+  //// forms config (array of { formid, filledby }, kept in form-name order)
+  // Only active forms: a soft-deleted form has delete:true. Most forms have no delete field at all, so a Firestore
+  // `!=` filter would drop them too — the deleted ones are filtered out here instead.
+  setDeliveryForms(docs: { id: string, data: () => any }[]) {
+    this.deliveryForms = docs.filter(d => d.data()['delete'] !== true).map(d => ({ formid: d.id, formname: d.data()['formname'] ?? '' }))
+    this.formRows.forEach(r => r.name = this.deliveryForms.find(f => f.formid === r.formid)?.formname ?? null)
+    this.updateForms()
+  }
+
+  addForm(option: { formid: string, formname: string }) {
+    if (this.formRows.some(r => r.formid === option.formid)) return
+    this.formRows = [...this.formRows, { formid: option.formid, name: option.formname, filledby: null }]
+    this.formSearch = ''
+    this.updateForms()
+  }
+
+  setFilledBy(row: ModelForm, filledby: FilledBy) {
+    row.filledby = filledby
+    this.updateForms()
+  }
+
+  removeForm(formid: string) {
+    this.formRows = this.formRows.filter(r => r.formid !== formid)
+    this.updateForms()
+  }
+
+  searchForms(text: string) {
+    this.formSearch = text
+    this.updateForms()
+  }
+
+  // after any change: rows in name order (a form without a name last), the "Add a form" list, and the Save block
+  updateForms() {
+    this.formRows = [...this.formRows].sort((a, b) => {
+      if (!a.name || !b.name) return !a.name ? (!b.name ? 0 : 1) : -1
+      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+    })
+    const chosen = new Set(this.formRows.map(r => r.formid))
+    const search = this.formSearch.trim().toLowerCase()
+    this.formOptions = this.deliveryForms.filter(f => !chosen.has(f.formid) && f.formname.toLowerCase().includes(search))
+    this.formsIncomplete = this.formRows.some(r => !r.filledby)
+  }
+
+  trackByFormId(index: number, item: { formid: string }): string {
+    return item.formid
+  }
+
   //// image
   onImagePicked(event: Event) {
     const input = event.target as HTMLInputElement
@@ -227,7 +295,7 @@ export class CreateAtcmodelComponent {
   }
 
   async onSubmit(){
-    if (this.form.invalid || this.saving) return
+    if (this.form.invalid || this.formsIncomplete || this.saving) return
     this.saving = true
     this.saveError = null
     try {
@@ -239,7 +307,11 @@ export class CreateAtcmodelComponent {
         return
       }
 
-      const value: any = { ...this.form.value, atcmodel: this.typedName }
+      const value: any = {
+        ...this.form.value,
+        atcmodel: this.typedName,
+        forms: this.formRows.map(r => ({ formid: r.formid, filledby: r.filledby })),
+      }
       let image: string | null = this.originalImage
       let replacedImage: string | null = null
       if (this.newImageFile) {

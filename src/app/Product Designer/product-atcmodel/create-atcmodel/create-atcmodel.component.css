@@ -123,6 +123,57 @@
   margin-top: -8px;
 }
 
+.ca-forms {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ca-forms-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.ca-forms-title {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.ca-form-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 4px 6px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 8px;
+}
+
+.ca-form-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-wrap: anywhere;
+}
+
+.ca-form-required {
+  font-size: 12px;
+  color: #b45309;
+}
+
+.ca-form-toggle {
+  flex: none;
+  height: 32px;
+  align-items: center;
+}
+
+.ca-form-toggle ::ng-deep .mat-button-toggle-label-content {
+  line-height: 30px;
+  font-size: 13px;
+  padding: 0 10px;
+}
+
 .ca-footer {
   display: flex;
   justify-content: flex-end;

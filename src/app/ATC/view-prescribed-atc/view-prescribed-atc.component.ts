@@ -6,8 +6,8 @@ import { AuthguardService } from '../../authguard.service';
 import { AtcReview, AtcReviewLogService } from '../shared/atc-review-log.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
-import { collection, writeBatch, collectionChanges, collectionData, CollectionReference, collectionSnapshots, doc, docSnapshots, Firestore, and, getDoc, getDocs, limit, or, orderBy, Query, query, QueryDocumentSnapshot, QueryFieldFilterConstraint, QueryLimitConstraint, QueryOrderByConstraint, updateDoc, where, DocumentSnapshot, QueryConstraint, QueryFilterConstraint, DocumentReference, getFirestore } from '@angular/fire/firestore';
-import { BehaviorSubject, combineLatestWith, debounceTime, firstValueFrom, map, Subject, Subscription, takeUntil } from 'rxjs';
+import { collection, writeBatch, collectionChanges, collectionData, CollectionReference, collectionSnapshots, doc, docSnapshots, Firestore, and, getDoc, getDocs, limit, or, orderBy, Query, query, QueryDocumentSnapshot, QueryFieldFilterConstraint, QueryLimitConstraint, QueryOrderByConstraint, updateDoc, where, DocumentSnapshot, QueryConstraint, QueryFilterConstraint, DocumentReference, getFirestore, documentId, setDoc, deleteDoc, serverTimestamp } from '@angular/fire/firestore';
+import { BehaviorSubject, combineLatestWith, debounceTime, firstValueFrom, from, map, Subject, Subscription, switchMap, takeUntil } from 'rxjs';
 import { SelectValidatorComponent } from '../select-validator/select-validator.component';
 import { FormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -22,6 +22,7 @@ import { MatListModule } from '@angular/material/list';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import * as XLSX from 'xlsx';
+import { FormOverlayViewComponent } from '../../Participants Profile Management/form-overlay-view/form-overlay-view.component';
 
 @Component({
   selector: 'app-view-prescribed-atc',
@@ -39,13 +40,15 @@ import * as XLSX from 'xlsx';
     MatPaginatorModule,
     MatListModule,
     MatRadioModule,
-    MatDatepickerModule
+    MatDatepickerModule,
+    FormOverlayViewComponent
   ],
   templateUrl: './view-prescribed-atc.component.html',
   styleUrl: './view-prescribed-atc.component.css'
 })
 export class ViewPrescribedATCComponent {
   @ViewChild('paginator') paginator: MatPaginator;
+  @ViewChild('formOverlay') formOverlay: FormOverlayViewComponent;
 
   // Loading states
   loading = new BehaviorSubject<boolean>(false);
@@ -100,6 +103,7 @@ export class ViewPrescribedATCComponent {
   mapBigActivity = {};
   mapATCclips = {};
   mapAtcVersionDoc = {};
+  mapAtcVersionLoad = {}; // atc path → promise that resolves once its earlier versions are in mapAtcVersionDoc
   mapProducts = {};
   reportSummary: any = {};
 
@@ -135,6 +139,12 @@ export class ViewPrescribedATCComponent {
   bulkLoadedAdjustments = new Set<string>() // adjustment paths whose procedures have arrived at least once
 
   atcModelList:any[] = []
+  // ATC forms (plan 2026-10-28) — worked out once here, the template only reads these maps
+  mapFormsCount = {}   // atc id → { done, total } for validated ATCs whose model has forms
+  mapFormRows = {}     // atc id → form rows of an opened, validated ATC
+  mapFormView = {}     // atc id → { specialist rows, participant rows, summary line } for the Forms card
+  mapForm = {}         // delivery form id → { name, deleted } (only the forms of opened ATCs), null when the doc is gone
+  mapFormRequests = {} // atc id → atc_form_requests docs of that ATC and its earlier versions (live while opened)
   startDate!: Date;
   endDate!: Date;
   updateProductPath = null
@@ -334,6 +344,7 @@ export class ViewPrescribedATCComponent {
     getDocs(atcModelRef).then(snap => {
       if(snap.docs.length != 0){
         this.atcModelList = snap.docs.map(e => e.data())
+        this.buildFormsCount()
       }
     })
   }
@@ -512,6 +523,8 @@ export class ViewPrescribedATCComponent {
           totalProcedurePending,
           totalProcedureCompleted
         };
+        this.buildFormsCount()
+        this.rebuildOpenedFormRows()
         // this.getProfileData()
         this.checkATCversion()
         this.loading.next(false);
@@ -918,6 +931,8 @@ export class ViewPrescribedATCComponent {
   async getATCVersion(path: string, editedFrom: any): Promise<void> {
     if ([null, undefined].includes(this.mapAtcVersionDoc[path])) {
       this.mapAtcVersionDoc[path] = [];
+      let versionsLoaded: () => void;
+      this.mapAtcVersionLoad[path] = new Promise<void>(resolve => versionsLoaded = resolve);
       let currentEditedFrom = editedFrom;
 
       while (currentEditedFrom) {
@@ -935,7 +950,9 @@ export class ViewPrescribedATCComponent {
           break;
         }
       }
+      versionsLoaded();
     }
+    return this.mapAtcVersionLoad[path];
   }
 
   // Open version history
@@ -1009,6 +1026,7 @@ export class ViewPrescribedATCComponent {
     previousTranscription.forEach(t => this.bulkLoadedAdjustments.delete(t.adjustment.ref.path))
 
     this.fetchATCnotes(atcData) // Load ATC Notes
+    this.openAtcForms(atc) // Forms section (validated ATCs whose model has forms)
 
     console.log(this.mapATCtranscription[atc.id])
 
@@ -1052,6 +1070,166 @@ export class ViewPrescribedATCComponent {
       }
     })
     this.mapTranscriptionSubscription.set(atc.id, [...this.mapTranscriptionSubscription.get(atc.id), adjSubscription])
+  }
+
+  //// ATC forms (plan 2026-10-28)
+  // the ATC's model forms, only when the ATC is validated (an atc_alpha doc not waiting for validation)
+  validatedModelForms(atc: QueryDocumentSnapshot<any>): any[] {
+    var atcData = atc.data()
+    if (atc.ref.parent.id != 'atc_alpha' || atcData['status'] == 'atc given') return []
+    var product = (atcData['product'] ?? '').toString().trim().toLowerCase()
+    var model = this.atcModelList.find(m => (m['atcmodel'] ?? '').toString().trim().toLowerCase() == product)
+    return (model?.['forms'] || []).filter(f => f?.['formid'])
+  }
+
+  // card count: how many of the model's forms have an answer on the ATC
+  buildFormsCount() {
+    var counts = {}
+    this.sourceReportATC.forEach(atc => {
+      var forms = this.validatedModelForms(atc)
+      if (forms.length == 0) return
+      var submitted = atc.data()['formsubmitted'] || {}
+      counts[atc.id] = { done: forms.filter(f => submitted[f['formid']]).length, total: forms.length }
+    })
+    this.mapFormsCount = counts
+  }
+
+  // Opening a validated ATC: read its model forms that aren't in mapForm yet (document-id `in` queries, 30 ids
+  // each) and listen to its form requests until the ATC is closed
+  openAtcForms(atc: QueryDocumentSnapshot<any>) {
+    var forms = this.validatedModelForms(atc)
+    if (forms.length == 0) return
+    // the live list may have a newer copy of this ATC (e.g. a form recorded since it was opened)
+    var latest = () => this.sourceReportATC.find(a => a.id == atc.id) || atc
+    var missing = forms.map(f => f['formid']).filter(id => this.mapForm[id] === undefined)
+    var chunks = []
+    for (let i = 0; i < missing.length; i += 30) chunks.push(missing.slice(i, i + 30))
+    Promise.all(chunks.map(ids => getDocs(query(collection(this.firestoreDefault, 'delivery forms'), where(documentId(), 'in', ids))))).then(results => {
+      missing.forEach(id => this.mapForm[id] = null) // no doc → the row is hidden
+      results.forEach(snap => snap.docs.forEach(d => this.mapForm[d.id] = { name: d.data()['formname'] ?? '', deleted: d.data()['delete'] === true }))
+      this.buildFormRows(latest())
+    }).catch(err => console.error('Error loading ATC forms:', err))
+
+    // requests of this ATC and its earlier versions (an edit gives the ATC a new id), once the versions are known
+    var atcData = atc.data()
+    var versionsLoaded = atcData['editedfrom'] ? this.getATCVersion(atc.ref.path, atcData['editedfrom']) : Promise.resolve()
+    var requestSubscription = from(versionsLoaded).pipe(
+      switchMap(() => {
+        var atcIds = [atc.id, ...(this.mapAtcVersionDoc[atc.ref.path] || []).map(v => v['atcPath'].split('/').pop())]
+        return collectionSnapshots(query(collection(this.firestoreATC, 'atc_form_requests'), where('profileid', '==', atcData['profileid']), where('atcid', 'in', atcIds)))
+      }),
+      takeUntil(this.metaSubscription),
+    ).subscribe({
+      next: requestDocs => {
+        this.mapFormRequests[atc.id] = requestDocs.map(d => ({ ...d.data(), path: d.ref.path }))
+        this.buildFormRows(latest())
+      },
+      error: err => {
+        console.error('Error loading ATC form requests:', err)
+        this.mapFormRequests[atc.id] = [] // still show the forms, without request statuses
+        this.buildFormRows(latest())
+      }
+    })
+    this.mapTranscriptionSubscription.set(atc.id, [...this.mapTranscriptionSubscription.get(atc.id), requestSubscription])
+  }
+
+  // Rows of an opened, validated ATC in form-name order, worked out once so the template only reads plain fields:
+  // status pill (status / tone / icon), the explanation line (note) and which buttons show (can*).
+  //   specialist:  To fill (Fill form) · Submitted (View answer, Edit answer)
+  //   participant: Not sent (Send to participant) · Waiting for participant (Withdraw) ·
+  //                Waiting for update (View answer, Withdraw) · Submitted (View answer, Ask to update)
+  //   soft-deleted delivery form, not answered and not waiting → Not required, no buttons
+  //   (waiting = the request's formstatus is 'sent'; the request is kept after the app submits it)
+  // No extra access check: the list query already limits a non-super user to the ATCs they authored, so whoever sees
+  // the ATC may act on its forms (same as the EI Review log)
+  buildFormRows(atc: QueryDocumentSnapshot<any>) {
+    var modelForms = this.validatedModelForms(atc)
+    if (modelForms.some(f => this.mapForm[f['formid']] === undefined)) return // forms still loading
+    // requests still loading: Send must not show before an existing request is known (one request per ATC + form)
+    if (this.mapFormRequests[atc.id] === undefined) return
+    var forms = modelForms.filter(f => this.mapForm[f['formid']]) // a delivery form doc that's gone isn't listed
+    if (forms.length == 0) return // no forms → no Forms card
+    var submitted = atc.data()['formsubmitted'] || {}
+    var requests = this.mapFormRequests[atc.id] || []
+    var rows = forms.map(f => {
+      var formid = f['formid']
+      var specialist = f['filledby'] == 'specialist'
+      var answerid = submitted[formid] || null
+      var request = requests.find(r => r['formid'] == formid) || null
+      var pending = !!request && request['formstatus'] == 'sent'
+      var form = this.mapForm[formid]
+      var deleted = form.deleted && !answerid && !pending
+      var sentOn = request?.['sentat']?.toDate ? this.datepipe.transform(request['sentat'].toDate(), 'd MMM y') : null
+      var row: any = { formid, name: form.name, filledby: f['filledby'], answerid, request, pending, deleted,
+        canView: false, canEdit: false, canFill: false, canSend: false, canResend: false, canWithdraw: false }
+      if (deleted) Object.assign(row, { status: 'Not required', tone: 'off', icon: 'block', note: 'This form was deleted' })
+      else if (specialist && !answerid) Object.assign(row, { status: 'To fill', tone: 'todo', icon: 'edit', note: "You haven't filled this yet", canFill: true })
+      else if (specialist) Object.assign(row, { status: 'Submitted', tone: 'done', icon: 'check_circle', note: 'Filled by you', canView: true, canEdit: !form.deleted })
+      else if (pending && request['answerid']) Object.assign(row, { status: 'Waiting for update', tone: 'wait', icon: 'autorenew',
+        note: sentOn ? 'Sent back ' + sentOn + ' to update their answer' : 'Sent back to update their answer', canView: !!answerid, canWithdraw: true })
+      else if (pending) Object.assign(row, { status: 'Waiting for participant', tone: 'wait', icon: 'schedule', note: sentOn ? 'Sent ' + sentOn : 'Sent', canWithdraw: true })
+      else if (answerid) Object.assign(row, { status: 'Submitted', tone: 'done', icon: 'check_circle', note: 'Filled by the participant', canView: true, canResend: true })
+      else Object.assign(row, { status: 'Not sent', tone: 'todo', icon: 'send', note: "The participant can't see it yet", canSend: true })
+      return row
+    }).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+    var done = rows.filter(r => r.answerid).length
+    var waiting = rows.filter(r => r.pending).length
+    var toFill = rows.filter(r => r.canFill).length
+    this.mapFormRows[atc.id] = rows
+    this.mapFormView[atc.id] = {
+      specialist: rows.filter(r => r.filledby == 'specialist'),
+      participant: rows.filter(r => r.filledby != 'specialist'),
+      summary: [done + ' of ' + rows.length + ' submitted', waiting ? waiting + ' waiting for participant' : null, toFill ? toFill + ' for you to fill' : null]
+        .filter(part => part).join(' · ')
+    }
+  }
+
+  // the live list changed (e.g. a form was just recorded on the ATC): refresh the rows of the opened ATCs
+  rebuildOpenedFormRows() {
+    this.sourceReportATC.forEach(atc => {
+      if (this.mapATCtranscription[atc.id]?.['view']) this.buildFormRows(atc)
+    })
+  }
+
+  // specialist form: open it in a new tab; the form screen records the answer on the ATC and closes itself
+  fillAtcForm(atc: QueryDocumentSnapshot<any>, row: any) {
+    var url = this.router.serializeUrl(this.router.createUrlTree(['/formtemplate'], { queryParams: { id: row.formid, type: 'form', profileid: atc.data()['profileid'], atcid: atc.id } }))
+    window.open(url, '_blank')
+  }
+
+  // submitted specialist form: open the saved answer prefilled and editable in a new tab; the form screen updates
+  // that same answer (B!G edit logic) and closes itself
+  editAtcForm(atc: QueryDocumentSnapshot<any>, row: any) {
+    var url = this.router.serializeUrl(this.router.createUrlTree(['/formtemplate'], { queryParams: { id: row.formid, type: 'form', patchdata: 'formsByClient/' + row.answerid, profileid: atc.data()['profileid'], atcid: atc.id } }))
+    window.open(url, '_blank')
+  }
+
+  // participant form: Send (no answer yet) or Resend (answerid = the answer to edit). ONE request per ATC + form for
+  // the ATC's whole life (operator 2026-10-29): when the row already has a request — made on this or an earlier
+  // version — the same doc is rewritten and keeps its atcid (the participant app builds the doc id from it and follows
+  // the ATC to its latest version); otherwise a new doc {atcid}_{formid}. formstatus 'sent' is what the app queries;
+  // this setDoc replaces the doc, so a Resend clears the 'submitted' left by the previous round.
+  sendAtcForm(atc: QueryDocumentSnapshot<any>, row: any) {
+    var atcData = atc.data()
+    var atcid = row.request ? row.request['atcid'] : atc.id
+    var request: any = { atcid, formid: row.formid, profileid: atcData['profileid'], product: atcData['product'] ?? null, sentby: this.profileID, sentat: serverTimestamp(), formstatus: 'sent' }
+    if (row.answerid) request.answerid = row.answerid
+    setDoc(row.request ? doc(this.firestoreATC, row.request.path) : doc(this.firestoreATC, 'atc_form_requests', atc.id + '_' + row.formid), request)
+      .catch(err => { console.error('Error sending ATC form:', err); alert("Couldn't send the form. Try again.") })
+  }
+
+  // Withdraw: delete the request (the participant's card goes away and the app can no longer submit it)
+  revokeAtcForm(row: any) {
+    if (!confirm("Withdraw this form? The participant won't be able to submit it.")) return
+    deleteDoc(doc(this.firestoreATC, row.request.path))
+      .catch(err => { console.error('Error revoking ATC form:', err); alert("Couldn't revoke the form. Try again.") })
+  }
+
+  // submitted form: the participant forms screen's read-only form overlay, as it is
+  viewAtcForm(atc: QueryDocumentSnapshot<any>, row: any) {
+    var profileid = atc.data()['profileid']
+    this.formOverlay.mapProfile = { [profileid]: (this.profileMap[profileid] || {})['name'] }
+    this.formOverlay.viewFormOverlay({ formname: row.name, formid: row.formid, docid: row.answerid, profileid })
   }
 
   onEditATC(atc: QueryDocumentSnapshot<any>): void {
@@ -1319,6 +1497,10 @@ export class ViewPrescribedATCComponent {
     return atc.id || atc.atcid;
   }
 
+  trackByFormId(index: number, row: any): any {
+    return row.formid;
+  }
+
   trackByAdjustmentID(index: number, transcription: any): any {
     return transcription["adjustment"]?.id;
   }
@@ -1375,17 +1557,11 @@ export class ViewPrescribedATCComponent {
   get myReviewerName(): string { return this.reviewerName(this.profileID) }
   reviewLogDate(value: any): Date | null { return this.reviewLog.toDate(value) }
   trackByReviewId(index: number, review: AtcReview): string { return review?.id ?? String(index) }
-  // involved (author / implementation agent) or mentor / admin / developer — adjustments are loaded when the ATC is open
-  canWriteReview(atc: any): boolean {
-    var adjustments = ((this.mapATCtranscription[atc.id] || {})["transcription"] ?? []).map(t => t?.adjustment?.data?.() ?? {})
-    return this.reviewLog.canWrite(this.profileID, this.profileRoles, atc.data(), adjustments)
-  }
   private reviewMessage(result: string): string | null {
     return result == 'retired' ? "This ATC was updated — reload to see the latest version."
       : result == 'missing' ? "This ATC or review no longer exists — reload the page." : null
   }
   async addReview(atc: any) {
-    if (!this.canWriteReview(atc)) return
     if ((this.reviewDraft[atc.id] ?? "").trim().length == 0) { this.reviewError[atc.id] = "Write the review first."; return }
     this.reviewBusy[atc.id] = true
     try {
@@ -1405,7 +1581,6 @@ export class ViewPrescribedATCComponent {
   }
   // undelete: straight back into the log, no confirmation (operator 2026-10-25)
   async restoreReview(atc: any, review: AtcReview) {
-    if (!this.canWriteReview(atc)) return
     this.reviewBusy[atc.id] = true
     try {
       var result = await this.reviewLog.restore(this.firestoreATC, atc.ref.path, review.id)
@@ -1419,7 +1594,6 @@ export class ViewPrescribedATCComponent {
     }
   }
   async confirmDeleteReview(atc: any, review: AtcReview) {
-    if (!this.canWriteReview(atc)) return
     this.reviewBusy[atc.id] = true
     try {
       var result = await this.reviewLog.softDelete(this.firestoreATC, atc.ref.path, review.id, this.profileID)

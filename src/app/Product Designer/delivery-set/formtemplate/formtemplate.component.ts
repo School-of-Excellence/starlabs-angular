@@ -2,7 +2,7 @@ import { Component, inject, Input, OnInit, OnDestroy, Output, EventEmitter, View
 import { ConnectivityGuardService, ConnectivityState } from '../../../shared/connectivity-guard.service';
 import { LocalDraftService } from '../../../shared/local-draft.service';
 import { Subscription } from 'rxjs';
-import { doc, Firestore , getDoc,collection , query, where, getDocs,setDoc,deleteDoc,updateDoc,arrayUnion, serverTimestamp, QueryDocumentSnapshot, waitForPendingWrites, getFirestore} from '@angular/fire/firestore';
+import { doc, Firestore , getDoc,collection , query, where, getDocs,setDoc,deleteDoc,updateDoc,arrayUnion, serverTimestamp, QueryDocumentSnapshot, waitForPendingWrites, getFirestore, runTransaction, FieldPath, DocumentReference, DocumentSnapshot} from '@angular/fire/firestore';
 import { ActivatedRoute, Router} from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { FormGroup,FormBuilder, Validators, FormControl, FormArray, ReactiveFormsModule}from'@angular/forms';
@@ -88,9 +88,19 @@ export class FormtemplateComponent {
 
   profileid: any;
   draftDocid:string
+  // video field index → the URL the player uses (+ ngsw-bypass). Kept OUT of submittedClientForm, which is saved to
+  // Firestore (draft + submit): the saved form keeps the plain URL from `delivery forms`. A plain string, like the
+  // audio field: <source [src]> doesn't unwrap a SafeResourceUrl (it rendered "SafeValue must use [property]=binding")
+  // and Firestore rejects the object ("Unsupported field value").
+  videoUrl: { [index: number]: string } = {}
   firestoreDefault = getFirestore()
   private firestoreForms = getFirestore('firestore-forms')
+  private firestoreATC = getFirestore('firestore-atc')
   private auth = inject(AuthguardService)
+  // ATC specialist form (opened from View ATC with ?atcid=): atcid = the ATC version it was opened from,
+  // atcTargetId = the current version the answer is recorded on (resolved at submit)
+  atcid: string | null = null
+  private atcTargetId: string | null = null
   currentUserId:string
   userProfile:any
   queueData:any
@@ -145,6 +155,7 @@ export class FormtemplateComponent {
 
     console.log('QueryParams', this.route.snapshot.queryParams);
     this.profileid = this.route.snapshot.queryParams['profileid'] || null;
+    this.atcid = this.route.snapshot.queryParams['atcid'] || null;
     // this.queueId = this.inlineQueueId ?? this.route.snapshot.queryParams['queueid'] ?? null;
     this.participantAssignmentId = this.route.snapshot.queryParams['participantAssignmentId'] ?? null;
 
@@ -328,15 +339,15 @@ export class FormtemplateComponent {
           this.showcontent = true
         })
       }//patch value if condition
-      this.submittedClientForm['formarray'] = this.submittedClientForm['formarray']?.map((form)=>{
+      this.videoUrl = {}
+      const fields = this.submittedClientForm['formarray'] || []
+      for (let index = 0; index < fields.length; index++) {
+        const form = fields[index]
         if(['video'].includes(form.type)){
-          let url = form.options[0];
-          url += (url.includes('?')?'&':'?') + 'ngsw-bypass';
-          url = this.sanitizer.bypassSecurityTrustResourceUrl(url);
-          form.options = [url]
+          const url = form.options[0];
+          this.videoUrl[index] = url + (url.includes('?')?'&':'?') + 'ngsw-bypass';
         }
-        return form
-      })
+      }
       // console.log('modified : ',this.submittedClientForm)
 
     })
@@ -507,9 +518,72 @@ export class FormtemplateComponent {
 
     previewRef.afterClosed().subscribe(async (data) => {
       if (data) {
+        // ATC form: stop before anything is reset or saved when the ATC no longer exists
+        if (this.atcid && !(await this.resolveAtcForSubmit())) return;
         await this.processFormSubmission(value,data);
       }
     });
+  }
+
+  // Follows upgradedto from the ATC the tab was opened for to its newest version (an edit may have upgraded it
+  // since the tab opened). An upgraded version also carries isdelete:true, so "upgraded" is checked before "deleted".
+  private async findCurrentAtc(read: (ref: DocumentReference) => Promise<DocumentSnapshot>): Promise<DocumentReference | 'deleted' | 'broken'> {
+    let ref = doc(this.firestoreATC, 'atc_alpha', this.atcid);
+    for (let hop = 0; hop < 20; hop++) {
+      const snap = await read(ref);
+      if (!snap.exists()) return 'deleted';
+      const data = snap.data();
+      if (data['upgradedto'] != null || data['status'] == 'upgraded') {
+        if (!data['upgradedto']?.id) return 'broken';
+        ref = doc(this.firestoreATC, 'atc_alpha', data['upgradedto'].id);
+        continue;
+      }
+      return data['isdelete'] === true ? 'deleted' : ref;
+    }
+    return 'broken';
+  }
+
+  // Checks the ATC still exists before the answer is saved
+  private async resolveAtcForSubmit(): Promise<boolean> {
+    try {
+      const atc = await this.findCurrentAtc(ref => getDoc(ref));
+      if (typeof atc !== 'string') {
+        this.atcTargetId = atc.id;
+        return true;
+      }
+      alert(atc === 'deleted'
+        ? "This ATC was removed, so the form wasn't saved."
+        : "This ATC couldn't be found, so the form wasn't saved. Try again from View ATC.");
+    } catch (error) {
+      console.error('Error resolving ATC:', error);
+      alert("Couldn't check the ATC. Your answers are kept; try submitting again.");
+    }
+    return false;
+  }
+
+  // Records the answer on the ATC's newest version (formsubmitted.{formid} = answer id) in one transaction, so an edit
+  // landing at the same moment makes Firestore retry on the new version. FieldPath keeps any form id a single map key.
+  private async recordOnAtc(formid: string, answerId: string): Promise<boolean> {
+    try {
+      const recorded = await runTransaction(this.firestoreATC, async transaction => {
+        const atc = await this.findCurrentAtc(ref => transaction.get(ref));
+        if (typeof atc === 'string') return false;
+        transaction.update(atc, new FieldPath('formsubmitted', formid), answerId);
+        return true;
+      });
+      if (!recorded) throw new Error('ATC removed before the form was recorded');
+      return true;
+    } catch (error) {
+      console.error('Error recording the form on the ATC:', error);
+      alert("The form was saved but couldn't be linked to the ATC. Tell your admin the form id " + answerId + ".");
+      return false;
+    }
+  }
+
+  // The tab was opened by View ATC, so it can close itself; a tab opened by hand falls back to home
+  private closeAtcFormTab() {
+    window.close();
+    setTimeout(() => this.router.navigateByUrl("/"), 300);
   }
 
    private async processFormSubmission(value: any, data: object) {
@@ -549,14 +623,26 @@ export class FormtemplateComponent {
       this.submittedClientForm['docid'] = this.draftDocid;
       this.submittedClientForm["submittedin"] = "starlabs";
       this.submittedClientForm['formid'] = this.inlineFormId ?? this.patchformid ?? null;
+      if (this.atcTargetId) {
+        this.submittedClientForm['atcid'] = this.atcTargetId;
+        this.submittedClientForm['filledby'] = 'specialist';
+      }
 
       console.log(this.submittedClientForm);
 
       // Submit the form
       await this.submitFormData(nextstage,data);
 
+      // ATC form: record the answer on the ATC
+      if (this.atcTargetId && !(await this.recordOnAtc(this.submittedClientForm['formid'], this.submittedClientForm['docid']))) {
+        loadingRef.close();
+        return;
+      }
+
       loadingRef.close();
-      if (this.queueId) {
+      if (this.atcTargetId) {
+        this.closeAtcFormTab();
+      } else if (this.queueId) {
         this.submittedFormName = this.submittedClientForm['formname'];
         this.submissionComplete = true;
         if (this.isInline) {
@@ -766,6 +852,8 @@ export class FormtemplateComponent {
 
     previewRef.afterClosed().subscribe(async (data) => {
       if (data.confirmed) {
+        // ATC answer (Edit from View ATC): stop before anything is saved when the ATC no longer exists
+        if (this.atcid && !(await this.resolveAtcForSubmit())) return;
         const loadingRef = this.dialog.open(LoadingProgressComponent, {
           data: { msg: "Submitting Please Wait ..." },
           disableClose: true
@@ -797,11 +885,20 @@ export class FormtemplateComponent {
           this.submittedClientForm['date'] = new Date();
           this.submittedClientForm['formid'] = this.inlineFormId ?? this.patchformid ?? null;
           this.submittedClientForm["submittedin"] = "starlabs";
+          if (this.atcTargetId) this.submittedClientForm['atcid'] = this.atcTargetId;
 
           console.log(this.submittedClientForm);
 
           // Update the document using merge option
           await setDoc(existingFormDocRef, this.submittedClientForm, { merge: true });
+
+          // ATC answer: keep it recorded on the ATC's newest version, then close the tab View ATC opened
+          if (this.atcTargetId) {
+            const recorded = await this.recordOnAtc(this.submittedClientForm['formid'], originalDocId);
+            loadingRef.close();
+            if (recorded) this.closeAtcFormTab();
+            return;
+          }
 
           // Update big participants assignments status
           if (this.participantAssignmentId) {

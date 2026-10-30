@@ -94,12 +94,44 @@
       </mat-autocomplete>
     </mat-form-field>
 
+    <div class="ca-forms">
+      <div class="ca-forms-head">
+        <span class="ca-forms-title">Forms</span>
+        <span class="ca-hint">{{ formRows.length ? formRows.length + (formRows.length === 1 ? ' form' : ' forms') : 'No forms yet' }}</span>
+      </div>
+
+      <div *ngFor="let row of formRows; trackBy: trackByFormId" data-testid="ca-form-row" class="ca-form-row">
+        <div class="ca-form-name">
+          <span *ngIf="row.name">{{ row.name }}</span>
+          <span *ngIf="row.name === null" data-testid="ca-form-missing" class="ca-error">Form not found</span>
+          <span *ngIf="!row.filledby" data-testid="ca-form-filledby-required" class="ca-form-required">Choose who fills this form</span>
+        </div>
+        <mat-button-toggle-group class="ca-form-toggle" hideSingleSelectionIndicator [value]="row.filledby" (change)="setFilledBy(row, $event.value)" aria-label="Filled by">
+          <mat-button-toggle data-testid="ca-form-specialist" value="specialist">Specialist</mat-button-toggle>
+          <mat-button-toggle data-testid="ca-form-participant" value="participant">Participant</mat-button-toggle>
+        </mat-button-toggle-group>
+        <button data-testid="ca-form-remove" mat-icon-button type="button" class="ca-danger" aria-label="Remove form" (click)="removeForm(row.formid)">
+          <mat-icon>delete_outline</mat-icon>
+        </button>
+      </div>
+
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Add a form</mat-label>
+        <input #formInput data-testid="ca-form-input" type="text" matInput placeholder="Search delivery forms"
+          [matAutocomplete]="formAuto"
+          (input)="searchForms(formInput.value)">
+        <mat-autocomplete #formAuto="matAutocomplete" (optionSelected)="addForm($event.option.value); formInput.value = ''">
+          <mat-option *ngFor="let option of formOptions; trackBy: trackByFormId" [value]="option">{{ option.formname }}</mat-option>
+        </mat-autocomplete>
+      </mat-form-field>
+    </div>
+
     <div *ngIf="saveError" data-testid="ca-save-error" class="ca-error">{{ saveError }}</div>
   </form>
 
   <div class="ca-footer">
     <button data-testid="ca-dialog-ref-1" mat-stroked-button type="button" (click)="onCancel()">Cancel</button>
-    <button data-testid="ca-on-submit-2" mat-flat-button color="primary" type="button" (click)="onSubmit()" [disabled]="form.invalid || saving">
+    <button data-testid="ca-on-submit-2" mat-flat-button color="primary" type="button" (click)="onSubmit()" [disabled]="form.invalid || formsIncomplete || saving">
       {{ saving ? 'Saving…' : (isEdit ? 'Save changes' : 'Create') }}
     </button>
   </div>

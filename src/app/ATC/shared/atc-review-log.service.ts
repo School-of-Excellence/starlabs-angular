@@ -34,19 +34,6 @@ export class AtcReviewLogService {
     return atcData == null || atcData["isdelete"] === true || atcData["status"] == "upgraded" || atcData["upgradedto"] != null
   }
 
-  /**
-   * Who may add and soft-delete reviews: a specialist involved in the ATC (in its `author` list or in any adjustment's
-   * `implementationagent`), or anyone with the mentor / admin / developer role. Everyone else reads only.
-   */
-  canWrite(profileid: string, roles: any, atcData: any, adjustments: any[]): boolean {
-    if (!profileid || atcData == null) return false
-    if (roles?.["mentor"] || roles?.["admin"] || roles?.["developer"]) return true
-    var authors: string[] = (atcData["author"] ?? []).map(a => typeof a == "string" ? a.split("/").pop() : a?.id)
-    if (authors.includes(profileid)) return true
-    return (adjustments ?? []).some(adj => (adj?.["implementationagent"] ?? []).some(agent =>
-      (typeof agent == "string" ? agent.split("/").pop() : agent?.id) == profileid))
-  }
-
   /** Active reviews (not deleted). */
   activeCount(reviewlog: any): number {
     return (Array.isArray(reviewlog) ? reviewlog : []).filter(r => r?.isdelete !== true).length
