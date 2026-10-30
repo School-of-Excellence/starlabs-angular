@@ -106,7 +106,7 @@
           <span *ngIf="row.name === null" data-testid="ca-form-missing" class="ca-error">Form not found</span>
           <span *ngIf="!row.filledby" data-testid="ca-form-filledby-required" class="ca-form-required">Choose who fills this form</span>
         </div>
-        <mat-button-toggle-group class="ca-form-toggle" hideSingleSelectionIndicator [value]="row.filledby" (change)="setFilledBy(row, $event.value)" aria-label="Filled by">
+        <mat-button-toggle-group data-testid="ca-form-filledby" class="ca-form-toggle" hideSingleSelectionIndicator [value]="row.filledby" (change)="setFilledBy(row, $event.value)" aria-label="Filled by">
           <mat-button-toggle data-testid="ca-form-specialist" value="specialist">Specialist</mat-button-toggle>
           <mat-button-toggle data-testid="ca-form-participant" value="participant">Participant</mat-button-toggle>
         </mat-button-toggle-group>
