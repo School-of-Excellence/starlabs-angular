@@ -5,13 +5,14 @@ import { OnInit } from '@angular/core';
 import { Firestore, collection, collectionData, query, where } from '@angular/fire/firestore';
 import { getDocs } from 'firebase/firestore';
 import { firstValueFrom } from 'rxjs';
+import { MatTableModule } from '@angular/material/table';
 
-type Panel = 'none' | 'compl' | 'weekly' | 'appt' | 'stuck' | 'nc' | 'rdy' | 'await' | 'ind';
+type Panel = 'none' | 'compl' | 'weekly' | 'appt' | 'stuck' | 'nc' | 'rdy' | 'await' | 'ind' | 'live';
 
 @Component({
   selector: 'app-delivery-dashboard-new',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, MatTableModule],
   templateUrl: './delivery-dashboard-new.component.html',
   styleUrl: './delivery-dashboard-new.component.css'
 })
@@ -114,10 +115,34 @@ export class DeliveryDashboardNewComponent implements OnInit {
   toastShow = false;
   private toastTimer: any;
 
+  // grouping
+  private readonly hiddenProductNames = new Set([
+    'CTD Review', 'CTD Live Event', 'SMP Live', 'SMP Master Class', 'CTD Master Class',
+    'B!G Accelerator March 2025', 'CPM Modules', 'Post uP! Review', 'High Performance Delivered',
+    'HPC Implementation', 'Pattern Interrupt Diagnostics And Implementation', 'A&H Vitality Booster',
+    'Complimentary Review', 'Covid Support', 'Test-Glimpse',
+    'Breakthrough Extreme Diagnostics & Implementation', 'Evolution Prep',
+    'A&H Custom Motherhood Excellence Solution for Wife', 'Test new'
+  ]);
+
+  private readonly mergedGroups: Record<string, string[]> = {
+    'CTD Diagnostics & Implementation': ['CTD Diagnostics (Appointment)', 'CTD Diagnostics & Implementation (Appointment)', 'CTD Platinum', 'CTD Diagnostics And Implementation'],
+    'EI Custom Solutions': ['EI Solution', 'EI Custom Solutions', 'EI Solution for Wife', 'EI Solution for Husband', 'EI for Entrepreneurs', 'EI for Academy Growth'],
+    'Critical Support Diagnostics and Implementation': ['Critical Support Diagnostics And Implementation', 'Critical Support Implementation'],
+    'SMP Diagnostics & Implementation': ['SMP Diagnostics & Implementation', 'SMP Diagnostic & Implementation (Appointment)']
+  };
+
   // array variable declaration
   dfuProducts: any[] = [];
   participantMetadata: any[] = [];
   participantProducts: any[] = [];
+  ongoingByProduct: { name: string; count: number; hidden: boolean }[] = [];  
+  ongoingTotal = 0;
+  liveLists: Record<string, any[]> = { ind: [], rdy: [], stuck: [], avg: [] };
+  liveRows: any[] = [];
+  liveColumns = ['name', 'email', 'product', 'startDate', 'days'];
+  avgDays: number | null = null;
+  lastAppointmentByProfile: Record<string, Date> = {};
 
   constructor(private firestore: Firestore) {}
 
@@ -125,28 +150,116 @@ export class DeliveryDashboardNewComponent implements OnInit {
     await this.getDfuProducts();
     await this.getParticipantMetadata();
     await this.getParticipantProducts();
+    await this.getLastAppointments();
+    this.buildOngoingByProduct();
+    this.buildLiveLists();
+  }
+
+  async getLastAppointments() {
+    const profileIds = this.participantMetadata.map(p => p.profileid);
+    const chunkSize = 30;
+    const requests: Promise<any>[] = [];
+
+    for (let i = 0; i < profileIds.length; i += chunkSize) {
+      const chunk = profileIds.slice(i, i + chunkSize);
+      const q = query(collection(this.firestore, 'appointments'), where('profileid', 'in', chunk));
+      requests.push(getDocs(q));
+    }
+
+    const snapshots = await Promise.all(requests);
+    for (const docSnap of snapshots.flatMap(s => s.docs)) {
+      const data = docSnap.data();
+      const date = data['startdate'].toDate();
+      const last = this.lastAppointmentByProfile[data['profileid']];
+      const isLater = !last || date > last;
+      if (isLater) { this.lastAppointmentByProfile[data['profileid']] = date; }
+    }
+  }
+
+  private daysBetween(from: Date, to: Date): number {
+    return Math.floor((to.getTime() - from.getTime()) / 86400000);
+  }
+
+  buildLiveLists() {
+    const metaByProfile = new Map(this.participantMetadata.map(m => [m.profileid, m]));
+    const stuckLimit = this.addDays(-14);
+    const lists: Record<string, any[]> = { ind: [], rdy: [], stuck: [], avg: [] };
+
+    for (const pp of this.participantProducts) {
+      const meta = metaByProfile.get(pp.profileid);
+      if (!meta) { continue; }
+
+      const startDate = (pp.statusdate?.ongoing || pp.statusdate?.initiated)?.toDate();
+      const completedDate = pp.statusdate?.completed?.toDate();
+      const product = this.dfuProducts.find(d => d.id === pp.productref?.id)?.product;
+      const row = { name: meta.name, email: meta.email, product, startDate, days: 0 };
+
+      const isInDelivery = pp.ongoing && !completedDate;
+      const lastActivity = this.lastAppointmentByProfile[pp.profileid] || startDate;
+      const isStuck = isInDelivery && lastActivity < stuckLimit;
+
+      const customerStatus = (meta.customerstatus || '').toLowerCase();
+      const financialStatus = (meta.financialstatus || '').toLowerCase();
+      const isCustomerActive = customerStatus === 'active';
+      const isPaid = ['regular', 'fully paid'].includes(financialStatus);
+      const hasNoParallel = meta.activeproduct.length === 1;
+      const isPaymentCleared = Number(pp.minimumpayment) === 0;
+      const isReady = !pp.ongoing && isCustomerActive && isPaid && hasNoParallel && isPaymentCleared;
+
+      const isCompleted = !!completedDate && !!pp.statusdate?.ongoing;
+
+      if (isInDelivery) { lists['ind'].push({ ...row, days: this.daysBetween(startDate, this.TODAY) }); }
+      if (isStuck) { lists['stuck'].push({ ...row, days: this.daysBetween(lastActivity, this.TODAY) }); }
+      if (isReady) { lists['rdy'].push(row); }
+      if (isCompleted) { lists['avg'].push({ ...row, days: this.daysBetween(pp.statusdate.ongoing.toDate(), completedDate) }); }
+    }
+
+    const totalDays = lists['avg'].reduce((sum, r) => sum + r.days, 0);
+    this.avgDays = lists['avg'].length ? Math.round(totalDays / lists['avg'].length) : null;
+    this.liveLists = lists;
+  }
+
+  openLive(kind: string) {
+    this.liveRows = this.liveLists[kind];
+    this.openPanel('live');
   }
 
   async getDfuProducts() {
     const q = query(collection(this.firestore, 'products'), where('type', '==', 'DFU'));
     const snapshot = await getDocs(q);
     this.dfuProducts = snapshot.docs.map(d => ({ id: d.id, ref: d.ref, ...d.data() }));
+    console.log('DFU Products:', this.dfuProducts);
   }
 
   async getParticipantMetadata() {
-    const dfuRefs = this.dfuProducts.map(p => p.ref);
-    const q = query(
-      collection(this.firestore, 'participant metadata'),
-      where('activeproduct', 'array-contains-any', dfuRefs)
-    );
-    const metadata = await firstValueFrom(collectionData(q, { idField: 'id' }));
-    this.participantMetadata = metadata.map(p => ({
-      id: p.id,
-      profileid: p['profileid'],
-      name: p['name'],
-      email: p['email'],
-      activeproduct: p['activeproduct']
-    }));
+    const dfuRefs = this.dfuProducts.map(p => p.id);
+    const chunkSize = 30;
+    const requests: Promise<any>[] = [];
+
+    for (let i = 0; i < dfuRefs.length; i += chunkSize) {
+      const chunk = dfuRefs.slice(i, i + chunkSize);
+      const q = query(collection(this.firestore, 'participant metadata'), where('activeproduct', 'array-contains-any', chunk));
+      requests.push(getDocs(q));
+    }
+
+    const snapshots = await Promise.all(requests);
+    const docs = snapshots.flatMap(s => s.docs);
+
+    const metadataById = new Map<string, any>();
+    for (const docSnap of docs) {
+      const p = docSnap.data();
+      metadataById.set(docSnap.id, {
+        id: docSnap.id,
+        profileid: p['profileid'],
+        name: p['name'],
+        email: p['email'],
+        activeproduct: p['activeproduct'],
+        activeproduct: p['activeproduct'],
+        customerstatus: p['customerstatus'],
+        financialstatus: p['financialstatus']
+      });
+    }
+    this.participantMetadata = Array.from(metadataById.values());
   }
 
   async getParticipantProducts() {
@@ -175,6 +288,40 @@ export class DeliveryDashboardNewComponent implements OnInit {
     }
     this.participantProducts = list;
   }
+
+  private groupNameOf(productName: string): string {
+    const groupName = Object.keys(this.mergedGroups).find(g => this.mergedGroups[g].includes(productName));
+    return groupName || productName;
+  }
+
+  buildOngoingByProduct() {
+    const countByProductId: Record<string, number> = {};
+    for (const p of this.participantProducts) {
+      if (!p.ongoing) continue;
+      const productId = p.productref?.id;
+      countByProductId[productId] = (countByProductId[productId] || 0) + 1;
+    }
+
+    const rowsByName: Record<string, { name: string; count: number; hidden: boolean }> = {};
+    for (const p of this.dfuProducts) {
+      const name = this.groupNameOf(p.product);
+      const isHidden = this.hiddenProductNames.has(p.product);
+      const row = rowsByName[name] || { name, count: 0, hidden: isHidden };
+      row.count += countByProductId[p.id] || 0;
+      rowsByName[name] = row;
+    }
+    this.ongoingByProduct = Object.values(rowsByName);
+  }
+
+  visibleOngoing() {
+    return this.ongoingByProduct.filter(p => this.S.showHidden || !p.hidden);
+  }
+
+  ongoingParticipant(): number {
+    return this.visibleOngoing().reduce((sum, p) => sum + p.count, 0);
+  }
+
+  maxOngoing(): number { return Math.max(...this.visibleOngoing().map(p => p.count), 1); }
 
   // ---------- sample data ----------
   private buildPeople(): any[] {
@@ -236,7 +383,6 @@ export class DeliveryDashboardNewComponent implements OnInit {
   sumFunnel(i: number): number { return this.sumProducts(p => p.funnel[i]); }
   sumStageTotal(): number { return this.sumProducts(p => this.stageTotal(p)); }
   prio(d: number): [string, string] { return d >= 14 ? ['HIGH', 'b-red'] : d >= 7 ? ['MEDIUM', 'b-amber'] : ['LOW', 'b-green']; }
-  maxOngoing(): number { return Math.max(...this.PRODUCTS.map(p => p.funnel[3]), 1); }
   maxOf(n: number): number { return Math.max(n, 1); }
 
   inRangeInit(p: any): boolean {
@@ -256,11 +402,11 @@ export class DeliveryDashboardNewComponent implements OnInit {
   }
   get kpis() {
     const p = this.curP(), SYS = this.SYS;
-    const avg = p ? (['0d', 'none', '—'].includes(p.avgDone) ? null : parseInt(p.avgDone, 10)) : SYS.avgDays;
+    const avg = p ? (['0d', 'none', '—'].includes(p.avgDone) ? null : parseInt(p.avgDone, 10)) : this.avgDays;
     return {
-      inDel: p ? p.funnel[3] : SYS.inDelivery,
-      ready: p ? p.funnel[0] : SYS.readyToStart,
-      stuck: p ? this.countStatusForProduct('stuck') : SYS.stuck,
+      inDel: p ? p.funnel[3] : this.liveLists['ind'].length,
+      ready: p ? p.funnel[0] : this.liveLists['rdy'].length,
+      stuck: p ? this.countStatusForProduct('stuck') : this.liveLists['stuck'].length,
       awaiting: p ? this.countStatusForProduct('awaiting-payment') : SYS.awaiting,
       notC: p ? this.countStatusForProduct('not-consuming') : SYS.notConsuming,
       avg
