@@ -1,0 +1,626 @@
+import { Component } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import {
+  Firestore, collection, query, orderBy, where, getDocs, doc, getDoc
+} from '@angular/fire/firestore';
+import { MatTabsModule } from '@angular/material/tabs';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { MAT_SELECT_CONFIG } from '@angular/material/select';
+
+import { AuthguardService } from '../../authguard.service';
+import { ProductFunnelComponent } from './product-funnel/product-funnel.component';
+import { UpdateEventDetailComponent } from '../event-list/update-event-detail/update-event-detail.component';
+import { MatDialog } from '@angular/material/dialog';
+
+interface OverviewRow {
+  arena: any;
+  eventName: string;
+  productName: string;
+  initial: string;
+  avatarColor: string;
+  dateLabel: string;
+  endValue: number;
+  startValue: number;
+  isToday: boolean;
+  potential: number | null;
+  requested: number | null;
+  approved: number | null;
+  eligible: number | null;
+  upgrade: number | null;
+  addon: number | null;
+  continuity: number | null;
+  notEligible: number | null;
+  frozen: boolean;
+  eligibleLoaded: boolean;
+  error: boolean;
+  event : boolean;
+}
+
+interface OpenTab {
+  key: string;
+  eventName: string;
+  eventStart : Date;
+  eventEnd: Date;
+  event : any;
+  arenaId : any;
+}
+
+const TABS_KEY = 'epc_open_tabs';
+const AVATAR_COLORS = ['#0a84ff', '#5856d6', '#30b0c7', '#ff9500', '#af52de', '#ff2d55', '#0fa37f'];
+const PAST_WINDOW_MS = 180 * 86400000;
+
+@Component({
+  selector: 'app-event-participation-confirmations-clone',
+  standalone: true,
+  imports: [
+    CommonModule, FormsModule, MatTabsModule, MatButtonModule, MatIconModule, MatTooltipModule,
+    MatFormFieldModule, MatInputModule, MatPaginatorModule, ProductFunnelComponent
+  ],
+  providers: [
+    { provide: MAT_SELECT_CONFIG, useValue: { overlayPanelClass: 'sx-select-pane' } }
+  ],
+  templateUrl: './event-participation-confirmations-clone.component.html',
+  styleUrl: './event-participation-confirmations-clone.component.css'
+})
+export class EventParticipationConfirmationsCloneComponent {
+
+  mapProduct: Record<string, string> = {};
+  overviewRows = [];
+  openTabs: OpenTab[] = [];
+  selectedIndex = 0;
+  loadingOverview = true;
+  loadError = false;
+  searchOverview = '';
+  mode: 'upcoming' | 'past' = 'upcoming';
+
+  pageIndex = 0;
+  pageSize = 5;
+  private tabsRestored = false;
+
+  participantMetadata = {};
+  eventMap = {};
+
+  constructor(public firestore: Firestore, public guard: AuthguardService , private dialog : MatDialog) {
+    this.loadOverview();
+
+    getDocs(collection(this.firestore , 'participant metadata')).then((participantMetadataSnap)=>{
+      participantMetadataSnap.docs.forEach((docref)=>{
+        const data = docref.data();
+        const profileId = data['profileid'] ?? null;
+        this.participantMetadata[profileId] = data;
+      })
+    });
+    
+  }
+
+  // async loadOverview() {
+  //   this.loadingOverview = true;
+  //   this.loadError = false;
+  //   try {
+  //     this.mapProduct = await this.guard.getProductMap();
+
+  //     const now = new Date();
+  //     now.setHours(0, 0, 0, 0);
+  //     const todayStart = now.getTime();
+  //     const todayEnd = todayStart + 86400000 - 1;
+  //     const pastFloor = todayStart - PAST_WINDOW_MS;
+  //     const inWindow = (end: number) =>
+  //       this.mode === 'past' ? (end < todayStart && end >= pastFloor) : (end >= todayStart);
+
+  //     const [eventSnap, queueSnap] = await Promise.all([
+  //       getDocs(query(collection(this.firestore, 'event collection'), orderBy('end_date', 'desc'))),
+  //       getDocs(query(collection(this.firestore, 'queue generation'), orderBy('queueenddate', 'desc')))
+  //     ]);
+
+  //     const mapEvent: Record<string, any> = {};
+  //     const refs: any[] = [];
+  //     eventSnap.docs.forEach(d => {
+  //       const data = d.data();
+  //       const end = this.toMillis(data['end_date']);
+  //       if (data['delete'] != true && inWindow(end)) {
+  //         mapEvent[d.id] = { name: data['name'], end, start: this.toMillis(data['start_date']) , docid : d.id , isQueueEvent : false };
+  //         refs.push(d.ref);
+  //       }
+  //     });
+  //     queueSnap.docs.forEach(d => {
+  //       const data = d.data();
+  //       const end = this.toMillis(data['queueenddate']);
+  //       if (data['delete'] != true && inWindow(end)) {
+  //         mapEvent[d.id] = { name: data['queuename'], end, start: this.toMillis(data['queuestartdate']) , isQueueEvent : true };
+  //         refs.push(d.ref);
+  //       }
+  //     });
+
+  //     const arenas: any[] = [];
+  //     for (let i = 0; i < refs.length; i += 10) {
+  //       const chunk = refs.slice(i, i + 10);
+  //       const snap = await getDocs(query(
+  //         collection(this.firestore, 'arena events'), where('eventref', 'in', chunk)));
+  //       snap.docs.forEach(d => { 
+  //         const a = d.data(); 
+  //         if (a['delete'] != true) { arenas.push(a);}
+  //       });
+  //     }
+
+  //     const rows: OverviewRow[] = arenas
+  //       .filter(a => a['eventref'] && mapEvent[a['eventref'].id])
+  //       .map(a => {
+  //         const ev = mapEvent[a['eventref'].id];
+  //         const start = ev?.start ?? 0;
+  //         const end = ev?.end ?? 0;
+  //         const eventName = ev?.name ?? 'Event';
+  //         const productName = this.mapProduct[a['productref']?.id] ?? 'Product';
+  //         const row: OverviewRow = {
+  //           arena: a,
+  //           eventName,
+  //           productName,
+  //           initial: this.initialFor(productName),
+  //           avatarColor: this.avatarColorFor(a['docid'] || eventName),
+  //           dateLabel: this.formatRange(start, end),
+  //           endValue: end, startValue: start,
+  //           isToday: !!start && start <= todayEnd && end >= todayStart,
+  //           event : ev ,
+  //           potential: null, requested: null, approved: null,
+  //           eligible: null, upgrade: null , addon: null , continuity: null, notEligible: null, frozen: false, eligibleLoaded: false, error: false
+  //         };
+  //         const snap = a['epc_snapshot'];
+  //         if (snap) {
+  //           row.potential = snap['potential'] ?? null;
+  //           row.requested = snap['requested'] ?? null;
+  //           row.approved = snap['approved'] ?? null;
+  //           row.eligible = snap['eligible'] ?? null;
+  //           row.notEligible = (snap['noProduct'] ?? 0) + (snap['inQueue'] ?? 0);
+  //           row.frozen = true;
+  //           row.eligibleLoaded = true;
+  //         }
+  //         return row;
+  //       });
+
+  //     rows.sort((x, y) => (y.endValue - x.endValue) || x.eventName.localeCompare(y.eventName));
+  //     this.overviewRows = rows;
+  //     this.loadingOverview = false;
+
+  //     if (!this.tabsRestored) { this.restoreTabs(); this.tabsRestored = true; }
+  //     this.computePageEligibility();
+  //   } catch (err) {
+  //     console.log(err);
+  //     this.loadError = true;
+  //     this.loadingOverview = false;
+  //   }
+  // }
+
+  async loadOverview() {
+    this.loadingOverview = true;
+    this.loadError = false;
+    try {
+      this.mapProduct = await this.guard.getProductMap();
+
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      const todayStart = now.getTime();
+      const todayEnd = todayStart + 86400000 - 1;
+      const pastFloor = todayStart - PAST_WINDOW_MS;
+      const inWindow = (end: number) =>
+        this.mode === 'past' ? (end < todayStart && end >= pastFloor) : (end >= todayStart);
+
+      const [eventSnap, queueSnap] = await Promise.all([
+        getDocs(query(collection(this.firestore, 'event collection'), orderBy('end_date', 'desc'))),
+        getDocs(query(collection(this.firestore, 'queue generation'), orderBy('queueenddate', 'desc')))
+      ]);
+
+      const mapEvent: Record<string, any> = {};
+      const refs: any[] = [];
+      eventSnap.docs.forEach(d => {
+        const data = d.data();
+        const end = this.toMillis(data['end_date']);
+        if (data['delete'] != true && inWindow(end)) {
+          mapEvent[d.id] = { name: data['name'], end, start: this.toMillis(data['start_date']) , docid : d.id , isQueueEvent : false };
+          refs.push(d.ref);
+        }
+      });
+      queueSnap.docs.forEach(d => {
+        const data = d.data();
+        const end = this.toMillis(data['queueenddate']);
+        if (data['delete'] != true && inWindow(end)) {
+          mapEvent[d.id] = { name: data['queuename'], end, start: this.toMillis(data['queuestartdate']) ,docid : d.id ,isQueueEvent : true };
+          refs.push(d.ref);
+        }
+      });
+
+      const arenas: any[] = [];
+      const arenaEventMap = {};
+      for (let i = 0; i < refs.length; i += 10) {
+        const chunk = refs.slice(i, i + 10);
+        const snap = await getDocs(query(
+          collection(this.firestore, 'arena events'), where('eventref', 'in', chunk)));
+        snap.docs.forEach(d => { 
+          const a = d.data(); 
+          if (a['delete'] != true) { 
+            const eventId = a['eventref']?.id;
+            arenaEventMap[eventId] = arenaEventMap[eventId] ?? [];
+            arenaEventMap[eventId].push(a);
+          }
+        });
+      }
+
+      const rows = [];
+
+      for (const [eventId , arenaevents] of Object.entries(arenaEventMap) as any) {
+        const event = mapEvent[eventId] ?? null;
+        const subEvents = [];
+
+        for (const arena of arenaevents) {
+          const arenaRow = this.buildArenaEvent(arena , mapEvent , todayStart , todayEnd);
+          subEvents.push(arenaRow);
+        };
+
+        subEvents.sort((a , b)=>{
+          if (a.arena.heroevent && !b.arena.heroevent) return -1;
+          if (!a.arena.heroevent && b.arena.heroevent) return 1;
+
+          return (a.start - b.start);
+        })
+
+        const eventRow = {
+          ...event , 
+          subEvents : subEvents
+        }
+
+        rows.push(eventRow)
+      }
+
+      rows.sort((x, y) => (y.end - x.end) || x.name.localeCompare(y.name));
+      console.log('overview rows : ' , this.overviewRows)
+      this.overviewRows = rows;
+      this.loadingOverview = false;
+
+      if (!this.tabsRestored) { this.restoreTabs(); this.tabsRestored = true; }
+      this.computePageEligibility();
+    } catch (err) {
+      console.log(err);
+      this.loadError = true;
+      this.loadingOverview = false;
+    }
+  }
+
+  buildArenaEvent(a , mapEvent , todayStart , todayEnd){
+    const ev = mapEvent[a['eventref'].id];
+    const start = this.toMillis(a?.startdate) ?? 0;
+    const end = this.toMillis(a?.enddate) ?? 0;
+    const eventName = ev?.name ?? 'Event';
+    const productName = this.mapProduct[a['productref']?.id] ?? 'Product';
+    const row = {
+      arena: a,
+      eventName,
+      productName,
+      initial: this.initialFor(productName),
+      avatarColor: this.avatarColorFor(a['docid'] || eventName),
+      dateLabel: this.formatRange(start, end),
+      endValue: end, startValue: start,
+      isToday: !!start && start <= todayEnd && end >= todayStart,
+      event : ev ,
+      potential: null, requested: null, approved: null,
+      eligible: null, upgrade: null , addon: null , continuity: null, notEligible: null, frozen: false, eligibleLoaded: false, error: false
+    };
+    const snap = a['epc_snapshot'];
+    if (snap) {
+      row.potential = snap['potential'] ?? null;
+      row.requested = snap['requested'] ?? null;
+      row.approved = snap['approved'] ?? null;
+      row.eligible = snap['eligible'] ?? null;
+      row.notEligible = (snap['noProduct'] ?? 0) + (snap['inQueue'] ?? 0);
+      row.frozen = true;
+      row.eligibleLoaded = true;
+    }
+    return row;
+  }
+  
+  retry() { this.loadOverview(); }
+
+  setMode(m: 'upcoming' | 'past') {
+    if (this.mode === m) return;
+    this.mode = m;
+    this.pageIndex = 0;
+    this.searchOverview = '';
+    this.overviewRows = [];
+    this.loadOverview();
+  }
+
+  // surya
+   private async computePageEligibility() {
+    const pending = [];
+    for (const event of this.pagedRows) {
+      const subEvents = event?.subEvents;
+      subEvents?.forEach((a : OverviewRow)=>{
+        if (!a.eligibleLoaded) {
+          pending.push(a);
+        }
+      })
+    };
+    
+    const CHUNK = 4;
+    for (let i = 0; i < pending.length; i += CHUNK) {
+      const chunk = pending.slice(i, i + CHUNK);
+      await Promise.all(chunk.map(async r => {
+        try {
+          const arena = r.arena;
+           const eligibility = arena['eligibility'] ?? {};
+           const productConsumption = eligibility['productconsumption'] ?? [];
+           const customerStatus = eligibility['customerstatus'] ?? [];
+           const eligibilityJourney = eligibility['journeyid'] ?? [];
+
+           const dataQueries : any = [
+              getDocs(query(collection(this.firestore, 'event participation request'),
+                where('arenaeventid', '==', arena['docid']), where('status', 'in', ['requested', 'approved']))),
+              this.getOwners(arena['productref']),
+              this.getActive(arena['eventref'])
+          ]
+           
+          if (eligibility?.cohortid?.length > 0) {
+            const cohortQuery = query(
+              collection(this.firestore, 'big cohorts'),
+              where('docid', 'in', eligibility?.cohortid),
+            );
+            dataQueries.push(getDocs(cohortQuery));
+          }
+
+
+          // Prefer the precomputed rollup doc (1 read). Any failure here — the doc
+          // doesn't exist yet, OR security rules don't allow event_stats yet — must
+          // fall through to the live scan-and-join below, so the screen never breaks.
+          try {
+            const statsSnap = await getDoc(doc(this.firestore, 'event_stats', arena['docid']));
+            if (statsSnap.exists()) {
+              const s: any = statsSnap.data();
+              r.potential = s['potential'] ?? null;
+              r.requested = s['requested'] ?? null;
+              r.approved = s['approved'] ?? null;
+              r.eligible = s['eligible'] ?? null;
+              r.notEligible = (s['noProduct'] ?? 0) + (s['inQueue'] ?? 0);
+              r.error = false;
+              r.eligibleLoaded = true;
+              return;
+            }
+          } catch { /* no event_stats yet / not readable — use the live fallback */ }
+          const [eprSnap, owners, active , cohorts] = await Promise.all(dataQueries);
+          const cohortParticipants = [];
+
+          if (cohorts) {
+            cohorts?.docs.forEach((docref) => {
+              const participant = docref.data()['participantidlist'] ?? [];
+              for (const pid of participant) {
+                if (!cohortParticipants.includes(pid)) {
+                  cohortParticipants.push(pid);
+                }
+              }
+            });
+          }
+
+          const requestedIds = new Set<string>();
+          const approvedIds = new Set<string>();
+
+          eprSnap.docs.forEach(d => {
+            const x = d.data();
+            const pid = x['profileid'];
+            if (!pid) return;
+            if (x['status'] == 'approved') approvedIds.add(pid);
+            else if (x['status'] == 'requested') requestedIds.add(pid);
+          });
+          approvedIds.forEach(p => requestedIds.delete(p));
+          let eligible = 0;
+          let upgrade = 0;
+          let addon = 0;
+          let continuity = 0;
+          let notEligible = 0;
+
+          // requestedIds.forEach(p => { if (owners.has(p) && !active.has(p)) eligible++; });
+          requestedIds.forEach(p => { 
+              const participantEligibleBucket = this.participantBucket(p , owners.has(p) , customerStatus , productConsumption , eligibilityJourney , cohortParticipants);
+              console.log(participantEligibleBucket)
+              if (participantEligibleBucket === 'eligibile' && !active.has(p)) {
+                eligible++
+              } else if(participantEligibleBucket === 'upgrade' && !active.has(p)){
+                upgrade++
+              } else if(participantEligibleBucket === 'addon' && !active.has(p)){
+                addon++
+              } else if(participantEligibleBucket === 'continuity' && !active.has(p)){
+                continuity++
+              } else if(participantEligibleBucket === 'not eligibile' && !active.has(p)){
+                notEligible++
+              }
+           });
+
+          r.potential = owners.size;
+          r.requested = requestedIds.size;
+          r.approved = approvedIds.size;
+          r.eligible = eligible;
+          r.upgrade = upgrade;
+          r.addon = addon;
+          r.continuity = continuity;
+          r.notEligible = notEligible;
+          r.error = false;
+          r.eligibleLoaded = true;
+        } catch (e) {
+          console.log('overview eligibility load failed', e);
+          r.error = true;
+          r.eligibleLoaded = true;
+        }
+      }));
+    }
+  }
+
+  participantBucket(pid : string , isOwner : boolean, customerStatus : Array<string>, productConsumption : Array<any> , eligibilityJourney : Array<string> , cohortParticipants : Array<string>){
+    const metadata = this.participantMetadata[pid] ?? null;
+    if (metadata) {
+      const journey = metadata['activejourney'] ?? metadata['lastcompletedjourney'] ?? null;
+      const status = metadata['customerstatus'] ?? null;
+      const consumedproducts = {};
+
+      for (const product of metadata['consumedproducts'] ?? []) {
+        consumedproducts[product] = consumedproducts[product] ?? 0;
+        consumedproducts[product] = consumedproducts[product] + 1;
+      }
+
+      const journeyMatch = eligibilityJourney.length === 0 || eligibilityJourney.includes(journey);
+      const cohortMatch = cohortParticipants.length === 0 || cohortParticipants.includes(pid);
+      const consumptionMatch = productConsumption.every((product) => {
+        const productId = product?.productid;
+        if (product['operator'] === '==') {
+          return (consumedproducts[productId] ?? 0) === product?.count;
+        } else if (product['operator'] === '>=') {
+          return (consumedproducts[productId] ?? 0) >= product?.count;
+        } else if (product['operator'] === '<=') {
+          return (consumedproducts[productId] ?? 0) <= product?.count;
+        } else {
+          return false;
+        }
+      });
+
+      if (status == 'active') {
+        if (!consumptionMatch || !cohortMatch) return 'not eligibile';
+        if (!journeyMatch) return 'upgrade';
+        if (!isOwner) return 'addon';
+        return 'eligibile';
+      }
+
+       if (status == 'non active') {
+        if (customerStatus.includes('non active') && isOwner) return 'eligibile';
+        if (journeyMatch) return 'continuity';
+        return 'upgrade';
+      }
+    }
+    return 'not eligibile'
+  }
+
+  private ownersCache = new Map<string, Set<string>>();
+  private activeCache = new Map<string, Set<string>>();
+  private async getOwners(productref: any): Promise<Set<string>> {
+    const key = productref?.id ?? String(productref);
+    const cached = this.ownersCache.get(key);
+    if (cached) return cached;
+    const snap = await getDocs(query(collection(this.firestore, 'participantsproduct'),
+      where('productref', '==', productref), where('status', '==', null)));
+    const set = new Set<string>();
+    snap.docs.forEach(d => { const x = d.data(); if (x['profileid']) set.add(x['profileid']); });
+    this.ownersCache.set(key, set);
+    return set;
+  }
+  private async getActive(eventref: any): Promise<Set<string>> {
+    const key = eventref?.id ?? String(eventref);
+    const cached = this.activeCache.get(key);
+    if (cached) return cached;
+    const snap = await getDocs(query(collection(this.firestore, 'queue_token'),
+      where('queueref', '==', eventref)));
+    const set = new Set<string>();
+    snap.docs.forEach(d => {
+      const x = d.data();
+      if ((x['tokenstatus'] ?? '').toString().toLowerCase() == 'active' && x['profile_id']) set.add(x['profile_id']);
+    });
+    this.activeCache.set(key, set);
+    return set;
+  }
+
+  private initialFor(name: string): string {
+    const m = (name || '').trim();
+    return m ? m[0].toUpperCase() : '?';
+  }
+  private avatarColorFor(key: string): string {
+    const k = key || '';
+    let h = 0;
+    for (let i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) >>> 0;
+    return AVATAR_COLORS[h % AVATAR_COLORS.length];
+  }
+
+  toMillis(d: any): number {
+    try {
+      if (d?.toMillis) return d.toMillis();
+      if (d?.toDate) return d.toDate().getTime();
+      if (d) return new Date(d).getTime();
+    } catch { }
+    return 0;
+  }
+  formatDate(ms: number): string {
+    return ms ? new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+  }
+  formatRange(start: number, end: number): string {
+    if (start && end && start !== end) return this.formatDate(start) + ' – ' + this.formatDate(end);
+    return this.formatDate(end || start);
+  }
+
+  get filteredRows() {
+    const s = this.searchOverview.trim().toLowerCase();
+    if (!s) return this.overviewRows;
+    return this.overviewRows.filter(r => r.name.toLowerCase().includes(s));
+  }
+  get pagedRows() {
+    const start = this.pageIndex * this.pageSize;
+    return this.filteredRows.slice(start, start + this.pageSize);
+  }
+  get isFiltered(): boolean { return this.searchOverview.trim().length > 0; }
+
+  onPage(e: PageEvent) { this.pageIndex = e.pageIndex; this.pageSize = e.pageSize; this.computePageEligibility(); }
+  onSearch() { this.pageIndex = 0; this.computePageEligibility(); }
+
+  openProduct(event : any , row : OverviewRow) {
+    const key = event['docid'];
+    const existing = this.openTabs.findIndex(t => t.key === key);
+    if (existing >= 0) { this.selectedIndex = existing + 1; return; }
+    this.openTabs.push({ key, eventName: event.name, eventEnd: new Date(event.end) , event : row?.event , eventStart :  new Date(event?.start) , arenaId : row?.arena?.docid});
+    this.selectedIndex = this.openTabs.length;
+    this.saveTabs();
+  }
+
+  onRowKey(e: KeyboardEvent, event : any , row: OverviewRow) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.openProduct(event , row); }
+  }
+
+  closeTab(i: number, ev?: Event) {
+    ev?.stopPropagation();
+    this.openTabs.splice(i, 1);
+    if (i + 1 < this.selectedIndex) this.selectedIndex--;
+    else if (this.selectedIndex > this.openTabs.length) this.selectedIndex = this.openTabs.length;
+    this.saveTabs();
+  }
+
+  private saveTabs() {
+    try { localStorage.setItem(TABS_KEY, JSON.stringify(this.openTabs.map(t => t.key))); } catch { }
+  }
+  private restoreTabs() {
+    let keys: string[] = [];
+    try { keys = JSON.parse(localStorage.getItem(TABS_KEY) || '[]'); } catch { keys = []; }
+    if (!Array.isArray(keys) || !keys.length) return;
+    this.openTabs = [];
+    const seen = new Set<string>();
+    keys.forEach(k => {
+      if (seen.has(k)) return;
+      seen.add(k);
+      const event = this.overviewRows.find(r => r.docid === k);
+      const arena = event?.subEvents?.[0];
+      if (event && arena) this.openTabs.push({ key: k, eventName: event.name, eventEnd: new Date(event.end) , event : arena?.event , eventStart :  new Date(event?.start) , arenaId : arena?.arena?.docid });
+    });
+    this.saveTabs();
+  }
+
+  openEventEditor(eventId?) {
+    this.dialog.open(UpdateEventDetailComponent, {
+      disableClose: true,
+      data: {
+        edit: [null, undefined, ''].includes(eventId) ? false : true,
+        eventDocId: [null, undefined, ''].includes(eventId)
+          ? doc(collection(this.firestore, 'event collection')).id
+          : eventId,
+      },
+      panelClass: 'custom-dialog-container',
+      maxHeight: '98vh',
+      maxWidth: '99vw',
+    }).afterClosed().toPromise().then(()=>{
+      
+    })
+  }
+}

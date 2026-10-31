@@ -58,6 +58,10 @@ export class UpdateEventDetailComponent {
 
   loading:boolean = true;
 
+  private readonly ARENA_IMAGE_RATIO = 16 / 9; 
+  private readonly EVENT_IMAGE_RATIO = 16 / 9;
+  private readonly RATIO_TOLERANCE = 0.01; 
+
   capturedData:Object = {};
   mapProduct:Object = {};
   mapProductToMode:Object = {};
@@ -711,12 +715,23 @@ export class UpdateEventDetailComponent {
     return validated.includes(true)
   }
 
-  uploadImage(event: Event) {
+  async uploadImage(event: Event) {
     const input = event.target as HTMLInputElement;
     const files = input.files;
 
     if (files && files.length > 0) {
       const file = files[0];
+      const { width, height } = await this.getImageDimensions(file);
+      const ratio = width / height;
+
+      if (Math.abs(ratio - this.EVENT_IMAGE_RATIO) > this.RATIO_TOLERANCE) {
+        alert(
+          `Invalid image size (${width} x ${height}).\n` +
+          `Please upload an image with a 16:9 aspect ratio, for example 1920 x 1080.`
+        );
+        return ;
+      }
+      
       this.eventimage.file = file;
 
       const reader = new FileReader();
@@ -789,14 +804,25 @@ export class UpdateEventDetailComponent {
     }
   }
 
-  uploadProductImage(event: Event, index: number) {
+  async uploadProductImage(event: Event, index: number) {
     const input = event.target as HTMLInputElement;
     const files = input.files;
 
     if (files && files.length > 0) {
       const file = files[0];
-      this.productImages[index].file = file;
+      const { width, height } = await this.getImageDimensions(file);
+      
+      const ratio = width / height;
 
+      if (Math.abs(ratio - this.ARENA_IMAGE_RATIO) > this.RATIO_TOLERANCE) {
+        alert(
+          `Arena Event ${index + 1}: invalid image size (${width} x ${height}).\n` +
+          `Please upload an image with a 16:9 aspect ratio, for example 1920 x 1080.`
+        );
+        return ;
+      }
+      
+      this.productImages[index].file = file;
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = () => {
@@ -804,6 +830,22 @@ export class UpdateEventDetailComponent {
       };
       this.submitProductImageToStorage(index);
     }
+  }
+
+  private getImageDimensions(file: File): Promise<{ width: number; height: number }> {
+    return new Promise((resolve, reject) => {
+      const objectUrl = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error("Unable to read image file"));
+      };
+      img.src = objectUrl;
+    });
   }
 
   async submitProductImageToStorage(index: number) {
@@ -858,11 +900,13 @@ export class UpdateEventDetailComponent {
             console.log("Product image deleted successfully from storage");
 
             // Update Firestore to remove image URL
-            const docid = this.productsArray.controls[index].value['docid'];
-            if (docid) {
-              await updateDoc(doc(this.firestore, "arena events", docid), {
-                image: null
-              });
+            if (this.capturedData['edit']) {
+              const docid = this.productsArray.controls[index].value['docid'];
+              if (docid) {
+                await updateDoc(doc(this.firestore, "arena events", docid), {
+                  image: null
+                });
+              }
             }
           } else {
             console.error("Could not extract file path from URL");

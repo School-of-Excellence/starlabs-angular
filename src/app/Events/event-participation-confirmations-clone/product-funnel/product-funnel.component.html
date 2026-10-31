@@ -1,0 +1,1111 @@
+<div class="sx">
+
+  <!-- ============ Finalized summary ============ -->
+  <div class="sx-frozen-card" *ngIf="alreadyFinalized">
+    <div class="sx-frozen-head"><mat-icon>lock</mat-icon> Finalized &middot; show-up</div>
+    <table class="sx-frozen-tbl">
+      <tr><th>Basis</th><th class="r">Rate</th><th class="r">Attended / total</th></tr>
+      <tr><td>Of approved</td><td class="r sx-fp-ok">{{ frozenStats.ofApproved }}%</td><td class="r">{{ frozenStats.attended | number }} / {{ frozenStats.approved | number }}</td></tr>
+      <tr><td>Of potential</td><td class="r">{{ frozenStats.ofPotential }}%</td><td class="r">{{ frozenStats.attended | number }} / {{ frozenStats.potential | number }}</td></tr>
+    </table>
+  </div>
+
+  <!-- ============ Sub events ============ -->
+  <div class="fcard-wrap">
+    <div class="fcard" [class.active]="a?.docid === arena?.docid" *ngFor="let a of subEvents" (click)="toggleArena(a)">
+      <div class="fn">{{ a?.title }}</div>
+      <div class="fdate">{{ a?.startdate?.toDate() | date:'MMM d' }} – {{ a?.enddate?.toDate() | date:'MMM d, y' }}</div>
+    </div>
+
+    <button type="button" class="edit-event-btn" [disabled]="!arena" (click)="openEventEditor(eventId['docid'])">
+      <mat-icon class="edit-event-icon">edit</mat-icon>
+      Edit event
+    </button>
+  </div>
+
+  <!-- ============ Load states ============ -->
+  <div class="sx-error" *ngIf="loadError">
+    <span><mat-icon>error_outline</mat-icon> Couldn't load participants.</span>
+    <button data-testid="pf-error-retry" mat-stroked-button class="sx-ghost" (click)="retry()">Retry</button>
+  </div>
+
+  <div class="sx-loading" *ngIf="loading">
+    <mat-icon class="spin">autorenew</mat-icon> Loading participants...
+  </div>
+
+  <ng-container *ngIf="!loading && !loadError">
+
+    <!-- ============ Cards grid ============ -->
+    <div class="sx-bd">
+
+      <!-- Potential / Approved (+ Overall requested) -->
+      <div class="sx-bd-stack" *ngFor="let p of funnelTree">
+        <div class="sx-bd-panel">
+          <div class="sx-bd-about">{{ p.about }}</div>
+
+          <ng-container *ngFor="let r of p.rows">
+            <button data-testid="pf-breakdown-row" type="button"
+              class="sx-bd-row d{{ r.depth }} {{ cardMap[r.key]?.cls }}"
+              [class.on]="segment === r.key" [attr.aria-pressed]="segment === r.key"
+              [matTooltip]="cardMap[r.key]?.tip || ''" matTooltipClass="sx-tip" (click)="setSegment(r.key)">
+              <span class="sx-bd-top">
+                <span class="sx-bd-dot"></span>
+                <span class="sx-bd-lab">{{ cardMap[r.key].label }}</span>
+                <span class="sx-bd-num">{{ counts[r.key] | number }}</span>
+              </span>
+            </button>
+
+            <!-- Customer-status split of the potential pool -->
+            <div class="sx-pot-split" *ngIf="r.key === 'potential'">
+              <span *ngIf="!splitsReady" class="sx-pot-load"><mat-icon class="spin">autorenew</mat-icon> customer status…</span>
+              <ng-container *ngIf="splitsReady">
+                <button data-testid="pf-potsplit-active" type="button" class="sx-pot-chip act" [class.on]="segment === 'potential' && customerFilter === 'active'"
+                  (click)="setCustomerChip('active')" matTooltipClass="sx-tip" matTooltip="Show only active-status participants in the table">
+                  Active <b>{{ potentialStatusCount('active') | number }}</b>
+                </button>
+                <button data-testid="pf-potsplit-nonactive" type="button" class="sx-pot-chip non" [class.on]="segment === 'potential' && customerFilter === 'nonactive'"
+                  (click)="setCustomerChip('nonactive')" matTooltipClass="sx-tip" matTooltip="Show only non-active-status participants in the table">
+                  Non-Active <b>{{ potentialStatusCount('nonactive') | number }}</b>
+                </button>
+                <button data-testid="pf-potsplit-discontinued" type="button" class="sx-pot-chip disc" [class.on]="segment === 'potential' && customerFilter === 'discontinued'"
+                  (click)="setCustomerChip('discontinued')" matTooltipClass="sx-tip" matTooltip="Show only discontinued-status participants in the table">
+                  Discontinued <b>{{ potentialStatusCount('discontinued') | number }}</b>
+                </button>
+                <button data-testid="pf-potsplit-sales" type="button" class="sx-pot-chip sale" [class.on]="isSalesSelected" (click)="toggleSaleClick()">
+                  Last 30 days Sales <b>{{ last30daysSale }}</b>
+                </button>
+              </ng-container>
+            </div>
+
+            <!-- Customer tickets (under the Approved outcomes) -->
+            <div class="tk-block" *ngIf="r.key === 'revoked'">
+              <div class="tk-sec"><span>Customer tickets</span></div>
+              <div class="tk-row">
+                <span class="tk-label"><span class="tk-dot"></span>Open</span>
+                <span class="tk-chips">
+                  <button type="button" class="tkc event" [class.act]="selectedTicketCategory === 'ep'"
+                    [attr.aria-pressed]="selectedTicketCategory === 'ep'" (click)="toggleTickets('ep')">
+                    Event &amp; Process : <b>{{ openTickets?.eventProcessTickets ?? 0 }}</b>
+                  </button>
+                  <button type="button" class="tkc other" [class.act]="selectedTicketCategory === 'others'"
+                    [attr.aria-pressed]="selectedTicketCategory === 'others'" (click)="toggleTickets('others')">
+                    Other : <b>{{ openTickets?.others ?? 0 }}</b>
+                  </button>
+                </span>
+              </div>
+            </div>
+          </ng-container>
+        </div>
+
+        <!-- Overall requested = still-requested + approved + terminal (unattended, revoked) -->
+        <button data-testid="pf-overall-requested" type="button" class="sx-overall-card" *ngIf="p.total === 'approved'"
+          [class.on]="segment === 'overallRequested'" (click)="setSegment('overallRequested')"
+          matTooltip="Show everyone who raised their hand: still-requested + approved + unattended + revoked" matTooltipClass="sx-tip">
+          <span class="sx-oc-dot"></span>
+          <div class="sx-oc-text">
+            <div class="sx-oc-lab">Overall requested</div>
+            <div class="sx-oc-hint">requested + approved + unattended + revoked</div>
+          </div>
+          <div class="sx-oc-num">{{ overallRequested | number }}</div>
+        </button>
+      </div>
+
+      <!-- Approved by journey × first-timer / repeat -->
+      <div class="sx-bd-stack" *ngIf="counts.approved > 0">
+        <div class="sx-jcard">
+          <div class="sx-jhead">
+            <span class="sx-jdot"></span>
+            <span class="sx-jtitle">Approved by journey</span>
+            <button data-testid="pf-journey-group-toggle" type="button" class="sx-jgroup-btn" [class.on]="groupEditMode"
+              (click)="toggleGroupEdit()" matTooltipClass="sx-tip"
+              [matTooltip]="groupEditMode ? 'Done grouping' : 'Group journeys together'">
+              <mat-icon>{{ groupEditMode ? 'check' : 'workspaces' }}</mat-icon>{{ groupEditMode ? 'Done' : 'Group' }}
+            </button>
+          </div>
+          <div class="sx-jsub">of {{ counts.approved | number }} approved · journey, split by first-timer vs repeat</div>
+          <div class="sx-jload" *ngIf="!splitsReady"><mat-icon class="spin">autorenew</mat-icon> journeys…</div>
+
+          <!-- Group edit mode: tick journeys → name → Group -->
+          <ng-container *ngIf="splitsReady && groupEditMode">
+            <div class="sx-jedit-hint">Tick journeys, type a group name, then Group. Repeat to build more groups.</div>
+            <div class="sx-jgroup-bar">
+              <input data-testid="pf-journey-group-name" class="sx-jgroup-input" type="text" placeholder="Group name…" [(ngModel)]="groupNameInput">
+              <button data-testid="pf-journey-group-apply" type="button" class="sx-jgroup-apply" [disabled]="!journeySel.size || !groupNameInput.trim()"
+                (click)="groupSelected()">Group{{ journeySel.size ? ' (' + journeySel.size + ')' : '' }}</button>
+              <button data-testid="pf-journey-group-ungroup" type="button" class="sx-jgroup-ungroup" [disabled]="!journeySel.size" (click)="ungroupSelected()">Ungroup</button>
+            </div>
+            <div class="sx-jgroup-existing" *ngIf="existingGroupNames.length">
+              <span class="sx-jgroup-existing-lab">Add to:</span>
+              <button data-testid="pf-journey-group-chip" type="button" class="sx-jgroup-chip" *ngFor="let g of existingGroupNames"
+                [class.on]="groupNameInput.trim() === g" (click)="groupNameInput = g"
+                matTooltipClass="sx-tip" [matTooltip]="'Use the group “' + g + '”'">{{ g }}</button>
+            </div>
+            <label class="sx-jedit" *ngFor="let j of approvedByJourney; trackBy: trackJourneyKey">
+              <input data-testid="pf-journey-edit-check" type="checkbox" class="sx-jchk" [checked]="isJourneySel(j.label)" (change)="toggleJourneySel(j.label)">
+              <span class="sx-jrdot" [style.background]="journeyColor(journeyGroups[j.label] ? ('grp:' + journeyGroups[j.label]) : j.key)"></span>
+              <span class="sx-jrlab">{{ j.label }}</span>
+              <span class="sx-jgroup-tag" *ngIf="journeyGroups[j.label]">{{ journeyGroups[j.label] }}</span>
+              <span class="sx-jnum">{{ j.total | number }}</span>
+            </label>
+          </ng-container>
+
+          <!-- Normal mode: click filters the table to the journey (or the union of a group) -->
+          <ng-container *ngIf="splitsReady && !groupEditMode">
+            <div class="sx-jgrp" *ngFor="let j of displayedJourneys; trackBy: trackJourneyKey">
+              <div class="sx-jrowline">
+                <button data-testid="pf-journey-row" type="button" class="sx-jrow"
+                  [class.on]="segment === 'approved' && journeyFilter === j.key && frFilter === 'all'"
+                  (click)="setJourneyChip(j)" matTooltipClass="sx-tip" [matTooltip]="'Show all approved from ' + j.label">
+                  <span class="sx-jrdot" [style.background]="journeyColor(j.key)"></span>
+                  <span class="sx-jrlab">
+                    <mat-icon class="sx-jgrp-ic" *ngIf="j.isGroup">workspaces</mat-icon>{{ j.label }}<span class="sx-jmembers" *ngIf="j.isGroup"> · {{ j.members?.length }} journeys</span>
+                  </span>
+                  <span class="sx-jnum">{{ j.total | number }}</span>
+                </button>
+                <!-- Participants open in an overlay (mat-menu) so the card stays compact -->
+                <button data-testid="pf-journey-expand" type="button" class="sx-jexp" [matMenuTriggerFor]="jmenu" (click)="$event.stopPropagation()"
+                  matTooltipClass="sx-tip" matTooltip="Show participants and their journeys">
+                  <mat-icon>group</mat-icon>
+                </button>
+              </div>
+
+              <mat-menu #jmenu="matMenu" class="sx-jmenu-panel" xPosition="before">
+                <ng-template matMenuContent>
+                  <ng-container *ngTemplateOutlet="frPanelTpl; context: { j: j, fr: 'all', count: j.total, label: 'approved' }"></ng-container>
+                </ng-template>
+              </mat-menu>
+
+              <div class="sx-jfr">
+                <!-- A pill filters the table AND opens the journey-grouped breakdown for that subset -->
+                <button data-testid="pf-journey-first" type="button" class="sx-frpill first" [matMenuTriggerFor]="frFirstMenu"
+                  [class.on]="segment === 'approved' && journeyFilter === j.key && frFilter === 'first'"
+                  (click)="setJourneyFr(j, 'first')" matTooltipClass="sx-tip" [matTooltip]="'Show first-timers from ' + j.label">First-timer {{ j.first | number }}</button>
+                <mat-menu #frFirstMenu="matMenu" class="sx-jmenu-panel" xPosition="before">
+                  <ng-template matMenuContent>
+                    <ng-container *ngTemplateOutlet="frPanelTpl; context: { j: j, fr: 'first', count: j.first, label: 'first-timer' }"></ng-container>
+                  </ng-template>
+                </mat-menu>
+
+                <button data-testid="pf-journey-repeat" type="button" class="sx-frpill rpt" [matMenuTriggerFor]="frRepeatMenu"
+                  [class.on]="segment === 'approved' && journeyFilter === j.key && frFilter === 'repeat'"
+                  (click)="setJourneyFr(j, 'repeat')" matTooltipClass="sx-tip" [matTooltip]="'Show repeat from ' + j.label">Repeat {{ j.repeat | number }}</button>
+                <mat-menu #frRepeatMenu="matMenu" class="sx-jmenu-panel" xPosition="before">
+                  <ng-template matMenuContent>
+                    <ng-container *ngTemplateOutlet="frPanelTpl; context: { j: j, fr: 'repeat', count: j.repeat, label: 'repeat' }"></ng-container>
+                  </ng-template>
+                </mat-menu>
+              </div>
+            </div>
+          </ng-container>
+
+          <!-- Shared overlay body: participants grouped by journey -->
+          <ng-template #frPanelTpl let-j="j" let-fr="fr" let-count="count" let-label="label">
+            <div data-testid="pf-journey-menu-stop" class="sx-jmenu" (click)="$event.stopPropagation()">
+              <div class="sx-jmenu-head">
+                <div class="sx-jmenu-title"><mat-icon class="sx-jgrp-ic" *ngIf="j.isGroup">workspaces</mat-icon>{{ j.label }}</div>
+                <div class="sx-jmenu-sub">{{ count | number }} {{ label }}<span *ngIf="j.isGroup"> · {{ j.members?.length }} journeys</span></div>
+              </div>
+              <div class="sx-jmemlist">
+                <div class="sx-jmemgrp" *ngFor="let b of groupJourneyBreakdown(j, fr); trackBy: trackBreakdown">
+                  <div class="sx-jmemgrp-head">
+                    <span class="sx-jmem-journey" [title]="b.journey">{{ b.journey }}</span>
+                    <span class="sx-jmemgrp-count">{{ b.participants.length | number }}</span>
+                  </div>
+                  <div class="sx-jmem" *ngFor="let p of b.participants; trackBy: trackParticipant">
+                    <span class="sx-jmem-name" [title]="p.email">{{ p.name }}</span>
+                    <span class="sx-jmem-journey sm">{{ p.journey || 'Not set' }}</span>
+                  </div>
+                  <div class="sx-jmem-empty" *ngIf="!b.participants.length">None</div>
+                </div>
+              </div>
+            </div>
+          </ng-template>
+        </div>
+      </div>
+
+      <!-- Checklist card -->
+      <div class="checklist-card">
+
+        <div class="checklist-head">
+          <span class="checklist-title">
+            <h3 class="checklist-heading">Checklist</h3>
+            <button type="button" class="checklist-add" title="Add checklist item" (click)="addCheckList()">+</button>
+          </span>
+        </div>
+
+        <div class="checklist-row checklist-labels">
+          <span>Item</span>
+          <span class="checklist-cell">Clear</span>
+          <span class="checklist-cell">Not clear</span>
+        </div>
+
+        <ng-container *ngFor="let checklist of checkListMap | keyvalue; trackBy: trackByChecklistId">
+          <div class="checklist-row">
+            <div class="checklist-item">
+              <span class="checklist-name">
+                <span class="checklist-name-text">
+                  <button type="button"
+                          class="checklist-col-btn"
+                          [class.on]="columnRegistry[checklist.key]"
+                          title="Show as a table column"
+                          (click)="toggleChecklist(checklist?.key, checklist?.value)">
+                    <mat-icon class="checklist-icon">
+                      {{ columnRegistry[checklist.key] ? 'check_box' : 'check_box_outline_blank' }}
+                    </mat-icon>
+                  </button>
+                  {{ checklist.value?.title }}
+                </span>
+
+                <div class="checklist-actions">
+                  <button type="button" class="checklist-del" title="Delete checklist" (click)="deleteCheckList(checklist?.key)">
+                    <mat-icon class="checklist-icon">delete</mat-icon>
+                  </button>
+                  <button type="button" class="checklist-edit" title="Edit checklist" (click)="editCheckList(checklist?.key)">
+                    <mat-icon class="checklist-icon">edit</mat-icon>
+                  </button>
+                </div>
+              </span>
+
+              <!-- clear / not clear split bar -->
+              <div class="checklist-bar">
+                <i class="checklist-bar-clear" [style.width.%]="(getClearCountForCheckList(checklist.value) / (getClearCountForCheckList(checklist.value) + getNonClearCountForCheckList(checklist.value) || 1)) * 100"></i>
+                <i class="checklist-bar-not"   [style.width.%]="(getNonClearCountForCheckList(checklist.value) / (getClearCountForCheckList(checklist.value) + getNonClearCountForCheckList(checklist.value) || 1)) * 100"></i>
+              </div>
+            </div>
+
+            <button type="button" class="checklist-cell checklist-count checklist-count-clear"
+                    [class.on]="selectedChecklist?.checklistId === checklist?.key && selectedChecklist?.type === 'clear'"
+                    (click)="onChecklistFilterClick(checklist?.key, 'clear')">
+              {{ getClearCountForCheckList(checklist.value) }}
+            </button>
+            <button type="button" class="checklist-cell checklist-count checklist-count-not"
+                    [class.on]="selectedChecklist?.checklistId === checklist?.key && selectedChecklist?.type === 'not clear'"
+                    (click)="onChecklistFilterClick(checklist?.key, 'not clear')">
+              {{ getNonClearCountForCheckList(checklist.value) }}
+            </button>
+          </div>
+        </ng-container>
+      </div>
+    </div>
+
+    <!-- ============ Action bar ============ -->
+    <div class="sx-bar">
+
+      <ng-container *ngIf="selection.selected.length > 0">
+
+        <ng-container *ngIf="selectionMode === 'approve'">
+          <mat-form-field appearance="outline" class="sx-seq" subscriptSizing="dynamic">
+            <mat-label>Delivery sequence</mat-label>
+            <mat-select data-testid="pf-bar-delivery-set" [(ngModel)]="selectedDeliverySet" required>
+              <mat-option *ngFor="let set of deliverySetList" [value]="set['deliverytype']">{{ set['deliverytype'] }}</mat-option>
+              <mat-option *ngIf="!deliverySetList.length" disabled>No sequence configured for this product</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="sx-seq"
+            *ngIf="arena?.type === 'queue' && queueVariationList.length" subscriptSizing="dynamic">
+            <mat-label>Queue variation</mat-label>
+            <mat-select data-testid="pf-bar-queue-variation" [(ngModel)]="selectedQueueVariation">
+              <mat-option *ngFor="let v of queueVariationList" [value]="v.id">{{ v.data['variationname'] }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <button data-testid="pf-bar-approve" mat-flat-button class="sx-approve" [disabled]="!canApprove()"
+            [matTooltip]="approveDisabledReason()" matTooltipClass="sx-tip" (click)="approveSelected()">
+            <mat-icon>check</mat-icon> Approve {{ readyCount }}
+          </button>
+          <button data-testid="pf-bar-revoke-requested" mat-stroked-button class="sx-danger" [disabled]="selectedToRevokeRequested.length === 0"
+            matTooltipClass="sx-tip" matTooltip="Revoke: cancel the selected participation request(s)"
+            (click)="markRevokedRequested(selectedToRevokeRequested)">
+            <mat-icon>block</mat-icon> Revoke {{ selectedToRevokeRequested.length }}
+          </button>
+          <span class="sx-hint" *ngIf="approveDisabledReason()">{{ approveDisabledReason() }}</span>
+        </ng-container>
+
+        <ng-container *ngIf="selectionMode === 'attend'">
+          <!-- "Mark attended" / "Not attended" bulk buttons are hidden per operator request -->
+          <button data-testid="pf-bar-revoke-attend" mat-stroked-button class="sx-danger" [disabled]="selectedToRevoke.length === 0" (click)="markRevoked(selectedToRevoke)"
+            matTooltipClass="sx-tip" matTooltip="Revoke: cancel the product, then assign a new one (destructive)">
+            <mat-icon>block</mat-icon> Revoke {{ selectedToRevoke.length }}
+          </button>
+        </ng-container>
+
+        <button data-testid="pf-bar-finalize" mat-flat-button class="sx-approve" *ngIf="canFinalize" (click)="finalizeAttendance()"
+          matTooltipClass="sx-tip" matTooltip="Close the event: mark no-show on approved participants who did not attend, and lock the final numbers">
+          <mat-icon>how_to_reg</mat-icon> Finalize attendance<span *ngIf="pendingNoShow.length"> ({{ pendingNoShow.length }})</span>
+        </button>
+
+        <button data-testid="pf-bar-send" mat-stroked-button class="sx-ghost" [matMenuTriggerFor]="sendMenu" [disabled]="!segmentRows.length"
+          matTooltipClass="sx-tip" matTooltip="Message the participants in this segment">
+          <mat-icon>campaign</mat-icon> Send
+        </button>
+        <mat-menu #sendMenu="matMenu" class="sx-menu-panel">
+          <button data-testid="pf-send-whatsapp" mat-menu-item (click)="sendWhatsApp()"><mat-icon>chat</mat-icon> WhatsApp ({{ selection.selected.length }})</button>
+          <button data-testid="pf-send-notification" mat-menu-item (click)="sendNotification()"><mat-icon>notifications</mat-icon> App notification ({{ selection.selected.length }})</button>
+          <button data-testid="pf-send-email" mat-menu-item (click)="sendEmail()"><mat-icon>mail</mat-icon> Email ({{ selection.selected.length }})</button>
+        </mat-menu>
+
+        <button data-testid="pf-bar-export" mat-stroked-button class="sx-ghost" (click)="exportList()"><mat-icon>download</mat-icon> Export</button>
+
+        <!-- Bulk manual-checklist update -->
+        <div class="bulk">
+          <span><b>{{ selection.selected?.length }} Selected</b></span>
+          <select class="sel" #selectforbulk>
+            <option *ngFor="let key of getManualChecklist()" [value]="key">{{ checkListMap[key]?.title }}</option>
+          </select>
+          <button type="button" class="bk c" (click)="blukManualUpdate(selectforbulk.value, 'clear')">✓ Clear</button>
+          <button type="button" class="bk nc" (click)="blukManualUpdate(selectforbulk.value, 'not clear')">✕ Not clear</button>
+          <button type="button" class="bx" title="Unselect all" (click)="selection.clear()">×</button>
+        </div>
+      </ng-container>
+
+      <span class="sx-spacer"></span>
+
+      <mat-form-field appearance="outline" class="sx-search" subscriptSizing="dynamic">
+        <mat-label>Filter</mat-label>
+        <input data-testid="pf-bar-filter" matInput [(ngModel)]="searchText" (ngModelChange)="onSearch()" placeholder="Name or email">
+        <mat-icon matSuffix>search</mat-icon>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="sx-seq" subscriptSizing="dynamic">
+        <mat-label>Add column</mat-label>
+        <mat-select [(ngModel)]="displayColumns" multiple>
+          <mat-option>
+            <ngx-mat-select-search [(ngModel)]="columSearch" name="column search" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let column of getColumn(); trackBy: trackByColumnKey" [value]="column.key">{{ column.label }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <button mat-stroked-button class="sx-ghost" (click)="handleImportClick()" *ngIf="showSelect">Import</button>
+      <input type="file" #inputFile (change)="onChange($event)" style="display: none;">
+    </div>
+
+    <!-- ============ Applied filters ============ -->
+    <div class="result-bar" *ngIf="isFiltered">
+      <span class="result-bar-count">
+        Showing <b class="result-bar-num">{{ segmentRows.length | number }}</b> of {{ counts[segment] | number }}
+      </span>
+
+      <div class="result-bar-chips">
+        <span class="result-chip" *ngFor="let chip of getFilterChips(); trackBy: trackChip">
+          <span class="result-chip-label">{{ chip.label }}:</span>
+          <span class="result-chip-value">{{ chip.value }}</span>
+          <button type="button" class="result-chip-remove" aria-label="Remove filter" (click)="removeFilterChip(chip)">
+            <mat-icon class="result-chip-icon">close</mat-icon>
+          </button>
+        </span>
+      </div>
+
+      <button type="button" class="result-bar-clear" (click)="clearAllFilters()">Clear all</button>
+    </div>
+
+    <!-- ============ Selected columns ============ -->
+    <div class="result-bar" *ngIf="displayColumns.length > 0">
+      <span class="result-bar-count">Selected columns</span>
+
+      <div class="result-bar-chips">
+        <span class="result-chip" *ngFor="let chip of displayColumns">
+          <span class="result-chip-value">{{ columnRegistry[chip]?.label ?? chip }}</span>
+          <button type="button" class="result-chip-remove" aria-label="Remove column" (click)="removeColumnChip(chip)">
+            <mat-icon class="result-chip-icon">close</mat-icon>
+          </button>
+        </span>
+      </div>
+
+      <button type="button" class="result-bar-clear" (click)="clearAllColumns()">Clear all columns</button>
+    </div>
+
+    <!-- ============ Participants table ============ -->
+    <div class="sx-wrap">
+      <div class="sx-scroll">
+        <table class="sx-t">
+          <thead>
+            <tr>
+              <th *ngFor="let column of tableColumns" class="th-cell" [class.sx-c-check]="column === 'select'">
+
+                <!-- select all -->
+                <mat-checkbox *ngIf="column === 'select'" data-testid="pf-table-select-all" [checked]="isAllSelected()" [indeterminate]="hasSelectionInView() && !isAllSelected()"
+                  (change)="masterToggle()" aria-label="Select all"></mat-checkbox>
+
+                <!-- status label changes with the segment -->
+                <ng-container *ngIf="column === 'status'">
+                  {{ (segment === 'noProduct' || segment === 'addon' || segment === 'inQueue') ? 'Reason' : (selectionMode === 'attend' ? 'Attendance' : 'Status') }}
+                </ng-container>
+
+                <!-- columns with a filter -->
+                <div class="th-in" *ngIf="columnRegistry[column].showFilter">
+                  <span class="th-label">{{ columnRegistry[column].label }}</span>
+                  <button type="button" class="fbtn" title="Filter" [class.on]="filterMap[column] || sortColumn?.column === column" (click)="openFilterCard(column, $event)">
+                    <mat-icon class="fbtn-icon">filter_alt</mat-icon>
+                  </button>
+                </div>
+
+                <!-- plain label (name, tickets, queue stage) -->
+                <ng-container *ngIf="column !== 'select' && column !== 'status' && !columnRegistry[column].showFilter">
+                  {{ columnRegistry[column].label }}
+                </ng-container>
+              </th>
+            </tr>
+          </thead>
+
+          <tbody>
+            <tr *ngFor="let row of pagedRows; trackBy: trackParticipant" [class.picked]="selection.isSelected(row)">
+              <td *ngFor="let column of tableColumns" [ngSwitch]="column" [class.sx-c-check]="column === 'select'">
+
+                <mat-checkbox *ngSwitchCase="'select'" data-testid="pf-table-row-select" [checked]="selection.isSelected(row)" [disabled]="!isSelectable(row)"
+                  (change)="toggleRow(row)"
+                  [attr.aria-label]="isSelectable(row) ? ('Select ' + row.name) : ('Cannot select ' + row.name + (row.reason ? ' — ' + row.reason : ''))"></mat-checkbox>
+
+                <div *ngSwitchCase="'name'" class="sx-nmcell">
+                  <app-profile-picture class="sx-ph" [profileId]="row.profileid" [name]="row.name" [size]="30"></app-profile-picture>
+                  <div class="sx-nmtext">
+                    <div class="sx-nm">{{ row.name }}</div>
+                    <div class="sx-em">{{ row.email || 'No email' }}</div>
+                  </div>
+                </div>
+
+                <ng-container *ngSwitchCase="'requestedDate'">
+                  <span *ngIf="row.requestedDate">{{ row.requestedDate | date:'medium' }}</span>
+                  <span *ngIf="!row.requestedDate" class="sx-mut">{{ columnRegistry[column].defaultHtml }}</span>
+                </ng-container>
+
+                <ng-container *ngSwitchCase="'current journey'">
+                  <span *ngIf="!row.metaLoaded" class="sx-mut">…</span>
+                  <span *ngIf="row.metaLoaded && row.metaError" class="sx-warn-i" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span>
+                  <span *ngIf="row.metaLoaded && !row.metaError">{{ row.journey || columnRegistry[column].defaultHtml }}</span>
+                </ng-container>
+
+                <ng-container *ngSwitchCase="'subscriptionend'">
+                  <span *ngIf="!row.subLoaded" class="sx-mut">…</span>
+                  <ng-container *ngIf="row.subLoaded">
+                    <span *ngIf="row.subscriptionend">{{ row.subscriptionend | date:'mediumDate' }}</span>
+                    <span *ngIf="!row.subscriptionend" class="sx-mut">{{ columnRegistry[column].defaultHtml }}</span>
+                  </ng-container>
+                </ng-container>
+
+                <ng-container *ngSwitchCase="'customerstatus'">
+                  <span *ngIf="!row.metaLoaded" class="sx-mut">…</span>
+                  <span *ngIf="row.metaLoaded && row.metaError" class="sx-warn-i" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span>
+                  <span *ngIf="row.metaLoaded && !row.metaError" class="sx-cust">{{ row.customerStatus || columnRegistry[column].defaultHtml }}</span>
+                </ng-container>
+
+                <ng-container *ngSwitchCase="'financialstatus'">
+                  <span *ngIf="!row.metaLoaded" class="sx-mut">…</span>
+                  <span *ngIf="row.metaLoaded && row.metaError" class="sx-warn-i" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span>
+                  <span *ngIf="row.metaLoaded && !row.metaError" class="sx-fin">
+                    <span class="dot" [ngClass]="financeDotClass(row.finance)" *ngIf="row.finance"></span>{{ row.finance || columnRegistry[column].defaultHtml }}
+                  </span>
+                </ng-container>
+
+                <ng-container *ngSwitchCase="'paid'">
+                  <span *ngIf="!row.metaLoaded" class="sx-mut">…</span>
+                  <span *ngIf="row.metaLoaded && row.metaError" class="sx-warn-i" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span>
+                  <span *ngIf="row.metaLoaded && !row.metaError" class="sx-paid"
+                    [matTooltip]="(row.purchaseValue || row.paid) ? ((+(row.paid || 0)) | number) + ' / ' + ((+(row.purchaseValue || 0)) | number) + ' paid' : ''" matTooltipClass="sx-tip">
+                    <ng-container *ngIf="row.purchaseValue || row.paid; else dashPaid">
+                      {{ shortAmount(row.paid) }}<span class="tot"> / {{ shortAmount(row.purchaseValue) }}</span>
+                    </ng-container>
+                    <ng-template #dashPaid><span class="sx-mut">{{ columnRegistry[column].defaultHtml }}</span></ng-template>
+                  </span>
+                </ng-container>
+
+                <button *ngSwitchCase="'tickets'" type="button" class="open-ticket-chip-tab" (click)="openTicketDetail(row?.profileid)">
+                  Open Tickets
+                  <b>{{ participantMetadata[row?.profileid]?.customersupporttickets ?? columnRegistry[column].defaultHtml }}</b>
+                </button>
+
+                <ng-container *ngSwitchCase="'queuestage'">
+                  <ng-container *ngIf="arena?.type === 'queue'; else noQueue">
+                    <span *ngIf="!queueStagesLoaded" class="sx-mut">…</span>
+                    <span *ngIf="queueStagesLoaded" class="sx-stage">{{ queueStageByPid.get(row.profileid) || columnRegistry[column].defaultHtml }}</span>
+                  </ng-container>
+                  <ng-template #noQueue><span class="sx-mut">{{ columnRegistry[column].defaultHtml }}</span></ng-template>
+                </ng-container>
+
+                <ng-container *ngSwitchCase="'status'">
+                  <!-- Reason (no product / in queue / addon) -->
+                  <ng-container *ngIf="segment === 'noProduct' || segment === 'inQueue' || segment === 'addon'">
+                    <span class="sx-reason" [class.sx-reason-mut]="segment === 'inQueue'">{{ row.reason }}</span>
+                    <button data-testid="pf-row-assign-product" mat-button class="sx-assign" *ngIf="(segment === 'noProduct' || segment === 'addon') && !row.isOwner" (click)="assignProduct(row)">Assign product</button>
+                  </ng-container>
+
+                  <!-- Attendance (approved / attended / no-show) -->
+                  <ng-container *ngIf="selectionMode === 'attend'">
+                    <span class="sx-att" *ngIf="row.attended">
+                      <mat-icon>check</mat-icon> Attended <span class="sx-mut" *ngIf="row.scanned">· scanned</span>
+                    </span>
+                    <ng-container *ngIf="!row.attended">
+                      <span class="sx-noshow" *ngIf="row.attendanceState === 'no_show'">No-show</span>
+                    </ng-container>
+                    <button data-testid="pf-row-revoke-attend" mat-button class="sx-mark-danger" (click)="markRevoked([row])">Revoke</button>
+                  </ng-container>
+
+                  <!-- Unattended segment -->
+                  <span class="sx-unatt" *ngIf="segment === 'unattended'">
+                    <mat-icon>person_off</mat-icon> Unattended <span class="sx-mut">· product cancelled</span>
+                  </span>
+
+                  <!-- Revoked segment -->
+                  <span class="sx-unatt" *ngIf="segment === 'revoked'">
+                    <mat-icon>block</mat-icon> Revoked
+                    <span class="sx-mut" *ngIf="row.revokedBy">· by {{ row.revokedBy }}</span>
+                    <span class="sx-mut" *ngIf="row.revokedDate">· {{ row.revokedDate | date:'d MMM y, h:mm a' }}</span>
+                    <span class="sx-mut" *ngIf="!row.revokedBy && !row.revokedDate">· product cancelled</span>
+                  </span>
+
+                  <!-- Status (other segments) -->
+                  <span class="sx-mut" *ngIf="segment !== 'noProduct' && segment !== 'addon' && segment !== 'inQueue' && segment !== 'unattended' && segment !== 'revoked' && selectionMode !== 'attend'">
+                    <ng-container *ngIf="segment === 'overallRequested'; else stdStatus">{{ row.isUnattended ? 'unattended' : (row.isRevoked ? 'revoked' : (row.isApproved ? (row.attended ? 'attended' : 'approved') : 'requested')) }}</ng-container>
+                    <ng-template #stdStatus>{{ segment === 'eligible' ? 'ready' : (row.isNotRequested ? 'owns product' : (row.isRequested ? 'requested' : '')) }}</ng-template>
+                  </span>
+
+                  <!-- Revoke: requested -> status-only, approved -> full product-cancel path -->
+                  <button data-testid="pf-row-revoke" mat-button class="sx-mark-danger" *ngIf="selectionMode !== 'attend' && segment !== 'unattended' && segment !== 'revoked' && ((row.isApproved && row.approvedRequestId) || (row.isRequested && !row.isApproved && row.requestData?.docid))"
+                    (click)="revoke(row)">Revoke</button>
+                </ng-container>
+
+                <!-- every other column: venue fee, checklists and all optional columns, chosen by registry type -->
+                <ng-container *ngSwitchDefault>
+                  <ng-container [ngSwitch]="columnRegistry[column].type">
+
+                    <div *ngSwitchCase="'relation'">
+                      <ng-container *ngIf="(getColumnValue(column, row) | keyvalue) as products">
+                        <p class="sx-prod" *ngFor="let product of products">{{ mapProduct[product.key] ?? product.key }} - {{ product.value }}</p>
+                        <span *ngIf="products.length === 0" class="sx-mut">{{ columnRegistry[column].defaultHtml }}</span>
+                      </ng-container>
+                    </div>
+
+                    <span *ngSwitchCase="'date'">{{ (getColumnValue(column, row) | date:'medium') || columnRegistry[column].defaultHtml }}</span>
+
+                    <ng-container *ngSwitchDefault>
+
+                      <ng-container *ngIf="columnRegistry[column]?.checklist; else plainValue">
+
+                        <!-- MANUAL: checkbox + status -->
+                        <label class="checklist-cell-manual"
+                               *ngIf="checkListMap[column]?.type === 'manual'; else autoPill"
+                               [class.checklist-cell-clear]="getColumnValue(column, row) === 'clear'"
+                               [class.checklist-cell-not]="getColumnValue(column, row) !== 'clear'"
+                               (click)="$event.stopPropagation()">
+                          <input type="checkbox"
+                                 class="checklist-cell-check"
+                                 [checked]="getColumnValue(column, row) === 'clear'"
+                                 (change)="onManualChecklistChange(row, column, $any($event.target).checked)">
+                          {{ getColumnValue(column, row) === 'clear' ? 'Clear' : 'Not clear' }}
+                        </label>
+
+                        <!-- AUTOMATED: read-only pill -->
+                        <ng-template #autoPill>
+                          <span class="checklist-cell-pill"
+                                title="Calculated automatically"
+                                [class.checklist-cell-clear]="getColumnValue(column, row) === 'clear'"
+                                [class.checklist-cell-not]="getColumnValue(column, row) !== 'clear'">
+                            {{ getColumnValue(column, row) === 'clear' ? 'Clear' : 'Not clear' }}
+                          </span>
+                        </ng-template>
+                      </ng-container>
+
+                      <!-- every other column -->
+                      <ng-template #plainValue>
+                        <span>{{ getColumnValue(column, row) ?? columnRegistry[column].defaultHtml }}</span>
+                      </ng-template>
+                    </ng-container>
+                  </ng-container>
+                </ng-container>
+
+              </td>
+            </tr>
+
+            <tr *ngIf="segmentRows.length === 0">
+              <td [attr.colspan]="colSpan" class="sx-empty">
+                {{ isFiltered ? (searchText ? 'No participants match “' + searchText + '”' : 'No participants match the current filter') : 'No participants in this segment' }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <mat-paginator [length]="segmentRows.length" [pageSize]="pageSize"
+        [pageSizeOptions]="[10, 25, 50, 100]" [pageIndex]="pageIndex" (page)="onPage($event)"></mat-paginator>
+    </div>
+
+  </ng-container>
+</div>
+
+<!-- =====================================================================
+     DIALOG TEMPLATES (opened with MatDialog)
+     ===================================================================== -->
+
+<ng-template #importTpl>
+  <h2 mat-dialog-title>Import participants</h2>
+  <mat-dialog-content>
+    <p class="sx-imp-total" *ngIf="importPreview">{{ importPreview.total | number }} row(s) read from the file.</p>
+
+    <div class="sx-imp-sec sx-imp-add" *ngIf="importPreview">
+      <button data-testid="pf-import-toggle-add" type="button" class="sx-imp-head" (click)="importExpand.willAdd = !importExpand.willAdd">
+        <mat-icon>{{ importExpand.willAdd ? 'expand_more' : 'chevron_right' }}</mat-icon>
+        <span>Will be initiated</span><span class="sx-imp-n">{{ importPreview.willAdd.length }}</span>
+      </button>
+      <ul *ngIf="importExpand.willAdd" class="sx-imp-list">
+        <li *ngFor="let p of importPreview.willAdd">{{ p.name }} <span class="sx-mut">{{ p.email }}</span></li>
+        <li *ngIf="!importPreview.willAdd.length" class="sx-mut">None</li>
+      </ul>
+    </div>
+
+    <div class="sx-imp-sec sx-imp-queue" *ngIf="importPreview">
+      <button data-testid="pf-import-toggle-queue" type="button" class="sx-imp-head" (click)="importExpand.inQueue = !importExpand.inQueue">
+        <mat-icon>{{ importExpand.inQueue ? 'expand_more' : 'chevron_right' }}</mat-icon>
+        <span>Already in an active queue — skipped</span><span class="sx-imp-n">{{ importPreview.inQueue.length }}</span>
+      </button>
+      <ul *ngIf="importExpand.inQueue" class="sx-imp-list">
+        <li *ngFor="let p of importPreview.inQueue">{{ p.name }} <span class="sx-mut">{{ p.email }}</span></li>
+        <li *ngIf="!importPreview.inQueue.length" class="sx-mut">None</li>
+      </ul>
+    </div>
+
+    <div class="sx-imp-sec sx-imp-no" *ngIf="importPreview">
+      <button data-testid="pf-import-toggle-noproduct" type="button" class="sx-imp-head" (click)="importExpand.noProduct = !importExpand.noProduct">
+        <mat-icon>{{ importExpand.noProduct ? 'expand_more' : 'chevron_right' }}</mat-icon>
+        <span>No product — needs assigning</span><span class="sx-imp-n">{{ importPreview.noProduct.length }}</span>
+      </button>
+      <ul *ngIf="importExpand.noProduct" class="sx-imp-list">
+        <li *ngFor="let p of importPreview.noProduct">{{ p.name }} <span class="sx-mut">{{ p.email }}</span></li>
+        <li *ngIf="!importPreview.noProduct.length" class="sx-mut">None</li>
+      </ul>
+      <div class="sx-imp-no-act" *ngIf="importPreview.noProduct.length">
+        <button data-testid="pf-import-assign-product" mat-stroked-button class="sx-ghost" (click)="assignImportNoProduct()"><mat-icon>add</mat-icon> Assign product</button>
+        <button data-testid="pf-import-export" mat-button class="sx-mark" (click)="exportImportNoProduct()">Export</button>
+      </div>
+    </div>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button data-testid="pf-import-cancel" mat-button [mat-dialog-close]="false">Cancel</button>
+    <button data-testid="pf-import-confirm" mat-flat-button color="primary" [disabled]="!importPreview?.willAdd?.length" (click)="confirmImport()">
+      Initiate {{ importPreview?.willAdd?.length || 0 }}
+    </button>
+  </mat-dialog-actions>
+</ng-template>
+
+<ng-template #confirmTpl let-data>
+  <h2 mat-dialog-title>{{ data.title }}</h2>
+  <mat-dialog-content>
+    <p>{{ data.body }}</p>
+    <p class="sx-warnline" *ngIf="data.warn"><mat-icon>warning</mat-icon> {{ data.warn }}</p>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button data-testid="pf-confirm-cancel" mat-button [mat-dialog-close]="false">Cancel</button>
+    <button data-testid="pf-confirm-ok" mat-flat-button color="primary" [mat-dialog-close]="true">{{ data.confirm }}</button>
+  </mat-dialog-actions>
+</ng-template>
+
+<ng-template #progressTpl>
+  <div class="sx-prog">
+    <div class="sx-prog-msg">{{ progress.msg }}</div>
+    <mat-progress-bar mode="determinate" [value]="progress.value"></mat-progress-bar>
+    <div class="sx-prog-sub">{{ progress.value }}%<span *ngIf="progress.eta"> · {{ progress.eta }}</span></div>
+  </div>
+</ng-template>
+
+<ng-template #failuresTpl let-data>
+  <h2 mat-dialog-title>Approved {{ data.success }} of {{ data.total }}</h2>
+  <mat-dialog-content>
+    <p>{{ data.failed.length }} could not be approved:</p>
+    <ul class="sx-fail"><li *ngFor="let n of data.failed">{{ n }}</li></ul>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button data-testid="pf-failures-close" mat-button [mat-dialog-close]="false">Close</button>
+    <button data-testid="pf-failures-retry" mat-flat-button color="primary" [mat-dialog-close]="'retry'">Retry {{ data.failed.length }}</button>
+  </mat-dialog-actions>
+</ng-template>
+
+
+<!-- =====================================================================
+     TICKETS POPUP
+     ===================================================================== -->
+<ng-template #ticketdetail>
+  <div class="sx-modal" *ngIf="selectedParticipantsTicket">
+    <div class="sx-modal-scrim" (click)="closeTicketDetail()"></div>
+
+    <div class="sx-modal-box tkdlg" role="dialog" aria-modal="true" aria-labelledby="tkTitle">
+
+      <div class="dlg-h">
+        <h3 id="tkTitle" class="dlg-title">Tickets · {{ selectedParticipantsTicket?.name }}</h3>
+        <button type="button" class="x" aria-label="Close" (click)="closeTicketDetail()">×</button>
+      </div>
+
+      <div class="dlg-b">
+
+        <!-- Open tab -->
+        <div class="tktabs">
+          <button type="button" class="on">Open <b>{{ selectedParticipantsTicket?.customersupporttickets }}</b></button>
+        </div>
+
+        <!-- category filter -->
+        <div class="tkcat">
+          <span>Category</span>
+          <button type="button" [class.on]="selectedParticipantsTicket.selectedCategory === 'all'" (click)="selectedParticipantsTicket.selectedCategory = 'all'">All <b>{{ selectedParticipantsTicket?.epTickets?.length + selectedParticipantsTicket?.otherTickets?.length }}</b></button>
+          <button type="button" [class.on]="selectedParticipantsTicket.selectedCategory === 'ep'" (click)="selectedParticipantsTicket.selectedCategory = 'ep'">Events &amp; Process <b>{{ selectedParticipantsTicket?.epTickets?.length }}</b></button>
+          <button type="button" [class.on]="selectedParticipantsTicket.selectedCategory === 'others'" (click)="selectedParticipantsTicket.selectedCategory = 'others'">Others <b>{{ selectedParticipantsTicket?.otherTickets?.length }}</b></button>
+        </div>
+
+        <!-- ticket rows -->
+        <button type="button" class="tkrow" *ngFor="let t of getTickets(); trackBy: trackByTicketNo" [title]="t.issue" (click)="onTicketClick(t)">
+          <span class="tkno">#{{ t.ticketno }}</span>
+          <span class="tks">
+            <span class="subj" [title]="t.issue">{{ t.issue }}</span>
+            <span class="tkmeta">
+              <span class="tkc-pop" *ngIf="t.category">{{ t.category }}</span>
+              <small>{{ reportedDate(t) | date: 'd MMM y, h:mm a' }}</small>
+            </span>
+          </span>
+          <span class="tkst" [ngClass]="t.status?.toLowerCase()">{{ t.status }}</span>
+        </button>
+      </div>
+
+      <div class="dlg-f">
+        <button type="button" class="btn" (click)="closeTicketDetail()">Close</button>
+      </div>
+    </div>
+  </div>
+</ng-template>
+
+
+<!-- =====================================================================
+     COLUMN FILTER POPUP (CDK connected overlay, one card at a time)
+     ===================================================================== -->
+<ng-template cdkConnectedOverlay
+             [cdkConnectedOverlayOrigin]="filterOrigin!"
+             [cdkConnectedOverlayOpen]="!!filterPopup && !!filterOrigin"
+             [cdkConnectedOverlayPush]="true"
+             [cdkConnectedOverlayFlexibleDimensions]="true"
+             [cdkConnectedOverlayViewportMargin]="8"
+             (detach)="closeFilterPopup()">
+  <ng-container *ngTemplateOutlet="filterPopupTpl"></ng-container>
+</ng-template>
+
+<ng-template #filterPopupTpl let-key>
+  <div class="fpop"
+       [style.width.px]="filterPopup?.width"
+       (click)="$event.stopPropagation()">
+
+    <!-- sort -->
+    <ng-container *ngIf="columnRegistry[filterPopup?.column]?.type !== 'relation'">
+      <button type="button" class="srt" [class.on]="filterPopup?.column === sortColumn?.column && sortColumn?.type === 'asc'" (click)="toggleSort(filterPopup?.column, 'asc')">
+        Sort A → Z
+      </button>
+      <button type="button" class="srt" [class.on]="filterPopup?.column === sortColumn?.column && sortColumn?.type === 'desc'" (click)="toggleSort(filterPopup?.column, 'desc')">
+        Sort Z → A
+      </button>
+      <div class="fpop-divider"></div>
+    </ng-container>
+
+    <div class="fb" [ngSwitch]="columnRegistry[filterPopup?.column]?.type">
+      <ng-container *ngSwitchCase="'enum'"><ng-container *ngTemplateOutlet="enumSection"></ng-container></ng-container>
+      <ng-container *ngSwitchCase="'text'"><ng-container *ngTemplateOutlet="textSection"></ng-container></ng-container>
+      <ng-container *ngSwitchCase="'date'"><ng-container *ngTemplateOutlet="dateSection"></ng-container></ng-container>
+      <ng-container *ngSwitchCase="'number'"><ng-container *ngTemplateOutlet="numberSection"></ng-container></ng-container>
+      <ng-container *ngSwitchCase="'relation'"><ng-container *ngTemplateOutlet="productSection"></ng-container></ng-container>
+    </div>
+
+    <div class="ff">
+      <button type="button" class="fpop-btn" (click)="closeFilterPopup()">Cancel</button>
+      <button type="button" class="fpop-btn pri" (click)="saveFilterPopup()">OK</button>
+    </div>
+  </div>
+</ng-template>
+
+<!-- ===== TEXT ===== -->
+<ng-template #textSection>
+  <div class="fl2">
+    <span>Contains</span>
+    <button type="button" class="fl2-btn" (click)="filterPopClearAll()">Clear</button>
+  </div>
+  <input type="text" class="fpop-search" placeholder="Type to match"
+         [value]="filterPopup.filterOption?.text ?? ''"
+         (input)="filterPopup.filterOption.text = $any($event.target).value">
+</ng-template>
+
+<!-- ===== ENUM ===== -->
+<ng-template #enumSection>
+  <div class="fl2">
+    <span>Filter by values</span>
+    <span>
+      <button type="button" class="fl2-btn" (click)="filterPopSelectAll()">Select all</button>
+      <button type="button" class="fl2-btn" (click)="filterPopClearAll()">Clear</button>
+    </span>
+  </div>
+
+  <input #searchInput
+         type="text"
+         class="fpop-search"
+         placeholder="Search"
+         [value]="filterPopup.search"
+         (input)="filterPopup.search = $any($event.target).value">
+
+  <div class="opts">
+    <label class="opt" *ngFor="let o of getFilterPopOptions()">
+      <input type="checkbox"
+             class="opt-check"
+             [checked]="filterPopup?.filterOption.selectedOption.includes(o.key)"
+             (change)="filterPopupToggleOptions(o.key)">
+      <span class="opt-name" [title]="o.value">{{ o.value }}</span>
+      <small class="opt-count">{{ o.count }}</small>
+    </label>
+    <div class="opt-none" *ngIf="getFilterPopOptions()?.length == 0">No matches</div>
+  </div>
+</ng-template>
+
+<!-- ===== DATE ===== -->
+<ng-template #dateSection>
+  <div class="fl2">
+    <span>Date range</span>
+    <button type="button" class="fl2-btn" (click)="filterPopClearAll()">Clear</button>
+  </div>
+
+  <mat-form-field class="fpop-date-field" appearance="outline" subscriptSizing="dynamic">
+    <mat-date-range-input [rangePicker]="rangePicker">
+      <input matStartDate placeholder="Start date" [value]="filterPopup.filterOption?.start" (dateChange)="filterPopup.filterOption.start = $event.value">
+      <input matEndDate placeholder="End date" [value]="filterPopup.filterOption?.end" (dateChange)="filterPopup.filterOption.end = $event.value">
+    </mat-date-range-input>
+    <mat-datepicker-toggle matSuffix [for]="rangePicker"></mat-datepicker-toggle>
+    <mat-date-range-picker #rangePicker></mat-date-range-picker>
+  </mat-form-field>
+</ng-template>
+
+<!-- ===== NUMBER ===== -->
+<ng-template #numberSection>
+  <div class="fl2">
+    <span>Range</span>
+    <button type="button" class="fl2-btn" (click)="filterPopClearAll()">Clear</button>
+  </div>
+
+  <div class="rng">
+    <input type="number" class="fpop-search rng-in" placeholder="Min"
+           [value]="filterPopup.filterOption.min ?? ''"
+           (input)="filterPopup.filterOption.min = toNumber($any($event.target).value)">
+    <span class="rng-sep">to</span>
+    <input type="number" class="fpop-search rng-in" placeholder="Max"
+           [value]="filterPopup.filterOption.max ?? ''"
+           (input)="filterPopup.filterOption.max = toNumber($any($event.target).value)">
+  </div>
+  <div class="rhint">Leave empty for no limit</div>
+</ng-template>
+
+<!-- ===== PRODUCT (relation) ===== -->
+<ng-template #productSection>
+  <div class="fl2">
+    <span>Consumed products</span>
+    <button type="button" class="fl2-btn" (click)="filterPopClearAll()">Clear</button>
+  </div>
+
+  <div class="rule-list">
+    <div class="rule-row" *ngFor="let r of filterPopup.filterOption; let i = index; trackBy: trackByIndex">
+
+      <mat-form-field class="rule-product" appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Product</mat-label>
+        <mat-select [(ngModel)]="r.productid" required>
+          <mat-option *ngFor="let product of mapProduct | keyvalue; trackBy: trackByKey" [value]="product.key">{{ product.value }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field class="rule-comparison" appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Comparison</mat-label>
+        <mat-select [(ngModel)]="r.operator" required>
+          <mat-option *ngFor="let c of reverseCompareMap | keyvalue" [value]="c.key">{{ c.value }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field class="rule-count" appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Count</mat-label>
+        <input matInput type="number" min="0" required [(ngModel)]="r.count">
+      </mat-form-field>
+
+      <button type="button" class="rule-remove" aria-label="Remove product" (click)="removeProductFromPopup(i)">
+        <mat-icon class="rule-remove-icon">delete</mat-icon>
+      </button>
+    </div>
+  </div>
+
+  <button type="button" class="rule-add" (click)="addProductFilterPopup()">
+    <mat-icon class="rule-add-icon">add</mat-icon>
+    Add product
+  </button>
+</ng-template>
+
+
+<!-- =====================================================================
+     CHECKLIST POPUP (create / edit)
+     ===================================================================== -->
+<ng-template #checklistpopup>
+  <div class="sx-modal">
+    <div class="sx-modal-scrim" (click)="closeChecklistPopup()"></div>
+
+    <div class="sx-modal-box" role="dialog" aria-modal="true" aria-labelledby="checklistPopupTitle">
+
+      <div class="dlg-h">
+        <h3 id="checklistPopupTitle" class="dlg-title">Add checklist item</h3>
+        <button type="button" class="x" aria-label="Close" (click)="closeChecklistPopup()">×</button>
+      </div>
+
+      <form class="dlg-b" [formGroup]="checkListForm">
+
+        <!-- name -->
+        <div class="blk">
+          <label class="fl">Name <span class="req">*</span></label>
+          <input type="text" class="in" formControlName="title" required>
+        </div>
+
+        <!-- clear when -->
+        <div class="blk">
+          <label class="fl">Clear when</label>
+
+          <div formArrayName="checklist">
+
+            <!-- group: attributes joined with AND, groups joined with OR -->
+            <ng-container *ngFor="let g of checklistForm.controls; let gi = index">
+              <div class="or" *ngIf="gi > 0">OR</div>
+
+              <div class="set" [formGroupName]="gi">
+
+                <div class="set-h">
+                  <span>Group {{ gi + 1 }}</span>
+                  <button type="button"
+                          class="icon-btn"
+                          *ngIf="checklistForm.controls.length > 1"
+                          aria-label="Remove group"
+                          (click)="removeChecklistGroup(gi)">
+                    <mat-icon class="ic-sm">delete</mat-icon>
+                  </button>
+                </div>
+
+                <div formArrayName="conditions">
+
+                  <!-- one attribute -->
+                  <ng-container *ngFor="let a of getGroupCond(gi); let ai = index">
+                    <div class="and" *ngIf="ai > 0">AND</div>
+
+                    <div class="grp" [formGroupName]="ai">
+
+                      <div class="grp-top">
+                        <mat-form-field class="grp-field" appearance="outline" subscriptSizing="dynamic">
+                          <mat-label>Select filter option</mat-label>
+                          <mat-select formControlName="field" (selectionChange)="onChangeChecklistAttribute(gi, ai)">
+                            <mat-option>
+                              <ngx-mat-select-search formControlName="search" name="Search" [placeholderLabel]="'Search'"
+                                        [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+                            </mat-option>
+                            <mat-option *ngFor="let at of getOptionsForChecklist(a?.get('search')?.value ?? ''); trackBy: trackByColumnKey" [value]="at.key">{{ at.label }}</mat-option>
+                          </mat-select>
+                        </mat-form-field>
+
+                        <button type="button"
+                                class="icon-btn"
+                                *ngIf="getGroupCond(gi).length > 1"
+                                aria-label="Remove attribute"
+                                (click)="removeChecklistGroupCondition(gi, ai)">
+                          <mat-icon class="ic-sm">close</mat-icon>
+                        </button>
+                      </div>
+
+                      <!-- ===== ENUM ===== -->
+                      <ng-container *ngIf="a?.get('type').value === 'enum'">
+                        <div class="fl2"><span>Select values</span></div>
+
+                        <mat-form-field class="grp-field" appearance="outline" subscriptSizing="dynamic">
+                          <mat-label>Select values</mat-label>
+                          <mat-select formControlName="value" multiple>
+                            <mat-option *ngFor="let column of getAvailableOptionsForColumn(a?.get('field')?.value); trackBy: trackByColumnKey" [value]="column.key">{{ column.value }}</mat-option>
+                          </mat-select>
+                        </mat-form-field>
+                      </ng-container>
+
+                      <!-- ===== DATE ===== -->
+                      <ng-container *ngIf="a?.get('type').value === 'date' && a?.get('value')">
+                        <div class="fl2"><span>Date range</span></div>
+
+                        <mat-form-field class="fpop-date-field" appearance="outline" subscriptSizing="dynamic">
+                          <mat-date-range-input formGroupName="value" [rangePicker]="checklistRange">
+                            <input matStartDate placeholder="Start date" formControlName="start">
+                            <input matEndDate placeholder="End date" formControlName="end">
+                          </mat-date-range-input>
+                          <mat-datepicker-toggle matSuffix [for]="checklistRange"></mat-datepicker-toggle>
+                          <mat-date-range-picker #checklistRange></mat-date-range-picker>
+                        </mat-form-field>
+                      </ng-container>
+
+                      <!-- ===== NUMBER ===== -->
+                      <ng-container *ngIf="a?.get('type').value === 'number' && a?.get('value')">
+                        <div class="fl2"><span>Range</span></div>
+
+                        <div class="rng" formGroupName="value">
+                          <input type="number" class="fpop-search rng-in" placeholder="Min" formControlName="min">
+                          <span class="rng-sep">to</span>
+                          <input type="number" class="fpop-search rng-in" placeholder="Max" formControlName="max">
+                        </div>
+                        <div class="rhint">Leave empty for no limit</div>
+                      </ng-container>
+
+                      <!-- ===== RELATION (products) ===== -->
+                      <ng-container *ngIf="a?.get('type').value === 'relation'">
+                        <div class="fl2"><span>Products</span></div>
+
+                        <div class="rule-list" formArrayName="value">
+                          <div class="rule-row"
+                               *ngFor="let r of a?.get('value')?.controls; let ri = index; trackBy: trackByIndex"
+                               [formGroupName]="ri">
+
+                            <mat-form-field class="rule-product" appearance="outline" subscriptSizing="dynamic">
+                              <mat-label>Product</mat-label>
+                              <mat-select formControlName="productid" required>
+                                <mat-option *ngFor="let product of mapProduct | keyvalue; trackBy: trackByKey" [value]="product.key">{{ product.value }}</mat-option>
+                              </mat-select>
+                            </mat-form-field>
+
+                            <mat-form-field class="rule-comparison" appearance="outline" subscriptSizing="dynamic">
+                              <mat-label>Comparison</mat-label>
+                              <mat-select formControlName="operator" required>
+                                <mat-option *ngFor="let c of reverseCompareMap | keyvalue" [value]="c.key">{{ c.value }}</mat-option>
+                              </mat-select>
+                            </mat-form-field>
+
+                            <mat-form-field class="rule-count" appearance="outline" subscriptSizing="dynamic">
+                              <mat-label>Count</mat-label>
+                              <input matInput type="number" min="0" formControlName="count" required>
+                            </mat-form-field>
+
+                            <button type="button" class="rule-remove" aria-label="Remove product" (click)="removeProductRuleForCheckList(a, ri)">
+                              <mat-icon class="rule-remove-icon">delete</mat-icon>
+                            </button>
+                          </div>
+                        </div>
+
+                        <button type="button" class="rule-add" (click)="addProductRuleForCheckList(a)">
+                          <mat-icon class="rule-add-icon">add</mat-icon>
+                          Add product
+                        </button>
+                      </ng-container>
+
+                    </div>
+                  </ng-container>
+                </div>
+
+                <button type="button" class="link" (click)="addCheckListCondition(gi)">+ AND attribute</button>
+              </div>
+            </ng-container>
+          </div>
+
+          <button type="button" class="btn ghost" (click)="addChecklistConditionGroup()">+ OR group</button>
+        </div>
+      </form>
+
+      <div class="dlg-f">
+        <button type="button" class="btn" (click)="closeChecklistPopup()">Cancel</button>
+        <button type="button"
+                class="btn pri"
+                [disabled]="!checkListForm?.value?.title?.trim()"
+                (click)="saveChecklist()">
+          Add checklist
+        </button>
+      </div>
+    </div>
+  </div>
+</ng-template>
