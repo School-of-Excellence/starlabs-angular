@@ -391,8 +391,47 @@
                     </div>
                   </div>
 
+                  <!-- Appointment slots -->
+                  <div *ngFor="let appt of getAppointmentSlotsForStage(stage)" class="slot-card-wrapper">
+                    <div class="slot-card" [attr.data-testid]="'qpr-apptcard-' + stage">
+                      <div class="slot-datetime-box">
+                        <div class="datetime-row slot-title-row">
+                          <mat-icon>medical_services</mat-icon>
+                          <span class="datetime-label" style="color: black;">Appointment:</span>
+                          <span class="slot-title-text">{{ getProfileName(appt.hostref?.id) }}</span>
+                          <button *ngIf="appt.appointmentref" mat-icon-button matTooltip="Revert Appointment"
+                            class="revert-btn" style="margin-left: auto;" (click)="revertAppointmentSlot(appt)">
+                            <mat-icon>undo</mat-icon>
+                          </button>
+                        </div>
+                        <div class="datetime-row">
+                          <mat-icon>event</mat-icon>
+                          <span class="datetime-label">Start:</span>
+                          <span class="datetime-value">{{ appt.startdate.toDate() | date:'dd MMM yyyy, h:mm a' }}</span>
+                        </div>
+                        <div class="datetime-divider"></div>
+                        <div class="datetime-row">
+                          <mat-icon>event_available</mat-icon>
+                          <span class="datetime-label">End:</span>
+                          <span class="datetime-value">{{ appt.enddate.toDate() | date:'dd MMM yyyy, h:mm a' }}</span>
+                        </div>
+                      </div>
+
+                      <div class="slot-counts-section">
+                        <div class="count-item segments-count">
+                          <span class="count-label">Seg:</span>
+                          <span class="count-value">{{ getSegmentName(appt.segmentid) }}</span>
+                        </div>
+                        <div class="count-item confirmed-count">
+                          <span class="count-label">Booked by:</span>
+                          <span class="count-value">{{ appt.bookedby ? getProfileName(appt.bookedby.id) : 'Open' }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   <!-- No Slots Message for Stage -->
-                  <div *ngIf="getSlotsForStage(stage).length === 0" class="no-slots-for-stage">
+                  <div *ngIf="getSlotsForStage(stage).length === 0 && getAppointmentSlotsForStage(stage).length === 0" class="no-slots-for-stage">
                     <mat-icon>event_busy</mat-icon>
                     <p>No slots</p>
                   </div>

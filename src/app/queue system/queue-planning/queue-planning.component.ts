@@ -2837,8 +2837,17 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
     });
 
     openSlots.sort((a, b) => a.slotstart.toDate().getTime() - b.slotstart.toDate().getTime());
+    // Hide slots already reserved in  queue 
+    const reservedDocs = await getDocs(query(collection(this.firestore, 'queue availability'),where('slottype', '==', 'appointment')));
+    const reserved = reservedDocs.docs.map(d => d.data());
 
-    this.appointmentSlotOptions = openSlots;
+    this.appointmentSlotOptions = openSlots.filter(open =>
+      !reserved.some(r =>
+        r['hostref']?.id === open.hostref?.id &&
+        r['startdate'].toMillis() < open.slotend.toMillis() &&
+        r['enddate'].toMillis() > open.slotstart.toMillis()
+      )
+    );
     this.loadingAppointmentSlots = false;
   }
 
@@ -2892,11 +2901,10 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
           startdate: slot.slotstart,
           enddate: slot.slotend,
           availabilityid: slot.availabilityid,
+          appointmenttypeid: this.stageProperty[stageName]['actionresource'].id,
           hostref: slot.hostref,
           appointmentref: null,
           bookedby: null,
-          booked: false,
-          available: true,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         });
@@ -2950,6 +2958,16 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
 
   toggleAppointmentSlotSelection(slot: any) {
     slot.selected = !slot.selected;
+    if (slot.selected) {
+      this.appointmentSlotOptions.forEach(otherSlot => {
+        if (otherSlot !== slot && otherSlot.selected &&
+            otherSlot.hostref?.id === slot.hostref?.id &&
+            otherSlot.slotstart.toMillis() < slot.slotend.toMillis() &&
+            otherSlot.slotend.toMillis() > slot.slotstart.toMillis()) {
+          otherSlot.selected = false;
+        }
+      });
+    }
     this.selectedAppointmentSlots = this.appointmentSlotOptions.filter(s => s.selected);
   }
 

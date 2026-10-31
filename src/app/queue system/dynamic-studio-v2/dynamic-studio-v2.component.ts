@@ -1,14 +1,14 @@
 import { Component, OnInit, ChangeDetectorRef, QueryList, ElementRef, ViewChildren, ViewChild, NgZone, TemplateRef, inject } from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { MatDialog, MatDialogRef, MatDialogModule } from '@angular/material/dialog';
-import { firstValueFrom, Subject, Subscription, takeUntil } from 'rxjs';
+import { firstValueFrom, Subject, Subscription, takeUntil,combineLatest } from 'rxjs';
 import { AuthguardService } from '../../authguard.service';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
 import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { collection, collectionData, doc, docData, Firestore, getDoc, getDocs, getCountFromServer, orderBy, query, updateDoc , arrayUnion, deleteDoc, setDoc, serverTimestamp, arrayRemove, addDoc, writeBatch, collectionSnapshots, documentId, limit, where, DocumentReference, getFirestore } from '@angular/fire/firestore';
+import { collection, collectionData, doc, docData, Firestore, getDoc, getDocs, getCountFromServer, orderBy, query, updateDoc , arrayUnion, deleteDoc, setDoc, serverTimestamp, arrayRemove, addDoc, writeBatch, collectionSnapshots, documentId, limit, where,FieldPath, DocumentReference, getFirestore } from '@angular/fire/firestore';
 import { Storage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
 import { environment } from '../../../environments/environment';
 import { CommonModule } from '@angular/common';
@@ -2091,6 +2091,12 @@ export class DynamicStudioV2Component {
   trackByTokenDocId(_index: number, token: any){
     return token?.docid
   }
+  
+  canBringToStudio(token: any, stage: string){
+     if(token["currentstage"] != stage) return false
+     if(token["status"] == "ready") return true
+     return token["bookedslot"]?.[stage]?.startdate.toDate() <= new Date()
+   }
 
   async onStudioSelect(studio){
     console.log("****** studio select ******");
@@ -2178,7 +2184,16 @@ export class DynamicStudioV2Component {
       // every token change — spamming the console and flickering the on-screen
       // names. Tear down the previous listener before subscribing again.
       this.tokenSubscription?.unsubscribe()
-      this.tokenSubscription = collectionData(query(collection(this.firestore,"queue_token"), where("queueref", "==", doc(this.firestore,'queue generation',this.ongoingQueue["docid"])),where("stagestatus", "==", "Approved"),where("tokenstatus", "==", "Active"),where("currentstage", "in", studioStage))).pipe(takeUntil(this.subscriptionHandle)).subscribe(async token=>{
+      // participants waiting at this studio's stages (query 1)
+      // and participants who already booked one of this studio's specialists but haven't
+      // reached the stage yet (query 2). Both are listened to in one subscription and
+      // combined later, so early-booked participants show up as "Booked your slot".
+      const queueRef = doc(this.firestore, 'queue generation', this.ongoingQueue["docid"])
+      const waitingTokens$ = collectionData(query(collection(this.firestore,"queue_token"), where("queueref", "==", queueRef), where("stagestatus", "==", "Approved"), where("tokenstatus", "==", "Active"), where("currentstage", "in", studioStage)))
+      const specialistRefs = this.selectedStudio["participants"].map(id => doc(this.firestore, "profile_data", id))
+      const bookedTokens$ = combineLatest(studioStage.map(stage =>collectionData(query(collection(this.firestore,"queue_token"), where("queueref", "==", queueRef), where("tokenstatus", "==", "Active"), where(new FieldPath("bookedslot", stage, "hostref"), "in", specialistRefs)))
+      ))
+      this.tokenSubscription = combineLatest([waitingTokens$, bookedTokens$]).pipe(takeUntil(this.subscriptionHandle)).subscribe(async ([token, bookedTokens]) => {
         console.log(token)
         if(this.liveAssignment != null && token.length != 0){
           // Only overwrite when this emission actually contains OUR token. The query is
@@ -2224,11 +2239,12 @@ export class DynamicStudioV2Component {
 
         }
         // var stageToken = token.filter(e => e["liveassignmentid"] == null && (e["preassigned"] == null || e["preassigned"] == undefined || e["preassigned"] == this.selectedStudio["docid"])).sort((a, b) => a["logdate"].toDate() - b["logdate"].toDate())
+        const stageTokens = [...token, ...bookedTokens.flat().filter(b => !token.some(t => t["docid"] == b["docid"]))]
         var localTokenList = []
         studioStage.forEach(stage=>{
           localTokenList.push({
             stagename: stage,
-            tokenlist: token.filter(e => e["status"] == "ready" && e["currentstage"] == stage && e["liveassignmentid"] == null && ([null,undefined].includes(this.selectedStudio['atcmodel']) ||  this.selectedStudio['atcmodel'].includes(this.mapProducts[e['productref'].id]))  && (e["preassigned"] == null || e["preassigned"] == undefined || (e["preassigned"][stage] ?? []).length == 0 || (e["preassigned"][stage] ?? []).includes(this.selectedStudio["docid"]))).sort((a, b) => a["queueposition"] - b["queueposition"]) // .sort((a, b) => b["logdate"].toDate() - a["logdate"].toDate())
+            tokenlist: stageTokens.filter(e => (e["bookedslot"]?.[stage]?.slottype == "appointment" ? this.selectedStudio["participants"].includes(e["bookedslot"][stage].hostref?.id) : e["status"] == "ready") && (e["currentstage"] == stage || e["bookedslot"]?.[stage]?.enddate?.toDate() > new Date()) && e["liveassignmentid"] == null && ([null,undefined].includes(this.selectedStudio['atcmodel']) ||  this.selectedStudio['atcmodel'].includes(this.mapProducts[e['productref'].id]))  && (e["preassigned"] == null || e["preassigned"] == undefined || (e["preassigned"][stage] ?? []).length == 0 || (e["preassigned"][stage] ?? []).includes(this.selectedStudio["docid"]))).sort((a, b) => (a["queueposition"] ?? 9999) - (b["queueposition"] ?? 9999)) // .sort((a, b) => b["logdate"].toDate() - a["logdate"].toDate()) 
           })
         })
         this.stageTokenList = localTokenList
