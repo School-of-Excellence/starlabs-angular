@@ -915,6 +915,9 @@
         <button data-testid="cman-duplicate-selected-cohorts-83" class="sb-btn primary" (click)="duplicateSelectedCohorts()" title="Duplicate selected cohorts into a marathon">
           <mat-icon>content_copy</mat-icon> <span class="sb-lbl">Duplicate</span>
         </button>
+        <button data-testid="cman-randomize-cohort-87" class="sb-btn primary" *ngIf="getRandomizeSourceCohorts().length > 0" (click)="openRandomizeDialog()" title="Randomize these cohorts' participants into groups">
+          <mat-icon>shuffle</mat-icon> <span class="sb-lbl">Randomize into cohorts</span>
+        </button>
         <button data-testid="cman-make-selected-cohorts-inactive-80" class="sb-btn danger" (click)="makeSelectedCohortsInactive()" title="Mark selected cohorts inactive">
           <mat-icon>visibility_off</mat-icon> <span class="sb-lbl">Make Inactive</span>
         </button>
