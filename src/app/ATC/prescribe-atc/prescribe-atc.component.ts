@@ -208,6 +208,8 @@ export class PrescribeATCComponent {
   stagename:string = null
   // appointments/{id} the specialists were taken from (WiSH / EI Solution); saved on the draft and the ATC
   appointmentId:string = null
+  // participantsproduct id of the delivery step holding that appointment (plan 2026-11-01); saved on the draft and the ATC
+  participantProductId:string = null
 
   // Ask · area of focus (EI Solution only): who asked and what they asked for.
   // Draft keeps every row (ask); the submitted ATC keeps complete rows only: ask [{ askedby, askedfor }].
@@ -1018,6 +1020,11 @@ export class PrescribeATCComponent {
       // the product cannot change (it locks), but stay safe if the screen was reset meanwhile
       if(this.product != model) return
 
+      // the delivery step holding this appointment → the purchase it belongs to (View ATC lists its forms by it)
+      var stepSnap = await getDocs(query(collection(this.firestoreDefault, "deliverables"),
+        where("fileref", "array-contains", doc(this.firestoreDefault, "appointments", closest.id)), limit(1)))
+      var participantProductId = stepSnap.docs[0]?.data()["participantproductid"] ?? null
+
       var roleMap = roleMapByType[closest.typeId]
       var toPath = (person) => typeof person == "string" ? (person.includes("/") ? person : "profile_data/" + person) : person?.path
       var authorFill = {}, observerFill = {}, mentorFill = {}, otherFill = {}, changeAgentFill = {}
@@ -1058,6 +1065,7 @@ export class PrescribeATCComponent {
           })
         })
         this.appointmentId = closest.id
+        this.participantProductId = participantProductId
         this.onObserverSelect()
         this.personnelReady = false
         setTimeout(() => this.personnelReady = true)
@@ -1827,6 +1835,7 @@ export class PrescribeATCComponent {
           // where the specialists came from — reopening patches these back (no re-check), so an ATC drafted
           // offline still submits with its appointment / queue reference
           appointmentid: this.appointmentId ?? null,
+          participantproductid: this.participantProductId ?? null,
           queueid: this.queueid ?? null,
           stagename: this.stagename ?? null,
           liveassignmentid: this.liveassignmentid ?? null,
@@ -1998,6 +2007,7 @@ export class PrescribeATCComponent {
     this.bulkAppliedSelection = value['bulkapplied'] ?? {}
     // Appointment / queue reference saved with the draft: patched as it is, no re-check
     this.appointmentId = value['appointmentid'] ?? null
+    this.participantProductId = value['participantproductid'] ?? null
     this.queueid = value['queueid'] ?? null
     this.stagename = value['stagename'] ?? null
     this.liveassignmentid = value['liveassignmentid'] ?? null
@@ -2728,6 +2738,7 @@ async removeATCImage(index: number) {
         }
         if(this.appointmentId != null){
           alphaData["appointmentid"] = this.appointmentId
+          alphaData["participantproductid"] = this.participantProductId
         }
         // EI Solution only: complete asks (other models get no field)
         if(this.isEISolution){
@@ -2973,6 +2984,7 @@ async removeATCImage(index: number) {
       })
       this.product = null;
       this.appointmentId = null;
+      this.participantProductId = null;
       // the bulk change agents belong to the submitted ATC — the next participant starts clean
       this.bulkAssignedSelection = {};
       this.bulkAppliedSelection = {};

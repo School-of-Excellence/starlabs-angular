@@ -145,6 +145,9 @@ export class ViewPrescribedATCComponent {
   mapFormView = {}     // atc id → { specialist rows, participant rows, summary line } for the Forms card
   mapForm = {}         // delivery form id → { name, deleted } (only the forms of opened ATCs), null when the doc is gone
   mapFormRequests = {} // atc id → atc_form_requests docs of that ATC and its earlier versions (live while opened)
+  // Delivery / queue forms (plan 2026-11-01) — loaded once when the ATC is opened
+  mapActivityForms = {} // atc id → { delivery: answer rows of the ATC's purchase, queue: answer rows of the ATC's queue }
+  mapFormsLocked = {}   // atc id → true when the ATC's model has forms but the ATC isn't validated yet
   startDate!: Date;
   endDate!: Date;
   updateProductPath = null
@@ -152,6 +155,7 @@ export class ViewPrescribedATCComponent {
 
   firestoreDefault = getFirestore() // Default Firestore
   firestoreATC = getFirestore("firestore-atc") // ATC Firestore
+  firestoreForms = getFirestore("firestore-forms") // Forms Firestore (formsByClient answers)
 
   constructor(
     // public firestore: Firestore,
@@ -1027,6 +1031,7 @@ export class ViewPrescribedATCComponent {
 
     this.fetchATCnotes(atcData) // Load ATC Notes
     this.openAtcForms(atc) // Forms section (validated ATCs whose model has forms)
+    this.openActivityForms(atc) // Forms section: forms filled in the ATC's delivery sequence / queue
 
     console.log(this.mapATCtranscription[atc.id])
 
@@ -1075,11 +1080,54 @@ export class ViewPrescribedATCComponent {
   //// ATC forms (plan 2026-10-28)
   // the ATC's model forms, only when the ATC is validated (an atc_alpha doc not waiting for validation)
   validatedModelForms(atc: QueryDocumentSnapshot<any>): any[] {
-    var atcData = atc.data()
-    if (atc.ref.parent.id != 'atc_alpha' || atcData['status'] == 'atc given') return []
-    var product = (atcData['product'] ?? '').toString().trim().toLowerCase()
+    if (!this.isValidated(atc)) return []
+    return this.modelForms(atc)
+  }
+
+  isValidated(atc: QueryDocumentSnapshot<any>): boolean {
+    return atc.ref.parent.id == 'atc_alpha' && atc.data()['status'] != 'atc given'
+  }
+
+  // the forms set on the ATC's model
+  modelForms(atc: QueryDocumentSnapshot<any>): any[] {
+    var product = (atc.data()['product'] ?? '').toString().trim().toLowerCase()
     var model = this.atcModelList.find(m => (m['atcmodel'] ?? '').toString().trim().toLowerCase() == product)
     return (model?.['forms'] || []).filter(f => f?.['formid'])
+  }
+
+  //// Delivery and queue forms (plan 2026-11-01), loaded once when the ATC is opened (formsByClient, forms DB):
+  //   participantproductid → the answers of that purchase (Delivery activities)
+  //   queueid              → the answers filled in that queue (Queue activities)
+  // Every answer is listed, newest first.
+  openActivityForms(atc: QueryDocumentSnapshot<any>) {
+    var atcData = atc.data()
+    this.mapActivityForms[atc.id] = { delivery: [], queue: [] }
+    this.mapFormsLocked[atc.id] = !this.isValidated(atc) && this.modelForms(atc).length > 0
+    var answers = collection(this.firestoreForms, 'formsByClient')
+    var toRows = (docs: QueryDocumentSnapshot<any>[]) => docs.map(d => {
+      var answer = d.data()
+      var date = answer['date']?.toDate ? answer['date'].toDate() : null
+      var filledin = answer['submittedin'] == 'breakthroughs' ? 'in the app' : answer['submittedin'] == 'starlabs' ? 'on web' : null
+      // note line: submitted date · queue stage · where it was filled
+      var note = [date ? this.datepipe.transform(date, 'd MMM y') : null, answer['stagename'], filledin].filter(part => part).join(' · ')
+      return { answerid: d.id, formid: answer['formid'], name: answer['formname'] ?? '', date, note }
+    }).sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0))
+    if (atcData['participantproductid']) {
+      getDocs(query(answers, where('profileid', '==', atcData['profileid']), where('participantproductid', '==', atcData['participantproductid'])))
+        .then(snap => this.mapActivityForms[atc.id] = { ...this.mapActivityForms[atc.id], delivery: toRows(snap.docs) })
+        .catch(err => console.error('Error loading delivery forms:', err))
+    }
+    if (atcData['queueid']) {
+      getDocs(query(answers, where('profileid', '==', atcData['profileid']), where('queueref', '==', doc(this.firestoreForms, 'queue generation', atcData['queueid']))))
+        .then(snap => this.mapActivityForms[atc.id] = { ...this.mapActivityForms[atc.id], queue: toRows(snap.docs) })
+        .catch(err => console.error('Error loading queue forms:', err))
+    }
+  }
+
+  // the Forms card shows when any of its three parts has something to show
+  hasFormsCard(atc: QueryDocumentSnapshot<any>): boolean {
+    var activity = this.mapActivityForms[atc.id]
+    return !!this.mapFormView[atc.id] || !!this.mapFormsLocked[atc.id] || activity?.delivery.length > 0 || activity?.queue.length > 0
   }
 
   // card count: how many of the model's forms have an answer on the ATC
@@ -1499,6 +1547,10 @@ export class ViewPrescribedATCComponent {
 
   trackByFormId(index: number, row: any): any {
     return row.formid;
+  }
+
+  trackByAnswerId(index: number, row: any): any {
+    return row.answerid;
   }
 
   trackByAdjustmentID(index: number, transcription: any): any {

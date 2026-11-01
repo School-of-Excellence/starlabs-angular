@@ -934,7 +934,23 @@ mat-list-item:hover {
 .form-status-todo { background: var(--so-soft2); color: var(--so-ink2); }
 .form-status-off { background: transparent; color: var(--so-muted); border: 1px solid var(--so-border); }
 .form-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+/* three parts (2026-11-01): Delivery activities · Queue activities · ATC forms — no font sizes set */
+.forms-part { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--so-border); }
+.forms-part-head { display: flex; align-items: center; gap: 10px; padding-bottom: 6px; }
+.forms-part-icon { flex: none; width: 32px; height: 32px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; }
+.forms-part-icon mat-icon { width: 18px; height: 18px; font-size: 18px; }
+.forms-part-delivery { background: #e1f5ee; color: #085041; }
+.forms-part-queue { background: #eeedfe; color: #3c3489; }
+.forms-part-atc { background: var(--so-soft2); color: var(--so-ink2); }
+.forms-part-text { display: flex; flex-direction: column; min-width: 0; }
+.forms-part-sub { color: var(--so-muted); }
+.forms-part-count { margin-left: auto; padding: 2px 10px; border-radius: 8px; background: var(--so-soft2); color: var(--so-ink2); white-space: nowrap; }
+.forms-part-row, .forms-part .forms-group, .forms-part .form-row, .forms-locked { margin-left: 42px; }
+.forms-locked { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 12px; border-radius: 8px; background: var(--so-soft2); color: var(--so-muted); }
+.forms-locked mat-icon { width: 18px; height: 18px; font-size: 18px; }
 @media (max-width: 600px) {
   .form-row { grid-template-columns: minmax(0, 1fr); }
   .form-actions { justify-content: flex-start; }
+  .forms-part-row, .forms-part .forms-group, .forms-part .form-row, .forms-locked { margin-left: 0; }
+  .forms-part-count { white-space: normal; }
 }

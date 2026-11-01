@@ -303,12 +303,65 @@
               Loading Full ATC...
             </div>
 
-            <!-- ATC forms (plan 2026-10-28): validated ATCs whose model has forms; rows worked out in buildFormRows -->
-            <div class="vp-card nonprintable" data-testid="vatc-forms-card" *ngIf="mapFormView[atc.id] as formView">
-              <div class="forms-head">
-                <div class="vp-card-title">Forms</div>
-                <span class="forms-summary" data-testid="vatc-forms-summary">{{ formView.summary }}</span>
+            <!-- Forms (plan 2026-11-01): 1 Delivery activities (participantproductid) · 2 Queue activities (queueid) ·
+                 3 ATC forms (plan 2026-10-28: validated ATCs whose model has forms; rows worked out in buildFormRows) -->
+            <div class="vp-card nonprintable" data-testid="vatc-forms-card" *ngIf="hasFormsCard(atc)">
+              <div class="vp-card-title">Forms</div>
+
+              <div class="forms-part" data-testid="vatc-forms-part-delivery" *ngIf="mapActivityForms[atc.id]?.delivery.length">
+                <div class="forms-part-head">
+                  <span class="forms-part-icon forms-part-delivery"><mat-icon aria-hidden="true">route</mat-icon></span>
+                  <div class="forms-part-text">
+                    <span class="forms-part-title">Delivery activities</span>
+                    <span class="forms-part-sub">Filled in this purchase's delivery sequence</span>
+                  </div>
+                  <span class="forms-part-count" data-testid="vatc-forms-delivery-count">{{ mapActivityForms[atc.id].delivery.length }} {{ mapActivityForms[atc.id].delivery.length == 1 ? 'answer' : 'answers' }}</span>
+                </div>
+                <ng-container *ngFor="let row of mapActivityForms[atc.id].delivery; trackBy: trackByAnswerId">
+                  <ng-container *ngTemplateOutlet="activityRow; context: { $implicit: row }"></ng-container>
+                </ng-container>
               </div>
+
+              <div class="forms-part" data-testid="vatc-forms-part-queue" *ngIf="mapActivityForms[atc.id]?.queue.length">
+                <div class="forms-part-head">
+                  <span class="forms-part-icon forms-part-queue"><mat-icon aria-hidden="true">groups</mat-icon></span>
+                  <div class="forms-part-text">
+                    <span class="forms-part-title">Queue activities</span>
+                    <span class="forms-part-sub">Filled in the queue{{ atcData['queuename'] ? ' · ' + atcData['queuename'] : '' }}</span>
+                  </div>
+                  <span class="forms-part-count" data-testid="vatc-forms-queue-count">{{ mapActivityForms[atc.id].queue.length }} {{ mapActivityForms[atc.id].queue.length == 1 ? 'answer' : 'answers' }}</span>
+                </div>
+                <ng-container *ngFor="let row of mapActivityForms[atc.id].queue; trackBy: trackByAnswerId">
+                  <ng-container *ngTemplateOutlet="activityRow; context: { $implicit: row }"></ng-container>
+                </ng-container>
+              </div>
+
+              <ng-template #activityRow let-row>
+                <div class="form-row forms-part-row" data-testid="vatc-activity-row">
+                  <div class="form-name">
+                    <span data-testid="vatc-activity-name">{{ row.name }}</span>
+                    <div class="form-line">
+                      <span class="form-status form-status-done"><mat-icon aria-hidden="true">check_circle</mat-icon><span>Submitted</span></span>
+                      <span class="form-note" data-testid="vatc-activity-note">{{ row.note }}</span>
+                    </div>
+                  </div>
+                  <div class="form-actions">
+                    <button data-testid="vatc-activity-view" mat-stroked-button type="button" (click)="viewAtcForm(atc, row)">View answer</button>
+                  </div>
+                </div>
+              </ng-template>
+
+              <div class="forms-part" data-testid="vatc-forms-part-atc" *ngIf="mapFormView[atc.id] || mapFormsLocked[atc.id]">
+                <div class="forms-part-head">
+                  <span class="forms-part-icon forms-part-atc"><mat-icon aria-hidden="true">assignment</mat-icon></span>
+                  <div class="forms-part-text">
+                    <span class="forms-part-title">ATC forms</span>
+                    <span class="forms-part-sub">Forms set on the {{ atcData['product'] }} ATC model</span>
+                  </div>
+                  <span class="forms-part-count forms-summary" data-testid="vatc-forms-summary" *ngIf="mapFormView[atc.id] as formView">{{ formView.summary }}</span>
+                </div>
+                <div class="forms-locked" data-testid="vatc-forms-locked" *ngIf="mapFormsLocked[atc.id]"><mat-icon aria-hidden="true">lock</mat-icon> These open once the ATC is validated.</div>
+              <ng-container *ngIf="mapFormView[atc.id] as formView">
               <ng-container *ngIf="formView.specialist.length">
                 <div class="forms-group" data-testid="vatc-forms-group-specialist"><mat-icon>how_to_reg</mat-icon> Forms you fill</div>
                 <ng-container *ngFor="let row of formView.specialist; trackBy: trackByFormId">
@@ -340,6 +393,8 @@
                   </div>
                 </div>
               </ng-template>
+              </ng-container>
+              </div>
             </div>
 
             <!-- Review log — EI Solution only (plan 2026-10-24): internal notes; add + soft delete for the involved
