@@ -46,13 +46,6 @@
   border-top: 1px solid var(--crnd-border);
 }
 
-.crnd-footer-note {
-  flex: 1;
-  min-width: 0;
-  font-size: 13px;
-  color: var(--crnd-dim);
-}
-
 .crnd-title {
   margin: 0;
   font-size: 18px;
@@ -317,13 +310,6 @@
   font-size: 18px;
 }
 
-.crnd-error-text {
-  margin: 8px 0 0;
-  font-size: 13px;
-  line-height: 1.4;
-  color: var(--crnd-red);
-}
-
 /* Group list */
 .crnd-list-tools {
   display: flex;
@@ -483,23 +469,6 @@
   margin-top: 8px;
 }
 
-.crnd-new-btn {
-  margin-top: 8px;
-}
-
-.crnd-new-form {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.crnd-new-form .crnd-input {
-  flex: 1 1 180px;
-  width: auto;
-}
-
 /* Summary panel */
 .crnd-panel-title {
   margin: 0 0 10px;
@@ -642,16 +611,6 @@
   min-width: 0;
   font-weight: 700;
   overflow-wrap: anywhere;
-}
-
-.crnd-card-tag {
-  flex-shrink: 0;
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: var(--crnd-accent-soft);
-  color: var(--crnd-accent);
-  font-size: 11px;
-  font-weight: 600;
 }
 
 .crnd-card-count {
