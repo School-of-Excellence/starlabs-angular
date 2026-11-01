@@ -3174,48 +3174,17 @@ export class CohortManagementComponent {
       },
     })
     const result = await firstValueFrom(dialogRef.afterClosed())
-    if (result?.plan?.length) await this.applyRandomizePlan(result.plan, result.source)
+    if (result?.plan?.length) await this.applyRandomizePlan(result.plan)
   }
 
   // Overwrites each selected cohort with its shuffled list. Nobody leaves the source or specialist cohorts.
-  private async applyRandomizePlan(plan: any[], source: any): Promise<void> {
+  private async applyRandomizePlan(plan: any[]): Promise<void> {
     try {
       const batch = writeBatch(this.firestore)
       const saved: { cohort: any, added: string[], removed: string[] }[] = []
 
       for (const group of plan) {
         const participantIds: string[] = [...group.specialistIds, ...group.participantIds]
-
-        if (group.isNew) {
-          const newRef = doc(collection(this.firestore, 'big cohorts'))
-          const now = new Date()
-          const newCohort = {
-            docid: newRef.id,
-            name: group.name,
-            description: '',
-            cohortCategory: 'educational',
-            cohortType: 'general',
-            participantidlist: participantIds,
-            createddate: now,
-            udpateddate: now,
-            marathonref: source['marathonref'] || this.mapMarathon[this.selectedMarathon!]?.['ref'] || null,
-            eventref: null,
-            status: 'active',
-            isTemporary: false,
-            startDate: null,
-            endDate: null,
-            level: source['level'] ?? null,
-            enableGroupChat: false,
-            tags: [],
-            mentors: [],
-            team: [],
-            bigactivity: null,
-            chatmembers: [],
-          }
-          batch.set(newRef, newCohort)
-          saved.push({ cohort: newCohort, added: participantIds, removed: [] })
-          continue
-        }
 
         // Read the cohort again so the logs and chat match what is actually being replaced.
         const cohortRef = doc(this.firestore, 'big cohorts', group.cohort.docid)

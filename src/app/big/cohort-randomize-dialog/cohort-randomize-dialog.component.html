@@ -98,10 +98,6 @@
                 {{cohort['name']}}
                 <button data-testid="crnd-target-chip-remove" type="button" title="Unselect" (click)="toggleTarget(cohort['docid'])"><mat-icon>close</mat-icon></button>
               </span>
-              <span class="crnd-chip" data-testid="crnd-new-cohort-chip" *ngFor="let name of newCohortNames">
-                {{name}} · new
-                <button data-testid="crnd-remove-new-cohort" type="button" title="Remove" (click)="removeNewCohort(name)"><mat-icon>close</mat-icon></button>
-              </span>
             </div>
             <div class="crnd-list">
               <label class="crnd-row" data-testid="crnd-target-row" *ngFor="let cohort of filteredTargets">
@@ -111,19 +107,9 @@
                 <span class="crnd-row-meta">{{cohort['cohortCategory'] | titlecase}} · {{cohort['participantidlist']?.length || 0}} people</span>
               </label>
               <p class="crnd-empty" data-testid="crnd-target-empty" *ngIf="filteredTargets.length === 0">
-                No matching cohorts. Try All marathons, or create a new one.
+                No matching cohorts. Try All marathons or a different search.
               </p>
             </div>
-            <button data-testid="crnd-add-new-cohort" class="crnd-ghost-btn crnd-new-btn" type="button" *ngIf="!addingNewCohort" (click)="startNewCohort()">
-              <mat-icon>add</mat-icon> New cohort
-            </button>
-            <div class="crnd-new-form" *ngIf="addingNewCohort">
-              <input data-testid="crnd-new-cohort-name" class="crnd-input" type="text" placeholder="New cohort name"
-                [(ngModel)]="newCohortName" (keydown.enter)="addNewCohort()" />
-              <button data-testid="crnd-new-cohort-save" class="crnd-ghost-btn" type="button" (click)="addNewCohort()">Add</button>
-              <button data-testid="crnd-new-cohort-cancel" class="crnd-ghost-btn" type="button" (click)="cancelNewCohort()">Cancel</button>
-            </div>
-            <p class="crnd-error-text" data-testid="crnd-new-cohort-error" *ngIf="newCohortError">{{newCohortError}}</p>
           </ng-container>
 
           <!-- Specialists -->
@@ -297,7 +283,6 @@
         <div class="crnd-card" data-testid="crnd-preview-card" *ngFor="let group of plan">
           <div class="crnd-card-head">
             <span class="crnd-card-name">{{group.name}}</span>
-            <span class="crnd-card-tag" *ngIf="group.isNew">new</span>
             <span class="crnd-card-count">{{group.participantIds.length + group.specialistIds.length}} people</span>
           </div>
           <p class="crnd-card-diff" data-testid="crnd-card-diff">
@@ -324,10 +309,9 @@
   </div>
 
   <div class="crnd-footer">
-    <span class="crnd-footer-note" data-testid="crnd-preview-only">Preview only. Saving is turned off for now, so nothing changes.</span>
     <button data-testid="crnd-cancel" class="crnd-ghost-btn" type="button" (click)="cancel()">Close</button>
-    <!-- <button data-testid="crnd-confirm" class="crnd-primary-btn" type="button" [disabled]="!canConfirm" (click)="confirm()">
-      Confirm: <ng-container *ngIf="newCohortNames.length > 0">create {{newCohortNames.length}}, </ng-container>add {{totalToAdd}}<ng-container *ngIf="totalRemoved > 0">, remove {{totalRemoved}}</ng-container>
-    </button> -->
+    <button data-testid="crnd-confirm" class="crnd-primary-btn" type="button" [disabled]="!canConfirm" (click)="confirm()">
+      Confirm: add {{totalToAdd}}<ng-container *ngIf="totalRemoved > 0">, remove {{totalRemoved}}</ng-container>
+    </button>
   </div>
 </div>

@@ -2,7 +2,7 @@
 
 Approved by operator 2026-11-01 in chat. Why: `specs/journals/2026-11-01-bigcohorts-randomize.md`.
 
-Goal: on `/bigcohorts`, choose with or without specialists, then build groups from new or existing educational or operational cohorts (existing ones are overwritten). With specialists, they're placed first. Then participants from one or more cohorts, filtered by event attendance on a date, are shuffled into the groups.
+Goal: on `/bigcohorts`, choose with or without specialists, then pick groups from existing educational or operational cohorts, which are overwritten. No cohort is created here. With specialists, they're placed first. Then participants from one or more cohorts, filtered by event attendance on a date, are shuffled into the groups.
 
 | # | File | Change |
 |---|---|---|
@@ -13,5 +13,5 @@ Goal: on `/bigcohorts`, choose with or without specialists, then build groups fr
 | 5 | `src/app/big/cohort-management/cohort-management.component.ts` | `getRandomizeSourceCohorts()`, `openRandomizeDialog()`, `applyRandomizePlan()` |
 
 Open:
-- Confirm is commented out on operator instruction, so nothing can be saved yet.
-- Before pushing: add e2e coverage with the `screen-e2e-coverage` skill.
+- Confirm is on, but the save has not run yet.
+- e2e: CRND-01..05 in the hub, including a save on the emulator. A first save on real data is still pending.
