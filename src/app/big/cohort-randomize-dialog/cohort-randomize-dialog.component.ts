@@ -32,11 +32,10 @@ export interface RandomizeDialogData {
   mapMarathon: any;
 }
 
-// One randomized cohort: an existing cohort that gets overwritten, or a new one (cohort is null) created on save.
+// One randomized cohort: an existing cohort that gets overwritten on save.
 export interface RandomizePlanGroup extends RandomizeGroup {
   name: string;
-  isNew: boolean;
-  cohort: any | null;
+  cohort: any;
   addedIds: string[];
   keptIds: string[];
   removedIds: string[];
@@ -65,7 +64,6 @@ interface DialogIssue {
 export class CohortRandomizeDialogComponent {
   profileName: (id: string) => string;
   allowedCohorts: any[] = [];
-  takenNames = new Set<string>();
   events: any[] = [];
   marathonId: string | undefined;
   marathonName = '';
@@ -87,10 +85,6 @@ export class CohortRandomizeDialogComponent {
   // Groups
   targetSearch = '';
   selectedTargetIds: string[] = [];
-  newCohortNames: string[] = [];
-  addingNewCohort = false;
-  newCohortName = '';
-  newCohortError = '';
   showSelectedGroups = false;
 
   // Specialists
@@ -135,7 +129,6 @@ export class CohortRandomizeDialogComponent {
     const marathon = data.mapMarathon?.[this.marathonId ?? ''];
     this.marathonName = marathon?.['title'] || marathon?.['name'] || '';
     this.showAllMarathons = !this.marathonName;
-    (data.cohorts ?? []).forEach(c => this.takenNames.add((c['name'] ?? '').trim().toLowerCase()));
     // Inactive cohorts are hidden, except one the admin ticked on purpose to randomize from.
     const tickedIds = (data.sources ?? []).map(c => c['docid']);
     this.allowedCohorts = (data.cohorts ?? [])
@@ -183,7 +176,7 @@ export class CohortRandomizeDialogComponent {
   }
 
   get targetCount(): number {
-    return this.selectedTargetIds.length + this.newCohortNames.length;
+    return this.selectedTargetIds.length;
   }
 
   get totalToAdd(): number {
@@ -386,40 +379,6 @@ export class CohortRandomizeDialogComponent {
 
   clearTargets(): void {
     this.selectedTargetIds = [];
-    this.newCohortNames = [];
-    this.recompute();
-  }
-
-  startNewCohort(): void {
-    this.addingNewCohort = true;
-    this.newCohortName = '';
-    this.newCohortError = '';
-  }
-
-  cancelNewCohort(): void {
-    this.addingNewCohort = false;
-    this.newCohortError = '';
-  }
-
-  addNewCohort(): void {
-    const name = this.newCohortName.trim();
-    if (!name) {
-      this.newCohortError = 'Type a name for the new cohort first.';
-      return;
-    }
-    const lower = name.toLowerCase();
-    if (this.takenNames.has(lower) || this.newCohortNames.some(n => n.toLowerCase() === lower)) {
-      this.newCohortError = `A cohort called "${name}" already exists. Tick it in the list to overwrite it, or use a different name.`;
-      return;
-    }
-    this.newCohortNames = [...this.newCohortNames, name];
-    this.addingNewCohort = false;
-    this.newCohortError = '';
-    this.recompute();
-  }
-
-  removeNewCohort(name: string): void {
-    this.newCohortNames = this.newCohortNames.filter(n => n !== name);
     this.recompute();
   }
 
@@ -511,7 +470,7 @@ export class CohortRandomizeDialogComponent {
   // The button that calls this is commented out in the template for now.
   confirm(): void {
     if (!this.canConfirm) return;
-    this.dialogRef.close({ plan: this.plan, source: this.selectedSourceCohorts[0] });
+    this.dialogRef.close({ plan: this.plan });
   }
 
   cancel(): void {
@@ -531,7 +490,7 @@ export class CohortRandomizeDialogComponent {
   }
 
   private groupIssues(): DialogIssue[] {
-    return this.targetCount === 0 ? [this.todo('Select at least one group', 'Tick an existing cohort or create a new one.')] : [];
+    return this.targetCount === 0 ? [this.todo('Select at least one group', 'Tick an existing cohort.')] : [];
   }
 
   private specialistIssues(): DialogIssue[] {
@@ -601,14 +560,12 @@ export class CohortRandomizeDialogComponent {
       splitIntoCohorts(shuffleIds(this.eligibleIds, this.seed), this.targetCount, this.size!),
       this.pickedSpecialistIds,
     );
-    const details = [
-      ...this.selectedTargets.map(cohort => ({ name: cohort['name'], isNew: false, cohort })),
-      ...this.newCohortNames.map(name => ({ name, isNew: true, cohort: null })),
-    ];
+    const cohorts = this.selectedTargets;
     this.plan = groups.map((group, index) => {
+      const cohort = cohorts[index];
       const nextIds = [...group.specialistIds, ...group.participantIds];
-      const { added, kept, removed } = diffCohortMembers(this.uniqueIds(details[index].cohort?.['participantidlist']), nextIds);
-      return { ...group, ...details[index], addedIds: added, keptIds: kept, removedIds: removed };
+      const { added, kept, removed } = diffCohortMembers(this.uniqueIds(cohort['participantidlist']), nextIds);
+      return { ...group, name: cohort['name'], cohort, addedIds: added, keptIds: kept, removedIds: removed };
     });
     this.canConfirm = true;
   }

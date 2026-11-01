@@ -10,11 +10,15 @@
 | 1 | committed 2026-11-01 | `src/app/big/cohort-randomize-dialog/` (new folder) | Dialog, pure logic, unit spec |
 | 2 | committed 2026-11-01 | `src/app/big/cohort-management/cohort-management.component.html` | "Randomize into cohorts" button in the select bar |
 | 3 | committed 2026-11-01 | `src/app/big/cohort-management/cohort-management.component.ts` | `getRandomizeSourceCohorts()`, `openRandomizeDialog()`, `applyRandomizePlan()` |
+| 4 | committed 2026-11-01 | `src/app/big/cohort-randomize-dialog/cohort-randomize-dialog.component.{html,css}` | Saving on: `crnd-confirm` uncommented; `crnd-preview-only` note and its CSS removed |
+| 5 | committed 2026-11-01 | `cohort-randomize-dialog.component.{html,css,ts}`, `cohort-management.component.ts` | Existing cohorts only: New cohort button, form, chips and "new" tag removed, plus the create branch of `applyRandomizePlan()` |
 
-Revert: restore `src/app/big/cohort-management` from the commit before this one and delete the new folder. #2 and #3 must be reverted together, because the button calls the methods.
+Revert: restore `src/app/big/cohort-management` from the commit before this one and delete the new folder. #2 and #3 must be reverted together, because the button calls the methods. To turn saving off only, revert #4.
 
-## To turn saving on
-Uncomment the `crnd-confirm` button at the bottom of `cohort-randomize-dialog.component.html`. `confirm()` and `applyRandomizePlan()` are already written. The dev environment points at production (`fir-sample-aae4a`), so a click there writes real cohorts.
+## Saving is on
+Operator asked for the `crnd-confirm` button to be uncommented. The "Preview only" footer note went with it, because it would now be false. `confirm()` and `applyRandomizePlan()` were already written and have not run against a database. The dev environment points at production (`fir-sample-aae4a`), so a click on localhost writes real cohorts.
+
+**No new database fields.** A selected cohort updates only `participantidlist`. A group chat, if enabled, updates the same four fields as the chat update already on this screen. Logs still go through the unchanged `createLogsForParticipants`. No cohort document is ever created here.
 
 ## Why (decisions)
 - **Copy, not move.** Operator: nobody is removed from the source or specialist cohorts. The move rules (active studio, same event) therefore don't apply.
@@ -40,10 +44,10 @@ Uncomment the `crnd-confirm` button at the bottom of `cohort-randomize-dialog.co
 - **An inactive cohort you ticked stays usable as the source.** Operator saw a blank participants dropdown with "The selected cohort has no participants". The dialog hid inactive cohorts but still counted the ticked one as selected, so it had no name or people. A test with an inactive source gave the same screen, but the real cohort's status wasn't read because the production login had expired. It now appears labelled Inactive in the participants dropdown only, and other inactive cohorts stay hidden.
 - **People with attendance not marked can be ticked in.** Operator: with Attended selected, show the cohort's people with no attendance that day so they can be picked and included in the shuffle. The list appears once a date is picked and only with Attended, since Not attended and All already cover them. Ticks reset when the event or date changes because they were made for one day. Only participants get this list; specialists still follow their attendance filter.
 - **Cohort lists default to the source's marathon**, with an All marathons tick, because the full list spans every marathon. Selected cohorts stay visible as chips while searching.
-- **Educational and operational only.** Source, targets and specialist sources; operational was added when the operator tried All CPI Participants. Studio and readiness stay out. Inactive cohorts are hidden too (my call). New cohorts are still created as educational.
+- **Educational and operational only.** Source, targets and specialist sources; operational was added when the operator tried All CPI Participants. Studio and readiness stay out. Inactive cohorts are hidden too (my call).
 - **Event comes from the dialog, not the cohort.** Operator: cohorts don't say which event they belong to.
 - **Attendance = `arena e-ticket log`**, by `eventref` and the local day of `logdate`, the same source as the live event dashboard. Not attended means a cohort member with no entry that day, so the count can differ from the dashboard's absent list, which only counts e-ticket holders.
-- **New cohorts need only a name.** The rest of the form is filled in: educational, general, active, no event; marathon and level copied from the source. Created only on save.
+- **Existing cohorts only.** Operator: don't offer creating a new cohort from here. This reverses the earlier new-or-existing choice, so the dialog can only overwrite cohorts that already exist. The source cohort no longer goes back with the plan, because it only supplied a new cohort's marathon and level.
 - **Category check lives in `isRandomizeCategory()`**, shared by the select bar button and the dialog lists, so the rule can't drift between them.
 - **Group chats are updated without the per-person dialog**, which would be unusable for this many people.
 - **Seeded shuffle.** Changing an input keeps a stable order; only Reshuffle changes it.
@@ -51,12 +55,15 @@ Uncomment the `crnd-confirm` button at the bottom of `cohort-randomize-dialog.co
 ## Verification (2026-11-01)
 - Unit: 29/29 pass with `tsconfig.unit.json`. App type-checks and templates compile with no errors in these files.
 - Browser: the redesigned dialog ran on a temporary unguarded route with synthetic data (since removed). Split, spread, overwrite counts, the error scenarios and the two-column layout at 1280px all checked, with no overflow. The operator has opened the select bar button in their own session.
-- **Not run by me:** the real `arena e-ticket log` read and `applyRandomizePlan()`. The built-in browser wasn't signed in, and saving is off.
+- Confirm button, on a temporary route with synthetic data (since removed): disabled when 3 groups × 20 can't be filled, enabled at 3 × 10, and a click closes the dialog with the plan (11, 11, 10). That route never calls the save.
+- Existing cohorts only, same kind of route (since removed): no New cohort button or "new" tag and no mention of creating one. The plan holds 3 groups, each tied to an existing cohort id.
+- **Not run by me:** the real `arena e-ticket log` read and `applyRandomizePlan()`. The built-in browser wasn't signed in, and a test save here would write to production.
 - `graphify` isn't installed here, so the graph wasn't rebuilt.
 
 ## e2e
-Hub `queue/big-cohorts-randomize.spec.ts` (`crnd` prefix; select bar hook `cman-randomize-cohort-87`). CRND-01 category gate; CRND-02 split, extras, removal warning, no write; CRND-03 attendance and ticking unmarked people; CRND-04 specialists, overlap, new cohort. The rest of the hooks are in CRND-ADDR1. Not covered while saving is off: `applyRandomizePlan()`. Turning saving on needs a case for it.
+Hub `queue/big-cohorts-randomize.spec.ts` (`crnd` prefix; select bar hook `cman-randomize-cohort-87`). CRND-01 category gate; CRND-02 split, extras, removal warning, Confirm state, no write on close; CRND-03 attendance and ticking unmarked people; CRND-04 specialists and overlap; CRND-05 a real save on the emulator (lists, added / removed logs, chat members, and nothing else changed). The rest of the hooks are in CRND-ADDR1. These don't run in the branch-suites queue leg: run `queue-e2e.yml` with `only: queue/big-cohorts-randomize.spec.ts`.
 
 ## Pending
+- First real save: try it on a spare existing group and check the cohort, its logs and any group chat.
 - Check on real data with a signed-in session.
 - Earlier this session, the two untracked zone-geofencing plans were discarded into `git stash` at the operator's request.
