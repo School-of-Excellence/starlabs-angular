@@ -15,6 +15,7 @@ import { ATCDraftService } from '../../shared/atc-draft.service';
 import { parseAtcOutput } from '../../ATC-Ops/atc-ops.types';
 import { resolveProcedurePseudonym } from '../../ATC-Ops/procedure-pseudonyms';
 import { DraftConflictDialogComponent } from '../shared/draft-conflict-dialog.component';
+import { isEISolutionProduct, isWiSHProduct } from '../shared/atc-product';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
 import { AtcOptionComponent } from '../../ATC/atc-option/atc-option.component';
@@ -223,7 +224,7 @@ export class PrescribeATCComponent {
   askRows: { askedby: string | null, askedfor: string }[] = []
 
   get isEISolution(): boolean {
-    return (this.product ?? "").toString().toLowerCase() == "ei solution"
+    return isEISolutionProduct(this.product)
   }
 
   // EI Solution always shows at least one (empty) ask row
@@ -261,7 +262,7 @@ export class PrescribeATCComponent {
   outcomeRows: { outcomearea: string, outcomeexpected: string }[] = []
 
   get isWiSH(): boolean {
-    return (this.product ?? "").toString().toLowerCase() == "wish"
+    return isWiSHProduct(this.product)
   }
 
   // WiSH opens with five empty outcome rows (as the prototype)
@@ -949,10 +950,9 @@ export class PrescribeATCComponent {
     this.runProductCheck()
   }
 
-  // WiSH and EI Solution take their specialists from the appointment (lowercase match, hardcoded)
+  // WiSH and EI Solution take their specialists from the appointment (name match, hardcoded)
   private isAppointmentModel(product: string): boolean {
-    var model = (product ?? "").toString().toLowerCase()
-    return model == "wish" || model == "ei solution"
+    return isWiSHProduct(product) || isEISolutionProduct(product)
   }
 
   // Runs only on the user's own product pick. A product loaded from a draft is patched as it is (no re-check);

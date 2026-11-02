@@ -29,6 +29,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MarkdownModule } from 'ngx-markdown';
 import { MAT_FORM_FIELD_DEFAULT_OPTIONS } from '@angular/material/form-field';
 import { AtcReview, AtcReviewLogService } from '../shared/atc-review-log.service';
+import { isEISolutionProduct, isWiSHProduct } from '../shared/atc-product';
 
 @Component({
   selector: 'app-edit-atc',
@@ -226,10 +227,10 @@ export class EditAtcComponent {
   panelError: string | null = null
 
   get isEISolution(): boolean {
-    return (this.reportATC?.product ?? "").toString().toLowerCase() == "ei solution"
+    return isEISolutionProduct(this.reportATC?.product)
   }
   get isWiSH(): boolean {
-    return (this.reportATC?.product ?? "").toString().toLowerCase() == "wish"
+    return isWiSHProduct(this.reportATC?.product)
   }
 
   // EI Solution always shows at least one (empty) ask row

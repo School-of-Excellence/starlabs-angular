@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { collection, doc, Firestore, runTransaction, Timestamp } from '@angular/fire/firestore';
+import { isEISolutionProduct } from './atc-product';
 
 /**
  * EI Solution Review log (plan specs/plans/2026-10-24-review-log.md).
@@ -26,7 +27,7 @@ export class AtcReviewLogService {
 
   /** The Review log exists for EI Solution ATCs only (same name rule as Ask). */
   isEISolution(product: any): boolean {
-    return (product ?? "").toString().toLowerCase() == "ei solution"
+    return isEISolutionProduct(product)
   }
 
   /** Edited into a new version, or deleted. */

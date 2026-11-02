@@ -44,6 +44,9 @@ const PEOPLE = {
   rahul: { name: 'Rahul Verma', participant: true, email: 'rahul.verma@example.com' },   // EI Solution ATC (saved)
   neha: { name: 'Neha Kapoor', participant: true, email: 'neha.kapoor@example.com' },    // WiSH prescribe walk-through
   arjun: { name: 'Arjun Pillai', participant: true, email: 'arjun.pillai@example.com' }, // EI prescribe walk-through
+  // sponsors (2026-11-02 update): existing users, picked on the first sponsor-form send
+  ravi: { name: 'Ravi Menon', participant: true, email: 'ravi.menon@example.com' },
+  meera: { name: 'Meera Iyer', participant: true, email: 'meera.iyer@example.com' },
 };
 const PID = (k) => `manual_pf_${k}`;
 const UID = (k) => `manual_u_${k}`;
@@ -258,17 +261,17 @@ async function seed() {
     docid: id, formid: DF[k], formname: FORMS[k].name, profileid: PID(who), atcid, filledby, date: daysAgo(1),
     formarray: FORMS[k].formarray.map((f, i) => (f.type === 'label' ? f : { ...f, value: values[i - 1] })), ...tag,
   });
-  await answer('manual_ans_clarity', 'clarity', 'asha', ATCID.wish,
+  await answer('manual_ans_clarity', 'clarity', 'kavya', ATCID.wish, // a specialist form carries the specialist's profile id
     ['Wants to stop feeling drained by 3 pm', 'Health', 'High', 'Start with the evening routine first'], 'specialist');
   await answer('manual_ans_pre', 'pre', 'rahul', ATCID.ei,
     ['Snapped at a colleague when a meeting overran', 'Spouse', 'Weekly'], 'participant');
   await adb.doc(`atc_alpha/${ATCID.wish}`).update({ formsubmitted: { [DF.clarity]: 'manual_ans_clarity' } });
   await adb.doc(`atc_alpha/${ATCID.ei}`).update({ formsubmitted: { [DF.pre]: 'manual_ans_pre' } });
   await adb.collection('atc_form_requests').doc(`${ATCID.wish}_${DF.life}`).set({
-    atcid: ATCID.wish, formid: DF.life, profileid: PID('asha'), product: MODEL.wish, sentby: PID('kavya'), sentat: daysAgo(1), formstatus: 'sent', ...tag,
+    atcid: ATCID.wish, formid: DF.life, profileid: PID('asha'), product: MODEL.wish, sentby: PID('kavya'), sentat: daysAgo(1), formstatus: 'sent', filledby: 'participant', ...tag,
   });
   await adb.collection('atc_form_requests').doc(`${ATCID.ei}_${DF.pre}`).set({
-    atcid: ATCID.ei, formid: DF.pre, profileid: PID('rahul'), product: MODEL.ei, sentby: PID('kavya'), sentat: daysAgo(3), formstatus: 'submitted', ...tag,
+    atcid: ATCID.ei, formid: DF.pre, profileid: PID('rahul'), product: MODEL.ei, sentby: PID('kavya'), sentat: daysAgo(3), formstatus: 'submitted', filledby: 'participant', ...tag,
   });
   console.log('[manual] seeded demo world');
 }

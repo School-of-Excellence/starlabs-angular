@@ -4,6 +4,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatPaginator, MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { AuthguardService } from '../../authguard.service';
 import { AtcReview, AtcReviewLogService } from '../shared/atc-review-log.service';
+import { isEISolutionProduct, isWiSHProduct } from '../shared/atc-product';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
 import { collection, writeBatch, collectionChanges, collectionData, CollectionReference, collectionSnapshots, doc, docSnapshots, Firestore, and, getDoc, getDocs, limit, or, orderBy, Query, query, QueryDocumentSnapshot, QueryFieldFilterConstraint, QueryLimitConstraint, QueryOrderByConstraint, updateDoc, where, DocumentSnapshot, QueryConstraint, QueryFilterConstraint, DocumentReference, getFirestore, documentId, setDoc, deleteDoc, serverTimestamp } from '@angular/fire/firestore';
@@ -1743,8 +1744,7 @@ export class ViewPrescribedATCComponent {
   }
   // prototype ATC card: the model tag colour and the initials shown when a participant has no photo
   modelTagClass(product: any): string {
-    var model = (product ?? "").toString().toLowerCase()
-    return model == "ei solution" ? "tag-ei" : model == "wish" ? "tag-wish" : "tag-model"
+    return isEISolutionProduct(product) ? "tag-ei" : isWiSHProduct(product) ? "tag-wish" : "tag-model"
   }
   initialsOf(name: any): string {
     var words = (name ?? "").toString().replace(/@.*/, "").split(/[\s._+-]+/).filter(w => w.length != 0)
@@ -1758,7 +1758,7 @@ export class ViewPrescribedATCComponent {
     return (index + 1 < 10 ? "0" : "") + (index + 1)
   }
   isWiSHModel(product: any): boolean {
-    return (product ?? "").toString().toLowerCase() == "wish"
+    return isWiSHProduct(product)
   }
 
   trackByActivityKey(index: number, item: any): any {

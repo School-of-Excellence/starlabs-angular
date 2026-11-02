@@ -12,6 +12,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { FormsModule } from '@angular/forms';
 import { Location } from '@angular/common';
+import { isWiSHProduct } from '../shared/atc-product';
 
 @Component({
   selector: 'app-atc-preview',
@@ -411,6 +412,6 @@ export class AtcPreviewComponent {
     return (index + 1 < 10 ? "0" : "") + (index + 1)
   }
   isWiSHModel(product: any): boolean {
-    return (product ?? "").toString().toLowerCase() == "wish"
+    return isWiSHProduct(product)
   }
 }

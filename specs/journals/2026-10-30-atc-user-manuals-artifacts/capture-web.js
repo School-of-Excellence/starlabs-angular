@@ -297,6 +297,32 @@ const steps = {
       if (await dlg.count()) { await shot(dlg, `${pre}-edit-preview`); const c = page.locator(tid('pabs-close')); if (await c.count()) await c.click(); else await page.keyboard.press('Escape'); }
     }
   },
+
+  // 2026-11-02 update: the three-part Forms card per participant, and the optional sponsor-form send
+  async sponsor(page) {
+    for (const [who, pre, sponsor] of [['Asha Menon', 'wish', 'Ravi'], ['Rahul Verma', 'ei', 'Meera']]) {
+      await tall(page, 1400);
+      await page.goto(`${BASE}/viewprescribedATC`);
+      await page.locator(tid('vatc-forms-count')).first().waitFor({ timeout: 30000 }); await settle(page, 2500);
+      const row = page.locator('[data-testid^="vatc-row-"]').filter({ hasText: who }).first();
+      await row.scrollIntoViewIfNeeded();
+      await row.locator(tid('vatc-toggle-full')).click();
+      const card = row.locator(tid('vatc-forms-card'));
+      await card.waitFor({ timeout: 30000 }); await settle(page, 3500);
+      await card.scrollIntoViewIfNeeded(); await shot(card, `${pre}-view-forms-card`);
+      const sp = card.locator(tid('vatc-form-row')).filter({ hasText: 'Sponsor Feedback' }).first();
+      await sp.locator(tid('vatc-form-send')).click();
+      const dlg = row.locator(tid('vatc-sponsor-dialog'));
+      await dlg.waitFor({ timeout: 10000 }); await settle(page, 600);
+      await dlg.locator(tid('vatc-sponsor-search')).fill(sponsor); await settle(page, 800);
+      await shot(dlg, `${pre}-sponsor-search`);
+      await dlg.locator(tid('vatc-sponsor-option')).first().click(); await settle(page, 500);
+      await shot(dlg, `${pre}-sponsor-dialog`);
+      await dlg.locator(tid('vatc-sponsor-send')).click(); await settle(page, 3000);
+      await card.scrollIntoViewIfNeeded(); await shot(card, `${pre}-view-forms-card-sponsor`);
+      await tall(page, 900);
+    }
+  },
 };
 
 (async () => {
