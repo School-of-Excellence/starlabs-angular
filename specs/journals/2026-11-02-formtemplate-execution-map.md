@@ -188,3 +188,118 @@ never matches). Adding `delete: false` to the web autosave fixes start-in-web/fi
 5. **`type` is dead** — eight callers pass it, nothing reads it.
 6. **`/formtemplate` is first on the ATC-coupling backlog** (`check-atc-coupling.mjs`, exits 1,
    17 routes) and is owned by the **queue** and **journey** e2e suites, not `atc`.
+
+---
+
+## Implemented 2026-11-02 — participant / sponsor fill
+
+Plan: `specs/plans/2026-11-02-atc-form-web-link.md`. Three files, every change behind
+`if (this.atcFormRequest)`, so the four existing flows are byte-identical without a `request` param.
+
+**Why the mode is the request id, not a new route or a new param pair.** `atcid` is set by exactly one
+caller (View Prescribed ATC), so `atcid` alone already means "specialist". Adding `request` beside it is
+a complete discriminator with no new state to keep consistent. The operator chose one route explicitly;
+the cost is that `/formtemplate`'s `dashboard` doc has to grant the `participant` role, which grants the
+URL rather than the link — accepted, and the same exposure the queue's existing shareable link has.
+
+**Why the request doc and not the URL.** `?profileid=` stays trusted for the other four flows (operator
+decision: on-behalf is wanted there). On a request form it is overwritten with the logged-in profile in
+`loadAtcFormRequest`, because the guard validates the opener and line 609 would otherwise write whatever
+the URL said — two different identities, and the valid participant could file under another name.
+
+**Why `formstatus: 'submitted'` is inside the transaction and not a follow-up write.** It is what makes
+the link single-use. Without it the request stays `sent`, a second open passes every check, and
+`onSubmit` mints a fresh `draftDocid` — so a second answer document, with the ATC pointing at the newer
+one and the first orphaned. The transaction also re-reads the request so a Withdraw landing mid-fill
+aborts, matching `FillForm.dart:2339`.
+
+**Why the draft is disposed after the transaction, diverging from the app.** The app clears its draft
+before its transaction (`FillForm.dart:2326`), so a revoked request there loses the typed answers. Web
+holds the draft until the commit, which is strictly safer; the operator asked for drafts not to be
+affected.
+
+**Why the `atcid` draft filter is conditional.** Firestore's `== null` matches only documents that carry
+the field. Unconditional would have stopped every in-flight non-ATC draft being offered the moment this
+deployed. See the addendum below — the conditional `where` alone turned out to be only half the scoping.
+
+**Dropped before implementation:** a fourth guard comparing `request.formid` to `?id=`. It closed a real
+hole (a valid request for form A opened as `?id=B` records at `formsubmitted.B`), but it was mine, not
+agreed, and the standing rule is agreed conditions only. Worth revisiting deliberately.
+
+**State:** `tsc --noEmit -p tsconfig.app.json` clean. `view-prescribed-atc.component.spec.ts` 13/14 — the
+failure is the stock CLI `should create` stub, which cannot pass for a component injecting
+`AuthguardService` with no Firebase app options in its TestBed, and predates this change. Not committed.
+Not run against the emulator. The `participant` role is NOT yet on the `/formtemplate` dashboard doc, so
+a participant following a link still gets "Access denied" until that is done. No e2e coverage yet.
+
+### Verified on the emulator, same day
+
+`atc/atc-form-web-link.spec.ts` **8/8** and `atc/form-screen-regression.spec.ts` **2/2**, against
+`firebase emulators:start --only firestore,auth,storage --project starlabs-cicd` with the app on `:4200`
+(`--configuration emulator`).
+
+Covered: specialist Copy link (present only on a pending request, right params, gone once submitted);
+participant new submit (own profile, `filledby: 'participant'`, `submittedin: 'starlabs'`, no stray `delete`
+field, ATC `formsubmitted`, request closed, lands home, draft disposed); sponsor submit; all three refusals
+(already submitted / someone else's link / withdrawn) leaving the request untouched; edit via `answerid`
+through the existing `patchdata` path (same answer merged, `formsByClient log` written, no duplicate); and the
+draft carrying `atcid` + `delete: false`. Regression: a queue form still drafts with its `queueid` and
+`atcid: null` and is still offered on a reopen, and a B!G activity form still drafts on behalf of the
+participant rather than the signed-in staff.
+
+NOT covered by these runs: the queue token advance, `queue stage log`, and the `big participants assignments`
+status update on submit. Those need the queue suite, which boots Cloud Functions; its last local run here wrote
+~25.5 GB of debug logs and there are 25 GiB free, so it was not run. The change does not touch that code — the
+draft payload and the draft query are the only lines outside `if (this.atcFormRequest)` — but that is reasoning,
+not a result.
+
+Three harness findings, now in the local-harness memory. The `:4200` pass-through no longer satisfies the hub
+config (Playwright spawns its own webServer, and `APP_PATH` defaults to `..`, wrong for sibling repos); run the
+app on `:4200` directly. A text field autosaves on `(keyup)`, so `fill()` writes no draft at all — draft cases
+must type, and a real user who PASTES also gets no draft until they press a key. And because every local suite
+shares one emulator, a draft left by an earlier run opens the draft picker instead of a blank form, so each
+draft case clears its own `(formid, profileid)` drafts first.
+
+---
+
+## Addendum, same day — the draft conflicts, and one claim retracted
+
+A conflict review of the ten entry points found two real defects in draft handling, both older than the
+web-link work, and corrected one thing this journal and the plan had asserted.
+
+**Retracted: B!G does not write a dangling `queueref`.** An earlier pass claimed that because B!G passes the
+assignment id as `queueid`, every B!G answer carried a `queueref` to a non-existent `queue generation`
+document. It does not. The submit branch is `if (participantAssignmentId) … else if (queueId) …` (:676), so
+B!G takes the first arm and never reaches the `queueref` arm. The inference came from seeing `queueId`
+truthy without reading the `else`. What *is* true is that the **finish** branch (:713) tests `queueId` on its
+own, so B!G is treated as a queue submission and shows the in-page confirmation inside a `window.open` tab it
+cannot close, leaving the board stale. Left alone deliberately — the fix is to test `participantAssignmentId`
+first there too, mirroring the submit branch, and that is not this change's scope.
+
+**Fixed: a restored draft kept its id but lost its context.** `_performAutoSave` writes `queueid` (and now
+`atcid`) onto the draft; nothing read them back. `selectDraft` set `draftDocid` to the draft's own `docid`,
+which becomes the answer id at :689, while `patchFromDraftData` restored field values only. Resuming a draft
+under a different flow therefore wrote the answer at the draft's id with the resuming session's refs.
+`selectDraft` now restores `atcid` and `queueId` and calls `initializeQueueData` again — without that call the
+answer would name one queue in `queueref` while taking `queuetokenref`, `stagename` and the stage advance from
+another, which is worse than the original bug. Operator chose this over scoping drafts by queue, accepting that
+a restore can move the submission to the draft's queue.
+
+**Fixed: the draft scoping was one-directional.** The conditional `where` scopes an ATC session to its own
+ATC, but a session with no `atcid` applies no filter and still matched ATC drafts for the same
+`(formid, profileid)`. Firestore cannot express "field missing", so the second half is applied to the result:
+`const scoped = this.atcid ? drafts : drafts.filter(d => !d['atcid'])`. `!atcid` catches missing and null
+alike, so no migration is needed — which also means the conditional `where` was working around a constraint
+that never needed working around.
+
+**Also verified and deliberately not changed.** `queueid` is never a draft filter at all, so the same
+cross-offering already exists between two queues sharing a form — older than this work and untouched. The
+offline local draft is unreachable on a later visit, because `getFormsOption` tests
+`localDraft.hasDraft(this.draftDocid)` against an id minted moments earlier in the constructor (:1014). A
+specialist can never edit a participant's answer: `canEdit` is set only in the `specialist` arm of
+`buildFormRows` (view-prescribed-atc.component.ts:1246), so a claim that an edit could leave a request open
+was wrong and is withdrawn. Two-tab concurrency on one draft or one answer has no guard; operator judged it
+rare enough to leave.
+
+**State:** `tsc --noEmit -p tsconfig.app.json` clean. `atc/form-screen-regression.spec.ts` FSR-01..04 and
+`atc/atc-form-web-link.spec.ts` WL-01..08 — **12/12** on the emulator. Not committed.

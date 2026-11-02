@@ -395,6 +395,7 @@
                     <button *ngIf="row.canFill" data-testid="vatc-form-fill" mat-flat-button color="primary" type="button" (click)="fillAtcForm(atc, row)">Fill form</button>
                     <button *ngIf="row.canSend" data-testid="vatc-form-send" mat-stroked-button type="button" (click)="row.filledby == 'sponsor' ? openSponsorSend(atc, row) : sendAtcForm(atc, row)">{{ row.sendLabel }}</button>
                     <button *ngIf="row.canResend" data-testid="vatc-form-resend" mat-stroked-button type="button" (click)="row.filledby == 'sponsor' ? openSponsorSend(atc, row) : sendAtcForm(atc, row)">Ask to update</button>
+                    <button *ngIf="row.canWithdraw" data-testid="vatc-form-copy" mat-stroked-button type="button" (click)="copyAtcFormLink(row)">Copy link</button>
                     <button *ngIf="row.canWithdraw" data-testid="vatc-form-revoke" mat-stroked-button type="button" (click)="revokeAtcForm(row)">Withdraw</button>
                   </div>
                 </div>

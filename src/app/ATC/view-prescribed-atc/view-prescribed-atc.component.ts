@@ -1349,6 +1349,22 @@ export class ViewPrescribedATCComponent {
       .catch(err => { console.error('Error revoking ATC form:', err); alert("Couldn't revoke the form. Try again.") })
   }
 
+  // Copy a link to this form so the participant / sponsor can fill it in the web, as a specialist does. The
+  // link carries the request doc id: who may use it is decided from that doc plus the login, never from the
+  // URL. `patchdata` is the same param Edit answer uses, so an "Ask to update" link opens prefilled.
+  copyAtcFormLink(row: any) {
+    var request = row.request
+    var params: any = { request: request.path.split('/').pop(), id: row.formid, type: 'form', atcid: request['atcid'] }
+    if (request['answerid']) params.patchdata = 'formsByClient/' + request['answerid']
+    var url = window.location.origin + this.router.serializeUrl(this.router.createUrlTree(['/formtemplate'], { queryParams: params }))
+    navigator.clipboard.writeText(url)
+      .then(() => this.reviewSnack.open('Form link copied', 'Close', { duration: 3000 }))
+      .catch(err => {
+        console.error('Error copying the ATC form link:', err)
+        this.reviewSnack.open("Couldn't copy the link", 'Close', { duration: 3000 })
+      })
+  }
+
   // submitted form: the participant forms screen's read-only form overlay, as it is, named after whoever filled it
   viewAtcForm(atc: QueryDocumentSnapshot<any>, row: any) {
     this.formOverlay.mapProfile = { [row.profileid]: (this.profileMap[row.profileid] || {})['name'] }

@@ -101,6 +101,12 @@ export class FormtemplateComponent {
   // atcTargetId = the current version the answer is recorded on (resolved at submit)
   atcid: string | null = null
   private atcTargetId: string | null = null
+  // ATC participant / sponsor form (?request=): the atc_form_requests doc that authorises this fill, and the
+  // only thing that distinguishes this flow from the specialist's (atcid alone). null for every other flow.
+  atcRequestId: string | null = null
+  atcFormRequest: any = null
+  // set when that doc refuses this user: ngAfterViewInit must not load the form behind the alert
+  private atcRequestInvalid = false
   currentUserId:string
   userProfile:any
   queueData:any
@@ -156,6 +162,7 @@ export class FormtemplateComponent {
     console.log('QueryParams', this.route.snapshot.queryParams);
     this.profileid = this.route.snapshot.queryParams['profileid'] || null;
     this.atcid = this.route.snapshot.queryParams['atcid'] || null;
+    this.atcRequestId = this.route.snapshot.queryParams['request'] || null;
     // this.queueId = this.inlineQueueId ?? this.route.snapshot.queryParams['queueid'] ?? null;
     this.participantAssignmentId = this.route.snapshot.queryParams['participantAssignmentId'] ?? null;
 
@@ -221,6 +228,10 @@ export class FormtemplateComponent {
      // Get queue ID from route params
     this.formpatch = (![null,undefined].includes(this.route.snapshot.queryParams['patchdata']) ||this.route.snapshot.queryParams['viewFilledForm'] === 'true' ||this.route.snapshot.queryParams['viewCompleted'] === 'true' ||![null,undefined].includes(this.participantformtemplateid));
 
+    // ATC participant / sponsor: the request doc decides who may fill this, whether it may still be
+    // filled, and whether it is a new answer or an edit. Nothing here is taken from the URL.
+    if (this.atcRequestId && !(await this.loadAtcFormRequest())) return;
+
     // Get user ID and roles in constructor
     await this.initializeUserData();
 
@@ -232,6 +243,7 @@ export class FormtemplateComponent {
   }
 
   ngAfterViewInit(){
+    if (this.atcRequestInvalid) return;
     // console.log(" ngAfterViewInit participantformtemplateid",this.participantformtemplateid);
 
     // console.log(this.formpatch);
@@ -568,12 +580,21 @@ export class FormtemplateComponent {
   // landing at the same moment makes Firestore retry on the new version. FieldPath keeps any form id a single map key.
   private async recordOnAtc(formid: string, answerId: string): Promise<boolean> {
     try {
+      const request = this.atcFormRequest
+        ? doc(this.firestoreATC, 'atc_form_requests', this.atcFormRequest['requestid']) : null;
       const recorded = await runTransaction(this.firestoreATC, async transaction => {
+        // a request withdrawn while the form was open must not be recorded (same rule as the app)
+        if (request && !(await transaction.get(request)).exists()) return 'revoked';
         const atc = await this.findCurrentAtc(ref => transaction.get(ref));
         if (typeof atc === 'string') return false;
         transaction.update(atc, new FieldPath('formsubmitted', formid), answerId);
+        if (request) transaction.update(request, { formstatus: 'submitted' });
         return true;
       });
+      if (recorded === 'revoked') {
+        alert("Your specialist withdrew this form, so it wasn't recorded.");
+        return false;
+      }
       if (!recorded) throw new Error('ATC removed before the form was recorded');
       return true;
     } catch (error) {
@@ -583,8 +604,50 @@ export class FormtemplateComponent {
     }
   }
 
-  // The tab was opened by View ATC, so it can close itself; a tab opened by hand falls back to home
+  // The atc_form_requests doc is the permission slip for a participant / sponsor fill: its profileid must be
+  // the logged-in profile, and only a 'sent' request may still be filled. `answerid` makes it an edit, which
+  // rides the existing patchdata workflow (the copied link carries patchdata when the request has an answer).
+  private async loadAtcFormRequest(): Promise<boolean> {
+    try {
+      const snap = await getDoc(doc(this.firestoreATC, 'atc_form_requests', this.atcRequestId));
+      const myProfileId = (await this.auth.getRoles())?.['profile_ref']?.id ?? null;
+      const refusal = !snap.exists() ? 'This form link is no longer valid.'
+        : snap.data()['profileid'] != myProfileId ? 'This form was sent to someone else.'
+        : snap.data()['formstatus'] != 'sent' ? 'This form has already been submitted.'
+        : null;
+      if (refusal) {
+        this.atcRequestInvalid = true;
+        alert(refusal);
+        this.router.navigateByUrl("/");
+        return false;
+      }
+      this.atcFormRequest = { requestid: snap.id, ...snap.data() };
+      this.profileid = myProfileId;   // a request form is always filled by the logged-in person
+      return true;
+    } catch (error) {
+      console.error('Error reading the ATC form request:', error);
+      this.atcRequestInvalid = true;
+      alert("Couldn't open this form. Try the link again.");
+      this.router.navigateByUrl("/");
+      return false;
+    }
+  }
+
+  // Removes the draft once the answer is safely recorded. A request form calls this only after the ATC
+  // transaction has committed, so a withdrawn request leaves the typed answers recoverable.
+  private async disposeDraft() {
+    const draftDocRef = doc(this.firestoreForms, 'temporary_forms', this.draftDocid);
+    await deleteDoc(draftDocRef);
+    this.localDraft.delete(this.draftDocid);
+  }
+
+  // The specialist's tab was opened by View ATC, so it can close itself. A participant / sponsor followed a
+  // pasted link in their own tab, which window.close() cannot close, so they go home instead.
   private closeAtcFormTab() {
+    if (this.atcFormRequest) {
+      this.router.navigateByUrl("/");
+      return;
+    }
     window.close();
     setTimeout(() => this.router.navigateByUrl("/"), 300);
   }
@@ -628,7 +691,8 @@ export class FormtemplateComponent {
       this.submittedClientForm['formid'] = this.inlineFormId ?? this.patchformid ?? null;
       if (this.atcTargetId) {
         this.submittedClientForm['atcid'] = this.atcTargetId;
-        this.submittedClientForm['filledby'] = 'specialist';
+        // the request's own tag (participant / sponsor) when the form was opened from a copied link
+        this.submittedClientForm['filledby'] = this.atcFormRequest?.['filledby'] ?? 'specialist';
       }
 
       console.log(this.submittedClientForm);
@@ -641,6 +705,9 @@ export class FormtemplateComponent {
         loadingRef.close();
         return;
       }
+
+      // request form: the draft was held back until the ATC + request write committed
+      if (this.atcFormRequest && this.draftDocid) await this.disposeDraft();
 
       loadingRef.close();
       if (this.atcTargetId) {
@@ -774,11 +841,9 @@ export class FormtemplateComponent {
       });
     }
 
-    // Delete draft
-    if (this.draftDocid) {
-      const draftDocRef = doc(this.firestoreForms, 'temporary_forms', this.draftDocid);
-      await deleteDoc(draftDocRef);
-      this.localDraft.delete(this.draftDocid);
+    // Delete draft — a request form keeps it until the ATC transaction has committed
+    if (this.draftDocid && !this.atcFormRequest) {
+      await this.disposeDraft();
     }
 
 
@@ -953,8 +1018,13 @@ export class FormtemplateComponent {
       this.submittedClientForm['docid']     = this.draftDocid;
       this.submittedClientForm['formid']    = this.inlineFormId ?? this.patchformid ?? null;
 
+      // The draft doc also carries the ids that scope it (atcid beside the queueid above) and delete:false,
+      // which is what the app's draft query filters on. Kept off submittedClientForm so the ANSWER document
+      // never gains a `delete` field.
+      const draftPayload = { ...this.submittedClientForm, atcid: this.atcid ?? null, delete: false };
+
       //  save locally first 
-      this.localDraft.save(this.draftDocid, this.submittedClientForm, {
+      this.localDraft.save(this.draftDocid, draftPayload, {
         formId:    this.submittedClientForm['formid'],
         profileId: this.profileid,
       });
@@ -967,7 +1037,7 @@ export class FormtemplateComponent {
       // Online — push to Firestore
       try {
         const tempFormDocRef = doc(this.firestoreForms, 'temporary_forms', this.draftDocid);
-        await setDoc(tempFormDocRef, this.submittedClientForm, { merge: true });
+        await setDoc(tempFormDocRef, draftPayload, { merge: true });
 
         if (myEpoch !== this.draftSaveEpoch) return;
 
@@ -1020,12 +1090,14 @@ async getFormsOption() {
 
     // Collect Firestore drafts
     const tempFormsRef = collection(this.firestoreForms, 'temporary_forms');
-    const draftQuery = query(
-      tempFormsRef,
+    // An ATC form's draft belongs to that ATC: the same form can be sent on two ATCs. The filter is added
+    // only when there is an atcid, so drafts written before this field existed are still found.
+    const draftFilters = [
       where('formid',    '==', this.patchformid),
-      where('profileid', '==', this.profileid)
-    );
-    const draftSnapshot = await getDocs(draftQuery);
+      where('profileid', '==', this.profileid),
+    ];
+    if (this.atcid) draftFilters.push(where('atcid', '==', this.atcid));
+    const draftSnapshot = await getDocs(query(tempFormsRef, ...draftFilters));
 
     if (!draftSnapshot.empty) {
       const firestoreDrafts = draftSnapshot.docs
@@ -1038,11 +1110,16 @@ async getFormsOption() {
       drafts.push(...firestoreDrafts);
     }
 
-    if (drafts.length === 0) return; 
+    // An ATC form's draft belongs to that ATC, so a session with no atcid must not be offered one. The where
+    // query cannot express it (Firestore has no "field missing" filter, and `== null` skips every draft written
+    // before the field existed), so the scoping is applied to the result. `!atcid` catches missing AND null.
+    const scoped = this.atcid ? drafts : drafts.filter(d => !d['atcid']);
+
+    if (scoped.length === 0) return; 
 
     //  Deduplicate by docid 
     const seen = new Set<string>();
-    this.allDrafts = drafts.filter(d => {
+    this.allDrafts = scoped.filter(d => {
       if (seen.has(d['docid'])) return false;
       seen.add(d['docid']);
       return true;
@@ -1067,10 +1144,18 @@ async getFormsOption() {
   }
 }
 
-selectDraft(draft: any) {
+// A draft was written under a queue (or an ATC), and its ids are saved on the draft doc but were never read
+// back — so the answer took the id of the draft while keeping the CURRENT session's context. Restoring them
+// here puts the submission back on the queue / ATC the draft belongs to. initializeQueueData has to run again:
+// the token and the stage list were resolved in ngOnInit for the session's queue, and queueref alone would
+// leave the answer referencing one queue while its token and stage came from another.
+async selectDraft(draft: any) {
   this.showDraftDialog = false;
   this.showAllDrafts = false;
   this.draftDocid = draft['docid'];
+  this.atcid = draft['atcid'] ?? null;
+  this.queueId = draft['queueid'] ?? null;
+  if (this.queueId) await this.initializeQueueData();
   this.patchFromDraftData(draft);
 }
 
