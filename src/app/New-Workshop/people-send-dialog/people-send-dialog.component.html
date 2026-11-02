@@ -1,0 +1,93 @@
+<div class="psd">
+  <header class="psd-head">
+    <div class="psd-head-text">
+      <h2 class="psd-title">{{ data.title }}</h2>
+      <p class="psd-sub" *ngIf="data.subtitle">{{ data.subtitle }}</p>
+    </div>
+    <button data-testid="psd-close" mat-icon-button type="button" class="psd-x" (click)="close()" aria-label="Close">
+      <mat-icon>close</mat-icon>
+    </button>
+  </header>
+
+  <div class="psd-toolbar">
+    <mat-form-field appearance="outline" class="psd-search" subscriptSizing="dynamic">
+      <mat-icon matPrefix>search</mat-icon>
+      <input matInput data-testid="psd-search" placeholder="Search name, email, phone, user type or journey"
+        [(ngModel)]="search" (ngModelChange)="applySearch()" autocomplete="off">
+    </mat-form-field>
+    <span class="psd-count" data-testid="psd-count">
+      <strong>{{ selection.selected.length }}</strong> selected · {{ shown.length }} of {{ dataSource.data.length }}
+    </span>
+  </div>
+
+  <div class="psd-table-wrap">
+    <table mat-table [dataSource]="dataSource" matSort class="psd-table">
+      <ng-container matColumnDef="select">
+        <th mat-header-cell *matHeaderCellDef class="psd-col-select">
+          <mat-checkbox data-testid="psd-select-all" [checked]="allShownSelected" [indeterminate]="someShownSelected"
+            [disabled]="!shown.length" (change)="toggleAllShown()" aria-label="Select everyone shown"></mat-checkbox>
+        </th>
+        <td mat-cell *matCellDef="let r" class="psd-col-select">
+          <mat-checkbox data-testid="psd-select-row" [checked]="selection.isSelected(r)" (change)="selection.toggle(r)"
+            (click)="$event.stopPropagation()" [attr.aria-label]="'Select ' + (r.name || r.email)"></mat-checkbox>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="name">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header data-testid="psd-sort-name">Name</th>
+        <td mat-cell *matCellDef="let r" class="psd-name" data-testid="psd-cell-name">{{ r.name || '—' }}</td>
+      </ng-container>
+      <ng-container matColumnDef="email">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header data-testid="psd-sort-email">Email</th>
+        <td mat-cell *matCellDef="let r">{{ r.email || '—' }}</td>
+      </ng-container>
+      <ng-container matColumnDef="phonenumber">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header data-testid="psd-sort-phone">Phone</th>
+        <td mat-cell *matCellDef="let r" class="psd-nowrap" data-testid="psd-cell-phone">{{ phone(r) || '—' }}</td>
+      </ng-container>
+      <ng-container matColumnDef="usertype">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header data-testid="psd-sort-usertype">User Type</th>
+        <td mat-cell *matCellDef="let r" data-testid="psd-cell-usertype">
+          <span class="psd-type" [class.psd-type-new]="r.usertype === 'New user'" *ngIf="r.usertype; else noType">{{ r.usertype }}</span>
+          <ng-template #noType><span class="psd-muted">—</span></ng-template>
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="journey">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header data-testid="psd-sort-journey">Journey</th>
+        <td mat-cell *matCellDef="let r">
+          <span class="psd-journey" *ngIf="r.journey; else noJourney">{{ r.journey }}</span>
+          <ng-template #noJourney><span class="psd-muted">—</span></ng-template>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="columns; sticky: true"></tr>
+      <tr mat-row data-testid="psd-row" *matRowDef="let r; columns: columns" [class.psd-picked]="selection.isSelected(r)"></tr>
+      <tr class="mat-row" *matNoDataRow>
+        <td class="psd-empty" data-testid="psd-empty" [attr.colspan]="columns.length">
+          {{ dataSource.data.length ? 'No one matches this search.' : 'No one to show.' }}
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="psd-status-row" *ngIf="sendResult">
+    <span class="psd-status" data-testid="psd-send-status" role="status"
+      [class.psd-status-ok]="sendResult.ok" [class.psd-status-err]="!sendResult.ok">
+      <mat-icon>{{ sendResult.ok ? 'check_circle' : 'error_outline' }}</mat-icon>{{ sendResult.message }}
+    </span>
+  </div>
+  <footer class="psd-foot">
+    <mat-paginator data-testid="psd-paginator" [pageSizeOptions]="[10, 25, 50, 100]" [pageSize]="10" showFirstLastButtons
+      aria-label="Pages"></mat-paginator>
+    <span class="psd-grow"></span>
+    <button data-testid="psd-export" mat-stroked-button type="button" class="psd-export" [disabled]="!selection.hasValue()"
+      (click)="exportCsv()">
+      <mat-icon>download</mat-icon> Export CSV
+    </button>
+    <!-- What Send does comes from the caller (data.send); the dialog never decides it. -->
+    <button data-testid="psd-send" mat-flat-button type="button" class="psd-send"
+      [disabled]="!selection.hasValue() || sending" (click)="send()">
+      <mat-icon>send</mat-icon> {{ sending ? 'Sending…' : 'Send' }}
+    </button>
+  </footer>
+</div>

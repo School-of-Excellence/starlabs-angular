@@ -838,3 +838,8 @@ body.eod-scroll-lock .toolbar {
   --mdc-protected-button-label-text-color: #ffffff;
 }
 /* End Journey Coach Dashboard dark-mode overlay block */
+
+/* People Send dialog (New-Workshop/people-send-dialog): some screens' side panels sit above the CDK
+   overlay layer (EiFlix operations dashboard panel = 1001). While the dialog is open it adds this class
+   so the dialog — and anything it opens — shows above them. Removed again when it closes. */
+.cdk-overlay-container.psd-over-panels { z-index: 1100; }
