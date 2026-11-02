@@ -431,6 +431,14 @@
   }
 }
 
+/* Toolbar menus (audiences, columns, checklists, export) open ~50px below the top, but Material caps a
+   menu at 100vh - 48px, so a long one ran past the bottom of the screen. Cap it to what is left below the
+   toolbar; the menu scrolls inside (audiences keeps its tabs / search and footer pinned). */
+::ng-deep .pi-menu.mat-mdc-menu-panel {
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
+}
+
 /* Dialogs and menus render in the CDK overlay, outside this component's view, so their
    styles are ::ng-deep and scoped by class (panelClass `pi-dialog`). */
 ::ng-deep .pi-dialog .mat-mdc-dialog-surface {
@@ -585,6 +593,13 @@
 }
 ::ng-deep .pi-dialog .btn-danger:hover {
   background: #f6dcd8;
+}
+
+/* the filter rail's dropdown panels (relation, product search): compact like the rail */
+::ng-deep .pi-select-panel .mat-mdc-option {
+  min-height: 36px;
+  font-size: 13px;
+  --mat-option-label-text-size: 13px;
 }
 
 /* full product list on hover in the table */

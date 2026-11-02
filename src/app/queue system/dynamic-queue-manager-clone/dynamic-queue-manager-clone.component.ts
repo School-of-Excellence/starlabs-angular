@@ -2606,7 +2606,8 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
 
       // Fetch all participant lists
       const participantListSnap = await getDocs(collection(this.firestore, 'participant list'));
-      const participantLists = participantListSnap.docs.map(doc => ({
+      // soft-deleted (isdeleted, set by Participant Intelligence) counts as deleted
+      const participantLists = participantListSnap.docs.filter(d => d.data()['isdeleted'] !== true).map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
@@ -2635,7 +2636,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
             where(documentId(), 'in', chunk)
           );
           const segmentsSnap = await getDocs(segmentsQuery);
-          segmentsSnap.docs.forEach(doc => {
+          segmentsSnap.docs.filter(d => d.data()['isdeleted'] !== true).forEach(doc => { // soft-deleted (isdeleted, set by Participant Intelligence) counts as deleted
             allSegments.push({
               id: doc.id,
               ...doc.data()

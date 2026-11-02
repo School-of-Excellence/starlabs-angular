@@ -170,6 +170,7 @@ export class QueueWebVersion1Component implements OnInit, OnDestroy {
     ));
   
     for (const doc of listSnap.docs) {
+      if (doc.data()['isdeleted'] === true) continue; // soft-deleted (isdeleted, set by Participant Intelligence) counts as deleted
       const segmentIds: string[] = doc.data()['segmentid'] ?? [];
       for (const id of segmentIds) {
         if (!result.includes(id)) {

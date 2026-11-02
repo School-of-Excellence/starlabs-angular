@@ -45,7 +45,7 @@ export class CreateParticipantlistDialogComponent {
   ngOnInit() {
     const listRef = collection(this.firestore, 'participant list');
     collectionData(listRef, { idField: 'id' }).subscribe((data) => {
-      this.listData = data;
+      this.listData = data.filter((l: any) => l['isdeleted'] !== true); // soft-deleted (isdeleted, set by Participant Intelligence) counts as deleted
       console.log('Fetched lists:', this.listData);
     });
   }

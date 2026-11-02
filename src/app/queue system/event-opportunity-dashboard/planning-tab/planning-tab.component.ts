@@ -573,16 +573,17 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
         ((d.data() as any)['planning'] || []).forEach((v: any) =>
           (v['segments'] || []).forEach((s: any) => { if (s['segmentid']) segIds.add(s['segmentid']); }));
       }));
+      // soft-deleted (isdeleted, set by Participant Intelligence) counts as deleted
       // 2) each segment doc lists its participant lists (participantlistid) — all in parallel
       const listIds = new Set<string>();
       const segDocs = await Promise.all([...segIds].map(sid => getDoc(doc(this.firestore, 'segments', sid))));
       segDocs.forEach(segDoc => {
-        if (segDoc.exists()) ((segDoc.data() as any)['participantlistid'] || []).forEach((lid: string) => { if (lid) listIds.add(lid); });
+        if (segDoc.exists() && segDoc.data()['isdeleted'] !== true) ((segDoc.data() as any)['participantlistid'] || []).forEach((lid: string) => { if (lid) listIds.add(lid); });
       });
       // 3) participant list → union of profilelist — all in parallel
       const listDocs = await Promise.all([...listIds].map(lid => getDoc(doc(this.firestore, 'participant list', lid))));
       listDocs.forEach(listDoc => {
-        if (listDoc.exists()) ((listDoc.data() as any)['profilelist'] || []).forEach((p: string) => { if (p) this.planningSegmentMembers.add(p); });
+        if (listDoc.exists() && listDoc.data()['isdeleted'] !== true) ((listDoc.data() as any)['profilelist'] || []).forEach((p: string) => { if (p) this.planningSegmentMembers.add(p); });
       });
     } catch (e) { console.error('Queue eligibility (Type #2) load failed', e); }
     if (this.active) this.recomputeView();

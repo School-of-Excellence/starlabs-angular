@@ -232,8 +232,9 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
         queueQuery = query(queueCollection, where("queueadmin", "array-contains", this.profileid), orderBy("queuename"));
       }
 
+      // soft-deleted (isdeleted, set by Participant Intelligence) counts as deleted
       const segmentsSub = collectionData(collection(this.firestore, 'segments'), { idField: 'id' }).subscribe(segments => {
-        this.segmentList = segments;
+        this.segmentList = segments.filter(s => s['isdeleted'] !== true);
       });
       this.subscriptions.push(segmentsSub);
 
@@ -248,7 +249,7 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
       this.subscriptions.push(tagsSub);
 
       const listsSub = collectionData(collection(this.firestore, 'participant list'), { idField: 'id' }).subscribe(lists => {
-        this.participantListsList = lists;
+        this.participantListsList = lists.filter(l => l['isdeleted'] !== true);
       });
       this.subscriptions.push(listsSub);
 
@@ -399,7 +400,7 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
 
     for (const listId of segment['participantlistid']) {
       const participantListDoc = await getDoc(doc(this.firestore, 'participant list', listId));
-      if (participantListDoc.exists()) {
+      if (participantListDoc.exists() && participantListDoc.data()['isdeleted'] !== true) { // soft-deleted (isdeleted, set by Participant Intelligence) counts as deleted
         const members = participantListDoc.data()['profilelist'] || [];
         members.forEach(memberId => allParticipantIds.add(memberId));
       }

@@ -734,6 +734,34 @@
       ]
     },
     {
+      "collectionGroup": "participantsproduct",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "productref",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "subscriptionstart",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "participantsproduct",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "productref",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "subscriptionend",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "queue_token",
       "queryScope": "COLLECTION",
       "fields": [

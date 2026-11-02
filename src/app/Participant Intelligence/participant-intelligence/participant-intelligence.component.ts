@@ -10,10 +10,13 @@ import { ChangeDetectionStrategy, Component, ElementRef, Injectable, Injector, O
 import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogConfig, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { MatMenuModule } from '@angular/material/menu';
+import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Firestore, QuerySnapshot, arrayRemove, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, orderBy, query, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
@@ -230,6 +233,19 @@ export interface SubscriptionFilter {
   to: string | null;
 }
 
+// A subscription window on one product, matched against that product's participantsproduct docs.
+export interface ProductSubscriptionFilter extends SubscriptionFilter {
+  productId: string | null;
+}
+
+// One participantsproduct doc as the filter needs it (start / end as yyyy-mm-dd). Cancelled and
+// shifted docs are dropped when loaded.
+export interface ProductSubscriptionDoc {
+  profileid: string;
+  start: string | null;
+  end: string | null;
+}
+
 export type RegisteredFilter = 'registered' | 'non-registered';
 
 export type UpStatus = 'new' | 'returning';
@@ -291,9 +307,15 @@ export interface FilterModel {
   queueStatus: QueueStatus;
   exclude: Partial<Record<CheckGroup, string[]>>;
   subscription: SubscriptionFilter;
+  productSubscription: ProductSubscriptionFilter;
   consumed: ProductCountRule[];
   unconsumed: ProductCountRule[];
+  // how several rules of one kind combine: 'all' = every rule must match (AND), 'any' = at least one (OR)
+  consumedMatch: RuleMatch;
+  unconsumedMatch: RuleMatch;
 }
+
+export type RuleMatch = 'all' | 'any';
 
 export function emptyCondition(): CountCondition {
   return { op: 'atLeast', a: null, b: null };
@@ -328,8 +350,11 @@ export function emptyFilter(): FilterModel {
     queueStatus: 'completed',
     exclude: {},
     subscription: { relation: 'startBetween', from: null, to: null },
+    productSubscription: { productId: null, relation: 'startBetween', from: null, to: null },
     consumed: [],
     unconsumed: [],
+    consumedMatch: 'all',
+    unconsumedMatch: 'all',
   };
 }
 
@@ -340,7 +365,6 @@ export interface Audience {
   id: string;
   name: string;
   kind: AudienceKind;
-  isDefault: boolean;
   createdBy: string;
   createdDate: string;
   filter?: FilterModel; // kind === 'filter'
@@ -442,6 +466,38 @@ const DEFAULT_VISIBLE_COLUMNS = ['name'];
 // Nothing is frozen by default, so every column scrolls together; pinning is opt-in from the Columns menu.
 const DEFAULT_PINNED_COLUMNS: string[] = [];
 
+// The viewer's column layout (shown columns, their order, pins) survives a reload in this browser.
+// Pins are saved with the columns: a pin on a column that isn't shown again would do nothing.
+const COLUMN_LAYOUT_KEY = 'pi.columnLayout.v1';
+
+interface ColumnLayout {
+  order: string[];
+  pinned: string[];
+}
+
+// The saved layout, minus columns that no longer exist; null when there is none or storage is unavailable (SSR, private mode).
+function readColumnLayout(): ColumnLayout | null {
+  try {
+    const raw = typeof localStorage === 'undefined' ? null : localStorage.getItem(COLUMN_LAYOUT_KEY);
+    if (!raw) return null;
+    const saved = JSON.parse(raw) as Partial<ColumnLayout>;
+    const known = (keys: unknown) => (Array.isArray(keys) ? keys.filter((k): k is string => typeof k === 'string' && k in COLUMN_DEF_MAP) : []);
+    const order = [...new Set(known(saved.order))];
+    if (!order.includes('name')) order.unshift('name');
+    return { order, pinned: known(saved.pinned).filter((k) => order.includes(k)) };
+  } catch {
+    return null;
+  }
+}
+
+function writeColumnLayout(layout: ColumnLayout): void {
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.setItem(COLUMN_LAYOUT_KEY, JSON.stringify(layout));
+  } catch {
+    // storage full or blocked: the layout just isn't remembered
+  }
+}
+
 // ================================================================================================
 // Filter engine
 // ================================================================================================
@@ -462,6 +518,7 @@ export interface FilterContext {
   segmentMembers?: Record<string, Set<string>>; // journey segment id -> profile ids in its saved list
   eventGroups?: Record<string, string[]>; // event id -> every event id with the same name (nameGroups)
   queueGroups?: Record<string, string[]>; // queue id -> every queue id with the same name
+  productSubscriptions?: Record<string, ProductSubscriptionDoc[]>; // productSubscriptionKey -> the docs its query returned (loaded on demand)
 }
 
 // Does participant p have value v in a checkbox group?
@@ -536,6 +593,10 @@ function subscriptionActive(s: SubscriptionFilter): boolean {
   return !!(s.from || s.to) && !subscriptionFilterError(s);
 }
 
+export function productSubscriptionActive(s: ProductSubscriptionFilter): boolean {
+  return !!s.productId && subscriptionActive(s);
+}
+
 // Anything entered in the rail, including input the engine ignores (a reversed range, a half-filled
 // "Is between", a rule without a number) and a changed switch, so Reset can clear it. The top search
 // has its own clear. Checked field by field: cycling an option off leaves an empty exclude list behind.
@@ -552,10 +613,16 @@ export function filterTouched(f: FilterModel): boolean {
     !!f.subscription.from ||
     !!f.subscription.to ||
     f.subscription.relation !== blank.subscription.relation ||
+    !!f.productSubscription.productId ||
+    !!f.productSubscription.from ||
+    !!f.productSubscription.to ||
+    f.productSubscription.relation !== blank.productSubscription.relation ||
     f.eventStatus !== blank.eventStatus ||
     f.queueStatus !== blank.queueStatus ||
     f.consumed.length > 0 ||
-    f.unconsumed.length > 0
+    f.unconsumed.length > 0 ||
+    f.consumedMatch !== blank.consumedMatch ||
+    f.unconsumedMatch !== blank.unconsumedMatch
   );
 }
 
@@ -582,6 +649,12 @@ function matchesProductCount(products: string[], rule: ProductCountRule): boolea
   return matchesCount(products.filter((id) => id === rule.productId).length, ruleCondition(rule));
 }
 
+// The active rules of one kind, AND'd ('all') or OR'd ('any'). No active rule never narrows.
+function matchesRules(products: string[], rules: ProductCountRule[], match: RuleMatch): boolean {
+  if (!rules.length) return true;
+  return match === 'any' ? rules.some((r) => matchesProductCount(products, r)) : rules.every((r) => matchesProductCount(products, r));
+}
+
 // Local calendar day as yyyy-mm-dd: subscription dates compare by day, not by time of day. A bare day
 // string is kept as it is; new Date() would read it as UTC midnight, the previous day west of UTC.
 function dayKey(value: string | Date | null): string | null {
@@ -595,8 +668,11 @@ function dayKey(value: string | Date | null): string | null {
 // How the participant's subscription (S, E) relates to the From–To range, by day and inclusive.
 // A missing date never matches; an open side of the range is unbounded.
 function matchesSubscription(p: Participant, s: SubscriptionFilter): boolean {
-  const start = dayKey(p.subscriptionstart);
-  const end = dayKey(p.subscriptionend);
+  return matchesWindow(dayKey(p.subscriptionstart), dayKey(p.subscriptionend), s);
+}
+
+// The same relations on any start / end days (a participant's subscription, or one product doc).
+function matchesWindow(start: string | null, end: string | null, s: SubscriptionFilter): boolean {
   const from = s.from ?? '0000-01-01';
   const to = s.to ?? '9999-12-31';
   const inRange = (day: string) => from <= day && day <= to;
@@ -617,6 +693,59 @@ function matchesSubscription(p: Participant, s: SubscriptionFilter): boolean {
     case 'notActive':
       return end < from || start > to;
   }
+}
+
+// The participantsproduct docs a product subscription filter needs are fetched with the range in the
+// query, so only docs near it are downloaded. Firestore takes a range on one field here (productref ==
+// plus subscriptionstart or subscriptionend, each with its own composite index); the other condition
+// is checked afterwards by productSubscriptionMembers, so a loose bound never changes the result.
+// Bounds are local days: from = 00:00 that day, to = the end of that day.
+export interface ProductSubscriptionQuery {
+  field: 'subscriptionstart' | 'subscriptionend' | null; // null = every doc of the product
+  min: Date | null;
+  max: Date | null;
+  empty?: boolean; // the relation can match nobody (e.g. "Active throughout" with no From)
+}
+
+const dayStart = (day: string): Date => new Date(`${day}T00:00:00`);
+const dayEnd = (day: string): Date => new Date(`${day}T23:59:59.999`);
+
+export function productSubscriptionQuery(s: SubscriptionFilter): ProductSubscriptionQuery {
+  const min = s.from ? dayStart(s.from) : null;
+  const max = s.to ? dayEnd(s.to) : null;
+  switch (s.relation) {
+    case 'startBetween':
+    case 'within':
+    case 'startInEndAfter':
+      return { field: 'subscriptionstart', min, max };
+    case 'endBetween':
+    case 'startBeforeEndIn':
+      return { field: 'subscriptionend', min, max };
+    case 'throughout': // start on or before From (end after To is checked afterwards)
+      return s.from ? { field: 'subscriptionstart', min: null, max: dayEnd(s.from) } : { field: null, min: null, max: null, empty: true };
+    case 'anyTime': // ends on or after From, or (no From) starts on or before To
+      return s.from ? { field: 'subscriptionend', min, max: null } : { field: 'subscriptionstart', min: null, max };
+    case 'notActive': // has to see every doc to know none is active
+      return { field: null, min: null, max: null };
+  }
+}
+
+// options whose query can still return most of a product's docs
+export const HEAVY_PRODUCT_RELATIONS = new Set<SubscriptionRelation>(['throughout', 'anyTime', 'notActive']);
+
+// one cache entry per product + relation + range
+export function productSubscriptionKey(s: ProductSubscriptionFilter): string {
+  return [s.productId, s.relation, s.from ?? '', s.to ?? ''].join('|');
+}
+
+// Profile ids whose docs for the product fit the window — a Set, so someone holding the product more
+// than once counts once. Any matching doc is enough, except "Not active in the range": there no doc
+// may be active in it (an expired copy must not match someone whose current one is active).
+export function productSubscriptionMembers(docs: ProductSubscriptionDoc[], s: SubscriptionFilter): Set<string> {
+  if (s.relation !== 'notActive') return new Set(docs.filter((d) => matchesWindow(d.start, d.end, s)).map((d) => d.profileid));
+  const dated = new Set(docs.filter((d) => d.start && d.end).map((d) => d.profileid));
+  const active = productSubscriptionMembers(docs, { ...s, relation: 'anyTime' });
+  return new Set([...dated].filter((id) => !active.has(id)));
 }
 
 function matchesSearch(p: Participant, term: string): boolean {
@@ -643,6 +772,9 @@ export function applyFilters(participants: Participant[], f: FilterModel, ctx: F
   ].filter((x) => conditionActive(x.c));
   const age = ageActive(f);
   const subscription = subscriptionActive(f.subscription);
+  const ps = f.productSubscription;
+  // not loaded yet = nobody (the rail says it is loading), never everyone
+  const productSub = productSubscriptionActive(ps) ? productSubscriptionMembers(ctx.productSubscriptions?.[productSubscriptionKey(ps)] ?? [], ps) : null;
   const consumed = f.consumed.filter(productRuleActive);
   const unconsumed = f.unconsumed.filter(productRuleActive);
   return participants.filter((p) => {
@@ -658,8 +790,9 @@ export function applyFilters(participants: Participant[], f: FilterModel, ctx: F
       if (f.ageMax != null && p.age > f.ageMax) return false;
     }
     if (subscription && !matchesSubscription(p, f.subscription)) return false;
-    for (const rule of consumed) if (!matchesProductCount(p.consumedproducts, rule)) return false;
-    for (const rule of unconsumed) if (!matchesProductCount(p.unconsumedproducts, rule)) return false;
+    if (productSub && !productSub.has(p.profileid)) return false;
+    if (!matchesRules(p.consumedproducts, consumed, f.consumedMatch)) return false;
+    if (!matchesRules(p.unconsumedproducts, unconsumed, f.unconsumedMatch)) return false;
     return true;
   });
 }
@@ -756,13 +889,21 @@ export function deriveChips(f: FilterModel, ref: ReferenceData): FilterChip[] {
     const relation = SUBSCRIPTION_RELATIONS.find((r) => r.value === s.relation)?.label ?? s.relation;
     chips.push({ group: 'subscription', value: '', label: `Subscription · ${relation}: ${describeRange(s.from, s.to)}` });
   }
+  const ps = f.productSubscription;
+  if (productSubscriptionActive(ps)) {
+    const relation = SUBSCRIPTION_RELATIONS.find((r) => r.value === ps.relation)?.label ?? ps.relation;
+    chips.push({ group: 'productSubscription', value: '', label: `${productName(ps.productId!)} · ${relation}: ${describeRange(ps.from, ps.to)}` });
+  }
 
   // value = the rule's index, so two rules on the same product are removed one at a time
-  const addRules = (group: 'consumed' | 'unconsumed', prefix: string) =>
+  // with "any" and more than one active rule, each chip says it is one of several alternatives
+  const addRules = (group: 'consumed' | 'unconsumed', prefix: string) => {
+    const any = (group === 'consumed' ? f.consumedMatch : f.unconsumedMatch) === 'any' && f[group].filter(productRuleActive).length > 1;
     f[group].forEach((r, i) => {
       if (productRuleActive(r))
-        chips.push({ group, value: String(i), label: `${prefix} ${productName(r.productId)}: ${describeCondition(ruleCondition(r))}` });
+        chips.push({ group, value: String(i), label: `${prefix}${any ? ' (any)' : ''} ${productName(r.productId)}: ${describeCondition(ruleCondition(r))}` });
     });
+  };
   addRules('consumed', 'Consumed');
   addRules('unconsumed', 'Unconsumed');
 
@@ -787,9 +928,56 @@ export function filterSignature(f: FilterModel): string {
     [cond(f.atcCount), cond(f.upCount), cond(f.cpmCount)],
     ageActive(f) ? [f.ageMin, f.ageMax] : null,
     subscriptionActive(s) ? [s.relation, s.from, s.to] : null,
+    productSubscriptionActive(f.productSubscription)
+      ? [f.productSubscription.productId, f.productSubscription.relation, f.productSubscription.from, f.productSubscription.to]
+      : null,
     rules(f.consumed),
     rules(f.unconsumed),
+    // the match mode only changes the result once two rules of the kind apply
+    f.consumed.filter(productRuleActive).length > 1 ? f.consumedMatch : null,
+    f.unconsumed.filter(productRuleActive).length > 1 ? f.unconsumedMatch : null,
   ]);
+}
+
+// What updating a saved filter changes, by chip label: kept, added (only in after), removed (only in before).
+export interface FilterDiff {
+  kept: string[];
+  added: string[];
+  removed: string[];
+}
+
+export function filterDiff(before: string[], after: string[]): FilterDiff {
+  const b = new Set(before);
+  const a = new Set(after);
+  return { kept: before.filter((l) => a.has(l)), added: after.filter((l) => !b.has(l)), removed: before.filter((l) => !a.has(l)) };
+}
+
+// Pipelines view: 'all' = everyone in each pipeline, 'every' = only names in every pipeline,
+// 'notEvery' = names in some pipelines but missing from at least one (each still under the ones it's in).
+export type PipelineMatch = 'all' | 'every' | 'notEvery';
+
+export function pipelineColumns<T extends { profileid: string }>(members: T[][], mode: PipelineMatch): T[][] {
+  if (mode === 'all' || !members.length) return members;
+  const seen = new Map<string, number>();
+  for (const list of members) for (const id of new Set(list.map((p) => p.profileid))) seen.set(id, (seen.get(id) ?? 0) + 1);
+  const inEvery = (p: T) => seen.get(p.profileid) === members.length;
+  return members.map((list) => list.filter((p) => (mode === 'every' ? inEvery(p) : !inEvery(p))));
+}
+
+// The pipelines view's unique-name list ("in every" / "not in every"): each person once, with the
+// pipelines they are in, A–Z. cols are the pipelines after pipelineColumns.
+export function uniquePipelineNames<T extends { profileid: string; name: string }>(
+  cols: { name: string; people: T[] }[]
+): { person: T; pipelines: string[] }[] {
+  const byId = new Map<string, { person: T; pipelines: string[] }>();
+  for (const col of cols) {
+    for (const p of col.people) {
+      const row = byId.get(p.profileid) ?? { person: p, pipelines: [] };
+      if (!row.pipelines.includes(col.name)) row.pipelines.push(col.name);
+      byId.set(p.profileid, row);
+    }
+  }
+  return [...byId.values()].sort((a, b) => a.person.name.localeCompare(b.person.name, undefined, { sensitivity: 'base', numeric: true }));
 }
 
 // id -> name lookup for a reference list.
@@ -1216,6 +1404,14 @@ const tsToIso = (x: any): string | null => {
 };
 // A saved date as yyyy-mm-dd: day strings are kept as they are, timestamps and ISO strings become their local day.
 const toDay = (x: unknown): string | null => dayKey(tsToIso(x));
+// participantsproduct docs -> what the product subscription filter needs; cancelled / shifted (any
+// case) and docs without a profile id are dropped.
+const SKIPPED_PRODUCT_STATUSES = new Set(['cancelled', 'shifted']);
+export function toProductSubscriptionDocs(raw: Dict[]): ProductSubscriptionDoc[] {
+  return raw
+    .filter((d) => typeof d['profileid'] === 'string' && d['profileid'] && !SKIPPED_PRODUCT_STATUSES.has(String(d['status'] ?? '').toLowerCase()))
+    .map((d) => ({ profileid: d['profileid'], start: toDay(d['subscriptionstart']), end: toDay(d['subscriptionend']) }));
+}
 const num = (x: unknown): number | null => (x == null || x === '' || Number.isNaN(Number(x)) ? null : Number(x));
 const ageFrom = (iso: string | null): number | null => {
   if (!iso) return null;
@@ -1456,45 +1652,62 @@ export class ParticipantDataService {
       getDocs(collection(this.firestore, 'segments')),
     ]);
     const out: Audience[] = [];
-    filters.docs.forEach((d) => {
+    // soft-deleted docs (isdeleted) stay in Firestore but are not shown
+    const live = (docs: typeof filters.docs) => docs.filter((d) => d.data()['isdeleted'] !== true);
+    live(filters.docs).forEach((d) => {
       const data = d.data() as Dict;
       const filter = this.mapSavedFilter(data);
       out.push({
         id: data['docid'] ?? d.id,
         name: data['label'] ?? 'Saved filter',
         kind: 'filter',
-        isDefault: false,
-        createdBy: data['createdby'] ?? '—',
+        createdBy: data['createdby'] ?? '',
         createdDate: '',
         filter,
         legacySubscriptionEnd: this.legacySubscriptionEnd(data, filter),
       });
     });
-    lists.docs.forEach((d) => {
+    live(lists.docs).forEach((d) => {
       const data = d.data() as Dict;
       out.push({
         id: d.id,
         name: data['listname'] ?? 'List',
         kind: 'list',
-        isDefault: false,
-        createdBy: '—',
+        createdBy: data['createdby'] ?? '',
         createdDate: tsToIso(data['createddate']) ?? '',
         live: data['live'] ?? false,
         profileIds: arr(data['profilelist']),
       });
     });
-    segments.docs.forEach((d) => {
+    live(segments.docs).forEach((d) => {
       const data = d.data() as Dict;
       out.push({
         id: d.id,
         name: data['segmentname'] ?? 'Segment',
         kind: 'segment',
-        isDefault: false,
         createdBy: '—',
         createdDate: tsToIso(data['createddate']) ?? '',
         memberAudienceIds: arr(data['participantlistid']),
       });
     });
+    // createdby holds a profile id: show the creator's name ("You" for the signed-in user)
+    const names = await this.profileNames(out.map((a) => a.createdBy)).catch(() => ({}) as Record<string, string>);
+    const me = this.loggedInProfileId;
+    for (const a of out) a.createdBy = !a.createdBy ? '—' : a.createdBy === me ? 'You' : (names[a.createdBy] ?? 'Unknown');
+    return out;
+  }
+
+  // profile id -> name from profile_data, 30 ids per query ('in' limit)
+  private async profileNames(ids: string[]): Promise<Record<string, string>> {
+    const out: Record<string, string> = {};
+    const unique = [...new Set(ids.filter(Boolean))];
+    for (const group of this.chunk(unique, 30)) {
+      const snap = await getDocs(query(collection(this.firestore, 'profile_data'), where('profileid', 'in', group)));
+      for (const d of snap.docs) {
+        const data = d.data() as Dict;
+        if (data['name']) out[data['profileid']] = data['name'];
+      }
+    }
     return out;
   }
 
@@ -1532,8 +1745,11 @@ export class ParticipantDataService {
     f.queueStatus = pi['queueStatus'] === 'live' ? 'live' : 'completed';
     f.exclude = (pi['exclude'] && typeof pi['exclude'] === 'object' ? pi['exclude'] : {}) as FilterModel['exclude'];
     f.subscription = this.subscriptionFilter(pi['subscription'], d);
+    f.productSubscription = this.productSubscriptionFilter(pi['productSubscription']);
     f.consumed = this.productRules(pi['consumed']);
     f.unconsumed = this.productRules(pi['unconsumed']);
+    f.consumedMatch = pi['consumedMatch'] === 'any' ? 'any' : 'all';
+    f.unconsumedMatch = pi['unconsumedMatch'] === 'any' ? 'any' : 'all';
     return f;
   }
 
@@ -1559,6 +1775,13 @@ export class ParticipantDataService {
 
   // pifilter keeps the relation. Older docs (and analytics) only have the start / end ranges, read back
   // as "Start between" or, when only the end range is set, "End between".
+  private productSubscriptionFilter(saved: unknown): ProductSubscriptionFilter {
+    const s = (saved && typeof saved === 'object' ? saved : {}) as Dict;
+    const relation = SUBSCRIPTION_RELATIONS.some((r) => r.value === s['relation']) ? (s['relation'] as SubscriptionRelation) : 'startBetween';
+    const productId = typeof s['productId'] === 'string' && s['productId'] ? s['productId'] : null;
+    return { productId, relation, from: toDay(s['from']), to: toDay(s['to']) };
+  }
+
   private subscriptionFilter(saved: unknown, d: Dict): SubscriptionFilter {
     if (saved && typeof saved === 'object') {
       const s = saved as Dict;
@@ -1744,6 +1967,19 @@ export class ParticipantDataService {
     return out;
   }
 
+  // The product's participantsproduct docs near the filter's range (productSubscriptionQuery), minus
+  // cancelled / shifted. Needs the (productref, subscriptionstart) / (productref, subscriptionend)
+  // composite indexes; without them Firestore rejects it with failed-precondition.
+  async loadProductSubscriptions(s: ProductSubscriptionFilter): Promise<ProductSubscriptionDoc[]> {
+    const plan = productSubscriptionQuery(s);
+    if (plan.empty || !s.productId) return [];
+    const parts = [where('productref', '==', doc(this.firestore, 'products', s.productId))];
+    if (plan.field && plan.min) parts.push(where(plan.field, '>=', plan.min));
+    if (plan.field && plan.max) parts.push(where(plan.field, '<=', plan.max));
+    const snap = await getDocs(query(collection(this.firestore, 'participantsproduct'), ...parts));
+    return toProductSubscriptionDocs(snap.docs.map((d) => d.data() as Dict));
+  }
+
   // Profile ids with an approved (confirmed) request, per event. `in` takes at most 30 values.
   async loadConfirmed(eventIds: string[]): Promise<Record<string, string[]>> {
     const out: Record<string, string[]> = {};
@@ -1760,6 +1996,12 @@ export class ParticipantDataService {
       }
     }
     return out;
+  }
+
+  // Delete keeps the doc: it is flagged isdeleted (with who / when) and skipped on load.
+  async softDeleteAudience(aud: Audience): Promise<void> {
+    const col = aud.kind === 'filter' ? 'searchquery' : aud.kind === 'list' ? 'participant list' : 'segments';
+    await updateDoc(doc(this.firestore, col, aud.id), { isdeleted: true, deletedby: this.loggedInProfileId, deleteddate: new Date() });
   }
 
   async renameAudience(aud: Audience, name: string): Promise<void> {
@@ -1805,7 +2047,8 @@ export class ParticipantDataService {
     await updateDoc(doc(this.firestore, 'participant tags', tagId), { tagsfor });
   }
 
-  async persistAudience(aud: Audience): Promise<void> {
+  // isNew: only a new saved filter records its creator; an update keeps the original createdby
+  async persistAudience(aud: Audience, isNew = false): Promise<void> {
     const f = aud.filter ?? emptyFilter();
     const s = f.subscription;
     // analytics reads subscriptionstart / subscriptionend as {start, end} day ranges and atccount as an exact count
@@ -1818,7 +2061,7 @@ export class ParticipantDataService {
     const data: Dict = {
       docid: aud.id,
       label: aud.name,
-      createdby: this.loggedInProfileId,
+      ...(isNew ? { createdby: this.loggedInProfileId } : {}),
       customerstatus: f.customerstatus,
       financialstatus: f.financialstatus,
       activejourney: f.activejourney,
@@ -1850,8 +2093,16 @@ export class ParticipantDataService {
         queueStatus: f.queueStatus,
         exclude: f.exclude,
         subscription: { relation: s.relation, from: s.from, to: s.to },
+        productSubscription: {
+          productId: f.productSubscription.productId,
+          relation: f.productSubscription.relation,
+          from: f.productSubscription.from,
+          to: f.productSubscription.to,
+        },
         consumed: rules(f.consumed),
         unconsumed: rules(f.unconsumed),
+        consumedMatch: f.consumedMatch,
+        unconsumedMatch: f.unconsumedMatch,
       },
     };
     // an analytics end range this screen doesn't apply stays in place unless "End between" replaces it
@@ -1867,6 +2118,7 @@ export class ParticipantDataService {
       listname: aud.name,
       profilelist: aud.profileIds ?? [],
       createddate: new Date(),
+      createdby: this.loggedInProfileId,
       live: false,
     });
   }
@@ -1916,9 +2168,18 @@ export class ParticipantStore {
 
   private readonly membership = signal<Set<string> | null>(null);
   readonly signalId = signal<string | null>(null);
-  readonly columnOrder = signal<string[]>([...DEFAULT_VISIBLE_COLUMNS]);
-  readonly pinned = signal<Set<string>>(new Set(DEFAULT_PINNED_COLUMNS));
+  private readonly savedLayout = readColumnLayout();
+  readonly columnOrder = signal<string[]>(this.savedLayout?.order ?? [...DEFAULT_VISIBLE_COLUMNS]);
+  readonly pinned = signal<Set<string>>(new Set(this.savedLayout?.pinned ?? DEFAULT_PINNED_COLUMNS));
   readonly selectedIds = signal<Set<string>>(new Set());
+
+  // participantsproduct docs per productSubscriptionKey, loaded only once a product AND a date are set
+  // (the current filter's and any saved filter's, so their counts are right); a failed query's message
+  // per key (a missing index says so)
+  readonly productSubDocs = signal<Record<string, ProductSubscriptionDoc[]>>({});
+  readonly productSubErrors = signal<Record<string, string>>({});
+  readonly productSubLoading = signal(false);
+  private readonly productSubRequested = new Set<string>();
 
   // approved (confirmed) profile ids per event, loaded on demand for the selected events
   private readonly confirmedByEvent = signal<Record<string, string[]>>({});
@@ -1932,11 +2193,18 @@ export class ParticipantStore {
   private playlistNamesRequested = false;
 
   constructor() {
+    effect(() => writeColumnLayout({ order: this.columnOrder(), pinned: [...this.pinned()] }));
     effect(() => {
       const f = this.filter();
       if (f.eventStatus !== 'confirmed' || !(f.events.length || f.exclude.events?.length)) return;
       const events = this.expandEvents([...f.events, ...(f.exclude.events ?? [])]);
       untracked(() => this.loadConfirmed(events));
+    });
+    effect(() => {
+      const wanted = [this.filter(), ...this.audiences().map((a) => a.filter)]
+        .map((f) => f?.productSubscription)
+        .filter((ps): ps is ProductSubscriptionFilter => !!ps && productSubscriptionActive(ps));
+      untracked(() => this.loadProductSubscriptions(wanted));
     });
     effect(() => {
       if (this.playlistNamesRequested || !this.columnOrder().some((c) => PLAYLIST_COLUMNS.includes(c))) return;
@@ -1971,6 +2239,7 @@ export class ParticipantStore {
     segmentMembers: this.segmentSets(),
     eventGroups: this.eventGroups(),
     queueGroups: this.queueGroups(),
+    productSubscriptions: this.productSubDocs(),
   }));
 
   private readonly signalContext = computed<SignalContext>(() => {
@@ -2057,7 +2326,9 @@ export class ParticipantStore {
     const counts: Record<string, number | null> = {};
     for (const a of this.audiences()) {
       const f = a.kind === 'filter' ? a.filter : undefined;
-      const pending = f?.eventStatus === 'confirmed' && this.expandEvents([...f.events, ...(f.exclude.events ?? [])]).some((id) => !(id in loaded));
+      const pendingProduct = !!f && productSubscriptionActive(f.productSubscription) && !(productSubscriptionKey(f.productSubscription) in this.productSubDocs());
+      const pending =
+        pendingProduct || (f?.eventStatus === 'confirmed' && this.expandEvents([...f.events, ...(f.exclude.events ?? [])]).some((id) => !(id in loaded)));
       counts[a.id] = pending ? null : this.resolveAudienceIds(a).size;
     }
     return counts;
@@ -2147,6 +2418,9 @@ export class ParticipantStore {
     });
 
     this.confirmedByEvent.set({});
+    this.productSubDocs.set({});
+    this.productSubErrors.set({});
+    this.productSubRequested.clear();
     this.queueTokensLoaded.set(false);
     this.data
       .loadQueueTokens()
@@ -2207,6 +2481,7 @@ export class ParticipantStore {
         next.ageMin = null;
         next.ageMax = null;
       } else if (g === 'subscription') next.subscription = { ...next.subscription, from: null, to: null };
+      else if (g === 'productSubscription') next.productSubscription = emptyFilter().productSubscription;
       else if (g === 'consumed' || g === 'unconsumed') next[g] = next[g].filter((_, i) => String(i) !== chip.value);
       else if (chip.exclude) {
         const cg = g as CheckGroup;
@@ -2343,14 +2618,13 @@ export class ParticipantStore {
       id: `aud-${Date.now()}`,
       name: name.trim(),
       kind: 'filter',
-      isDefault: false,
       createdBy: 'You',
       createdDate: new Date().toISOString(),
       filter: structuredClone(this.filter()),
     };
     this.audiences.update((list) => [...list, aud]);
     this.activateSavedFilter(aud.id);
-    this.data.persistAudience(aud).catch((e) => console.error('persistAudience failed', e));
+    this.data.persistAudience(aud, true).catch((e) => console.error('persistAudience failed', e));
     return aud;
   }
 
@@ -2360,7 +2634,6 @@ export class ParticipantStore {
       id: `aud-${Date.now()}`,
       name: name.trim(),
       kind: 'list',
-      isDefault: false,
       createdBy: 'You',
       createdDate: new Date().toISOString(),
       live: false,
@@ -2398,16 +2671,29 @@ export class ParticipantStore {
   }
 
   deleteAudience(id: string): void {
+    const aud = this.audiences().find((a) => a.id === id);
+    if (!aud) return;
     this.audiences.update((list) => list.filter((a) => a.id !== id));
     if (this.activeAudienceId() === id) this.removeAudience();
+    this.data.softDeleteAudience(aud).catch((e) => console.error('softDeleteAudience failed', e));
   }
 
-  setDefaultAudience(id: string): void {
-    this.audiences.update((list) => list.map((a) => ({ ...a, isDefault: a.id === id })));
+  // The saved filter's chips and the current ones, for the update confirmation.
+  updatePreview(id: string): FilterDiff | null {
+    const aud = this.audiences().find((a) => a.id === id && a.kind === 'filter');
+    if (!aud?.filter) return null;
+    const before = deriveChips(this.normalizeSaved(aud.filter), this.reference()).map((c) => c.label);
+    return filterDiff(before, this.chips().map((c) => c.label));
   }
 
-  toggleListLive(id: string): void {
-    this.audiences.update((list) => list.map((a) => (a.id === id ? { ...a, live: !a.live } : a)));
+  // An audience's participants A–Z (the pipelines view).
+  audienceMembers(id: string): Participant[] {
+    const aud = this.audiences().find((a) => a.id === id);
+    if (!aud) return [];
+    const ids = this.resolveAudienceIds(aud);
+    return this.all()
+      .filter((p) => ids.has(p.profileid))
+      .sort((a, b) => LABEL_ORDER.compare(a.name, b.name));
   }
 
   private resolveAudienceIds(aud: Audience): Set<string> {
@@ -2424,6 +2710,32 @@ export class ParticipantStore {
       if (member) this.resolveAudienceIds(member).forEach((id) => out.add(id));
     }
     return out;
+  }
+
+  // Each query runs once per key (Refresh clears them). A failure is kept as that key's message and not
+  // retried by every keystroke: with a missing index it would fail the same way.
+  private async loadProductSubscriptions(filters: ProductSubscriptionFilter[]): Promise<void> {
+    const byKey = new Map(filters.map((ps) => [productSubscriptionKey(ps), ps]));
+    const missing = [...byKey].filter(([key]) => !this.productSubRequested.has(key));
+    if (!missing.length) return;
+    missing.forEach(([key]) => this.productSubRequested.add(key));
+    this.productSubLoading.set(true);
+    await Promise.all(
+      missing.map(async ([key, ps]) => {
+        try {
+          const docs = await this.data.loadProductSubscriptions(ps);
+          this.productSubDocs.update((m) => ({ ...m, [key]: docs }));
+        } catch (e: any) {
+          console.error('loading participantsproduct failed', e);
+          const msg =
+            e?.code === 'failed-precondition'
+              ? "This filter isn't available yet: its Firestore index hasn't been deployed."
+              : "Couldn't load this product's subscriptions. Try Refresh.";
+          this.productSubErrors.update((m) => ({ ...m, [key]: msg }));
+        }
+      })
+    );
+    this.productSubLoading.set(false);
   }
 
   private async loadConfirmed(eventIds: string[]): Promise<void> {
@@ -2606,6 +2918,158 @@ export class PromptDialogComponent {
     const v = this.value.trim();
     if (v.length >= 2 && !this.error()) this.ref.close(v);
   }
+}
+
+// ================================================================================================
+// Dialog: confirm (optionally with what a saved-filter update changes)
+// ================================================================================================
+
+export interface ConfirmData {
+  title: string;
+  message: string;
+  confirmText?: string;
+  icon?: string;
+  danger?: boolean;
+  diff?: FilterDiff; // saved filter now vs after the update
+}
+
+@Component({
+  selector: 'app-confirm-dialog',
+  styles: `
+    .msg {
+      margin: 0 0 4px;
+      font-size: 13.5px;
+      color: var(--pi-text-2);
+    }
+    .diff {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 14px;
+    }
+    .side h3 {
+      margin: 0 0 8px;
+      font-size: 11.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      color: var(--pi-text-3);
+    }
+    .chips {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .chip {
+      padding: 6px 10px;
+      border-radius: var(--pi-radius-sm);
+      background: var(--pi-surface-2);
+      border: 1px solid var(--pi-border);
+      font-size: 12.5px;
+      color: var(--pi-text);
+    }
+    .chip.added {
+      background: var(--pi-status-active-bg);
+      border-color: var(--pi-status-active);
+    }
+    .chip.removed {
+      background: var(--pi-status-banned-bg);
+      border-color: var(--pi-status-banned);
+      text-decoration: line-through;
+    }
+    .chip .mark {
+      font-weight: 700;
+      margin-right: 4px;
+    }
+    .none {
+      font-size: 12.5px;
+      color: var(--pi-text-3);
+    }
+    .same {
+      margin-top: 12px;
+      font-size: 12.5px;
+      color: var(--pi-status-late);
+    }
+  `,
+  template: `
+    <div class="dlg">
+      <div class="dlg-head">
+        <span class="ic"><span class="material-symbols-rounded">{{ data.icon || 'help' }}</span></span>
+        <div>
+          <h2>{{ data.title }}</h2>
+        </div>
+        <button class="x" (click)="ref.close()"><span class="material-symbols-rounded">close</span></button>
+      </div>
+      <div class="dlg-body">
+        <p class="msg">{{ data.message }}</p>
+        @if (data.diff; as d) {
+          <div class="diff">
+            <div data-testid="pi-confirm-before" class="side">
+              <h3>Saved now</h3>
+              <div class="chips">
+                @for (l of d.kept; track l) {
+                  <span class="chip">{{ l }}</span>
+                }
+                @for (l of d.removed; track l) {
+                  <span data-testid="pi-confirm-removed" class="chip removed"><span class="mark">−</span>{{ l }}</span>
+                }
+                @if (!d.kept.length && !d.removed.length) {
+                  <span class="none">No filters</span>
+                }
+              </div>
+            </div>
+            <div data-testid="pi-confirm-after" class="side">
+              <h3>After update</h3>
+              <div class="chips">
+                @for (l of d.kept; track l) {
+                  <span class="chip">{{ l }}</span>
+                }
+                @for (l of d.added; track l) {
+                  <span data-testid="pi-confirm-added" class="chip added"><span class="mark">+</span>{{ l }}</span>
+                }
+                @if (!d.kept.length && !d.added.length) {
+                  <span class="none">No filters</span>
+                }
+              </div>
+            </div>
+          </div>
+          @if (!d.added.length && !d.removed.length) {
+            <p data-testid="pi-confirm-unchanged" class="same">The current filters are the same as the saved ones.</p>
+          }
+        }
+      </div>
+      <div class="dlg-foot">
+        <button data-testid="pi-confirm-cancel" class="btn btn-ghost" (click)="ref.close(false)">Cancel</button>
+        <button data-testid="pi-confirm-ok" class="btn" [class.btn-danger]="data.danger" [class.btn-primary]="!data.danger" (click)="ref.close(true)">
+          {{ data.confirmText || 'Confirm' }}
+        </button>
+      </div>
+    </div>
+  `,
+})
+export class ConfirmDialogComponent {
+  readonly ref = inject(MatDialogRef<ConfirmDialogComponent>);
+  readonly data = inject<ConfirmData>(MAT_DIALOG_DATA);
+}
+
+// "Update with current filters" (Manage audiences and the switcher): shows what is saved now and what the
+// update adds / removes, and only overwrites the saved filter once confirmed.
+function confirmUpdateFilter(dialog: MatDialog, injector: Injector, store: ParticipantStore, snack: MatSnackBar, aud: Audience): void {
+  const diff = store.updatePreview(aud.id);
+  if (!diff) return;
+  dialog
+    .open(ConfirmDialogComponent, {
+      panelClass: 'pi-dialog',
+      width: '620px',
+      injector,
+      data: { title: 'Update saved filter', message: `Replace the filters saved in “${aud.name}” with the current ones?`, confirmText: 'Update', icon: 'save_as', diff } as ConfirmData,
+    })
+    .afterClosed()
+    .subscribe((ok?: boolean) => {
+      if (!ok) return;
+      store.updateAudienceFilter(aud.id);
+      snack.open(`Updated "${aud.name}" with the current filters`, 'Dismiss', { duration: 3000 });
+    });
 }
 
 // ================================================================================================
@@ -3279,15 +3743,7 @@ export interface ManageAudiencesData {
                       <span class="material-symbols-rounded">save_as</span>
                     </button>
                   }
-                  <button class="ic" [class.on]="a.isDefault" matTooltip="Set as default" (click)="store.setDefaultAudience(a.id)">
-                    <span class="material-symbols-rounded">star</span>
-                  </button>
-                  @if (a.kind === 'list') {
-                    <button class="ic" [class.on]="a.live" matTooltip="Toggle live" (click)="store.toggleListLive(a.id)">
-                      <span class="material-symbols-rounded">{{ a.live ? 'toggle_on' : 'toggle_off' }}</span>
-                    </button>
-                  }
-                  <button class="ic del" matTooltip="Delete" (click)="store.deleteAudience(a.id)">
+                  <button data-testid="pi-manage-delete" class="ic del" matTooltip="Delete" (click)="remove(a)">
                     <span class="material-symbols-rounded">delete</span>
                   </button>
                 </td>
@@ -3467,13 +3923,505 @@ export class ManageAudiencesDialogComponent {
   }
 
   updateFilter(a: Audience): void {
-    this.store.updateAudienceFilter(a.id);
-    this.snack.open(`Updated "${a.name}" with the current filters`, 'Dismiss', { duration: 3000 });
+    confirmUpdateFilter(this.dialog, this.injector, this.store, this.snack, a);
+  }
+
+  remove(a: Audience): void {
+    const noun = AUDIENCE_KIND_LABEL[a.kind].toLowerCase();
+    this.dialog
+      .open(ConfirmDialogComponent, {
+        panelClass: 'pi-dialog',
+        width: '440px',
+        injector: this.injector,
+        data: { title: `Delete ${noun}`, message: `Delete “${a.name}”? It disappears from this screen for everyone.`, confirmText: 'Delete', icon: 'delete', danger: true } as ConfirmData,
+      })
+      .afterClosed()
+      .subscribe((ok?: boolean) => {
+        if (!ok) return;
+        this.store.deleteAudience(a.id);
+        this.snack.open(`Deleted "${a.name}"`, 'Dismiss', { duration: 3000 });
+      });
   }
 
   load(id: string): void {
     this.store.loadAudience(id);
     this.ref.close();
+  }
+}
+
+// ================================================================================================
+// Dialog: pipelines — saved filters side by side, names only. A one-time view: nothing is stored.
+// ================================================================================================
+
+export type CommAction = 'email' | 'whatsapp' | 'notify' | 'watiMessages' | 'broadcast' | 'watiConfig';
+
+export interface PipelinesData {
+  // opens the screen's communication flow for exactly these participants
+  send: (action: CommAction, people: Participant[]) => void;
+}
+
+@Component({
+  selector: 'app-pipelines-dialog',
+  imports: [MatMenuModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  styles: `
+    .dlg {
+      height: 84vh;
+    }
+    .dlg-body {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-height: 0;
+      flex: 1;
+    }
+    .label {
+      font-size: 11.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      color: var(--pi-text-3);
+    }
+    .pick-head,
+    .bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .search {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      height: 32px;
+      padding: 0 10px;
+      border: 1px solid var(--pi-border-strong);
+      border-radius: var(--pi-radius-sm);
+      background: var(--pi-surface);
+    }
+    .search .material-symbols-rounded {
+      font-size: 17px;
+      color: var(--pi-text-3);
+    }
+    .search input {
+      border: none;
+      outline: none;
+      background: transparent;
+      font-family: inherit;
+      font-size: 13px;
+      min-width: 0;
+      width: 180px;
+    }
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      max-height: 96px;
+      overflow-y: auto;
+    }
+    .fchip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      height: 30px;
+      padding: 0 12px;
+      border: 1px solid var(--pi-border-strong);
+      border-radius: 999px;
+      background: var(--pi-surface);
+      font-family: inherit;
+      font-size: 12.5px;
+      color: var(--pi-text);
+      cursor: pointer;
+    }
+    .fchip.on {
+      background: var(--pi-accent-bg);
+      border-color: var(--pi-accent);
+      color: var(--pi-accent-text);
+      font-weight: 600;
+    }
+    .fchip .material-symbols-rounded {
+      font-size: 16px;
+    }
+    .seg {
+      display: inline-flex;
+      border: 1px solid var(--pi-border-strong);
+      border-radius: var(--pi-radius-sm);
+      overflow: hidden;
+    }
+    .seg button {
+      border: none;
+      background: var(--pi-surface);
+      padding: 6px 12px;
+      font-family: inherit;
+      font-size: 12.5px;
+      color: var(--pi-text-2);
+      cursor: pointer;
+    }
+    .seg button + button {
+      border-left: 1px solid var(--pi-border-strong);
+    }
+    .seg button.on {
+      background: var(--pi-accent);
+      color: #fff;
+      font-weight: 600;
+    }
+    .seg button:disabled {
+      cursor: default;
+      opacity: 0.5;
+    }
+    .total {
+      margin-left: auto;
+      font-size: 12.5px;
+      color: var(--pi-text-2);
+    }
+    .board {
+      display: flex;
+      gap: 12px;
+      flex: 1;
+      min-height: 0;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+    .col {
+      flex: 0 0 240px;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      border: 1px solid var(--pi-border);
+      border-radius: var(--pi-radius);
+      background: var(--pi-surface-2);
+    }
+    .col-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--pi-border);
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .col-name {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .col-count {
+      font-variant-numeric: tabular-nums;
+      color: var(--pi-text-2);
+      font-weight: 500;
+    }
+    .names {
+      overflow-y: auto;
+      padding: 6px;
+    }
+    .name {
+      padding: 5px 8px;
+      font-size: 13px;
+      border-radius: var(--pi-radius-sm);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .name:hover {
+      background: var(--pi-surface);
+    }
+    .empty,
+    .col-empty {
+      color: var(--pi-text-3);
+      font-size: 13px;
+      text-align: center;
+      padding: 24px 12px;
+    }
+    .empty {
+      margin: auto;
+    }
+    /* "in every" / "not in every": one list, each person once, selectable */
+    .unique {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--pi-border);
+      border-radius: var(--pi-radius);
+    }
+    .u-head,
+    .u-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 12px;
+    }
+    .u-head {
+      border-bottom: 1px solid var(--pi-border);
+      background: var(--pi-surface-2);
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--pi-text-2);
+    }
+    .u-list {
+      overflow-y: auto;
+    }
+    .u-row {
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .u-row:hover {
+      background: var(--pi-surface-2);
+    }
+    .u-row input,
+    .u-head input {
+      width: 15px;
+      height: 15px;
+      margin: 0;
+      accent-color: var(--pi-accent);
+      cursor: pointer;
+    }
+    .u-name {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .u-in {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      max-width: 55%;
+    }
+    .tag {
+      padding: 1px 8px;
+      border-radius: 999px;
+      background: var(--pi-accent-bg);
+      color: var(--pi-accent-text);
+      font-size: 11px;
+      white-space: nowrap;
+    }
+    .dlg-foot .sel {
+      margin-right: auto;
+      font-size: 12.5px;
+      color: var(--pi-text-2);
+    }
+    .btn .material-symbols-rounded {
+      font-size: 18px;
+      vertical-align: -4px;
+    }
+    .mi {
+      font-size: 19px;
+      margin-right: 10px;
+      color: var(--pi-text-2);
+      vertical-align: -5px;
+    }
+  `,
+  template: `
+    <div class="dlg">
+      <div class="dlg-head">
+        <span class="ic"><span class="material-symbols-rounded">view_kanban</span></span>
+        <div>
+          <h2>Pipelines</h2>
+          <p>Pick saved filters to see their participants side by side. Nothing here is saved.</p>
+        </div>
+        <button class="x" (click)="ref.close()"><span class="material-symbols-rounded">close</span></button>
+      </div>
+
+      <div class="dlg-body">
+        <div class="pick-head">
+          <span class="label">Saved filters</span>
+          <div class="search">
+            <span class="material-symbols-rounded">search</span>
+            <input data-testid="pi-pipe-filter-search" type="text" placeholder="Search saved filters…" [value]="filterQuery()" (input)="filterQuery.set($any($event.target).value)" />
+          </div>
+        </div>
+        <div class="filters">
+          @for (f of filterOptions(); track f.id) {
+            <button data-testid="pi-pipe-filter" class="fchip" [class.on]="picked().includes(f.id)" (click)="toggle(f.id)">
+              @if (picked().includes(f.id)) {
+                <span class="material-symbols-rounded">check</span>
+              }
+              {{ f.name }}
+            </button>
+          } @empty {
+            <span class="col-empty">No saved filters{{ filterQuery() ? ' match “' + filterQuery() + '”' : '' }}.</span>
+          }
+        </div>
+
+        <div class="bar">
+          <div class="seg">
+            <button data-testid="pi-pipe-mode-all" [class.on]="mode() === 'all'" (click)="mode.set('all')">All names</button>
+            <button data-testid="pi-pipe-mode-every" [class.on]="mode() === 'every'" [disabled]="pipelines().length < 2" (click)="mode.set('every')">
+              In every pipeline
+            </button>
+            <button data-testid="pi-pipe-mode-not-every" [class.on]="mode() === 'notEvery'" [disabled]="pipelines().length < 2" (click)="mode.set('notEvery')">
+              Not in every pipeline
+            </button>
+          </div>
+          <div class="search">
+            <span class="material-symbols-rounded">search</span>
+            <input data-testid="pi-pipe-search" type="text" placeholder="Search names…" [value]="nameQuery()" (input)="nameQuery.set($any($event.target).value)" />
+          </div>
+          <span data-testid="pi-pipe-total" class="total">{{ uniqueCount() }} unique {{ uniqueCount() === 1 ? 'name' : 'names' }}</span>
+        </div>
+
+        @if (uniqueView()) {
+          <div data-testid="pi-pipe-unique" class="unique">
+            <label class="u-head">
+              <input
+                data-testid="pi-pipe-select-all"
+                type="checkbox"
+                [checked]="allSelected()"
+                [indeterminate]="selectedCount() > 0 && !allSelected()"
+                (change)="toggleAll()"
+              />
+              <span class="u-name">Name</span>
+              <span>{{ mode() === 'notEvery' ? 'In pipelines' : '' }}</span>
+            </label>
+            <div class="u-list">
+              @for (row of uniqueRows(); track row.person.profileid) {
+                <label data-testid="pi-pipe-unique-row" class="u-row">
+                  <input data-testid="pi-pipe-unique-check" type="checkbox" [checked]="selected().has(row.person.profileid)" (change)="toggle1(row.person.profileid)" />
+                  <span class="u-name" [title]="row.person.name">{{ row.person.name || '(no name)' }}</span>
+                  @if (mode() === 'notEvery') {
+                    <span class="u-in">
+                      @for (n of row.pipelines; track n) {
+                        <span class="tag">{{ n }}</span>
+                      }
+                    </span>
+                  }
+                </label>
+              } @empty {
+                <div class="col-empty">No one {{ mode() === 'every' ? 'is in every pipeline' : 'is missing from a pipeline' }}{{ nameQuery() ? ' with that name' : '' }}.</div>
+              }
+            </div>
+          </div>
+        } @else if (pipelines().length) {
+          <div class="board">
+            @for (col of pipelines(); track col.id) {
+              <div data-testid="pi-pipe-column" class="col">
+                <div class="col-head">
+                  <span class="col-name" [title]="col.name">{{ col.name }}</span>
+                  <span data-testid="pi-pipe-column-count" class="col-count">{{ col.people.length }}</span>
+                </div>
+                <div class="names">
+                  @for (p of col.people; track p.profileid) {
+                    <div data-testid="pi-pipe-name" class="name" [title]="p.name">{{ p.name || '(no name)' }}</div>
+                  } @empty {
+                    <div class="col-empty">No one here.</div>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        } @else {
+          <div data-testid="pi-pipe-empty" class="empty">Pick one or more saved filters above.</div>
+        }
+      </div>
+
+      <div class="dlg-foot">
+        @if (uniqueView()) {
+          <span data-testid="pi-pipe-selected" class="sel">{{ selectedCount() }} selected</span>
+          <button data-testid="pi-pipe-comm" class="btn btn-primary" [disabled]="!selectedCount()" [matMenuTriggerFor]="comm">
+            <span class="material-symbols-rounded">campaign</span> Communication
+          </button>
+        }
+        <button class="btn btn-ghost" (click)="ref.close()">Done</button>
+      </div>
+    </div>
+
+    <mat-menu #comm="matMenu" class="pi-menu">
+      <button data-testid="pi-pipe-email" mat-menu-item (click)="send('email')">
+        <span class="material-symbols-rounded mi">mail</span> Send Email
+      </button>
+      <button data-testid="pi-pipe-whatsapp" mat-menu-item (click)="send('whatsapp')">
+        <span class="material-symbols-rounded mi">chat</span> Send WhatsApp
+      </button>
+      <button data-testid="pi-pipe-notify" mat-menu-item (click)="send('notify')">
+        <span class="material-symbols-rounded mi">notifications</span> Send In-App Notification
+      </button>
+      <button data-testid="pi-pipe-wati-messages" mat-menu-item (click)="send('watiMessages')">
+        <span class="material-symbols-rounded mi">forum</span> Send Wati Messages
+      </button>
+      <button data-testid="pi-pipe-broadcast" mat-menu-item (click)="send('broadcast')">
+        <span class="material-symbols-rounded mi">podcasts</span> Send Broadcast in Breakthroughs
+      </button>
+      <button data-testid="pi-pipe-wati-config" mat-menu-item (click)="send('watiConfig')">
+        <span class="material-symbols-rounded mi">settings</span> Wati Configuration
+      </button>
+    </mat-menu>
+  `,
+})
+export class PipelinesDialogComponent {
+  readonly ref = inject(MatDialogRef<PipelinesDialogComponent>);
+  private readonly store = inject(ParticipantStore);
+  private readonly data = inject<PipelinesData>(MAT_DIALOG_DATA);
+
+  readonly picked = signal<string[]>([]); // in the order picked = column order
+  readonly mode = signal<PipelineMatch>('all');
+  readonly filterQuery = signal('');
+  readonly nameQuery = signal('');
+
+  private readonly savedFilters = computed(() => this.store.audiences().filter((a) => a.kind === 'filter'));
+  readonly filterOptions = computed(() => {
+    const q = this.filterQuery().trim().toLowerCase();
+    return this.savedFilters().filter((a) => !q || a.name.toLowerCase().includes(q));
+  });
+
+  // each picked saved filter's members, before the match mode and name search
+  private readonly members = computed(() =>
+    this.picked()
+      .map((id) => this.savedFilters().find((a) => a.id === id))
+      .filter((a): a is Audience => !!a)
+      .map((a) => ({ id: a.id, name: a.name, people: this.store.audienceMembers(a.id) }))
+  );
+
+  readonly pipelines = computed(() => {
+    const cols = this.members();
+    // below two pipelines "every" / "not every" mean nothing, so they show everyone
+    const mode = cols.length < 2 ? 'all' : this.mode();
+    const q = this.nameQuery().trim().toLowerCase();
+    const shown = pipelineColumns(cols.map((c) => c.people), mode);
+    return cols.map((c, i) => ({ ...c, people: q ? shown[i].filter((p) => p.name.toLowerCase().includes(q)) : shown[i] }));
+  });
+
+  readonly uniqueCount = computed(() => new Set(this.pipelines().flatMap((c) => c.people.map((p) => p.profileid))).size);
+
+  // "In every" / "Not in every" (two or more pipelines): one list of unique names to select and message
+  readonly uniqueView = computed(() => this.pipelines().length >= 2 && this.mode() !== 'all');
+  readonly uniqueRows = computed(() => (this.uniqueView() ? uniquePipelineNames(this.pipelines()) : []));
+
+  // Ticks are kept while the view changes, but only the ticked people in the list shown now count,
+  // and only they are sent to (as the table: shown ∩ selected).
+  readonly selected = signal<Set<string>>(new Set());
+  private readonly selectedPeople = computed(() => this.uniqueRows().filter((r) => this.selected().has(r.person.profileid)).map((r) => r.person));
+  readonly selectedCount = computed(() => this.selectedPeople().length);
+  readonly allSelected = computed(() => this.uniqueRows().length > 0 && this.selectedCount() === this.uniqueRows().length);
+
+  toggle(id: string): void {
+    this.picked.update((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+  }
+
+  toggle1(id: string): void {
+    this.selected.update((s) => {
+      const next = new Set(s);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  toggleAll(): void {
+    const ids = this.uniqueRows().map((r) => r.person.profileid);
+    this.selected.update((s) => {
+      const next = new Set(s);
+      if (this.allSelected()) ids.forEach((id) => next.delete(id));
+      else ids.forEach((id) => next.add(id));
+      return next;
+    });
+  }
+
+  send(action: CommAction): void {
+    this.data.send(action, this.selectedPeople());
   }
 }
 
@@ -3924,12 +4872,22 @@ export class CountConditionComponent {
   }
 }
 
-type CustomSection = 'atc' | 'programs' | 'age' | 'dates' | 'activity';
+type CustomSection = 'atc' | 'programs' | 'age' | 'dates' | 'productSub' | 'activity';
 type RuleKind = 'consumed' | 'unconsumed';
 
 @Component({
   selector: 'app-filter-rail',
-  imports: [DecimalPipe, NgTemplateOutlet, MatDatepickerModule, MatFormFieldModule, CountConditionComponent],
+  imports: [
+    DecimalPipe,
+    NgTemplateOutlet,
+    MatAutocompleteModule,
+    MatDatepickerModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatSelectModule,
+    MatTooltipModule,
+    CountConditionComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="rail-head">
@@ -4041,18 +4999,8 @@ type RuleKind = 'consumed' | 'unconsumed';
               }
               <div class="opts" [class.scroll]="sec.group === 'events' || sec.group === 'queues'">
                 @for (o of sec.options; track o.value) {
-                  <button
-                    data-testid="pi-filter-option"
-                    class="opt"
-                    role="checkbox"
-                    [attr.aria-checked]="state(sec.group, o.value) === 'in' ? 'true' : state(sec.group, o.value) === 'out' ? 'mixed' : 'false'"
-                    [class.in]="state(sec.group, o.value) === 'in'"
-                    [class.out]="state(sec.group, o.value) === 'out'"
-                    [title]="cycleHint(sec.group, o.value)"
-                    (click)="cycle(sec.group, o.value)"
-                  >
-                    <span class="box"></span>
-                    <span class="opt-text">
+                  <div data-testid="pi-filter-option" class="opt" [class.in]="state(sec.group, o.value) === 'in'" [class.out]="state(sec.group, o.value) === 'out'">
+                    <span class="opt-text" (click)="setOption(sec.group, o.value, 'in')">
                       <span class="opt-label">
                         {{ o.label }}
                         @if (o.count != null) {
@@ -4063,7 +5011,29 @@ type RuleKind = 'consumed' | 'unconsumed';
                         <span class="opt-hint">{{ o.hint }}</span>
                       }
                     </span>
-                  </button>
+                    <span class="pills">
+                      <button
+                        data-testid="pi-filter-option-include"
+                        class="pill inc"
+                        role="checkbox"
+                        [attr.aria-checked]="state(sec.group, o.value) === 'in'"
+                        [attr.aria-label]="'Include ' + o.label"
+                        (click)="setOption(sec.group, o.value, 'in')"
+                      >
+                        Include
+                      </button>
+                      <button
+                        data-testid="pi-filter-option-exclude"
+                        class="pill exc"
+                        role="checkbox"
+                        [attr.aria-checked]="state(sec.group, o.value) === 'out'"
+                        [attr.aria-label]="'Exclude ' + o.label"
+                        (click)="setOption(sec.group, o.value, 'out')"
+                      >
+                        Exclude
+                      </button>
+                    </span>
+                  </div>
                 } @empty {
                   <span class="hint">{{ sectionQuery()[sec.group] ? 'No matches.' : 'Nothing to choose from yet.' }}</span>
                 }
@@ -4110,19 +5080,31 @@ type RuleKind = 'consumed' | 'unconsumed';
             <div class="sec-body">
               <span class="mini-label">uP! attendance</span>
               @for (o of upStatusOpts; track o.value) {
-                <button
-                  data-testid="pi-filter-up-status"
-                  class="opt"
-                  role="checkbox"
-                  [attr.aria-checked]="state('upStatus', o.value) === 'in' ? 'true' : state('upStatus', o.value) === 'out' ? 'mixed' : 'false'"
-                  [class.in]="state('upStatus', o.value) === 'in'"
-                  [class.out]="state('upStatus', o.value) === 'out'"
-                  [title]="cycleHint('upStatus', o.value)"
-                  (click)="cycle('upStatus', o.value)"
-                >
-                  <span class="box"></span>
-                  <span class="opt-label">{{ o.label }}</span>
-                </button>
+                <div data-testid="pi-filter-up-status" class="opt" [class.in]="state('upStatus', o.value) === 'in'" [class.out]="state('upStatus', o.value) === 'out'">
+                  <span class="opt-label" (click)="setOption('upStatus', o.value, 'in')">{{ o.label }}</span>
+                  <span class="pills">
+                    <button
+                      data-testid="pi-filter-up-status-include"
+                      class="pill inc"
+                      role="checkbox"
+                      [attr.aria-checked]="state('upStatus', o.value) === 'in'"
+                      [attr.aria-label]="'Include ' + o.label"
+                      (click)="setOption('upStatus', o.value, 'in')"
+                    >
+                      Include
+                    </button>
+                    <button
+                      data-testid="pi-filter-up-status-exclude"
+                      class="pill exc"
+                      role="checkbox"
+                      [attr.aria-checked]="state('upStatus', o.value) === 'out'"
+                      [attr.aria-label]="'Exclude ' + o.label"
+                      (click)="setOption('upStatus', o.value, 'out')"
+                    >
+                      Exclude
+                    </button>
+                  </span>
+                </div>
               }
               <span class="mini-label">uP! count</span>
               <app-count-condition data-testid="pi-filter-up-count" [value]="store.filter().upCount" (valueChange)="setCount('upCount', $event)" />
@@ -4202,11 +5184,13 @@ type RuleKind = 'consumed' | 'unconsumed';
           @if (isOpen('dates')) {
             <div class="sec-body">
               <span class="mini-label">Match subscriptions that…</span>
-              <select data-testid="pi-filter-sub-relation" class="rule-sel" aria-label="Match subscriptions that" (change)="setRelation($any($event.target).value)">
-                @for (r of relations; track r.value) {
-                  <option [value]="r.value" [selected]="r.value === subscription().relation">{{ r.label }}</option>
-                }
-              </select>
+              <mat-form-field class="range sel" appearance="outline" subscriptSizing="dynamic">
+                <mat-select data-testid="pi-filter-sub-relation" aria-label="Match subscriptions that" [value]="subscription().relation" panelClass="pi-select-panel" (selectionChange)="setRelation($event.value)">
+                  @for (r of relations; track r.value) {
+                    <mat-option data-testid="pi-filter-sub-relation-option" [value]="r.value" [matTooltip]="relationHelp[r.value]" matTooltipPosition="right">{{ r.label }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
               <span class="hint">{{ relationHelp[subscription().relation] }}</span>
               <mat-form-field data-testid="pi-filter-sub-range" class="range" [class.bad]="subError()" appearance="outline" subscriptSizing="dynamic">
                 <mat-label>Date range</mat-label>
@@ -4238,6 +5222,81 @@ type RuleKind = 'consumed' | 'unconsumed';
         </div>
       }
 
+      <!-- product subscription (participantsproduct) -->
+      @if (showCustom('productSub')) {
+        <div class="section" [class.open]="isOpen('productSub')">
+          <button class="sec-head" (click)="toggleSection('productSub')">
+            <span class="sec-label">Product subscription</span>
+            @if (customErrors().productSub) {
+              <span class="material-symbols-rounded sec-err" title="Check the dates">error</span>
+            } @else if (customCounts().productSub) {
+              <span class="sec-count">{{ customCounts().productSub }}</span>
+            }
+            <span class="material-symbols-rounded chev">{{ isOpen('productSub') ? 'expand_less' : 'expand_more' }}</span>
+          </button>
+          @if (isOpen('productSub')) {
+            <div class="sec-body">
+              <span class="mini-label">Product</span>
+              <!-- type to search; the field shows the picked product's name while not searching -->
+              <mat-form-field data-testid="pi-filter-psub-product" class="range sel" appearance="outline" subscriptSizing="dynamic">
+                <span class="material-symbols-rounded" matIconPrefix>search</span>
+                <input
+                  data-testid="pi-filter-psub-product-search"
+                  matInput
+                  aria-label="Product"
+                  placeholder="Search products…"
+                  [matAutocomplete]="psubAuto"
+                  [value]="psubQuery() ?? psubProductName()"
+                  (focus)="psubQuery.set('')"
+                  (input)="psubQuery.set($any($event.target).value)"
+                  (blur)="psubQuery.set(null)"
+                />
+                <mat-autocomplete #psubAuto="matAutocomplete" class="pi-select-panel" [displayWith]="psubDisplay" (optionSelected)="pickPsubProduct($event.option.value)">
+                  @for (p of psubOptions(); track p.id) {
+                    <mat-option data-testid="pi-filter-psub-product-option" [value]="p.id">{{ p.name }}</mat-option>
+                  } @empty {
+                    <mat-option disabled>No products match “{{ psubQuery() }}”</mat-option>
+                  }
+                </mat-autocomplete>
+              </mat-form-field>
+              <span class="mini-label">Match subscriptions that…</span>
+              <mat-form-field class="range sel" appearance="outline" subscriptSizing="dynamic">
+                <mat-select data-testid="pi-filter-psub-relation" aria-label="Match product subscriptions that" [value]="productSub().relation" panelClass="pi-select-panel" (selectionChange)="setPsub({ relation: $event.value })">
+                  @for (r of relations; track r.value) {
+                    <mat-option data-testid="pi-filter-psub-relation-option" [value]="r.value" [matTooltip]="relationHelp[r.value]" matTooltipPosition="right">{{ r.label }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <span class="hint">{{ relationHelp[productSub().relation] }}</span>
+              <mat-form-field data-testid="pi-filter-psub-range" class="range" [class.bad]="psubError()" appearance="outline" subscriptSizing="dynamic">
+                <mat-label>Date range</mat-label>
+                <mat-date-range-input [rangePicker]="psubPicker">
+                  <input data-testid="pi-filter-psub-from" matStartDate placeholder="From" [value]="psubFrom()" (dateChange)="setPsubDate('from', $event.value)" />
+                  <input data-testid="pi-filter-psub-to" matEndDate placeholder="To" [value]="psubTo()" (dateChange)="setPsubDate('to', $event.value)" />
+                </mat-date-range-input>
+                <mat-datepicker-toggle matIconSuffix [for]="psubPicker" />
+                <mat-date-range-picker #psubPicker />
+              </mat-form-field>
+              @if (psubError()) {
+                <span class="msg">{{ psubError() }}</span>
+              }
+              @if (psubLoadError(); as err) {
+                <span data-testid="pi-filter-psub-error" class="msg">{{ err }}</span>
+              } @else if (psubPending()) {
+                <span data-testid="pi-filter-psub-loading" class="hint">
+                  {{ psubHeavy() ? 'Loading… this option checks most of the product’s records, so it may take a moment.' : 'Loading…' }}
+                </span>
+              } @else if (productSub().productId && !productSub().from && !productSub().to) {
+                <span class="hint">Pick a date range to apply it.</span>
+              }
+              @if (productSub().productId || productSub().from || productSub().to) {
+                <button data-testid="pi-filter-psub-clear" class="link start" (click)="clearPsub()">Clear</button>
+              }
+            </div>
+          }
+        </div>
+      }
+
       <!-- product activity -->
       @if (showCustom('activity')) {
         <div class="section" [class.open]="isOpen('activity')">
@@ -4262,6 +5321,13 @@ type RuleKind = 'consumed' | 'unconsumed';
             </div>
             <ng-template #ruleKind let-kind>
               <span class="mini-label">{{ kind.label }}</span>
+              @if (kind.rules.length > 1) {
+                <div class="seg">
+                  <button data-testid="pi-filter-rule-match-all" [class.on]="kind.match === 'all'" (click)="setRuleMatch(kind.key, 'all')">Match all</button>
+                  <button data-testid="pi-filter-rule-match-any" [class.on]="kind.match === 'any'" (click)="setRuleMatch(kind.key, 'any')">Match any</button>
+                </div>
+                <span class="hint">{{ kind.match === 'any' ? 'Participants matching at least one rule.' : 'Participants matching every rule.' }}</span>
+              }
               @for (row of kind.rules; track $index) {
                 <div data-testid="pi-filter-rule" class="rule">
                   <div class="rule-top">
@@ -4668,13 +5734,12 @@ type RuleKind = 'consumed' | 'unconsumed';
     .opt {
       display: flex;
       align-items: center;
-      gap: 9px;
+      gap: 6px;
       width: 100%;
       padding: 5px 6px;
       border: none;
       background: none;
       border-radius: 7px;
-      cursor: pointer;
       font-family: inherit;
       font-size: 13px;
       color: var(--pi-text-2);
@@ -4684,20 +5749,51 @@ type RuleKind = 'consumed' | 'unconsumed';
     .opt:hover {
       background: var(--pi-surface-3);
     }
-    .opt .box {
-      width: 16px;
-      height: 16px;
-      border: 1.5px solid var(--pi-border-strong);
-      border-radius: 5px;
-      background: #fff;
-      position: relative;
+    /* Include / Exclude pills at the end of every option row: outlined until set, then filled */
+    .pills {
+      display: inline-flex;
+      gap: 4px;
+      margin-left: auto;
       flex-shrink: 0;
+    }
+    .pill {
+      height: 22px;
+      padding: 0 8px;
+      border: 1px solid var(--pi-border-strong);
+      border-radius: 999px;
+      background: var(--pi-surface);
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--pi-text-2);
+      cursor: pointer;
       transition: all 0.1s ease;
     }
-    .opt-text {
+    .pill.inc:hover {
+      border-color: var(--pi-accent);
+      color: var(--pi-accent);
+    }
+    .pill.exc:hover {
+      border-color: var(--pi-status-banned);
+      color: var(--pi-status-banned);
+    }
+    .opt.in .pill.inc {
+      background: var(--pi-accent);
+      border-color: var(--pi-accent);
+      color: #fff;
+    }
+    .opt.out .pill.exc {
+      background: var(--pi-status-banned);
+      border-color: var(--pi-status-banned);
+      color: #fff;
+    }
+    .opt-text,
+    .opt > .opt-label {
       display: flex;
       flex-direction: column;
+      flex: 1;
       min-width: 0;
+      cursor: pointer;
     }
     .opt-count {
       color: var(--pi-text-3);
@@ -4707,48 +5803,11 @@ type RuleKind = 'consumed' | 'unconsumed';
       font-size: 11px;
       color: var(--pi-text-3);
     }
-    /* include: blue tick */
-    .opt.in .box {
-      background: var(--pi-accent);
-      border-color: var(--pi-accent);
-    }
-    .opt.in .box::after {
-      content: '';
-      position: absolute;
-      left: 4.5px;
-      top: 1px;
-      width: 4px;
-      height: 9px;
-      border: solid #fff;
-      border-width: 0 2px 2px 0;
-      transform: rotate(45deg);
-    }
     .opt.in .opt-label {
       color: var(--pi-text);
       font-weight: 500;
     }
-    /* exclude: red cross, struck-through label */
-    .opt.out .box {
-      background: var(--pi-status-banned);
-      border-color: var(--pi-status-banned);
-    }
-    .opt.out .box::before,
-    .opt.out .box::after {
-      content: '';
-      position: absolute;
-      left: 6px;
-      top: 2px;
-      width: 1.8px;
-      height: 9px;
-      background: #fff;
-      border-radius: 1px;
-    }
-    .opt.out .box::before {
-      transform: rotate(45deg);
-    }
-    .opt.out .box::after {
-      transform: rotate(-45deg);
-    }
+    /* excluded: struck-through red label */
     .opt.out .opt-label {
       color: var(--pi-status-banned);
       text-decoration: line-through;
@@ -4790,9 +5849,19 @@ type RuleKind = 'consumed' | 'unconsumed';
     }
 
     /* Material date range field, sized and coloured to match the rail's inputs */
+    .range.sel {
+      margin-top: 2px;
+    }
+    .range .material-symbols-rounded[matIconPrefix] {
+      font-size: 18px;
+      color: var(--pi-text-3);
+      padding: 0 4px 0 10px;
+    }
     .range {
       width: 100%;
       margin-top: 8px;
+      --mat-select-trigger-text-size: 13px;
+      --mat-select-trigger-text-font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', system-ui, 'Segoe UI', sans-serif;
       --mat-form-field-container-height: 40px;
       --mat-form-field-container-vertical-padding: 9px;
       --mat-form-field-container-text-size: 13px;
@@ -4944,6 +6013,7 @@ export class FilterRailComponent {
     programs: 'uP! & CPM count attendance new already attended',
     age: 'Age',
     dates: 'Subscription dates start end range',
+    productSub: 'Product subscription start end range participantsproduct',
     activity: 'Product activity consumed unconsumed count',
   };
 
@@ -4955,6 +6025,24 @@ export class FilterRailComponent {
   readonly eventStatus = computed(() => this.store.filter().eventStatus);
   readonly queueStatus = computed(() => this.store.filter().queueStatus);
   readonly subscription = computed(() => this.store.filter().subscription);
+  readonly productSub = computed(() => this.store.filter().productSubscription);
+  readonly psubError = computed(() => subscriptionFilterError(this.productSub()));
+  private readonly psubFromDay = computed(() => this.productSub().from);
+  private readonly psubToDay = computed(() => this.productSub().to);
+  readonly psubFrom = computed(() => dayToDate(this.psubFromDay()));
+  readonly psubTo = computed(() => dayToDate(this.psubToDay()));
+  // state of the current product + range's query (only once a product and a date are set)
+  private readonly psubKey = computed(() => (productSubscriptionActive(this.productSub()) ? productSubscriptionKey(this.productSub()) : null));
+  readonly psubLoadError = computed(() => {
+    const key = this.psubKey();
+    return key ? this.store.productSubErrors()[key] ?? null : null;
+  });
+  readonly psubPending = computed(() => {
+    const key = this.psubKey();
+    return !!key && !(key in this.store.productSubDocs()) && !this.psubLoadError();
+  });
+  readonly psubHeavy = computed(() => HEAVY_PRODUCT_RELATIONS.has(this.productSub().relation));
+
 
   readonly eventHint = computed(() => {
     if (this.eventStatus() === 'attended') return 'Participants who attended the ticked events.';
@@ -5061,6 +6149,7 @@ export class FilterRailComponent {
       programs: f.upStatus.length + (f.exclude.upStatus?.length ?? 0) + [f.upCount, f.cpmCount].filter(conditionActive).length,
       age: ageActive(f) ? 1 : 0,
       dates: subscriptionActive(f.subscription) ? 1 : 0,
+      productSub: productSubscriptionActive(f.productSubscription) ? 1 : 0,
       activity: [...f.consumed, ...f.unconsumed].filter(productRuleActive).length,
     };
   });
@@ -5072,6 +6161,7 @@ export class FilterRailComponent {
       programs: conditionInvalid(f.upCount) || conditionInvalid(f.cpmCount),
       age: !!ageRangeError(f.ageMin, f.ageMax),
       dates: !!subscriptionFilterError(f.subscription),
+      productSub: !!subscriptionFilterError(f.productSubscription),
       activity: [...f.consumed, ...f.unconsumed].some((r) => conditionInvalid(ruleCondition(r))),
     };
   });
@@ -5098,6 +6188,7 @@ export class FilterRailComponent {
     const kind = (key: RuleKind, label: string) => ({
       key,
       label,
+      match: key === 'consumed' ? f.consumedMatch : f.unconsumedMatch,
       rules: f[key].map((r) => ({ productId: r.productId, condition: ruleCondition(r) })),
     });
     return { consumed: kind('consumed', 'Consumed count'), unconsumed: kind('unconsumed', 'Unconsumed count') };
@@ -5141,19 +6232,16 @@ export class FilterRailComponent {
     const f = this.store.filter();
     return (f[group] as string[]).length + (f.exclude[group]?.length ?? 0);
   }
-  cycleHint(group: CheckGroup, value: string): string {
-    const st = this.state(group, value);
-    return st === 'in' ? 'Included — click to exclude' : st === 'out' ? 'Excluded — click to clear' : 'Click to include';
-  }
-  // click cycle: off → include → exclude → off
-  cycle(group: CheckGroup, value: string): void {
+  // Each option has its own Include (✓) and Exclude (✕); clicking the active one clears it, the other
+  // switches the option over. The label is the Include target.
+  setOption(group: CheckGroup, value: string, target: 'in' | 'out'): void {
     const f = this.store.filter();
-    const inc = f[group] as string[];
-    const exc = f.exclude[group] ?? [];
-    const st = this.state(group, value);
-    const nextInc = st === null ? [...inc, value] : inc.filter((v) => v !== value);
-    const nextExc = st === 'in' ? [...exc, value] : exc.filter((v) => v !== value);
-    this.store.patchFilter({ [group]: nextInc, exclude: { ...f.exclude, [group]: nextExc } } as Partial<FilterModel>);
+    const next = this.state(group, value) === target ? null : target;
+    const inc = (f[group] as string[]).filter((v) => v !== value);
+    const exc = (f.exclude[group] ?? []).filter((v) => v !== value);
+    if (next === 'in') inc.push(value);
+    if (next === 'out') exc.push(value);
+    this.store.patchFilter({ [group]: inc, exclude: { ...f.exclude, [group]: exc } } as Partial<FilterModel>);
   }
 
   // no clamping: an out-of-range number is flagged by the validation instead of silently changed
@@ -5181,6 +6269,34 @@ export class FilterRailComponent {
     this.store.patchFilter({ subscription: { ...this.subscription(), from: null, to: null } });
   }
 
+  // product picker search: null = not searching (the field shows the picked product's name)
+  readonly psubQuery = signal<string | null>(null);
+  readonly psubOptions = computed(() => {
+    const q = (this.psubQuery() ?? '').trim().toLowerCase();
+    return this.products().filter((p) => !q || p.name.toLowerCase().includes(q));
+  });
+  private readonly productNames = computed(() => toNameMap(this.store.reference().products));
+  readonly psubProductName = computed(() => {
+    const id = this.productSub().productId;
+    return id ? this.productNames()[id] ?? '' : '';
+  });
+  readonly psubDisplay = (id: string | null): string => (id ? this.productNames()[id] ?? '' : '');
+  pickPsubProduct(id: string): void {
+    this.psubQuery.set(null);
+    this.setPsub({ productId: id });
+  }
+
+  // product subscription: one product, the same relations and day range
+  setPsub(patch: Partial<ProductSubscriptionFilter>): void {
+    this.store.patchFilter({ productSubscription: { ...this.productSub(), ...patch } });
+  }
+  setPsubDate(edge: 'from' | 'to', value: Date | null): void {
+    this.setPsub({ [edge]: dayKey(value) });
+  }
+  clearPsub(): void {
+    this.store.patchFilter({ productSubscription: emptyFilter().productSubscription });
+  }
+
   // product activity rules
   addRule(kind: RuleKind): void {
     const first = this.products()[0]?.id ?? '';
@@ -5191,6 +6307,9 @@ export class FilterRailComponent {
   }
   setRuleCondition(kind: RuleKind, index: number, c: CountCondition): void {
     this.updateRule(kind, index, { comparison: c.op, count: c.a, count2: c.b });
+  }
+  setRuleMatch(kind: RuleKind, match: RuleMatch): void {
+    this.store.patchFilter(kind === 'consumed' ? { consumedMatch: match } : { unconsumedMatch: match });
   }
   removeRule(kind: RuleKind, index: number): void {
     this.store.patchFilter({ [kind]: this.store.filter()[kind].filter((_, i) => i !== index) });
@@ -5389,7 +6508,7 @@ export class ActiveFilterChipsComponent {
       </button>
     }
 
-    <mat-menu #menu="matMenu" class="aud-menu" xPosition="before" (closed)="query.set('')">
+    <mat-menu #menu="matMenu" class="aud-menu pi-menu" xPosition="before" (closed)="query.set('')">
       <div class="menu-top" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
         <div class="tabs">
           @for (kind of kinds; track kind.key) {
@@ -5416,9 +6535,6 @@ export class ActiveFilterChipsComponent {
           <span class="dot" [class.on]="store.activeAudienceId() === aud.id"></span>
           <span class="aud-name">{{ aud.name }}</span>
           <span class="aud-count">{{ store.audienceCounts()[aud.id] ?? 0 }}</span>
-          @if (aud.isDefault) {
-            <span class="material-symbols-rounded star" matTooltip="Default">star</span>
-          }
         </button>
       } @empty {
         <div class="none" (click)="$event.stopPropagation()">
@@ -5624,19 +6740,22 @@ export class ActiveFilterChipsComponent {
       background: var(--pi-accent);
       border-color: var(--pi-accent);
     }
-    .star {
-      font-size: 16px;
-      color: #d8a200;
-    }
+    /* stays in view at the bottom of the scrolling menu, like menu-top at the top */
     .menu-foot {
       border-top: 1px solid var(--pi-border);
       margin-top: 4px;
+      position: sticky;
+      bottom: 0;
+      background: var(--pi-surface);
+      z-index: 1;
     }
   `,
 })
 export class AudienceSwitcherComponent {
   readonly store = inject(ParticipantStore);
   private readonly snack = inject(MatSnackBar);
+  private readonly dialog = inject(MatDialog);
+  private readonly injector = inject(Injector);
 
   // emits the open tab, so Manage audiences opens on the same kind
   readonly manage = output<AudienceKind>();
@@ -5670,8 +6789,7 @@ export class AudienceSwitcherComponent {
   updateSavedFilter(): void {
     const aud = this.store.activeAudience();
     if (aud?.kind !== 'filter') return;
-    this.store.updateAudienceFilter(aud.id);
-    this.snack.open(`Updated "${aud.name}" with the current filters`, 'Dismiss', { duration: 3000 });
+    confirmUpdateFilter(this.dialog, this.injector, this.store, this.snack, aud);
   }
 }
 
@@ -6959,7 +8077,7 @@ export class BulkActionBarComponent {
       <span class="lbl">Columns</span>
     </button>
 
-    <mat-menu #menu="matMenu" class="col-menu" (closed)="query.set('')">
+    <mat-menu #menu="matMenu" class="col-menu pi-menu" (closed)="query.set('')">
       <div class="head" (click)="$event.stopPropagation()">
         <span>Visible columns</span>
         <button class="reset" (click)="store.resetColumns()">Reset</button>
@@ -7052,9 +8170,11 @@ export class BulkActionBarComponent {
       font-weight: 600;
       cursor: pointer;
     }
+    /* both lists share what the viewport leaves after the headings and search (~260px) */
     .list,
     .add-list {
-      max-height: 300px;
+      max-height: min(300px, calc((100vh - 280px) / 2));
+      min-height: 80px;
       overflow-y: auto;
       padding: 0 8px 6px;
     }
@@ -7453,6 +8573,11 @@ export class ParticipantIntelligenceComponent implements OnInit {
   }
 
   // The rail's Saved filters block opens it on Saved filters; the audience dropdown on its own tab.
+  openPipelines(): void {
+    const data: PipelinesData = { send: (action, people) => this.sendCommunication(action, people) };
+    this.dialog.open(PipelinesDialogComponent, { ...this.dlg('1100px'), maxWidth: '96vw', data });
+  }
+
   openManageAudiences(tab: AudienceKind = 'filter'): void {
     this.dialog.open(ManageAudiencesDialogComponent, { ...this.dlg('720px'), data: { tab } as ManageAudiencesData });
   }
@@ -7540,6 +8665,27 @@ export class ParticipantIntelligenceComponent implements OnInit {
     }
   }
 
+  // Communication to an explicit set of participants (the pipelines view), not the table's selection:
+  // the people picked there need not be in the table's current filter.
+  sendCommunication(action: CommAction, people: Participant[]): void {
+    if (!people.length) return;
+    switch (action) {
+      case 'email':
+        return this.composeEmail(people);
+      case 'whatsapp':
+        return this.composeWhatsapp(people);
+      case 'notify':
+        return this.notify(people);
+      case 'watiMessages':
+        return this.sendWatiMessages(people);
+      case 'broadcast':
+        return this.broadcast(people);
+      case 'watiConfig':
+        this.dialog.open(WatiConfigDialogComponent, { data: people.map((p) => p.raw), width: '70vw', height: '80vh', disableClose: true });
+        return;
+    }
+  }
+
   // the analytics dialogs expect the raw participant metadata docs
   private rawSelected(): Dict[] {
     return this.store.selectedParticipants().map((p) => p.raw);
@@ -7547,8 +8693,7 @@ export class ParticipantIntelligenceComponent implements OnInit {
 
   // Send Wati Messages: template picker, then the chunked send with progress (as analytics'
   // sendWattiWorkshop / workshopmessageChunked).
-  private sendWatiMessages(): void {
-    const people = this.store.selectedParticipants();
+  private sendWatiMessages(people = this.store.selectedParticipants()): void {
     this.dialog
       .open(SendmessagesComponent, {
         width: '1000px',
@@ -7639,8 +8784,7 @@ export class ParticipantIntelligenceComponent implements OnInit {
   }
 
   // Broadcast in Breakthroughs: template picker (analytics' BroadcastComponent), confirm, then send.
-  private broadcast(): void {
-    const people = this.store.selectedParticipants();
+  private broadcast(people = this.store.selectedParticipants()): void {
     this.dialog
       .open(BroadcastComponent, { data: {}, minWidth: '50vw', maxWidth: '70vw', disableClose: true })
       .afterClosed()
@@ -7739,13 +8883,13 @@ export class ParticipantIntelligenceComponent implements OnInit {
   // Reuses the production email composer (email-input) from the analytics screen.
   // It returns a result with {docid, status}; the parent persists to `email archive`
   // and/or triggers the sendBatchEmail cloud function (mirrors the old screen's afterClosed).
-  private composeEmail(): void {
+  private composeEmail(people = this.store.selectedParticipants()): void {
     this.dialog
-      .open(EmailInputComponent, { panelClass: 'pi-dialog', minWidth: '600px', disableClose: true, data: this.rawSelected() })
+      .open(EmailInputComponent, { panelClass: 'pi-dialog', minWidth: '600px', disableClose: true, data: people.map((p) => p.raw) })
       .afterClosed()
       .subscribe(async (result: any) => {
         if (!result) return;
-        const n = this.store.selectedCount();
+        const n = people.length;
         try {
           if (result.status === 'queued' || result.status === 'send') {
             await setDoc(doc(collection(this.firestore, 'email archive'), result.docid), result, { merge: true });
@@ -7768,19 +8912,19 @@ export class ParticipantIntelligenceComponent implements OnInit {
 
   // Reuses the production WhatsApp composer (wati-input) from the analytics screen.
   // It writes the `wati archive` doc and triggers the send itself; we just react to the close result.
-  private composeWhatsapp(): void {
+  private composeWhatsapp(people = this.store.selectedParticipants()): void {
     this.dialog
       .open(WatiInputComponent, {
         panelClass: 'pi-dialog',
         width: '70vw',
         height: '80vh',
         disableClose: true,
-        data: this.rawSelected(),
+        data: people.map((p) => p.raw),
       })
       .afterClosed()
       .subscribe((r: any) => {
         if (!r) return;
-        const n = this.store.selectedCount();
+        const n = people.length;
         if (r === 'queued') {
           this.snack.open(`WhatsApp queued for ${n} participants`, 'Dismiss', { duration: 3000 });
         } else if (r === 'failed' || r?.status === 'failed') {
@@ -7794,7 +8938,7 @@ export class ParticipantIntelligenceComponent implements OnInit {
   // Reuses the production in-app notification composer (ah-notification). It saves the template;
   // the parent (here) uploads any image and pushes via authguard.saveNotificationRecord to the
   // registered (firebaseuserref) profiles — mirrors the old analytics screen's afterClosed.
-  private notify(): void {
+  private notify(people = this.store.selectedParticipants()): void {
     this.dialog
       .open(AhNotificationComponent, {
         panelClass: 'pi-dialog',
@@ -7802,12 +8946,12 @@ export class ParticipantIntelligenceComponent implements OnInit {
         maxHeight: '90vh',
         disableClose: true,
         autoFocus: false,
-        data: this.rawSelected(),
+        data: people.map((p) => p.raw),
       })
       .afterClosed()
       .subscribe(async (result: any) => {
         if (!result) return;
-        const profileID = this.store.selectedParticipants().filter((p) => p.registered).map((p) => p.profileid);
+        const profileID = people.filter((p) => p.registered).map((p) => p.profileid);
         let notificationimage = null;
         if (result['notificationimage'] != null) {
           try {
