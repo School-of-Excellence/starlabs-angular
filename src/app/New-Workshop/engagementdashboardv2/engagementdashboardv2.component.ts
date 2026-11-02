@@ -20,7 +20,7 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 /**
  * Engagement dashboard v2 (operator 2026-11-02). First section: CONTENT engagement, month by month.
  * Population = `participant metadata` where customerstatus is 'active' or 'non active' (read once).
- * A person is engaged in the chosen month when their profileid has a `content analytics` doc whose
+ * A person is engaged in the chosen month when their profileid has a `content analytics` doc whose.
  * logdate falls inside it. Grouped by journey (activejourney, else lastcompletedjourney).
  */
 @Component({
