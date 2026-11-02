@@ -109,6 +109,7 @@
         <mat-button-toggle-group data-testid="ca-form-filledby" class="ca-form-toggle" hideSingleSelectionIndicator [value]="row.filledby" (change)="setFilledBy(row, $event.value)" aria-label="Filled by">
           <mat-button-toggle data-testid="ca-form-specialist" value="specialist">Specialist</mat-button-toggle>
           <mat-button-toggle data-testid="ca-form-participant" value="participant">Participant</mat-button-toggle>
+          <mat-button-toggle data-testid="ca-form-sponsor" value="sponsor">Sponsor</mat-button-toggle>
         </mat-button-toggle-group>
         <button data-testid="ca-form-remove" mat-icon-button type="button" class="ca-danger" aria-label="Remove form" (click)="removeForm(row.formid)">
           <mat-icon>delete_outline</mat-icon>

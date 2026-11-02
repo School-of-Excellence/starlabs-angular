@@ -364,13 +364,19 @@
               <ng-container *ngIf="mapFormView[atc.id] as formView">
               <ng-container *ngIf="formView.specialist.length">
                 <div class="forms-group" data-testid="vatc-forms-group-specialist"><mat-icon>how_to_reg</mat-icon> Forms you fill</div>
-                <ng-container *ngFor="let row of formView.specialist; trackBy: trackByFormId">
+                <ng-container *ngFor="let row of formView.specialist; trackBy: trackByRowKey">
                   <ng-container *ngTemplateOutlet="formRow; context: { $implicit: row }"></ng-container>
                 </ng-container>
               </ng-container>
               <ng-container *ngIf="formView.participant.length">
-                <div class="forms-group" data-testid="vatc-forms-group-participant"><mat-icon>smartphone</mat-icon> Forms the participant fills in the app</div>
-                <ng-container *ngFor="let row of formView.participant; trackBy: trackByFormId">
+                <div class="forms-group" data-testid="vatc-forms-group-participant"><mat-icon>smartphone</mat-icon> Forms the participant fills · {{ profileMap[atcData['profileid']]?.name }}</div>
+                <ng-container *ngFor="let row of formView.participant; trackBy: trackByRowKey">
+                  <ng-container *ngTemplateOutlet="formRow; context: { $implicit: row }"></ng-container>
+                </ng-container>
+              </ng-container>
+              <ng-container *ngIf="formView.sponsor.length">
+                <div class="forms-group" data-testid="vatc-forms-group-sponsor"><mat-icon>volunteer_activism</mat-icon> Forms the sponsor fills<span data-testid="vatc-sponsor-name" *ngIf="formView.sponsorName"> · {{ formView.sponsorName }}</span><mat-icon data-testid="vatc-sponsor-locked-icon" class="forms-group-lock" *ngIf="formView.sponsorLocked" aria-label="Sponsor locked">lock</mat-icon></div>
+                <ng-container *ngFor="let row of formView.sponsor; trackBy: trackByRowKey">
                   <ng-container *ngTemplateOutlet="formRow; context: { $implicit: row }"></ng-container>
                 </ng-container>
               </ng-container>
@@ -387,13 +393,40 @@
                     <button *ngIf="row.canView" data-testid="vatc-form-view" mat-stroked-button type="button" (click)="viewAtcForm(atc, row)">View answer</button>
                     <button *ngIf="row.canEdit" data-testid="vatc-form-edit" mat-stroked-button type="button" (click)="editAtcForm(atc, row)">Edit answer</button>
                     <button *ngIf="row.canFill" data-testid="vatc-form-fill" mat-flat-button color="primary" type="button" (click)="fillAtcForm(atc, row)">Fill form</button>
-                    <button *ngIf="row.canSend" data-testid="vatc-form-send" mat-stroked-button type="button" (click)="sendAtcForm(atc, row)">Send to participant</button>
-                    <button *ngIf="row.canResend" data-testid="vatc-form-resend" mat-stroked-button type="button" (click)="sendAtcForm(atc, row)">Ask to update</button>
+                    <button *ngIf="row.canSend" data-testid="vatc-form-send" mat-stroked-button type="button" (click)="row.filledby == 'sponsor' ? openSponsorSend(atc, row) : sendAtcForm(atc, row)">{{ row.sendLabel }}</button>
+                    <button *ngIf="row.canResend" data-testid="vatc-form-resend" mat-stroked-button type="button" (click)="row.filledby == 'sponsor' ? openSponsorSend(atc, row) : sendAtcForm(atc, row)">Ask to update</button>
                     <button *ngIf="row.canWithdraw" data-testid="vatc-form-revoke" mat-stroked-button type="button" (click)="revokeAtcForm(row)">Withdraw</button>
                   </div>
                 </div>
               </ng-template>
               </ng-container>
+              </div>
+
+              <!-- Send to sponsor (plan 2026-11-02): search while the sponsor isn't locked, the locked name after -->
+              <div class="sponsor-backdrop" *ngIf="sponsorSend?.atc.id == atc.id">
+                <div class="sponsor-dialog" data-testid="vatc-sponsor-dialog" role="dialog" aria-label="Send to sponsor">
+                  <div class="sponsor-title">Send {{ sponsorSend.row.name }}</div>
+                  <label class="sponsor-label" for="vatc-sponsor-search">Sponsor</label>
+                  <ng-container *ngIf="!sponsorSend.locked">
+                    <div class="sponsor-search">
+                      <mat-icon aria-hidden="true">search</mat-icon>
+                      <input id="vatc-sponsor-search" data-testid="vatc-sponsor-search" type="text" placeholder="Search by name" autocomplete="off"
+                        [(ngModel)]="sponsorSend.search" (ngModelChange)="filterSponsors()">
+                    </div>
+                    <div class="sponsor-options" *ngIf="sponsorSend.matches.length">
+                      <button class="sponsor-option" data-testid="vatc-sponsor-option" type="button" *ngFor="let option of sponsorSend.matches; trackBy: trackByProfileId" (click)="pickSponsor(option)">{{ option.name }}</button>
+                    </div>
+                    <div class="sponsor-help">You can change the sponsor until the first sponsor form is sent.</div>
+                  </ng-container>
+                  <ng-container *ngIf="sponsorSend.locked">
+                    <div class="sponsor-locked" data-testid="vatc-sponsor-locked"><mat-icon aria-hidden="true">lock</mat-icon><span>{{ sponsorSend.search }}</span></div>
+                    <div class="sponsor-help">Locked: a form was already sent to {{ sponsorSend.search }}.</div>
+                  </ng-container>
+                  <div class="sponsor-actions">
+                    <button data-testid="vatc-sponsor-cancel" mat-stroked-button type="button" (click)="sponsorSend = null">Cancel</button>
+                    <button data-testid="vatc-sponsor-send" mat-flat-button color="primary" type="button" [disabled]="!sponsorSend.sponsorid" (click)="confirmSponsorSend()">Send to sponsor</button>
+                  </div>
+                </div>
               </div>
             </div>
 

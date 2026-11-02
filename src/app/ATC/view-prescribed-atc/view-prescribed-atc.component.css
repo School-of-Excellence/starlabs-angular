@@ -948,6 +948,21 @@ mat-list-item:hover {
 .forms-part-row, .forms-part .forms-group, .forms-part .form-row, .forms-locked { margin-left: 42px; }
 .forms-locked { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 12px; border-radius: 8px; background: var(--so-soft2); color: var(--so-muted); }
 .forms-locked mat-icon { width: 18px; height: 18px; font-size: 18px; }
+.forms-group-lock { color: var(--so-muted); }
+/* Send to sponsor dialog (plan 2026-11-02) */
+.sponsor-backdrop { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(15, 23, 42, 0.45); }
+.sponsor-dialog { width: 100%; max-width: 420px; padding: 20px; border-radius: 12px; background: #fff; color: var(--so-ink); }
+.sponsor-title { margin-bottom: 12px; font-weight: 500; }
+.sponsor-label { display: block; margin-bottom: 4px; color: var(--so-muted); }
+.sponsor-search { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--so-border2); border-radius: 8px; }
+.sponsor-search mat-icon, .sponsor-locked mat-icon { width: 18px; height: 18px; font-size: 18px; color: var(--so-muted); }
+.sponsor-search input { flex: 1; min-width: 0; border: none; outline: none; background: transparent; font: inherit; color: inherit; }
+.sponsor-options { display: flex; flex-direction: column; margin-top: 4px; border: 1px solid var(--so-border); border-radius: 8px; max-height: 240px; overflow-y: auto; }
+.sponsor-option { padding: 8px 10px; border: none; background: transparent; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.sponsor-option:hover { background: var(--so-soft2); }
+.sponsor-locked { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; background: var(--so-soft2); }
+.sponsor-help { margin: 8px 0 16px; color: var(--so-muted); }
+.sponsor-actions { display: flex; justify-content: flex-end; gap: 8px; }
 @media (max-width: 600px) {
   .form-row { grid-template-columns: minmax(0, 1fr); }
   .form-actions { justify-content: flex-start; }

@@ -142,12 +142,14 @@ export class ViewPrescribedATCComponent {
   // ATC forms (plan 2026-10-28) — worked out once here, the template only reads these maps
   mapFormsCount = {}   // atc id → { done, total } for validated ATCs whose model has forms
   mapFormRows = {}     // atc id → form rows of an opened, validated ATC
-  mapFormView = {}     // atc id → { specialist rows, participant rows, summary line } for the Forms card
+  mapFormView = {}     // atc id → { specialist / participant / sponsor rows, summary, sponsor } for the Forms card
   mapForm = {}         // delivery form id → { name, deleted } (only the forms of opened ATCs), null when the doc is gone
   mapFormRequests = {} // atc id → atc_form_requests docs of that ATC and its earlier versions (live while opened)
-  // Delivery / queue forms (plan 2026-11-01) — loaded once when the ATC is opened
+  // One forms query (plan 2026-11-02) — live while the ATC is opened
+  mapAtcAnswers = {}    // atc id → answer rows whose atcid is the ATC or one of its versions (ATC forms)
   mapActivityForms = {} // atc id → { delivery: answer rows of the ATC's purchase, queue: answer rows of the ATC's queue }
   mapFormsLocked = {}   // atc id → true when the ATC's model has forms but the ATC isn't validated yet
+  sponsorSend: any = null // { atc, row, locked, sponsorid, search, matches } while the Send-to-sponsor dialog is open
   startDate!: Date;
   endDate!: Date;
   updateProductPath = null
@@ -1031,7 +1033,7 @@ export class ViewPrescribedATCComponent {
 
     this.fetchATCnotes(atcData) // Load ATC Notes
     this.openAtcForms(atc) // Forms section (validated ATCs whose model has forms)
-    this.openActivityForms(atc) // Forms section: forms filled in the ATC's delivery sequence / queue
+    this.openActivityForms(atc) // Forms section: one forms query — ATC form answers, delivery sequence, queue
 
     console.log(this.mapATCtranscription[atc.id])
 
@@ -1095,33 +1097,59 @@ export class ViewPrescribedATCComponent {
     return (model?.['forms'] || []).filter(f => f?.['formid'])
   }
 
-  //// Delivery and queue forms (plan 2026-11-01), loaded once when the ATC is opened (formsByClient, forms DB):
-  //   participantproductid → the answers of that purchase (Delivery activities)
-  //   queueid              → the answers filled in that queue (Queue activities)
-  // Every answer is listed, newest first.
+  // this ATC's id and its earlier versions' ids (an edit gives the ATC a new id), once the versions are known
+  atcVersionIds(atc: QueryDocumentSnapshot<any>): Promise<string[]> {
+    var atcData = atc.data()
+    var versionsLoaded = atcData['editedfrom'] ? this.getATCVersion(atc.ref.path, atcData['editedfrom']) : Promise.resolve()
+    return versionsLoaded.then(() => [atc.id, ...(this.mapAtcVersionDoc[atc.ref.path] || []).map(v => v['atcPath'].split('/').pop())])
+  }
+
+  // the live list may have a newer copy of this ATC (e.g. a sponsor saved since it was opened)
+  currentAtc(atc: QueryDocumentSnapshot<any>): QueryDocumentSnapshot<any> {
+    return this.sourceReportATC.find(a => a.id == atc.id) || atc
+  }
+
+  //// One forms query (plan 2026-11-02), live while the ATC is opened, on formsByClient (forms DB):
+  //   atcid in [ATC + versions] OR participantproductid == ATC's OR (queueref == ATC's queue AND profileid == participant)
+  // A clause is used only when the ATC has that id. A queue holds many participants, so its clause also matches the
+  // ATC's participant (operator 2026-11-02); a purchase id belongs to one participant and needs no such match. Each answer goes to the part whose id it matches: ATC forms (atcid),
+  // Delivery activities (participantproductid), Queue activities (queueref). No de-duplication: an answer matching two
+  // ids shows in both parts. Who filled it comes from its profileid.
   openActivityForms(atc: QueryDocumentSnapshot<any>) {
     var atcData = atc.data()
     this.mapActivityForms[atc.id] = { delivery: [], queue: [] }
+    this.mapAtcAnswers[atc.id] = undefined // ATC form rows wait for the answers
     this.mapFormsLocked[atc.id] = !this.isValidated(atc) && this.modelForms(atc).length > 0
-    var answers = collection(this.firestoreForms, 'formsByClient')
+    var queueRef = atcData['queueid'] ? doc(this.firestoreForms, 'queue generation', atcData['queueid']) : null
     var toRows = (docs: QueryDocumentSnapshot<any>[]) => docs.map(d => {
       var answer = d.data()
       var date = answer['date']?.toDate ? answer['date'].toDate() : null
       var filledin = answer['submittedin'] == 'breakthroughs' ? 'in the app' : answer['submittedin'] == 'starlabs' ? 'on web' : null
       // note line: submitted date · queue stage · where it was filled
       var note = [date ? this.datepipe.transform(date, 'd MMM y') : null, answer['stagename'], filledin].filter(part => part).join(' · ')
-      return { answerid: d.id, formid: answer['formid'], name: answer['formname'] ?? '', date, note }
+      return { answerid: d.id, formid: answer['formid'], name: answer['formname'] ?? '', profileid: answer['profileid'], date, note,
+        atcid: answer['atcid'], participantproductid: answer['participantproductid'], queueref: answer['queueref'] }
     }).sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0))
-    if (atcData['participantproductid']) {
-      getDocs(query(answers, where('profileid', '==', atcData['profileid']), where('participantproductid', '==', atcData['participantproductid'])))
-        .then(snap => this.mapActivityForms[atc.id] = { ...this.mapActivityForms[atc.id], delivery: toRows(snap.docs) })
-        .catch(err => console.error('Error loading delivery forms:', err))
-    }
-    if (atcData['queueid']) {
-      getDocs(query(answers, where('profileid', '==', atcData['profileid']), where('queueref', '==', doc(this.firestoreForms, 'queue generation', atcData['queueid']))))
-        .then(snap => this.mapActivityForms[atc.id] = { ...this.mapActivityForms[atc.id], queue: toRows(snap.docs) })
-        .catch(err => console.error('Error loading queue forms:', err))
-    }
+    var answerSubscription = from(this.atcVersionIds(atc)).pipe(
+      switchMap(atcIds => {
+        var clauses: QueryFilterConstraint[] = [where('atcid', 'in', atcIds)]
+        if (atcData['participantproductid']) clauses.push(where('participantproductid', '==', atcData['participantproductid']))
+        if (queueRef) clauses.push(and(where('queueref', '==', queueRef), where('profileid', '==', atcData['profileid'])))
+        return collectionSnapshots(query(collection(this.firestoreForms, 'formsByClient'), or(...clauses))).pipe(map(docs => ({ atcIds, rows: toRows(docs) })))
+      }),
+      takeUntil(this.metaSubscription),
+    ).subscribe({
+      next: ({ atcIds, rows }) => {
+        this.mapActivityForms[atc.id] = {
+          delivery: atcData['participantproductid'] ? rows.filter(r => r.participantproductid == atcData['participantproductid']) : [],
+          queue: queueRef ? rows.filter(r => r.queueref?.path == queueRef.path && r.profileid == atcData['profileid']) : [],
+        }
+        this.mapAtcAnswers[atc.id] = rows.filter(r => atcIds.includes(r.atcid))
+        this.buildFormRows(this.currentAtc(atc))
+      },
+      error: err => console.error('Error loading ATC answers:', err)
+    })
+    this.mapTranscriptionSubscription.set(atc.id, [...this.mapTranscriptionSubscription.get(atc.id), answerSubscription])
   }
 
   // the Forms card shows when any of its three parts has something to show
@@ -1147,35 +1175,28 @@ export class ViewPrescribedATCComponent {
   openAtcForms(atc: QueryDocumentSnapshot<any>) {
     var forms = this.validatedModelForms(atc)
     if (forms.length == 0) return
-    // the live list may have a newer copy of this ATC (e.g. a form recorded since it was opened)
-    var latest = () => this.sourceReportATC.find(a => a.id == atc.id) || atc
     var missing = forms.map(f => f['formid']).filter(id => this.mapForm[id] === undefined)
     var chunks = []
     for (let i = 0; i < missing.length; i += 30) chunks.push(missing.slice(i, i + 30))
     Promise.all(chunks.map(ids => getDocs(query(collection(this.firestoreDefault, 'delivery forms'), where(documentId(), 'in', ids))))).then(results => {
       missing.forEach(id => this.mapForm[id] = null) // no doc → the row is hidden
       results.forEach(snap => snap.docs.forEach(d => this.mapForm[d.id] = { name: d.data()['formname'] ?? '', deleted: d.data()['delete'] === true }))
-      this.buildFormRows(latest())
+      this.buildFormRows(this.currentAtc(atc))
     }).catch(err => console.error('Error loading ATC forms:', err))
 
-    // requests of this ATC and its earlier versions (an edit gives the ATC a new id), once the versions are known
-    var atcData = atc.data()
-    var versionsLoaded = atcData['editedfrom'] ? this.getATCVersion(atc.ref.path, atcData['editedfrom']) : Promise.resolve()
-    var requestSubscription = from(versionsLoaded).pipe(
-      switchMap(() => {
-        var atcIds = [atc.id, ...(this.mapAtcVersionDoc[atc.ref.path] || []).map(v => v['atcPath'].split('/').pop())]
-        return collectionSnapshots(query(collection(this.firestoreATC, 'atc_form_requests'), where('profileid', '==', atcData['profileid']), where('atcid', 'in', atcIds)))
-      }),
+    // requests of this ATC and its earlier versions — by atcid only, so participant and sponsor requests both load
+    var requestSubscription = from(this.atcVersionIds(atc)).pipe(
+      switchMap(atcIds => collectionSnapshots(query(collection(this.firestoreATC, 'atc_form_requests'), where('atcid', 'in', atcIds)))),
       takeUntil(this.metaSubscription),
     ).subscribe({
       next: requestDocs => {
         this.mapFormRequests[atc.id] = requestDocs.map(d => ({ ...d.data(), path: d.ref.path }))
-        this.buildFormRows(latest())
+        this.buildFormRows(this.currentAtc(atc))
       },
       error: err => {
         console.error('Error loading ATC form requests:', err)
         this.mapFormRequests[atc.id] = [] // still show the forms, without request statuses
-        this.buildFormRows(latest())
+        this.buildFormRows(this.currentAtc(atc))
       }
     })
     this.mapTranscriptionSubscription.set(atc.id, [...this.mapTranscriptionSubscription.get(atc.id), requestSubscription])
@@ -1183,11 +1204,13 @@ export class ViewPrescribedATCComponent {
 
   // Rows of an opened, validated ATC in form-name order, worked out once so the template only reads plain fields:
   // status pill (status / tone / icon), the explanation line (note) and which buttons show (can*).
-  //   specialist:  To fill (Fill form) · Submitted (View answer, Edit answer)
-  //   participant: Not sent (Send to participant) · Waiting for participant (Withdraw) ·
-  //                Waiting for update (View answer, Withdraw) · Submitted (View answer, Ask to update)
+  //   specialist:          To fill (Fill form) · Submitted (View answer, Edit answer)
+  //   participant/sponsor: Not sent (Send) · Waiting for … (Withdraw) · Waiting for update (View answer, Withdraw) ·
+  //                        Submitted (View answer, Ask to update)
   //   soft-deleted delivery form, not answered and not waiting → Not required, no buttons
   //   (waiting = the request's formstatus is 'sent'; the request is kept after the app submits it)
+  // A row's answer is an answer of the forms query with this ATC's (or a version's) atcid and the row's formid; two
+  // such answers give two rows (no de-duplication). Groups follow the model config's filledby.
   // No extra access check: the list query already limits a non-super user to the ATCs they authored, so whoever sees
   // the ATC may act on its forms (same as the EI Review log)
   buildFormRows(atc: QueryDocumentSnapshot<any>) {
@@ -1195,89 +1218,140 @@ export class ViewPrescribedATCComponent {
     if (modelForms.some(f => this.mapForm[f['formid']] === undefined)) return // forms still loading
     // requests still loading: Send must not show before an existing request is known (one request per ATC + form)
     if (this.mapFormRequests[atc.id] === undefined) return
+    if (this.mapAtcAnswers[atc.id] === undefined) return // answers still loading
     var forms = modelForms.filter(f => this.mapForm[f['formid']]) // a delivery form doc that's gone isn't listed
     if (forms.length == 0) return // no forms → no Forms card
-    var submitted = atc.data()['formsubmitted'] || {}
+    var atcData = atc.data()
     var requests = this.mapFormRequests[atc.id] || []
-    var rows = forms.map(f => {
-      var formid = f['formid']
-      var specialist = f['filledby'] == 'specialist'
-      var answerid = submitted[formid] || null
-      var request = requests.find(r => r['formid'] == formid) || null
-      var pending = !!request && request['formstatus'] == 'sent'
-      var form = this.mapForm[formid]
-      var deleted = form.deleted && !answerid && !pending
-      var sentOn = request?.['sentat']?.toDate ? this.datepipe.transform(request['sentat'].toDate(), 'd MMM y') : null
-      var row: any = { formid, name: form.name, filledby: f['filledby'], answerid, request, pending, deleted,
-        canView: false, canEdit: false, canFill: false, canSend: false, canResend: false, canWithdraw: false }
-      if (deleted) Object.assign(row, { status: 'Not required', tone: 'off', icon: 'block', note: 'This form was deleted' })
-      else if (specialist && !answerid) Object.assign(row, { status: 'To fill', tone: 'todo', icon: 'edit', note: "You haven't filled this yet", canFill: true })
-      else if (specialist) Object.assign(row, { status: 'Submitted', tone: 'done', icon: 'check_circle', note: 'Filled by you', canView: true, canEdit: !form.deleted })
-      else if (pending && request['answerid']) Object.assign(row, { status: 'Waiting for update', tone: 'wait', icon: 'autorenew',
-        note: sentOn ? 'Sent back ' + sentOn + ' to update their answer' : 'Sent back to update their answer', canView: !!answerid, canWithdraw: true })
-      else if (pending) Object.assign(row, { status: 'Waiting for participant', tone: 'wait', icon: 'schedule', note: sentOn ? 'Sent ' + sentOn : 'Sent', canWithdraw: true })
-      else if (answerid) Object.assign(row, { status: 'Submitted', tone: 'done', icon: 'check_circle', note: 'Filled by the participant', canView: true, canResend: true })
-      else Object.assign(row, { status: 'Not sent', tone: 'todo', icon: 'send', note: "The participant can't see it yet", canSend: true })
-      return row
+    var answers = this.mapAtcAnswers[atc.id]
+    var rows = forms.flatMap(f => {
+      var formAnswers = answers.filter(a => a.formid == f['formid'])
+      return (formAnswers.length ? formAnswers : [null]).map(answer => {
+        var formid = f['formid']
+        var filledby = f['filledby']
+        var specialist = filledby == 'specialist'
+        var who = filledby == 'sponsor' ? 'sponsor' : 'participant'
+        var answerid = answer?.answerid ?? null
+        var request = requests.find(r => r['formid'] == formid) || null
+        var pending = !!request && request['formstatus'] == 'sent'
+        var form = this.mapForm[formid]
+        var deleted = form.deleted && !answerid && !pending
+        var sentOn = request?.['sentat']?.toDate ? this.datepipe.transform(request['sentat'].toDate(), 'd MMM y') : null
+        var row: any = { key: formid + '_' + (answerid ?? ''), formid, name: form.name, filledby, answerid, profileid: answer?.profileid ?? null,
+          request, pending, deleted, sendLabel: 'Send to ' + who,
+          canView: false, canEdit: false, canFill: false, canSend: false, canResend: false, canWithdraw: false }
+        if (deleted) Object.assign(row, { status: 'Not required', tone: 'off', icon: 'block', note: 'This form was deleted' })
+        else if (specialist && !answerid) Object.assign(row, { status: 'To fill', tone: 'todo', icon: 'edit', note: "You haven't filled this yet", canFill: true })
+        else if (specialist) Object.assign(row, { status: 'Submitted', tone: 'done', icon: 'check_circle', note: 'Filled by ' + ((this.profileMap[answer.profileid] || {})['name'] ?? answer.profileid), canView: true, canEdit: !form.deleted })
+        else if (pending && request['answerid']) Object.assign(row, { status: 'Waiting for update', tone: 'wait', icon: 'autorenew',
+          note: sentOn ? 'Sent back ' + sentOn + ' to update their answer' : 'Sent back to update their answer', canView: !!answerid, canWithdraw: true })
+        else if (pending) Object.assign(row, { status: 'Waiting for ' + who, tone: 'wait', icon: 'schedule', note: sentOn ? 'Sent ' + sentOn : 'Sent', canWithdraw: true })
+        else if (answerid) Object.assign(row, { status: 'Submitted', tone: 'done', icon: 'check_circle', note: 'Filled by the ' + who, canView: true, canResend: true })
+        else Object.assign(row, { status: 'Not sent', tone: 'todo', icon: 'send', note: 'The ' + who + " can't see it yet", canSend: true })
+        return row
+      })
     }).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
     var done = rows.filter(r => r.answerid).length
-    var waiting = rows.filter(r => r.pending).length
+    var waitingParticipant = rows.filter(r => r.pending && r.filledby == 'participant').length
+    var waitingSponsor = rows.filter(r => r.pending && r.filledby == 'sponsor').length
     var toFill = rows.filter(r => r.canFill).length
+    // the sponsor is chosen once: locked while a sponsor request exists or the sponsor has answered (plan 2026-11-02)
+    var sponsorid = atcData['sponsorid'] ?? null
     this.mapFormRows[atc.id] = rows
     this.mapFormView[atc.id] = {
       specialist: rows.filter(r => r.filledby == 'specialist'),
-      participant: rows.filter(r => r.filledby != 'specialist'),
-      summary: [done + ' of ' + rows.length + ' submitted', waiting ? waiting + ' waiting for participant' : null, toFill ? toFill + ' for you to fill' : null]
+      participant: rows.filter(r => r.filledby == 'participant'),
+      sponsor: rows.filter(r => r.filledby == 'sponsor'),
+      sponsorid,
+      sponsorName: sponsorid ? ((this.profileMap[sponsorid] || {})['name'] ?? sponsorid) : null,
+      sponsorLocked: requests.some(r => r['filledby'] == 'sponsor') || answers.some(a => a.profileid === sponsorid),
+      summary: [done + ' of ' + rows.length + ' submitted', waitingParticipant ? waitingParticipant + ' waiting for participant' : null,
+        waitingSponsor ? waitingSponsor + ' waiting for sponsor' : null, toFill ? toFill + ' for you to fill' : null]
         .filter(part => part).join(' · ')
     }
   }
 
-  // the live list changed (e.g. a form was just recorded on the ATC): refresh the rows of the opened ATCs
+  // the live list changed (e.g. a sponsor was just saved on the ATC): refresh the rows of the opened ATCs
   rebuildOpenedFormRows() {
     this.sourceReportATC.forEach(atc => {
       if (this.mapATCtranscription[atc.id]?.['view']) this.buildFormRows(atc)
     })
   }
 
-  // specialist form: open it in a new tab; the form screen records the answer on the ATC and closes itself
+  // specialist form: open it in a new tab; the form screen saves the answer under the logged-in specialist's profile id
+  // (no profileid in the link, plan 2026-11-02), records it on the ATC and closes itself
   fillAtcForm(atc: QueryDocumentSnapshot<any>, row: any) {
-    var url = this.router.serializeUrl(this.router.createUrlTree(['/formtemplate'], { queryParams: { id: row.formid, type: 'form', profileid: atc.data()['profileid'], atcid: atc.id } }))
+    var url = this.router.serializeUrl(this.router.createUrlTree(['/formtemplate'], { queryParams: { id: row.formid, type: 'form', atcid: atc.id } }))
     window.open(url, '_blank')
   }
 
   // submitted specialist form: open the saved answer prefilled and editable in a new tab; the form screen updates
   // that same answer (B!G edit logic) and closes itself
   editAtcForm(atc: QueryDocumentSnapshot<any>, row: any) {
-    var url = this.router.serializeUrl(this.router.createUrlTree(['/formtemplate'], { queryParams: { id: row.formid, type: 'form', patchdata: 'formsByClient/' + row.answerid, profileid: atc.data()['profileid'], atcid: atc.id } }))
+    var url = this.router.serializeUrl(this.router.createUrlTree(['/formtemplate'], { queryParams: { id: row.formid, type: 'form', patchdata: 'formsByClient/' + row.answerid, atcid: atc.id } }))
     window.open(url, '_blank')
   }
 
-  // participant form: Send (no answer yet) or Resend (answerid = the answer to edit). ONE request per ATC + form for
-  // the ATC's whole life (operator 2026-10-29): when the row already has a request — made on this or an earlier
-  // version — the same doc is rewritten and keeps its atcid (the participant app builds the doc id from it and follows
-  // the ATC to its latest version); otherwise a new doc {atcid}_{formid}. formstatus 'sent' is what the app queries;
-  // this setDoc replaces the doc, so a Resend clears the 'submitted' left by the previous round.
-  sendAtcForm(atc: QueryDocumentSnapshot<any>, row: any) {
+  // ONE request per ATC + form for the ATC's whole life (operator 2026-10-29): when the row already has a request —
+  // made on this or an earlier version — the same doc is rewritten and keeps its atcid (the app builds the doc id from
+  // it and follows the ATC to its latest version); otherwise a new doc {atcid}_{formid}. formstatus 'sent' is what the
+  // app queries; the write replaces the doc, so a Resend clears the 'submitted' left by the previous round.
+  formRequest(atc: QueryDocumentSnapshot<any>, row: any, profileid: string, filledby: string) {
     var atcData = atc.data()
-    var atcid = row.request ? row.request['atcid'] : atc.id
-    var request: any = { atcid, formid: row.formid, profileid: atcData['profileid'], product: atcData['product'] ?? null, sentby: this.profileID, sentat: serverTimestamp(), formstatus: 'sent' }
+    var request: any = { atcid: row.request ? row.request['atcid'] : atc.id, formid: row.formid, profileid, filledby,
+      product: atcData['product'] ?? null, sentby: this.profileID, sentat: serverTimestamp(), formstatus: 'sent' }
+    if (filledby == 'sponsor') request.participantid = atcData['profileid']
     if (row.answerid) request.answerid = row.answerid
-    setDoc(row.request ? doc(this.firestoreATC, row.request.path) : doc(this.firestoreATC, 'atc_form_requests', atc.id + '_' + row.formid), request)
-      .catch(err => { console.error('Error sending ATC form:', err); alert("Couldn't send the form. Try again.") })
+    var ref = row.request ? doc(this.firestoreATC, row.request.path) : doc(this.firestoreATC, 'atc_form_requests', atc.id + '_' + row.formid)
+    return { ref, request }
   }
 
-  // Withdraw: delete the request (the participant's card goes away and the app can no longer submit it)
+  // participant form: Send (no answer yet) or Resend (answerid = the answer to edit)
+  sendAtcForm(atc: QueryDocumentSnapshot<any>, row: any) {
+    var { ref, request } = this.formRequest(atc, row, atc.data()['profileid'], 'participant')
+    setDoc(ref, request).catch(err => { console.error('Error sending ATC form:', err); alert("Couldn't send the form. Try again.") })
+  }
+
+  // sponsor form: Send / Resend open the sponsor dialog (plan 2026-11-02). The sponsor is searched in the loaded
+  // profile list while it isn't locked; the ATC's sponsor, when set, is filled in
+  openSponsorSend(atc: QueryDocumentSnapshot<any>, row: any) {
+    var view = this.mapFormView[atc.id]
+    this.sponsorSend = { atc, row, locked: view.sponsorLocked, sponsorid: view.sponsorid, search: view.sponsorName ?? '', matches: [] }
+  }
+
+  filterSponsors() {
+    var search = this.sponsorSend.search.trim().toLowerCase()
+    this.sponsorSend.sponsorid = null
+    this.sponsorSend.matches = search ? this.participantList.filter(option => option.name.toLowerCase().includes(search)).slice(0, 8) : []
+  }
+
+  pickSponsor(option: any) {
+    Object.assign(this.sponsorSend, { sponsorid: option.profileid, search: option.name, matches: [] })
+  }
+
+  // one batch on firestore-atc: the sponsor's request + the ATC's sponsorid (one sponsor per ATC)
+  confirmSponsorSend() {
+    var { atc, row, sponsorid } = this.sponsorSend
+    if (!sponsorid) return
+    var { ref, request } = this.formRequest(atc, row, sponsorid, 'sponsor')
+    var batch = writeBatch(this.firestoreATC)
+    batch.set(ref, request)
+    batch.update(doc(this.firestoreATC, atc.ref.path), { sponsorid })
+    this.sponsorSend = null
+    batch.commit().catch(err => { console.error('Error sending ATC form to sponsor:', err); alert("Couldn't send the form. Try again.") })
+  }
+
+  // Withdraw: delete the request (the card goes away in the app and it can no longer be submitted)
   revokeAtcForm(row: any) {
-    if (!confirm("Withdraw this form? The participant won't be able to submit it.")) return
+    if (!confirm("Withdraw this form? The " + (row.filledby == 'sponsor' ? 'sponsor' : 'participant') + " won't be able to submit it.")) return
     deleteDoc(doc(this.firestoreATC, row.request.path))
       .catch(err => { console.error('Error revoking ATC form:', err); alert("Couldn't revoke the form. Try again.") })
   }
 
-  // submitted form: the participant forms screen's read-only form overlay, as it is
+  // submitted form: the participant forms screen's read-only form overlay, as it is, named after whoever filled it
   viewAtcForm(atc: QueryDocumentSnapshot<any>, row: any) {
-    var profileid = atc.data()['profileid']
-    this.formOverlay.mapProfile = { [profileid]: (this.profileMap[profileid] || {})['name'] }
-    this.formOverlay.viewFormOverlay({ formname: row.name, formid: row.formid, docid: row.answerid, profileid })
+    this.formOverlay.mapProfile = { [row.profileid]: (this.profileMap[row.profileid] || {})['name'] }
+    this.formOverlay.viewFormOverlay({ formname: row.name, formid: row.formid, docid: row.answerid, profileid: row.profileid })
   }
 
   onEditATC(atc: QueryDocumentSnapshot<any>): void {
@@ -1547,6 +1621,14 @@ export class ViewPrescribedATCComponent {
 
   trackByFormId(index: number, row: any): any {
     return row.formid;
+  }
+
+  trackByRowKey(index: number, row: any): any {
+    return row.key;
+  }
+
+  trackByProfileId(index: number, option: any): any {
+    return option.profileid;
   }
 
   trackByAnswerId(index: number, row: any): any {

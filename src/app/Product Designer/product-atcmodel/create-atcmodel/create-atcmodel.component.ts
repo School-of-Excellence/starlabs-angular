@@ -17,7 +17,8 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
 
 // Forms config (operator, 2026-10-28): forms: [{ formid, filledby }] on the model; formid = `delivery forms`
 // doc id; filledby has no default (the admin must pick one); the list is kept in form-name order.
-export type FilledBy = 'specialist' | 'participant'
+// 'sponsor' added 2026-11-02 (plan 2026-11-02-atc-sponsor-forms).
+export type FilledBy = 'specialist' | 'participant' | 'sponsor'
 // name: undefined while the forms load, null when the form isn't an active delivery form
 export interface ModelForm { formid: string; name?: string | null; filledby: FilledBy | null }
 

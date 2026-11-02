@@ -527,20 +527,23 @@ export class FormtemplateComponent {
 
   // Follows upgradedto from the ATC the tab was opened for to its newest version (an edit may have upgraded it
   // since the tab opened). An upgraded version also carries isdelete:true, so "upgraded" is checked before "deleted".
-  private async findCurrentAtc(read: (ref: DocumentReference) => Promise<DocumentSnapshot>): Promise<DocumentReference | 'deleted' | 'broken'> {
+  // No version cap (plan 2026-11-02): a version seen twice or an upgradedto that points nowhere is a corrupted chain.
+  private async findCurrentAtc(read: (ref: DocumentReference) => Promise<DocumentSnapshot>): Promise<DocumentReference | 'deleted' | 'corrupted'> {
     let ref = doc(this.firestoreATC, 'atc_alpha', this.atcid);
-    for (let hop = 0; hop < 20; hop++) {
+    const seen = new Set<string>();
+    while (true) {
+      seen.add(ref.id);
       const snap = await read(ref);
-      if (!snap.exists()) return 'deleted';
+      if (!snap.exists()) return seen.size == 1 ? 'deleted' : 'corrupted';
       const data = snap.data();
       if (data['upgradedto'] != null || data['status'] == 'upgraded') {
-        if (!data['upgradedto']?.id) return 'broken';
-        ref = doc(this.firestoreATC, 'atc_alpha', data['upgradedto'].id);
+        const next = data['upgradedto']?.id;
+        if (!next || seen.has(next)) return 'corrupted';
+        ref = doc(this.firestoreATC, 'atc_alpha', next);
         continue;
       }
       return data['isdelete'] === true ? 'deleted' : ref;
     }
-    return 'broken';
   }
 
   // Checks the ATC still exists before the answer is saved
@@ -553,7 +556,7 @@ export class FormtemplateComponent {
       }
       alert(atc === 'deleted'
         ? "This ATC was removed, so the form wasn't saved."
-        : "This ATC couldn't be found, so the form wasn't saved. Try again from View ATC.");
+        : "This ATC is corrupted — unable to find the stable version.");
     } catch (error) {
       console.error('Error resolving ATC:', error);
       alert("Couldn't check the ATC. Your answers are kept; try submitting again.");
