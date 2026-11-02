@@ -23,7 +23,19 @@ import {
   voiceFrames,
   VOICE_FRAME_MS,
 } from './captions';
-import { BASIS_LABEL, FaceSample, PeopleTracker, Person, Profile, SpeakerPick, TrackedFace, pickSpeaker } from './speakers';
+import {
+  BASIS_LABEL,
+  FaceSample,
+  MainSpeakerTally,
+  PeopleTracker,
+  Person,
+  Profile,
+  SpeakerPick,
+  TrackedFace,
+  isQuietLine,
+  peakLevel,
+  pickSpeaker,
+} from './speakers';
 import type { FaceAnalyser } from './face-analyser';
 import { loadProfilesCached } from './profiles';
 import { PlaybackDenoise } from './playback-denoise';
@@ -54,6 +66,12 @@ const FACE_BURST_MS = 3000;
 const FACE_LEAD_MS = 20000;
 /** …and at most this far past the transcribed speech. */
 const FACE_OVER_SPEECH_MS = 4000;
+/**
+ * Multi-camera: frames sampled through the whole video on load, so who it
+ * follows is known from the first line (audience shots can fill the opening
+ * minute).
+ */
+const MAIN_SCAN_FRAMES = 20;
 /** A caption's speaker may be decided from the first part of the line… */
 const DECIDE_AFTER_MS = 1500;
 /** …and if faces haven't reached even that by this far in, it's "Unknown". */
@@ -222,6 +240,10 @@ export class LiveVideoSubtitlesComponent implements OnDestroy {
   // ── Face state (names on) ─────────────────────────────────────────────
   private analyser: FaceAnalyser | null = null;
   private tracker: PeopleTracker | null = null;
+  /** Split-screen multi-camera video only. */
+  private mainTally: MainSpeakerTally | null = null;
+  /** Voice level per line (multi-camera). */
+  private lineLevels = new Map<SpeechSegment, number>();
   private faceGen = 0;
   /** Analysed frames: time → faces, plus the times kept sorted. */
   private faces = new Map<number, TrackedFace[]>();
@@ -559,14 +581,38 @@ export class LiveVideoSubtitlesComponent implements OnDestroy {
       if (gen !== this.faceGen) return;
       this.faceDevice.set(device);
       this.tracker = new PeopleTracker(profiles, FACE_STEP_MS);
-      this.facesStatus.set('');
-      this.zone.runOutsideAngular(() => this.faceLoop(gen));
+      this.zone.runOutsideAngular(async () => {
+        if (this.analyser?.panes) await this.scanForMainSpeaker(gen);
+        if (gen !== this.faceGen) return;
+        this.zone.run(() => this.facesStatus.set(''));
+        await this.faceLoop(gen);
+      });
     } catch (e: any) {
       if (gen !== this.faceGen) return;
       this.facesStatus.set('');
       this.error.set(`Names unavailable: ${e?.message ?? e}`);
       this.stopFaces();
     }
+  }
+
+  /** Sample the whole video once to see who it follows. */
+  private async scanForMainSpeaker(gen: number): Promise<void> {
+    this.mainTally = new MainSpeakerTally();
+    this.zone.run(() => this.facesStatus.set('Finding the main speaker across the cameras…'));
+    const total = this.durationMs();
+    for (let i = 0; i < MAIN_SCAN_FRAMES; i++) {
+      const t = (total * (i + 0.5)) / MAIN_SCAN_FRAMES;
+      try {
+        const { faces, embed } = await this.analyser!.analyse(t);
+        if (gen !== this.faceGen || !this.tracker) return;
+        const tracked = await this.tracker.track(t, faces, embed);
+        if (gen !== this.faceGen || !this.tracker) return;
+        this.mainTally.seed(tracked.map((f) => f.personId), total / MAIN_SCAN_FRAMES);
+      } catch {
+        if (gen !== this.faceGen) return; // a frame can be skipped
+      }
+    }
+    this.tracker?.breakTrack();
   }
 
   private async ensureProfiles(): Promise<Profile[]> {
@@ -589,6 +635,8 @@ export class LiveVideoSubtitlesComponent implements OnDestroy {
     this.analyser?.dispose();
     this.analyser = null;
     this.tracker = null;
+    this.mainTally = null;
+    this.lineLevels.clear();
     this.faces.clear();
     this.faceTimes = [];
     this.faceDone = [];
@@ -626,6 +674,7 @@ export class LiveVideoSubtitlesComponent implements OnDestroy {
           const tracked = await this.tracker.track(t, faces, embed);
           if (gen !== this.faceGen) return;
           this.addFaces(t, tracked);
+          this.mainTally?.see(tracked.map((f) => f.personId), FACE_STEP_MS);
         }
       } catch (e: any) {
         if (gen !== this.faceGen) return;
@@ -733,15 +782,37 @@ export class LiveVideoSubtitlesComponent implements OnDestroy {
     if (i > 0 && c.startMs - list[i - 1].endMs < 3000) {
       previous = this.speakerCache.get(list[i - 1])?.personId ?? null;
     }
+    const multi = this.mainTally !== null;
     const samples: FaceSample[] = [];
     for (let k = this.firstFaceIndex(c.startMs - 500); k < this.faceTimes.length; k++) {
       const t = this.faceTimes[k];
       if (t > c.endMs + 500) break;
       for (const f of this.faces.get(t)!) {
-        samples.push({ timeMs: t, personId: f.personId, area: f.box[2] * f.box[3], mouth: f.mouth });
+        samples.push({
+          timeMs: t,
+          personId: multi ? this.tracker!.canonical(f.personId) : f.personId,
+          area: f.box[2] * f.box[3],
+          mouth: f.mouth,
+          pane: f.pane,
+        });
       }
     }
-    return pickSpeaker(c, samples, previous);
+    if (!multi) return pickSpeaker(c, samples, previous);
+    return pickSpeaker(c, samples, previous, this.mainTally!.main((id) => this.tracker!.canonical(id)), this.isQuiet(c, list.slice(0, i)));
+  }
+
+  private isQuiet(c: SpeechSegment, before: SpeechSegment[]): boolean {
+    const level = (s: SpeechSegment): number => {
+      let v = this.lineLevels.get(s);
+      if (v === undefined) {
+        v = this.pcm ? peakLevel(this.pcm, s.startMs, s.endMs) : 0;
+        this.lineLevels.set(s, v);
+      }
+      return v;
+    };
+    const levels: number[] = before.map((s) => level(s));
+    levels.push(level(c));
+    return isQuietLine(level(c), levels);
   }
 
   private person(id: number | null): Person | null {
@@ -819,8 +890,17 @@ export class LiveVideoSubtitlesComponent implements OnDestroy {
       pick.basis === 'pending' ? null : p && pick.basis === 'mostVisible' ? `${p.name}?` : (p?.name ?? 'Unknown');
     this.caption.set({ text: line.text, name, recognised: p?.profileId != null });
     // Only the speaker gets a box.
-    const face = p ? this.facesAt(this.positionMs()).find((f) => f.personId === p.id) : undefined;
+    const face = p ? this.speakerFace(p) : undefined;
     this.speakerBox.set(face && name ? this.toScreen(v, face.box, name, p!.profileId != null) : null);
+  }
+
+  /** The speaker's face now: in a split screen, their largest of the cameras. */
+  private speakerFace(p: Person): TrackedFace | undefined {
+    const faces = this.facesAt(this.positionMs());
+    if (!this.mainTally) return faces.find((f) => f.personId === p.id);
+    return faces
+      .filter((f) => this.tracker!.canonical(f.personId) === p.id)
+      .sort((a, b) => b.box[2] * b.box[3] - a.box[2] * a.box[3])[0];
   }
 
   /** Map a box in video pixels onto the displayed (letterboxed) video. */

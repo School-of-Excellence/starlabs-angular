@@ -13,6 +13,8 @@ export interface FaceSample {
   personId: number;
   area: number;
   mouth: number | null;
+  /** Which camera of a split screen: lips are compared within one camera. */
+  pane?: number;
 }
 
 /** How the speaker for a line was decided, strongest first. */
@@ -20,6 +22,7 @@ export type SpeakerBasis =
   | 'lipMovement' // several faces on screen; this one's mouth moved most
   | 'onlyFace' // exactly one face on screen while the line was spoken
   | 'continuing' // weak/close lip signal; same speaker as the line before
+  | 'mainSpeaker' // no one clearly took over from who has been talking most
   | 'mostVisible' // several faces, no clear lip signal — largest/most present
   | 'byElimination' // the others' lips are still; this side-on face is left
   | 'notTalking' // faces visible but their lips are still: speaker is unseen
@@ -31,6 +34,7 @@ export const BASIS_LABEL: Record<SpeakerBasis, string> = {
   lipMovement: 'lips',
   onlyFace: 'only face',
   continuing: 'same as before',
+  mainSpeaker: 'main speaker',
   mostVisible: 'guess',
   byElimination: 'others silent',
   notTalking: 'visible faces not talking',
@@ -67,6 +71,19 @@ const MAX_SAMPLE_GAP_MS = 1500;
 // camera's 1.2 s steps one pair can catch a talking mouth at the same
 // openness twice, which named nobody while that face was plainly talking.
 const MIN_STILL_PAIRS = 2;
+// Multi-camera: someone takes the floor from the main speaker only with lips
+// moving this much, seen more than once, while the main speaker's are still.
+// (A crowd always holds someone whose mouth moved: laughing, chewing, a word
+// to a neighbour. The median listener measures 0.017, the talking speaker 0.117.)
+const TAKE_OVER_LIPS = 0.06;
+const TAKE_OVER_PAIRS = 2;
+const TWO_CAMERA_SHARE = 0.5;
+const QUIET_GAP_DB = 8;
+const MIN_LEVELS = 5;
+const MAIN_HALF_LIFE_MS = 120000;
+// Main speaker: on camera this long, and this many times the next person.
+const MAIN_MIN_MS = 4000;
+const MAIN_LEAD = 1.5;
 
 /**
  * Pick who is saying `seg` from the face samples around it. A face counts as
@@ -74,7 +91,15 @@ const MIN_STILL_PAIRS = 2;
  * are all still mean the speaker is unseen (no name rather than naming the
  * listener).
  */
-export function pickSpeaker(seg: SpeechSegment, samples: Iterable<FaceSample>, previous: number | null): SpeakerPick {
+export function pickSpeaker(
+  seg: SpeechSegment,
+  samples: Iterable<FaceSample>,
+  previous: number | null,
+  /** Multi-camera videos only: who the video follows (see {@link MainSpeakerTally}). */
+  main: number | null = null,
+  /** The line is well below the video's usual voice level: not the presenter's mic. */
+  quiet = false,
+): SpeakerPick {
   const lo = seg.startMs - WINDOW_PAD_MS;
   const hi = seg.endMs + WINDOW_PAD_MS;
   const byPerson = new Map<number, FaceSample[]>();
@@ -87,11 +112,41 @@ export function pickSpeaker(seg: SpeechSegment, samples: Iterable<FaceSample>, p
   if (byPerson.size === 0) return pick(null, 'offScreen');
   byPerson.forEach((l) => l.sort((a, b) => a.timeMs - b.timeMs));
   const activity = new Map<number, number>();
+  const pairsOf = new Map<number, number>();
   byPerson.forEach((s, id) => {
     const a = lipActivity(s);
     // Too few looks to call still lips still: left unmeasured.
-    if (a !== null && (a.mean >= MIN_LIP_ACTIVITY || a.pairs >= MIN_STILL_PAIRS)) activity.set(id, a.mean);
+    if (a !== null && (a.mean >= MIN_LIP_ACTIVITY || a.pairs >= MIN_STILL_PAIRS)) {
+      activity.set(id, a.mean);
+      pairsOf.set(id, a.pairs);
+    }
   });
+  if (main !== null) {
+    if (!byPerson.has(main)) {
+      // Between cameras: the turn goes on until someone else's lips say otherwise.
+      if (previous === main) return pick(main, 'continuing', activity);
+    } else {
+      const a = activity.get(main);
+      if (a !== undefined && a >= MIN_LIP_ACTIVITY) return pick(main, 'lipMovement', activity);
+      // Two cameras on one person at once means they have the floor: crews
+      // follow whoever is talking, and audience cut-aways rarely land on one
+      // person twice. A line at the presenter's usual level needs that AND
+      // the presenter's lips seen still (a listener's mouth also moves while
+      // the presenter talks). A quieter line, off the presenter's mic, needs
+      // one of the two: lips unreadable (side-on) prove nothing either way.
+      const still = a !== undefined;
+      let taker: number | null = null;
+      let takerA = TAKE_OVER_LIPS;
+      activity.forEach((v, id) => {
+        if (id === main || v < takerA || (pairsOf.get(id) ?? 0) < TAKE_OVER_PAIRS) return;
+        const floor = twoCameraShare(byPerson.get(id)!) >= TWO_CAMERA_SHARE;
+        if (quiet ? !still && !floor : !still || !floor) return;
+        takerA = v;
+        taker = id;
+      });
+      return taker !== null ? pick(taker, 'lipMovement', activity) : pick(main, 'mainSpeaker', activity);
+    }
+  }
 
   const talkers = [...activity.entries()].filter(([, a]) => a >= MIN_LIP_ACTIVITY).sort((a, b) => b[1] - a[1]);
   if (talkers.length) {
@@ -116,19 +171,118 @@ export function pickSpeaker(seg: SpeechSegment, samples: Iterable<FaceSample>, p
   return pick(mostVisible(byPerson), 'mostVisible', activity);
 }
 
-/** Mean |Δ mouth| between back-to-back samples; null if none (unmeasurable). */
+/**
+ * Mean |Δ mouth| between back-to-back samples of one camera (the same person
+ * in two cameras isn't a movement); null if none (unmeasurable).
+ */
 function lipActivity(s: FaceSample[]): { mean: number; pairs: number } | null {
   let sum = 0;
   let pairs = 0;
-  for (let i = 1; i < s.length; i++) {
-    const a = s[i - 1].mouth;
-    const b = s[i].mouth;
-    if (a === null || b === null) continue;
-    if (s[i].timeMs - s[i - 1].timeMs > MAX_SAMPLE_GAP_MS) continue;
-    sum += Math.abs(b - a);
+  const lastIn = new Map<number, FaceSample>();
+  for (const cur of s) {
+    const pane = cur.pane ?? 0;
+    const prev = lastIn.get(pane);
+    lastIn.set(pane, cur);
+    if (!prev || prev.mouth === null || cur.mouth === null) continue;
+    if (cur.timeMs - prev.timeMs > MAX_SAMPLE_GAP_MS) continue;
+    sum += Math.abs(cur.mouth - prev.mouth);
     pairs++;
   }
   return pairs === 0 ? null : { mean: sum / pairs, pairs };
+}
+
+/**
+ * Whether a line is well below the video's usual voice level, measured on
+ * its loudest moment. `levels` is every line so far (mostly the presenter).
+ * A fixed gap, as floor voices sit ~15 dB under a mic'd presenter (the answer
+ * doesn't change for any gap from 6 to 10 dB on the multi-cam test video).
+ */
+export function isQuietLine(level: number, levels: number[]): boolean {
+  if (levels.length < MIN_LEVELS) return false;
+  const sorted = levels.slice().sort((a, b) => a - b);
+  return level < sorted[sorted.length >> 1] - QUIET_GAP_DB;
+}
+
+/** Loudest 100 ms of a 16 kHz stretch, in dB. */
+export function peakLevel(pcm: Float32Array, startMs: number, endMs: number): number {
+  const from = Math.max(0, Math.floor(startMs * 16));
+  const to = Math.min(pcm.length, Math.floor(endMs * 16));
+  let best = 0;
+  for (let i = from; i < to; i += 800) {
+    const end = Math.min(i + 1600, to);
+    let sum = 0;
+    for (let k = i; k < end; k++) sum += pcm[k] * pcm[k];
+    if (end > i) best = Math.max(best, sum / (end - i));
+  }
+  return 10 * Math.log10(best + 1e-9);
+}
+
+/** Of the moments someone was seen, the share they were in two cameras at once. */
+function twoCameraShare(s: FaceSample[]): number {
+  const panes = new Map<number, Set<number>>();
+  for (const x of s) {
+    let at = panes.get(x.timeMs);
+    if (!at) panes.set(x.timeMs, (at = new Set()));
+    at.add(x.pane ?? 0);
+  }
+  let two = 0;
+  panes.forEach((at) => {
+    if (at.size >= 2) two++;
+  });
+  return panes.size ? two / panes.size : 0;
+}
+
+/**
+ * Who a multi-camera video follows: the person on camera most. Crews stay on
+ * the presenter while audience shots keep changing, so this holds through
+ * side-on stretches where lips can't be read. Frames sampled across the whole
+ * video outweigh a long audience shot; recent frames fade, so on a live feed
+ * (no samples ahead) a new presenter takes over within a couple of minutes.
+ * With no clear leader (a panel, say) there is no main speaker and lips decide.
+ */
+export class MainSpeakerTally {
+  /** From frames across the whole video: doesn't fade. */
+  private readonly whole = new Map<number, number>();
+  private readonly recent = new Map<number, number>();
+  private current: number | null = null;
+
+  /** People in a frame sampled ahead through the video, standing for `stepMs` of it. */
+  seed(people: Iterable<number>, stepMs: number): void {
+    for (const id of new Set(people)) this.whole.set(id, (this.whole.get(id) ?? 0) + stepMs);
+  }
+
+  /** People on camera in a frame standing for `stepMs` of video. */
+  see(people: Iterable<number>, stepMs: number): void {
+    const fade = Math.pow(0.5, stepMs / MAIN_HALF_LIFE_MS);
+    this.recent.forEach((v, id) => this.recent.set(id, v * fade));
+    for (const id of new Set(people)) this.recent.set(id, (this.recent.get(id) ?? 0) + stepMs);
+  }
+
+  /**
+   * `canonical` joins someone's entries, read now because a face seen before
+   * it was recognised belongs to the same person once it is.
+   */
+  main(canonical: (id: number) => number = (id) => id): number | null {
+    const ms = new Map<number, number>();
+    for (const from of [this.whole, this.recent]) {
+      from.forEach((v, id) => ms.set(canonical(id), (ms.get(canonical(id)) ?? 0) + v));
+    }
+    let best: number | null = null;
+    let top = 0;
+    let next = 0;
+    ms.forEach((v, id) => {
+      if (v > top) {
+        next = top;
+        top = v;
+        best = id;
+      } else if (v > next) {
+        next = v;
+      }
+    });
+    // Stays until someone else clearly leads (a long audience shot only narrows it).
+    if (top >= MAIN_MIN_MS && top >= next * MAIN_LEAD) this.current = best;
+    return this.current;
+  }
 }
 
 function mostVisible(byPerson: Map<number, FaceSample[]>): number {
@@ -173,6 +327,8 @@ export interface TrackedFace {
   box: [number, number, number, number];
   personId: number;
   mouth: number | null;
+  /** Which camera of a split screen; one person can be in several at once. */
+  pane: number;
 }
 
 /** A face found by face.worker.ts (frame pixels). */
@@ -182,6 +338,8 @@ export interface WorkerFace {
   /** 5 points (x,y): image-left eye, image-right eye, nose, left/right mouth. */
   kps: number[];
   score: number;
+  /** Which camera of a split screen. */
+  pane?: number;
 }
 
 /** Face as measured in a frame, before tracking (no identity vector yet). */
@@ -192,6 +350,8 @@ export interface MeasuredFace {
   /** Turned ≤ 60°: good enough to match against profiles. */
   identifiable: boolean;
   mouth: number | null;
+  /** Which camera of a split screen (0 for one picture). */
+  pane: number;
 }
 
 /** Identity vectors for the given faces of the frame being tracked. */
@@ -259,17 +419,29 @@ export class PeopleTracker {
     return this.people[id]?.profileId != null;
   }
 
+  /** One id per recognised person (each new track of them is a new entry here). */
+  canonical(id: number): number {
+    const profileId = this.people[id]?.profileId;
+    return profileId == null ? id : this.people.find((p) => p.profileId === profileId)!.id;
+  }
+
   /**
    * Assign each measured face to a person; returns the tracked faces. A face
    * overlapping last frame's face keeps its person. Identity vectors
-   * (`embed`) are fetched for every frontal face (each one is another chance
-   * to recognise them) and for new side-on faces (to group them); side-on
+   * (`embed`) are fetched for frontal faces not yet recognised (each one is
+   * another chance) and for new side-on faces (to group them); side-on
    * vectors are never matched to profiles.
    */
   async track(t: number, faces: MeasuredFace[], embed: EmbedFn): Promise<TrackedFace[]> {
     const consecutive = t - this.prevT <= this.stepMs * 2 && t > this.prevT;
     // Pass 1: box tracking, and which faces need an identity vector.
-    const used = new Set<number>();
+    // Per camera: in a split screen one person can be in several at once.
+    const usedIn = new Map<number, Set<number>>();
+    const used = (pane: number) => {
+      let u = usedIn.get(pane);
+      if (!u) usedIn.set(pane, (u = new Set()));
+      return u;
+    };
     const matched: (number | null)[] = [];
     const need: number[] = [];
     faces.forEach((f, i) => {
@@ -277,7 +449,7 @@ export class PeopleTracker {
       if (consecutive) {
         let best = MIN_TRACK_IOU;
         for (const p of this.prevFaces) {
-          if (used.has(p.personId)) continue;
+          if (p.pane !== f.pane || used(f.pane).has(p.personId)) continue;
           const o = boxIou(p.box, f.box);
           if (o > best) {
             best = o;
@@ -285,8 +457,9 @@ export class PeopleTracker {
           }
         }
       }
-      if (personId !== null) used.add(personId);
-      if (personId === null || f.identifiable) need.push(i);
+      if (personId !== null) used(f.pane).add(personId);
+      // Once recognised, a tracked face needs no more vectors (the slowest step).
+      if (personId === null || (f.identifiable && this.people[personId].profileId === null)) need.push(i);
       matched.push(personId);
     });
     const vectors = new Map<number, Float32Array>();
@@ -300,17 +473,17 @@ export class PeopleTracker {
       let personId = matched[i];
       const q = vectors.get(i);
       if (personId !== null) {
-        if (q) this.consider(this.people[personId], q, f.identifiable, used);
+        if (q) this.consider(this.people[personId], q, f.identifiable, used(f.pane));
       } else if (q) {
-        const person = this.personFor(q, f.identifiable, used);
-        this.consider(person, q, f.identifiable, used);
+        const person = this.personFor(q, f.identifiable, used(f.pane));
+        this.consider(person, q, f.identifiable, used(f.pane));
         personId = person.id;
-        used.add(personId);
+        used(f.pane).add(personId);
       }
       if (personId === null) return;
       // Side-on: lip landmarks jitter and read as "talking" — leave the
       // mouth unmeasured instead.
-      out.push({ box: f.box, personId, mouth: f.frontal ? f.mouth : null });
+      out.push({ box: f.box, personId, mouth: f.frontal ? f.mouth : null, pane: f.pane });
     });
     this.prevFaces = out;
     this.prevT = t;

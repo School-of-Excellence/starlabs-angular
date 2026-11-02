@@ -33,8 +33,10 @@ const DET_SIZE = 640;
 const DET_SCORE = 0.5;
 const NMS_IOU = 0.4;
 const REC_SIZE = 112;
-const MIN_FACE_FRAC = 0.1; // of frame height
+const MIN_FACE_FRAC = 0.1; // of frame height (of one camera's, in a split screen)
 const MAX_FACES = 4;
+/** Per camera in a split screen, so a crowd in one can't push out the speaker in another. */
+const MAX_FACES_PER_PANE = 3;
 // InsightFace reference points for a 112×112 aligned face.
 const REF = [
   [38.2946, 51.6963],
@@ -132,15 +134,17 @@ async function createSession(bytes: Uint8Array, gpu: boolean): Promise<[ort.Infe
 
 let detCanvas: OffscreenCanvas | null = null;
 
-async function detect(bitmap: ImageBitmap): Promise<{ box: number[]; kps: number[]; score: number }[]> {
-  const scale = Math.min(DET_SIZE / bitmap.width, DET_SIZE / bitmap.height);
-  const w = Math.round(bitmap.width * scale);
-  const h = Math.round(bitmap.height * scale);
+/** Faces in part of the frame (`pane`: x, y, width, height), in frame pixels. */
+async function detect(bitmap: ImageBitmap, pane: number[]): Promise<{ box: number[]; kps: number[]; score: number }[]> {
+  const [paneX, paneY, pw, ph] = pane;
+  const scale = Math.min(DET_SIZE / pw, DET_SIZE / ph);
+  const w = Math.round(pw * scale);
+  const h = Math.round(ph * scale);
   detCanvas ??= new OffscreenCanvas(DET_SIZE, DET_SIZE);
   const ctx = detCanvas.getContext('2d', { willReadFrequently: true })!;
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, DET_SIZE, DET_SIZE);
-  ctx.drawImage(bitmap, 0, 0, w, h); // letterbox top-left, like insightface
+  ctx.drawImage(bitmap, paneX, paneY, pw, ph, 0, 0, w, h); // letterbox top-left, like insightface
   const px = ctx.getImageData(0, 0, DET_SIZE, DET_SIZE).data;
   const area = DET_SIZE * DET_SIZE;
   const input = new Float32Array(3 * area);
@@ -180,13 +184,13 @@ async function detect(bitmap: ImageBitmap): Promise<{ box: number[]; kps: number
       const cell = Math.floor(i / anchors);
       const cx = (cell % cols) * stride;
       const cy = Math.floor(cell / cols) * stride;
-      const x1 = (cx - g.b[i * 4] * stride) / scale;
-      const y1 = (cy - g.b[i * 4 + 1] * stride) / scale;
-      const x2 = (cx + g.b[i * 4 + 2] * stride) / scale;
-      const y2 = (cy + g.b[i * 4 + 3] * stride) / scale;
+      const x1 = paneX + (cx - g.b[i * 4] * stride) / scale;
+      const y1 = paneY + (cy - g.b[i * 4 + 1] * stride) / scale;
+      const x2 = paneX + (cx + g.b[i * 4 + 2] * stride) / scale;
+      const y2 = paneY + (cy + g.b[i * 4 + 3] * stride) / scale;
       const kps: number[] = [];
       for (let k = 0; k < 5; k++) {
-        kps.push((cx + g.k[i * 10 + k * 2] * stride) / scale, (cy + g.k[i * 10 + k * 2 + 1] * stride) / scale);
+        kps.push(paneX + (cx + g.k[i * 10 + k * 2] * stride) / scale, paneY + (cy + g.k[i * 10 + k * 2 + 1] * stride) / scale);
       }
       cands.push({ box: [x1, y1, x2 - x1, y2 - y1], kps, score });
     }
@@ -294,16 +298,21 @@ let frameCanvas: OffscreenCanvas | null = null;
 /** The last frame's pixels and faces, kept for a follow-up 'embed'. */
 let last: { id: number; px: Uint8ClampedArray; W: number; H: number; kps: number[][] } | null = null;
 
-async function onFrame(id: number, bitmap: ImageBitmap): Promise<void> {
+async function onFrame(id: number, bitmap: ImageBitmap, panes: number[][] | null): Promise<void> {
   const t0 = performance.now();
   const W = bitmap.width;
   const H = bitmap.height;
   // Only the people in the conversation: small background faces (an
   // audience) cost time and can't be lip-read anyway.
-  const found = (await detect(bitmap))
-    .filter((f) => f.box[3] >= H * MIN_FACE_FRAC)
-    .sort((a, b) => b.box[2] * b.box[3] - a.box[2] * a.box[3])
-    .slice(0, MAX_FACES);
+  const found: { box: number[]; kps: number[]; score: number; pane: number }[] = [];
+  const areas = panes ?? [[0, 0, W, H]];
+  for (let pane = 0; pane < areas.length; pane++) {
+    const inPane = (await detect(bitmap, areas[pane]))
+      .filter((f) => f.box[3] >= areas[pane][3] * MIN_FACE_FRAC)
+      .sort((a, b) => b.box[2] * b.box[3] - a.box[2] * a.box[3])
+      .slice(0, panes ? MAX_FACES_PER_PANE : MAX_FACES);
+    for (const f of inPane) found.push({ ...f, pane });
+  }
   last = null;
   if (found.length) {
     if (!frameCanvas || frameCanvas.width !== W || frameCanvas.height !== H) {
@@ -314,7 +323,7 @@ async function onFrame(id: number, bitmap: ImageBitmap): Promise<void> {
     last = { id, px: ctx.getImageData(0, 0, W, H).data, W, H, kps: found.map((f) => f.kps) };
   }
   bitmap.close();
-  const faces: WorkerFace[] = found.map((f) => ({ box: f.box as WorkerFace['box'], kps: f.kps, score: f.score }));
+  const faces: WorkerFace[] = found.map((f) => ({ box: f.box as WorkerFace['box'], kps: f.kps, score: f.score, pane: f.pane }));
   postMessage({ type: 'faces', id, faces, ms: performance.now() - t0 });
 }
 
@@ -332,7 +341,7 @@ let queue: Promise<void> = Promise.resolve();
 async function handle(data: any): Promise<void> {
   try {
     if (data.type === 'load') await load();
-    else if (data.type === 'frame') await onFrame(data.id, data.bitmap);
+    else if (data.type === 'frame') await onFrame(data.id, data.bitmap, data.panes ?? null);
     else if (data.type === 'embed') await onEmbed(data.id, data.indices);
   } catch (e: any) {
     data?.bitmap?.close?.();

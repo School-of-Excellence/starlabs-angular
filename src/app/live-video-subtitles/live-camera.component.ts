@@ -20,7 +20,7 @@ import { Firestore } from '@angular/fire/firestore';
 import { SpeechSegment, VOICE_FRAME_MS, shapeCaptions, splitForWhisper, toSrt, trimToVoice, voiceFrames } from './captions';
 import { LiveAudio, Phrase, WAVE_FRAMES, collapseRepeats, isFillerHallucination, normalizeForWhisper } from './live-audio';
 import { loadProfilesCached } from './profiles';
-import { BASIS_LABEL, FaceSample, PeopleTracker, Person, SpeakerPick, TrackedFace, pickSpeaker } from './speakers';
+import { BASIS_LABEL, FaceSample, MainSpeakerTally, PeopleTracker, Person, SpeakerPick, TrackedFace, pickSpeaker } from './speakers';
 import type { FaceAnalyser } from './face-analyser';
 import { RecordingStore } from './recording-store';
 import { zipFiles } from './zip';
@@ -307,6 +307,8 @@ export class LiveCameraComponent implements OnDestroy {
   // Faces.
   private analyser: FaceAnalyser | null = null;
   private tracker: PeopleTracker | null = null;
+  /** Filled while the feed is a split-screen multi-camera view (e.g. an ATEM multiview). */
+  private readonly mainTally = new MainSpeakerTally();
   private faceGen = 0;
   private faces = new Map<number, TrackedFace[]>();
   private faceTimes: number[] = [];
@@ -681,6 +683,9 @@ export class LiveCameraComponent implements OnDestroy {
         if (gen !== this.faceGen) return;
         this.faces.set(t, tracked);
         this.faceTimes.push(t);
+        if (this.analyser?.panes) {
+          this.mainTally.see(tracked.map((f) => f.personId), FACE_STEP_MS);
+        }
         if (this.recording() && this.job) this.job.faces.push({ t, faces: tracked });
         while (this.faceTimes.length && this.faceTimes[0] < t - FACE_KEEP_MS) this.faces.delete(this.faceTimes.shift()!);
       } catch (e: any) {
@@ -713,9 +718,19 @@ export class LiveCameraComponent implements OnDestroy {
     const samples: FaceSample[] = [];
     for (const t of this.faceTimes) {
       if (t < seg.startMs - 500 || t > seg.endMs + 500) continue;
-      for (const f of this.faces.get(t)!) samples.push({ timeMs: t, personId: f.personId, area: f.box[2] * f.box[3], mouth: f.mouth });
+      for (const f of this.faces.get(t)!) samples.push(this.sampleOf(f, t, this.tracker));
     }
-    return pickSpeaker(seg, samples, previous);
+    return pickSpeaker(seg, samples, previous, this.analyser?.panes ? this.mainTally.main((id) => this.tracker!.canonical(id)) : null);
+  }
+
+  private sampleOf(f: TrackedFace, t: number, tracker: PeopleTracker): FaceSample {
+    return {
+      timeMs: t,
+      personId: this.analyser?.panes ? tracker.canonical(f.personId) : f.personId,
+      area: f.box[2] * f.box[3],
+      mouth: f.mouth,
+      pane: f.pane,
+    };
   }
 
   private person(id: number | null | undefined): Person | null {
@@ -758,7 +773,7 @@ export class LiveCameraComponent implements OnDestroy {
         box: f.box,
         name: p?.name ?? 'Unknown',
         recognised: p?.profileId != null,
-        speaking: speaker !== null && f.personId === speaker,
+        speaking: speaker !== null && (this.analyser?.panes ? this.tracker!.canonical(f.personId) : f.personId) === speaker,
       };
     });
   }
@@ -1213,9 +1228,9 @@ export class LiveCameraComponent implements OnDestroy {
       for (const r of job.faces) {
         const t = r.t - job.audio0;
         if (t < seg.startMs - 500 || t > seg.endMs + 500) continue;
-        for (const f of r.faces) samples.push({ timeMs: t, personId: f.personId, area: f.box[2] * f.box[3], mouth: f.mouth });
+        for (const f of r.faces) samples.push(this.sampleOf(f, t, tracker));
       }
-      const pick = pickSpeaker(seg, samples, seg.startMs - prevEnd < TURN_GAP_MS ? prevId : null);
+      const pick = pickSpeaker(seg, samples, seg.startMs - prevEnd < TURN_GAP_MS ? prevId : null, this.analyser?.panes ? this.mainTally.main((id) => tracker.canonical(id)) : null);
       prevId = pick.personId;
       prevEnd = seg.endMs;
       const p = pick.personId == null ? null : (tracker.people[pick.personId] ?? null);

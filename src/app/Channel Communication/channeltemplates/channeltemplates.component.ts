@@ -646,7 +646,7 @@ export class ChannelTemplatesComponent implements OnInit, AfterViewInit, OnDestr
   extractVariables(template: string): string[] {
     const matches = template.match(/{{(.*?)}}/g) || [];
     const variables = new Set<string>();
-    matches.forEach(m => {
+    matches.forEach((m: string) => {
       const key = m.replace(/{{|}}/g, '').trim();
       if (key) variables.add(key);
     });

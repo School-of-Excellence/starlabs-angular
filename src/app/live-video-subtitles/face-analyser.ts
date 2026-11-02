@@ -21,6 +21,14 @@ const CROP_SIZE = 256;
 export const MAX_YAW_DEG = 45;
 /** Turned more than this: too side-on to match against profiles. */
 export const MAX_ID_YAW_DEG = 60;
+/**
+ * A 2×2 multi-camera split screen is recognised by the edges down and across
+ * the frame's middle: how many times stronger than a usual line of the
+ * picture. Measured 8–21× on a multi-cam video, under 2.5× on a single camera.
+ */
+const SEAM_RATIO = 5;
+/** Frames looked at to decide that; most must show both seams. */
+const LAYOUT_FRAMES = 5;
 
 export interface AnalyserTimings {
   frames: number;
@@ -49,6 +57,10 @@ export class FaceAnalyser {
   meshDelegate = '';
   /** Last measured yaw values (diagnostics / calibration). */
   lastYaws: number[] = [];
+  /** Cameras in a split screen (x, y, w, h in frame pixels); null = one picture. */
+  panes: number[][] | null = null;
+  private layoutSeen = 0;
+  private layoutVotes = 0;
 
   /**
    * `source`: a file's URL (frames are read from a hidden copy, seeking
@@ -106,7 +118,8 @@ export class FaceAnalyser {
         once: true,
       });
     });
-    this.ready = Promise.all([workerReady, meshReady, videoReady]).then(([device]) => device);
+    const layoutReady = videoReady.then(() => (this.live ? undefined : this.scanLayout()));
+    this.ready = Promise.all([workerReady, meshReady, layoutReady]).then(([device]) => device);
     return this.ready;
   }
 
@@ -157,11 +170,14 @@ export class FaceAnalyser {
     }
     const ctx = this.canvas.getContext('2d', { willReadFrequently: true })!;
     ctx.drawImage(this.video, 0, 0, W, H);
+    // A camera feed can't be sampled ahead: its first frames decide.
+    if (this.live && this.layoutSeen < LAYOUT_FRAMES) this.voteLayout(ctx, W, H);
     const bitmap = await createImageBitmap(this.canvas);
     this.timings.seekMs += performance.now() - t0;
 
     const id = this.nextId++;
-    const found = await this.request<WorkerFace[]>(id, { type: 'frame', id, bitmap }, [bitmap]);
+    const panes = this.panes;
+    const found = await this.request<WorkerFace[]>(id, { type: 'frame', id, bitmap, panes }, [bitmap]);
 
     const t1 = performance.now();
     const out: MeasuredFace[] = [];
@@ -176,6 +192,7 @@ export class FaceAnalyser {
         frontal: Math.abs(yaw) <= MAX_YAW_DEG,
         identifiable: Math.abs(yaw) <= MAX_ID_YAW_DEG,
         mouth: m?.mouth ?? null,
+        pane: f.pane ?? 0,
       });
     }
     this.lastYaws = yaws;
@@ -198,10 +215,12 @@ export class FaceAnalyser {
     if (!this.mesh) return null;
     const [x, y, w, h] = f.box;
     let side = Math.max(w, h) * 1.5;
-    side = Math.min(side, this.canvas.width, this.canvas.height);
+    // Stay inside this camera: Face Mesh reads one face, maybe the next camera's.
+    const [ax, ay, aw, ah] = this.panes?.[f.pane ?? 0] ?? [0, 0, this.canvas.width, this.canvas.height];
+    side = Math.min(side, aw, ah);
     if (side < 24) return null; // too small to read lips
-    const x0 = Math.min(Math.max(0, x + w / 2 - side / 2), this.canvas.width - side);
-    const y0 = Math.min(Math.max(0, y + h / 2 - side / 2), this.canvas.height - side);
+    const x0 = Math.min(Math.max(ax, x + w / 2 - side / 2), ax + aw - side);
+    const y0 = Math.min(Math.max(ay, y + h / 2 - side / 2), ay + ah - side);
     const cctx = this.crop.getContext('2d')!;
     cctx.drawImage(this.canvas, x0, y0, side, side, 0, 0, CROP_SIZE, CROP_SIZE);
     const r = this.mesh.detect(this.crop);
@@ -216,6 +235,38 @@ export class FaceAnalyser {
     const mtx = r.facialTransformationMatrixes?.[0]?.data;
     const yaw = mtx ? (Math.atan2(mtx[8], mtx[10]) * 180) / Math.PI : kpsYaw(f.kps);
     return { mouth, yaw };
+  }
+
+  /** A file: look at frames spread through it, whatever is on screen at the start. */
+  private async scanLayout(): Promise<void> {
+    const v = this.video;
+    if (!v.videoWidth || !v.videoHeight || !isFinite(v.duration)) return;
+    const k = Math.min(1, MAX_FRAME_W / v.videoWidth);
+    const W = Math.round(v.videoWidth * k);
+    const H = Math.round(v.videoHeight * k);
+    this.canvas.width = W;
+    this.canvas.height = H;
+    const ctx = this.canvas.getContext('2d', { willReadFrequently: true })!;
+    for (let i = 0; i < LAYOUT_FRAMES; i++) {
+      await this.seek((v.duration * (i + 0.5)) / LAYOUT_FRAMES);
+      ctx.drawImage(v, 0, 0, W, H);
+      this.voteLayout(ctx, W, H);
+    }
+  }
+
+  private voteLayout(ctx: CanvasRenderingContext2D, W: number, H: number): void {
+    this.layoutSeen++;
+    if (seamRatio(ctx, W, H, true) >= SEAM_RATIO && seamRatio(ctx, W, H, false) >= SEAM_RATIO) this.layoutVotes++;
+    if (this.layoutSeen < LAYOUT_FRAMES) return;
+    if (this.layoutVotes * 2 <= LAYOUT_FRAMES) return;
+    const w = Math.round(W / 2);
+    const h = Math.round(H / 2);
+    this.panes = [
+      [0, 0, w, h],
+      [w, 0, W - w, h],
+      [0, h, w, H - h],
+      [w, h, W - w, H - h],
+    ];
   }
 
   private seek(sec: number): Promise<void> {
@@ -244,6 +295,33 @@ export class FaceAnalyser {
     this.waiting.forEach((w) => w.reject(new Error('stopped')));
     this.waiting.clear();
   }
+}
+
+/**
+ * How much stronger the edge along the frame's middle (a column if
+ * `vertical`, else a row) is than along a usual line of the picture.
+ */
+function seamRatio(ctx: CanvasRenderingContext2D, W: number, H: number, vertical: boolean): number {
+  const along = vertical ? H : W;
+  const across = vertical ? W : H;
+  const edge = (at: number): number => {
+    const d = vertical ? ctx.getImageData(at, 0, 2, along).data : ctx.getImageData(0, at, along, 2).data;
+    const step = vertical ? 8 : 4; // to the next pixel along the line
+    const next = vertical ? 4 : along * 4; // to its neighbour across it
+    let sum = 0;
+    for (let i = 0; i < along; i++) sum += Math.abs(d[i * step] - d[i * step + next]);
+    return sum / along;
+  };
+  const mid = Math.round(across / 2);
+  let seam = 0;
+  for (let a = mid - 4; a < mid + 4; a++) seam = Math.max(seam, edge(a));
+  const usual: number[] = [];
+  for (let i = 1; i < 16; i++) {
+    const a = Math.round((across * i) / 16);
+    if (Math.abs(a - mid) > 8) usual.push(edge(a));
+  }
+  usual.sort((a, b) => a - b);
+  return seam / Math.max(usual[usual.length >> 1], 0.5);
 }
 
 /**
