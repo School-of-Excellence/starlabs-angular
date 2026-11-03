@@ -107,8 +107,11 @@ export class FormtemplateComponent {
   // only thing that distinguishes this flow from the specialist's (atcid alone). null for every other flow.
   atcRequestId: string | null = null
   atcFormRequest: any = null
-  // set when that doc refuses this user: ngAfterViewInit must not load the form behind the alert
-  private atcRequestInvalid = false
+  // THE ANSWER, not a flag derived from it. `async ngOnInit` returns to Angular at its first `await`, so the
+  // lifecycle moves on and ngAfterViewInit used to read `atcRequestInvalid` while the check was still in
+  // flight — it was false, the form rendered, and the refusal arrived after. Both hooks now await this one
+  // promise, so there is nothing to read early. Resolved true when there is no ?request to check.
+  private atcRequestCheck: Promise<boolean> = Promise.resolve(true)
   currentUserId:string
   userProfile:any
   queueData:any
@@ -232,7 +235,8 @@ export class FormtemplateComponent {
 
     // ATC participant / sponsor: the request doc decides who may fill this, whether it may still be
     // filled, and whether it is a new answer or an edit. Nothing here is taken from the URL.
-    if (this.atcRequestId && !(await this.loadAtcFormRequest())) return;
+    this.atcRequestCheck = this.atcRequestId ? this.loadAtcFormRequest() : Promise.resolve(true);
+    if (!(await this.atcRequestCheck)) return;
 
     // Get user ID and roles in constructor
     await this.initializeUserData();
@@ -244,8 +248,8 @@ export class FormtemplateComponent {
     await this.getFormsOption();
   }
 
-  ngAfterViewInit(){
-    if (this.atcRequestInvalid) return;
+  async ngAfterViewInit(){
+    if (!(await this.atcRequestCheck)) return;
     // console.log(" ngAfterViewInit participantformtemplateid",this.participantformtemplateid);
 
     // console.log(this.formpatch);
@@ -639,7 +643,6 @@ export class FormtemplateComponent {
         : snap.data()['formstatus'] != 'sent' ? 'This form has already been submitted.'
         : null;
       if (refusal) {
-        this.atcRequestInvalid = true;
         alert(refusal);
         this.router.navigateByUrl("/");
         return false;
@@ -649,7 +652,6 @@ export class FormtemplateComponent {
       return true;
     } catch (error) {
       console.error('Error reading the ATC form request:', error);
-      this.atcRequestInvalid = true;
       alert("Couldn't open this form. Try the link again.");
       this.router.navigateByUrl("/");
       return false;
