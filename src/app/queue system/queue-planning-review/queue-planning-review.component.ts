@@ -54,6 +54,7 @@ interface MergedSlot {
       variationName: string;
       stageData: {
         [stageName: string]: {
+          docid: string;
           maxslot: number;
           usedslot: number;
           title: string; 
@@ -173,7 +174,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
   liveQueueExportModeOn: boolean = false;
   private liveQueueExportCache = new Map<string, {
     stages: string[];
-    planningData: any;
+    slotList: any[];
     tokens: any[];
   }>();
 
@@ -187,7 +188,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
   activeSlotPlannerTab: 'appointment' | 'queue' = 'appointment';
 
   // Cached planning data
-  cachedPlanningData: any = null;
+  queueSlotList: any[] = [];
   private dataReadyFlags = { tokens: false, planners: false, planning: false };
   private planningSlotLookup = new Map<string, Set<string>>();
 
@@ -336,68 +337,22 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
     }));
   }
 
-  private updateSlotConfiguredFlags(planningData: any, variationId?: string, segmentId?: string): void {
-    this.queueStagesConfig.forEach(stage => stage.slotConfigured = false);
+    private updateSlotConfiguredFlags(slotDocs: any[]): void {
+      const stagesWithSlots = new Set(slotDocs.map(slot => slot.stagename));
 
-    if (!planningData || !planningData.planning) return;
-
-    const stagesWithSlots = new Set<string>();
-
-    for (const variationPlanning of planningData.planning) {
-      if (variationId && variationPlanning.variationid !== variationId) continue;
-
-      if (variationPlanning.segments && variationPlanning.segments.length > 0) {
-        for (const segmentData of variationPlanning.segments) {
-          if (segmentId && segmentData.segmentid !== segmentId) continue;
-
-          if (segmentData.slots && segmentData.slots.length > 0) {
-            for (const slot of segmentData.slots) {
-              if (slot.stagename) {
-                stagesWithSlots.add(slot.stagename);
-              }
-            }
-          }
-        }
-      }
+      this.queueStagesConfig.forEach(stage => {
+        stage.slotConfigured = stagesWithSlots.has(stage.stageName);
+      });
     }
 
-    this.queueStagesConfig.forEach(stage => {
-      stage.slotConfigured = stagesWithSlots.has(stage.stageName);
-    });
-  }
-
-  private getStageConfigForVariationSegment(variationId: string, segmentId: string): StageConfig[] {
-    const stageConfig: StageConfig[] = this.queueStages.map(stageName => ({
-      stageName: stageName,
-      slotConfigured: false
-    }));
-
-    if (!this.cachedPlanningData || !this.cachedPlanningData.planning) {
-      return stageConfig;
+    private getStageConfigForVariationSegment(variationId: string, segmentId: string): StageConfig[] {
+      return this.queueStages.map(stageName => ({
+        stageName: stageName,
+        slotConfigured: this.queueSlotList.some(slot =>
+          slot.variationid === variationId && slot.segmentid === segmentId && slot.stagename === stageName
+        )
+      }));
     }
-
-    for (const variationPlanning of this.cachedPlanningData.planning) {
-      if (variationPlanning.variationid !== variationId) continue;
-
-      if (variationPlanning.segments) {
-        for (const segmentData of variationPlanning.segments) {
-          if (segmentData.segmentid !== segmentId) continue;
-
-          if (segmentData.slots) {
-            for (const slot of segmentData.slots) {
-              const stageName = slot.stagename;
-              const stageIdx = stageConfig.findIndex(s => s.stageName === stageName);
-              if (stageIdx >= 0) {
-                stageConfig[stageIdx].slotConfigured = true;
-              }
-            }
-          }
-        }
-      }
-    }
-
-    return stageConfig;
-  }
 
   private findLastPreviousStageWithSlot(
     currentStageIndex: number,
@@ -437,7 +392,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
     this.cohortQueuePlannerList = [];
     this.mergedSlots = [];
     this.queuePlanningSegmentList = [];
-    this.cachedPlanningData = null;
+    this.queueSlotList = [];
     this.dataReadyFlags = { tokens: false, planners: false, planning: false };
     this.selectedQueueArenaEventId = null;
     this.selectedQueueProductRef = null;
@@ -532,7 +487,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
       this.subscriptions.push(cohortPlannerSub);
 
       const planningQuery = query(
-        collection(this.firestore, 'queue planning'),
+        collection(this.firestore, 'queue availability'),
         where('queueid', '==', this.selectedQueue['docid'])
       );
 
@@ -547,11 +502,11 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
       const queueEligibleProduct = await getDocs(query(collection(this.firestore, 'products'), where('checkforqueue', '==', true)));
       this.selectedQueueProductRef = !queueEligibleProduct.empty ? queueEligibleProduct.docs[0].ref : null;
 
-      const planningSub = collectionData(planningQuery, { idField: 'id' }).subscribe(async (planningDocs) => {
-        if (planningDocs.length > 0) {
-          this.updateSlotConfiguredFlags(planningDocs[0]);
-          this.queuePlanningSegmentList = planningDocs[0]['segmentlist'] || [];
-          this.cachedPlanningData = planningDocs[0];
+      const planningSub = collectionData(planningQuery, { idField: 'id' }).subscribe(async (slotDocs) => {
+        if (slotDocs.length > 0) {
+          this.queueSlotList = slotDocs;
+          this.updateSlotConfiguredFlags(slotDocs);
+          this.queuePlanningSegmentList = [...new Set(slotDocs.map(slot => slot['segmentid']))] as string[];
           this.dataReadyFlags.planning = true;
           this.rebuildIfAllReady();
         }
@@ -591,11 +546,6 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
     this.subscriptions = [];
   }
 
-  async loadQueuePlanning(planningData: any) {
-    this.cachedPlanningData = planningData;
-    this.rebuildIfAllReady();
-  }
-
   rebuildIfAllReady() {
     const { tokens, planners, planning } = this.dataReadyFlags;
     if (!tokens || !planners || !planning) return;
@@ -613,73 +563,61 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
   }
 
   rebuildMergedSlots() {
-    const planningData = this.cachedPlanningData;
-    if (!planningData) return;
+    if (this.queueSlotList.length === 0) return;
+
+    const toSafeDate = (d: any): Date | null => {
+      if (!d) return null;
+      if (d.toDate && typeof d.toDate === 'function') return d.toDate();
+      if (d.seconds !== undefined) return new Date(d.seconds * 1000);
+      if (d instanceof Date) return d;
+      return null;
+    };
 
     const slotsMap = new Map<string, any>();
 
-    if (planningData.planning && planningData.planning.length > 0) {
-      for (const variationPlanning of planningData.planning) {
-        const variationId = variationPlanning.variationid;
+    for (const slot of this.queueSlotList) {
+      if (slot.slottype === 'appointment') continue;
 
-        if (variationPlanning.segments && variationPlanning.segments.length > 0) {
-          for (const segmentData of variationPlanning.segments) {
-            const segmentId = segmentData.segmentid;
+      const startDate = toSafeDate(slot.startdate);
+      const endDate = toSafeDate(slot.enddate);
+      if (!startDate || !endDate) continue;
 
-            if (segmentData.slots && segmentData.slots.length > 0) {
-              for (const slot of segmentData.slots) {
-              const toSafeDate = (d: any): Date | null => {
-                if (!d) return null;
-                if (d.toDate && typeof d.toDate === 'function') return d.toDate();
-                if (d.seconds !== undefined) return new Date(d.seconds * 1000);
-                if (d instanceof Date) return d;
-                return null;
-              };
+      const stageName = slot.stagename;
+      const variationId = slot.variationid;
+      const segmentId = slot.segmentid;
+      const slotKey = this.generateSlotKey(startDate, endDate);
 
-              const startDate = toSafeDate(slot.startdate);
-              const endDate = toSafeDate(slot.enddate);
-                const stageName = slot.stagename;
-
-                if (startDate && endDate) {
-                  const slotKey = this.generateSlotKey(startDate, endDate);
-
-                  if (!slotsMap.has(slotKey)) {
-                    slotsMap.set(slotKey, {
-                      startdate: startDate,
-                      enddate: endDate,
-                      starttime: this.formatTimeTo24Hour(startDate),
-                      endtime: this.formatTimeTo24Hour(endDate),
-                      stages: new Set<string>(),
-                      segmentVariationsData: new Map()
-                    });
-                  }
-
-                  const slotData = slotsMap.get(slotKey);
-                  slotData.stages.add(stageName);
-
-                  const segmentVariationKey = `${segmentId}_${variationId}`;
-                  if (!slotData.segmentVariationsData.has(segmentVariationKey)) {
-                    slotData.segmentVariationsData.set(segmentVariationKey, {
-                      segmentId,
-                      variationId,
-                      stageData: {}
-                    });
-                  }
-
-                  const segVariationData = slotData.segmentVariationsData.get(segmentVariationKey);
-                  segVariationData.stageData[stageName] = {
-                    maxslot: slot.maxslot || 0,
-                    usedslot: slot.usedslot || 0,
-                    title: slot.title || '', 
-                    startdate: startDate,
-                    enddate: endDate
-                  };
-                }
-              }
-            }
-          }
-        }
+      if (!slotsMap.has(slotKey)) {
+        slotsMap.set(slotKey, {
+          startdate: startDate,
+          enddate: endDate,
+          starttime: this.formatTimeTo24Hour(startDate),
+          endtime: this.formatTimeTo24Hour(endDate),
+          stages: new Set<string>(),
+          segmentVariationsData: new Map()
+        });
       }
+
+      const slotData = slotsMap.get(slotKey);
+      slotData.stages.add(stageName);
+
+      const segmentVariationKey = `${segmentId}_${variationId}`;
+      if (!slotData.segmentVariationsData.has(segmentVariationKey)) {
+        slotData.segmentVariationsData.set(segmentVariationKey, {
+          segmentId,
+          variationId,
+          stageData: {}
+        });
+      }
+
+      slotData.segmentVariationsData.get(segmentVariationKey).stageData[stageName] = {
+        docid: slot.id,
+        maxslot: slot.maxslot || 0,
+        usedslot: slot.usedslot || 0,
+        title: slot.title || '',
+        startdate: startDate,
+        enddate: endDate
+      };
     }
 
     // BUILD LOOKUP MAP FIRST
@@ -815,6 +753,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
       );
 
       result[stageName] = {
+        docid: slot.docid,
         maxslot: slot.maxslot || 0,
         usedslot: confirmedParticipants.length,
         title: slot.title || '',
@@ -916,7 +855,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
 
     this.queueTokenList.forEach(token => {
       const profileId = token.profile_id || token.profileid;
-      const stages = Object.keys(token.selectedstageslot || {});
+      const stages = Object.keys(token.bookedslot || {});
 
       stages.forEach(stageName => {
         const slotExists = this.checkParticipantSlotExistsInStage(token, stageName);
@@ -935,7 +874,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
 
     this.queueTokenList.forEach(token => {
       if (token.tokenstatus === 'Active' && token.stagestatus === 'Approved' && [null, undefined, false].includes(token.delete)) {
-        const stages = Object.keys(token.selectedstageslot || {});
+        const stages = Object.keys(token.bookedslot || {});
         if (stages.length > 0) {
           const profileId = token.profile_id || token.profileid;
           confirmedParticipants.add(profileId);
@@ -959,7 +898,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
 
     this.queueTokenList.forEach(token => {
       if (token.tokenstatus === 'Active' && token.stagestatus === 'Approved' && [null, undefined, false].includes(token.delete)) {
-        const stages = Object.keys(token.selectedstageslot || {});
+        const stages = Object.keys(token.bookedslot || {});
         if (stages.length > 0) {
           const profileId = token.profile_id || token.profileid;
           confirmedParticipants.add(profileId);
@@ -1045,7 +984,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
       if (tokenCurrentStageIndex > currentStageIndex) return;
 
       if (tokenCurrentStageIndex >= checkFromStageIndex && tokenCurrentStageIndex <= currentStageIndex) {
-        const stageSlots = token.selectedstageslot || {};
+        const stageSlots = token.bookedslot || {};
 
         const hasConfirmedThisStage = stageSlots[stagename] != null;
         if (!hasConfirmedThisStage) {
@@ -1185,7 +1124,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
       if (token.stagestatus !== 'Approved') continue;
       if (![null, undefined, false].includes(token.delete)) continue;
 
-      const stageSlots = token.selectedstageslot || {};
+      const stageSlots = token.bookedslot || {};
       const slot = stageSlots[stagename];
 
       if (
@@ -1245,7 +1184,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
       }
 
       // Check if token has selected slot for this stage
-      const stageSlots = token.selectedstageslot || {};
+      const stageSlots = token.bookedslot || {};
       return stageSlots[stage] != null;
     }).length;
   }
@@ -1260,7 +1199,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
       }
 
       // Check if token does NOT have selected slot for this stage
-      const stageSlots = token.selectedstageslot || {};
+      const stageSlots = token.bookedslot || {};
       return stageSlots[stage] == null;
     }).length;
   }
@@ -1293,7 +1232,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
         );
 
         if (queueToken) {
-          const stageSlots = queueToken.selectedstageslot || {};
+          const stageSlots = queueToken.bookedslot || {};
           if (stageSlots[stage] != null) {
             confirmedParticipants.add(profileId);
           }
@@ -1318,7 +1257,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
         );
 
         if (queueToken) {
-          const stageSlots = queueToken.selectedstageslot || {};
+          const stageSlots = queueToken.bookedslot || {};
           if (stageSlots[stage] == null) {
             nonConfirmedParticipants.add(profileId);
           }
@@ -1378,7 +1317,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
 
   // NEW: Check if participant's selected slot exists in any stage's slots
   checkParticipantSlotExistsInStage(participant: any, stageName: string): boolean {
-    const stageSlots = participant.selectedstageslot || {};
+    const stageSlots = participant.bookedslot || {};
     const selectedSlot = stageSlots[stageName];
 
     if (!selectedSlot) return true; // No slot selected, so not a deleted slot case
@@ -1543,7 +1482,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
         return false;
       }
 
-      const stages = Object.keys(token.selectedstageslot || {});
+      const stages = Object.keys(token.bookedslot || {});
       return stages.length > 0;
     });
 
@@ -1572,7 +1511,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
         return false;
       }
 
-      const stages = Object.keys(token.selectedstageslot || {});
+      const stages = Object.keys(token.bookedslot || {});
       return stages.length === 0;
     });
 
@@ -1609,7 +1548,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
         );
 
         if (queueToken) {
-          const stages = Object.keys(queueToken.selectedstageslot || {});
+          const stages = Object.keys(queueToken.bookedslot || {});
           if (stages.length > 0 && !confirmedParticipants.has(profileId)) {
             confirmedParticipants.set(profileId, {
               ...queueToken,
@@ -1643,7 +1582,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
         );
 
         if (queueToken) {
-          const stages = Object.keys(queueToken.selectedstageslot || {});
+          const stages = Object.keys(queueToken.bookedslot || {});
           if (stages.length === 0 && !nonConfirmedParticipants.has(profileId)) {
             nonConfirmedParticipants.set(profileId, {
               ...queueToken,
@@ -1681,7 +1620,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
     this.queueTokenList.forEach(token => {
       const profileId = token.profile_id || token.profileid;
       const participantSegmentId = this.getParticipantSegment(profileId);
-      const stages = Object.keys(token.selectedstageslot || {});
+      const stages = Object.keys(token.bookedslot || {});
       console.log('segmentid3', participantSegmentId);
 
       stages.forEach(stageName => {
@@ -1843,7 +1782,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
       ).join('; ') || 'No slots';
 
       // Check for deleted slots
-      const stageSlots = token.selectedstageslot || {};
+      const stageSlots = token.bookedslot || {};
       const stages = Object.keys(stageSlots);
       const deletedSlotStages: string[] = [];
       stages.forEach(stageName => {
@@ -1945,7 +1884,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
           stageStatus = queueToken.stagestatus || '';
 
           // Check for deleted slots
-          const stageSlots = queueToken.selectedstageslot || {};
+          const stageSlots = queueToken.bookedslot || {};
           const stages = Object.keys(stageSlots);
           stages.forEach(stageName => {
             const slotExists = this.checkParticipantSlotExistsInStage(queueToken, stageName);
@@ -2121,7 +2060,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
                   stageName: stage,
                   slotTitle,
                   slotBooked: slotTiming,
-                  slotBookedTiming: queueTokenMap.get(participantId)?.selectedstageslot[stage]?.slotconfirmation
+                  slotBookedTiming: queueTokenMap.get(participantId)?.bookedslot[stage]?.slotconfirmation
                 });
               }
             });
@@ -2267,7 +2206,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
       const queueDataResults = await Promise.all(
         queues.map(async (q): Promise<{ stages: string[]; slots: MergedSlot[]; tokens: any[] } | null> => {
           const docid = q['docid'];
-          if (this.selectedQueue?.['docid'] === docid && this.cachedPlanningData) {
+          if (this.selectedQueue?.['docid'] === docid && this.queueSlotList.length > 0) {
             return {
               stages: this.queueStages,
               slots: this.mergedSlots,
@@ -2279,27 +2218,27 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
           if (cached) {
             return {
               stages: cached.stages,
-              slots: this.buildSlotsForExport(cached.planningData, cached.stages, cached.tokens),
+              slots: this.buildSlotsForExport(cached.slotList, cached.stages, cached.tokens),
               tokens: cached.tokens
             };
           }
           const queueRef = doc(this.firestore, 'queue generation', docid);
-          const [queueDoc, planningDocs, tokenDocs] = await Promise.all([getDoc(queueRef),
-            getDocs(query(collection(this.firestore, 'queue planning'), where('queueid', '==', docid))),
+          const [queueDoc, slotDocs, tokenDocs] = await Promise.all([getDoc(queueRef),
+            getDocs(query(collection(this.firestore, 'queue availability'), where('queueid', '==', docid))),
             getDocs(query(collection(this.firestore, 'queue_token'), where('queueref', '==', queueRef)))
           ]);
 
-          if (!queueDoc.exists() || planningDocs.empty) return null;
+          if (!queueDoc.exists() || slotDocs.empty) return null;
 
           const stages: string[] = queueDoc.data()['stages'] || [];
           const tokens = tokenDocs.docs.map((d: any) => d.data());
-          const planningData = planningDocs.docs[0].data();
+          const slotList = slotDocs.docs.map((d: any) => ({ ...d.data(), id: d.id }));
 
-          this.liveQueueExportCache.set(docid, { stages, planningData, tokens });
+          this.liveQueueExportCache.set(docid, { stages, slotList, tokens });
 
           return {
             stages,
-            slots: this.buildSlotsForExport(planningData, stages, tokens),
+            slots: this.buildSlotsForExport(slotList, stages, tokens),
             tokens
           };
         })
@@ -2320,7 +2259,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
       tokens.forEach(t => {
         const pid = t.profile_id || t.profileid;
         if (!pid) return;
-        const otherSlots = Object.values(t.selectedstageslot || {});
+        const otherSlots = Object.values(t.bookedslot || {});
         if (otherSlots.length > 0) {
           const segmentId = (otherSlots[0] as any).segmentid;
           const name = segmentIdToName.get(segmentId) || this.getSegmentName(segmentId);
@@ -2355,7 +2294,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
           const currentIdx = stages.indexOf(t.currentstage);
           return currentIdx !== -1 &&
                 currentIdx <= stageIdx &&
-                t.selectedstageslot?.[stage] == null;
+                t.bookedslot?.[stage] == null;
         }).forEach(t => {
           const pid = t.profile_id || t.profileid;
           if (!pid || addedNonConfirmed.has(pid) || confirmedIds.has(pid)) return;
@@ -2422,7 +2361,7 @@ private pushSlotRows(exportData: any[], queueName: string, stage: string, slot: 
   });
 }
 
-  private buildSlotsForExport(planningData: any, stages: string[], tokens: any[]): MergedSlot[] {
+    private buildSlotsForExport(slotList: any[], stages: string[], tokens: any[]): MergedSlot[] {
     const toDate = (d: any): Date | null => {
       if (!d) return null;
       if (d.toDate) return d.toDate();
@@ -2431,37 +2370,34 @@ private pushSlotRows(exportData: any[], queueName: string, stage: string, slot: 
     };
 
     const slotsMap = new Map<string, any>();
-    (planningData?.planning || []).forEach((variationPlanning: any) => {
-      const variationId = variationPlanning.variationid;
-      (variationPlanning.segments || []).forEach((segmentData: any) => {
-        const segmentId = segmentData.segmentid;
-        (segmentData.slots || []).forEach((slot: any) => {
-          const startdate = toDate(slot.startdate);
-          const enddate = toDate(slot.enddate);
-          if (!startdate || !enddate) return;
+    slotList.forEach((slot: any) => {
+      // Appointment slots are added in a later step
+      if (slot.slottype === 'appointment') return;
 
-          const key = this.generateSlotKey(startdate, enddate);
-          if (!slotsMap.has(key)) {
-            slotsMap.set(key, {
-              startdate,
-              enddate,
-              starttime: this.formatTimeTo24Hour(startdate),
-              endtime: this.formatTimeTo24Hour(enddate),
-              stages: new Set<string>(),
-              segVar: new Map()
-            });
-          }
+      const startdate = toDate(slot.startdate);
+      const enddate = toDate(slot.enddate);
+      if (!startdate || !enddate) return;
 
-          const entry = slotsMap.get(key);
-          entry.stages.add(slot.stagename);
-
-          const svKey = `${segmentId}_${variationId}`;
-          if (!entry.segVar.has(svKey)) {
-            entry.segVar.set(svKey, { segmentId, variationId, stageData: {} });
-          }
-          entry.segVar.get(svKey).stageData[slot.stagename] = { startdate, enddate, title: slot.title || '' };
+      const key = this.generateSlotKey(startdate, enddate);
+      if (!slotsMap.has(key)) {
+        slotsMap.set(key, {
+          startdate,
+          enddate,
+          starttime: this.formatTimeTo24Hour(startdate),
+          endtime: this.formatTimeTo24Hour(enddate),
+          stages: new Set<string>(),
+          segVar: new Map()
         });
-      });
+      }
+
+      const entry = slotsMap.get(key);
+      entry.stages.add(slot.stagename);
+
+      const svKey = `${slot.segmentid}_${slot.variationid}`;
+      if (!entry.segVar.has(svKey)) {
+        entry.segVar.set(svKey, { segmentId: slot.segmentid, variationId: slot.variationid, stageData: {} });
+      }
+      entry.segVar.get(svKey).stageData[slot.stagename] = { startdate, enddate, title: slot.title || '' };
     });
 
     return Array.from(slotsMap.values()).map(entry => {
@@ -2475,7 +2411,7 @@ private pushSlotRows(exportData: any[], queueName: string, stage: string, slot: 
 
           const confirmed = tokens.filter(t => {
             if (!this.isActiveToken(t)) return false;
-            const slot = t.selectedstageslot?.[stageName];
+            const slot = t.bookedslot?.[stageName];
             if (!slot || slot.segmentid !== sv.segmentId) return false;
             return toDate(slot.startdate)?.getTime() === startdate.getTime() && 
                   toDate(slot.enddate)?.getTime() === enddate.getTime();
@@ -2489,7 +2425,7 @@ private pushSlotRows(exportData: any[], queueName: string, stage: string, slot: 
             const pid = t.profile_id || t.profileid;
             if (confirmedIds.has(pid)) return false;
             const currentIdx = stages.indexOf(t.currentstage);
-            return currentIdx !== -1 && currentIdx <= stageIdx && t.selectedstageslot?.[stageName] == null;
+            return currentIdx !== -1 && currentIdx <= stageIdx && t.bookedslot?.[stageName] == null;
           });
 
           stageData[stageName] = { title, confirmedParticipants: confirmed, nonConfirmedParticipants: nonConfirmed };
@@ -2647,7 +2583,7 @@ private pushSlotRows(exportData: any[], queueName: string, stage: string, slot: 
         return false;
       }
 
-      const stageSlots = token.selectedstageslot || {};
+      const stageSlots = token.bookedslot || {};
       return stageSlots[stage] != null;
     });
 
@@ -2676,7 +2612,7 @@ private pushSlotRows(exportData: any[], queueName: string, stage: string, slot: 
         return false;
       }
 
-      const stageSlots = token.selectedstageslot || {};
+      const stageSlots = token.bookedslot || {};
       return stageSlots[stage] == null;
     });
 
@@ -2710,7 +2646,7 @@ private pushSlotRows(exportData: any[], queueName: string, stage: string, slot: 
         );
 
         if (queueToken) {
-          const stageSlots = queueToken.selectedstageslot || {};
+          const stageSlots = queueToken.bookedslot || {};
           if (stageSlots[stage] != null && !confirmedParticipants.has(profileId)) {
             const slotExists = this.checkParticipantSlotExistsInStage(queueToken, stage);
 
@@ -2747,7 +2683,7 @@ private pushSlotRows(exportData: any[], queueName: string, stage: string, slot: 
         );
 
         if (queueToken) {
-          const stageSlots = queueToken.selectedstageslot || {};
+          const stageSlots = queueToken.bookedslot || {};
           if (stageSlots[stage] == null && !nonConfirmedParticipants.has(profileId)) {
             nonConfirmedParticipants.set(profileId, {
               ...queueToken,
@@ -2928,9 +2864,9 @@ private pushSlotRows(exportData: any[], queueName: string, stage: string, slot: 
   getParticipantSelectedSlots(participant: any): any[] {
     const slots = [];
 
-    if (participant.selectedstageslot) {
-      Object.keys(participant.selectedstageslot).forEach(stageName => {
-        const slot = participant.selectedstageslot[stageName];
+    if (participant.bookedslot) {
+      Object.keys(participant.bookedslot).forEach(stageName => {
+        const slot = participant.bookedslot[stageName];
 
         if ([null, undefined, ''].includes(slot.segmentid)) {
           console.log(participant.profile_name);
@@ -3624,6 +3560,20 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
     return this.applySegmentFilter(slotsForStage, stage);
   }
 
+   // Appointment slots of this stage
+  getAppointmentSlotsForStage(stage: string): any[] {
+    return this.queueSlotList
+      .filter(slot => slot.slottype === 'appointment' && slot.stagename === stage)
+      .filter(slot => !this.overallSegmentFilter?.length || this.overallSegmentFilter.includes(slot.segmentid))
+      .sort((a, b) => a.startdate.toMillis() - b.startdate.toMillis());
+  }
+
+  async revertAppointmentSlot(slot) {
+    const apptSnap = await getDoc(slot.appointmentref);
+    if (!apptSnap.exists()) return;
+    this.guard.cancelAppointment({ ...(apptSnap.data() as any), bookingid: apptSnap.id });
+  }
+
   getUniqueSegments(): string[] {
     if (!this.selectedSlot || !this.selectedStageForPanel) return [];
 
@@ -4144,7 +4094,7 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
   // Add new method to get participant's variation
   getParticipantVariation(participant: any): string {
     if (!participant) return '';
-    const stageSlots = participant.selectedstageslot || {};
+    const stageSlots = participant.bookedslot || {};
     const stages = Object.keys(stageSlots);
 
     if (stages.length > 0) {
@@ -4231,7 +4181,7 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
       const profileId = token.profile_id || token.profileid;
       if (!profileId || addedProfileIds.has(profileId)) return;
 
-      const stageSlots = token.selectedstageslot || {};
+      const stageSlots = token.bookedslot || {};
       const stages = Object.keys(stageSlots);
       const deletedSlotStages: string[] = [];
 
@@ -5314,7 +5264,7 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
             variationid: variationId,
             maxslot: maxSlot,
             usedslot: usedSlot,
-            queueplanid: this.cachedPlanningData.docid
+            docid: stageData.docid
           });
         }
       }
@@ -5384,95 +5334,27 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
     return `${dayFormat(start)} ${timeFormat(start)} - ${dayFormat(end)} ${timeFormat(end)}`;
   }
 
-  // Update slot count in queue planning 
-  async updateSlotCount(
-    queuePlanId: string,
-    segmentId: string,
-    stageName: string,
-    variationId: string,
-    increment: boolean,
-    selectedSlot: any
-  ): Promise<boolean> {
 
-    const planningRef = doc(this.firestore, 'queue planning', queuePlanId);
-    let updated = false;
-
-    const toMillis = (d: any): number => {
-      if (!d) return 0;
-      if (d.seconds !== undefined) return d.seconds * 1000;
-      if (d.toDate && typeof d.toDate === 'function') return d.toDate().getTime();
-      if (d instanceof Date) return d.getTime();
-      return new Date(d).getTime();
-    };
-
-    const selectedStart = toMillis(selectedSlot.startdate);
-    const selectedEnd = toMillis(selectedSlot.enddate);
+  async updateSlotCount(slotDocId: string, increment: boolean): Promise<boolean> {
+    const slotRef = doc(this.firestore, 'queue availability', slotDocId);
 
     try {
       await runTransaction(this.firestore, async (transaction) => {
-        const queueDoc = await transaction.get(planningRef);
-        if (!queueDoc.exists()) throw new Error('No Planning');
+        const slotDoc = await transaction.get(slotRef);
+        if (!slotDoc.exists()) throw new Error('Slot not found');
 
-        const data = queueDoc.data();
-        const planningList = data['planning'] as any[];
-        let found = false;
+        const currentUsed = slotDoc.data()['usedslot'] || 0;
+        const maxSlot = slotDoc.data()['maxslot'] || 0;
 
-        for (let i = 0; i < planningList.length; i++) {
-          if (planningList[i]['variationid'] !== variationId) continue;
+        if (increment && maxSlot !== 0 && currentUsed >= maxSlot) throw new Error('Slot Full');
 
-          const segments = planningList[i]['segments'] as any[];
-          for (let j = 0; j < segments.length; j++) {
-            if (segments[j]['segmentid'] !== segmentId) continue;
-
-            const slots = segments[j]['slots'] as any[];
-            for (let k = 0; k < slots.length; k++) {
-              const slot = slots[k];
-
-              const slotStart = toMillis(slot.startdate);
-              const slotEnd = toMillis(slot.enddate);
-
-              if (
-                slot['stagename'] !== stageName ||
-                slotStart !== selectedStart ||
-                slotEnd !== selectedEnd
-              ) continue;
-
-              // Found the slot — update usedslot
-              const currentUsed = slot['usedslot'] || 0;
-              const maxSlot = slot['maxslot'] || 0;
-
-              if (increment) {
-                if (maxSlot === 0 || currentUsed < maxSlot) {
-                  slot['usedslot'] = currentUsed + 1;
-                  updated = true;
-                  found = true;
-                } else {
-                  throw new Error('Slot Full');
-                }
-              } else {
-                slot['usedslot'] = currentUsed > 0 ? currentUsed - 1 : 0;
-                updated = true;
-                found = true;
-              }
-              break;
-            }
-            if (found) break;
-          }
-          if (found) break;
-        }
-
-        if (updated) {
-          transaction.update(planningRef, { 'planning': planningList });
-        } else {
-          throw new Error('Slot not found');
-        }
+        transaction.update(slotRef, { usedslot: increment ? currentUsed + 1 : Math.max(currentUsed - 1, 0) });
       });
+      return true;
     } catch (err) {
       console.error('Transaction error:', err);
-      updated = false;
+      return false;
     }
-
-    return updated;
   }
 
   async confirmBookSlot() {
@@ -5493,9 +5375,7 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
     try {
       // In-queue participant 
       if (!participant.isNonQueueParticipant) {
-        const updated = await this.updateSlotCount(
-          queuePlanId, segmentId, stageName, variationId, true, selectedSlot
-        );
+        const updated = await this.updateSlotCount(selectedSlot.docid, true);
 
         if (!updated) {
           alert('Failed to book slot. Slot may be full. Please try again.');
@@ -5517,7 +5397,7 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
         const logRef = doc(collection(this.firestore, 'queue_slot_log'));
         await Promise.all([
           updateDoc(tokenRef, {
-            [`selectedstageslot.${stageName}`]: slotData
+            [`bookedslot.${stageName}`]: slotData
           }),
           setDoc(logRef, {
             docid:       logRef.id,
@@ -5537,9 +5417,9 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
         const tokenIndex = this.queueTokenList.findIndex(t => t.tokenid === tokenId || t.id === tokenId);
         if (tokenIndex !== -1) {
           const updatedToken = { ...this.queueTokenList[tokenIndex] };
-          const updatedStageSlot = { ...(updatedToken.selectedstageslot || {}) };
+          const updatedStageSlot = { ...(updatedToken.bookedslot || {}) };
           updatedStageSlot[stageName] = slotData;
-          updatedToken.selectedstageslot = updatedStageSlot;
+          updatedToken.bookedslot = updatedStageSlot;
           this.queueTokenList[tokenIndex] = updatedToken;
         }
 
@@ -5582,10 +5462,7 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
       const pendingProductDoc = pendingProductResult.docs[0];
       const pendingProductData = pendingProductDoc.data();
 
-      // Increment usedslot
-      const updated = await this.updateSlotCount(
-        queuePlanId, segmentId, stageName, variationId, true, selectedSlot
-      );
+      const updated = await this.updateSlotCount(selectedSlot.docid, true);
 
       if (!updated) {
         alert('Failed to book slot. Slot may be full. Please try again.');
@@ -5653,7 +5530,7 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
     const confirmed = window.confirm(`Are you sure you want to revert the slot`);
     if (!confirmed) return;
 
-    const stageSlots = participant.selectedstageslot || {};
+    const stageSlots = participant.bookedslot || {};
     const selectedSlot = stageSlots[stageName];
 
     if (!selectedSlot) {
@@ -5663,10 +5540,8 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
 
     const segmentId = selectedSlot.segmentid;
     const variationId = selectedSlot.variationid || participant.variationId;
-    const queuePlanId = this.cachedPlanningData?.docid;
-
-    if (!queuePlanId) {
-      alert('Queue planning data not found.');
+    if (!selectedSlot.docid) {
+      alert('Slot reference not found');
       return;
     }
 
@@ -5676,10 +5551,7 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
     });
 
     try {
-      const updated = await this.updateSlotCount(
-        queuePlanId, segmentId, stageName, variationId, false, selectedSlot
-      );
-
+      const updated = await this.updateSlotCount(selectedSlot.docid, false);
       if (!updated) {
         loading.close();
         alert('Failed to revert slot. Please try again.');
@@ -5691,7 +5563,7 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
       const logRef = doc(collection(this.firestore, 'queue_slot_log'));
       await Promise.all([
         updateDoc(tokenRef, {
-          [`selectedstageslot.${stageName}`]: deleteField()
+          [`bookedslot.${stageName}`]: deleteField()
         }),
         setDoc(logRef, {
           docid:      logRef.id,
@@ -5708,9 +5580,9 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
       const tokenIndex = this.queueTokenList.findIndex(t => t.tokenid === tokenId || t.id === tokenId);
       if (tokenIndex !== -1) {
         const updatedToken = { ...this.queueTokenList[tokenIndex] };
-        const updatedStageSlot = { ...(updatedToken.selectedstageslot || {}) };
+        const updatedStageSlot = { ...(updatedToken.bookedslot || {}) };
         delete updatedStageSlot[stageName];
-        updatedToken.selectedstageslot = updatedStageSlot;
+        updatedToken.bookedslot = updatedStageSlot;
         this.queueTokenList[tokenIndex] = updatedToken;
       }
       this.confirmedParticipants = this.confirmedParticipants.filter(p => (p.profile_id || p.profileid) !== profileId);

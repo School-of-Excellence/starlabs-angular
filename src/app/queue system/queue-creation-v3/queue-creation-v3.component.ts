@@ -85,8 +85,9 @@ export class QueueCreationV3Component {
   filterprofile = ""
   filterpackageeligibility = ""
   venueList: any[] = []
-  stageActionTypes = ["Form", "Link", "VideoAsk", "EvolutionMapping"]
+  stageActionTypes = ["Form", "Link", "VideoAsk", "EvolutionMapping","Appointment"]
   formTemplateList = []
+  appointmentTypeList=[]
   videoAskList = []
   // newly added
   mapProductToDeliverySequence: any = {}
@@ -329,7 +330,7 @@ export class QueueCreationV3Component {
           var property = data["stageproperty"][stage]
 
           var actionResources: any;
-          if (property["actiontype"] == "form") {
+          if (property["actiontype"] == "form" || property["actiontype"]== "appointment") {
             actionResources = property["actionresource"]?.id;
           } else if (property["actiontype"] == "videoask") {
 
@@ -531,8 +532,12 @@ export class QueueCreationV3Component {
           })
         })
       }
-      console.log(this.mapProductToMode)
+      console.log(this.mapProductToMode) 
       console.log(this.mapProductToDeliverySequence, 'this.mapProductToDeliverySequence')
+    })
+    getDocs(query(collection(this.firestore,'appointmenttype'),orderBy('appointmenttype'))).then(snap =>{
+      this.appointmentTypeList = snap.docs.map(e => ({ ...e.data(), docid: e.id }))
+      .filter(e => e['queueappointment'] === true || e['groupappointment'] === true)
     })
     //get delivery events forms queue
     // getDocs(collection(this.firestore, 'delivery events')).then((snap) => {
@@ -1061,6 +1066,9 @@ addNextStage(mainIndex: number) {
           }
           if (property["actiontype"] == "form") {
             metadata["stageproperty"][property["stage"]]["actionresource"] = doc(this.firestore, "delivery forms", property["actionresource"])
+          }
+          else if (property["actiontype"] == "appointment") {
+            metadata["stageproperty"][property["stage"]]["actionresource"] = doc(this.firestore, "appointmenttype", property["actionresource"])
           }
           else if (property["actiontype"] == "videoask") {
 
