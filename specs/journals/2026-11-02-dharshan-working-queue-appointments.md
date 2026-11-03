@@ -82,6 +82,28 @@ Operator 2026-11-03: no live queues; past queues out of scope → migration gap 
 11. Group appointment types (planner lists `groupappointment == true`) are booked as one seat:
     queue booking sets `booked: true`, ignoring `maxbooking` / `totalbooked` that the normal flow uses.
 
+## Re-pull onto charan-staging (2026-11-03, afternoon)
+First batch landed as `charan-staging` `f477945d` (web) / `deeade2` (Flutter), not charan-release.
+Operator: "get the changes from dharshan again". Applied only Dharshan's own new commits (not his
+`3e52ad7e` development merge); every touched file is now byte-identical to `origin/dharshan-working`.
+
+| Commit | Files | What |
+|---|---|---|
+| web `3210a907` | queue-planning `{css,html,ts}`, queue-creation-v3 `.ts`, dynamic-studio-v2 `.ts` | Planner: date-range picker + slots grouped by specialist/day; overlapping slots of the same specialist disabled; edit an appointment slot in place; refuses to remove/edit a slot a participant already booked. Creation: appointment types queried server-side (`or(queueappointment, groupappointment)`). Studio: "bring to studio" only while now is inside the booked slot (adds end check). |
+| web `854ad880` | events-stage-data, queue-web-version1, dynamic-queue-manager-clone, planning.engine | `selectedstageslot` → `bookedslot` reads |
+| app `3393d08` | `lib/Delivery Queue/queueControl.dart` | Awaits the booking; success snackbar only when it actually booked |
+
+Gap status after this: **#8 fixed**. **#3 partly fixed** — still on `selectedstageslot`:
+`queue-planning.component.ts` (~642, ~957, ~1398, ~2762) and `queue-planning-clone`; `'queue planning'`
+still read by manage-participantlist-dialog, queue manager, queue-web-version1, planning-tab,
+queue-planning(-clone). New risk: the planner's `queue availability` query (`slottype ==` +
+`startdate` range) and creation's `or(...)` + `orderBy('appointmenttype')` need composite indexes —
+none are in `firestore.indexes.json`, so the first run may fail with an index link in the console.
+
+Revert (re-pull only): restore the files above from `f477945d` (web) / `deeade2` (Flutter). The
+854ad880 four restore from `charan-release`.
+
 ## Pending
-- Not committed (awaiting operator).
-- e2e coverage (screen-e2e-coverage) for the new planner/review/studio/flag UI before push.
+- e2e coverage (screen-e2e-coverage) for the new planner/review/studio/flag UI before this reaches
+  charan-release.
+- Cloud Functions `dharshan-development` not pulled.
