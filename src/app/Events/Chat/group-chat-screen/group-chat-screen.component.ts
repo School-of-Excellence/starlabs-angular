@@ -12,7 +12,7 @@ import {
 } from '@angular/fire/firestore';
 import { writeBatch, FieldPath, increment } from 'firebase/firestore';
 import { Storage } from '@angular/fire/storage';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject, UploadTask } from 'firebase/storage';
 import { Subject, Subscription, takeUntil } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
 import { AuthguardService } from '../../../authguard.service';
@@ -33,6 +33,16 @@ export interface PendingFile {
   type: Attachment['type'];
   /** Object URL for image/video previews; revoked when the file is removed or sent. */
   previewUrl?: string;
+  /** Upload progress 0–100. The upload starts as soon as the file is picked, not on Send. */
+  progress?: number;
+  /** Resolves with the stored file record once uploaded (live groups only). */
+  upload?: Promise<any>;
+  /** The running upload, so removing the file can cancel it. */
+  task?: UploadTask;
+  /** The stored record, once the upload finished. */
+  record?: any;
+  /** Why the upload failed, shown on the preview. */
+  error?: string;
 }
 
 export interface Attachment {
@@ -354,6 +364,15 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   readonly cDesc = '';
   /** Event picked in the create dialog (an `event collection` doc id) — saved as `linked_event_ref`. */
   cEventId = '';
+  /** The create dialog's event list is open (QA item 1: the field opens it, a pick closes it). */
+  cEventOpen = false;
+  /**
+   * QA item 3: with an event picked, Members lists only participants approved for it — the same rule
+   * the B!G cohort screens use: an `event participation request` for the event with status approved or
+   * attended. Uids of those with an app account; null while no event is picked (everyone is listed).
+   */
+  cApprovedUids: Set<string> | null = null;
+  cApprovedLoading = false;
   cSaving = false;
   cImageFile: File | null = null;
   cImagePreview: string | null = null;
@@ -1628,14 +1647,21 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
    * The preview is a ~480px JPEG for images and the first frame for videos, so phones load the small
    * one in the chat. Storage path stays chat-screen's, so the old web screen still serves the files.
    */
-  private async uploadToStorage(groupId: string, file: File | Blob, filename: string, mime: string): Promise<any> {
+  private async uploadToStorage(groupId: string, file: File | Blob, filename: string, mime: string,
+                                track?: { onProgress: (pct: number) => void; onTask: (t: UploadTask) => void }): Promise<any> {
     const kind = this.mediaKind(mime, filename);
     const storageRef = ref(this.storage, `chat-files/${groupId}/${Date.now()}_${filename}`);
-    const snapshot = await uploadBytes(storageRef, file, {
+    // Resumable, so the composer can show progress while the file uploads (QA item 9).
+    const task = uploadBytesResumable(storageRef, file, {
       contentType: mime || undefined,
       // Opened in a browser, it downloads as "report.pdf", not as the storage path (as the app does).
       contentDisposition: `inline; filename*=UTF-8''${encodeURIComponent(filename)}`,
     });
+    track?.onTask(task);
+    if (track) {
+      task.on('state_changed', s => track.onProgress(s.totalBytes ? Math.round(100 * s.bytesTransferred / s.totalBytes) : 0));
+    }
+    const snapshot = await task;
     const fileurl = await getDownloadURL(snapshot.ref);
     let filethumbnail: string | null = null;
     try {
@@ -2415,8 +2441,18 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     else if (p.type === 'video') this.openVideo(p.previewUrl);
   }
 
+  /** The open profile was reached from Group Info, so it offers Back to it (QA item 5). */
+  personFromInfo = false;
+
+  backToInfo(): void {
+    this.person = null;
+    this.personFromInfo = false;
+    this.showInfo = true;
+  }
+
   openPerson(name: string): void {
     if (!name || name === this.TEAM_NAME) return;
+    this.personFromInfo = this.showInfo;
     this.person = { name, doc: this.directory[name] || null };
     this.showInfo = false; this.infoMsg = null;
     this.loadPersonTickets(name);
@@ -3152,6 +3188,22 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   /* These three all go through replaceRange() rather than assigning `draft`, so each stays a
      single undoable step — see replaceRange() for why that matters. */
 
+  /* ── Emoji (QA item 8) — a small picker on the composer toolbar; an emoji goes in at the caret ── */
+  emojiOpen = false;
+  readonly EMOJI_SETS: { label: string; emojis: string[] }[] = [
+    { label: 'Smileys', emojis: ['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '😉', '😍', '🥰', '😘', '😎', '🤩', '🥳', '😋', '🤔', '🤗', '😮', '😢', '😭', '😤', '😴', '🙏'] },
+    { label: 'Gestures', emojis: ['👍', '👎', '👏', '🙌', '👋', '🤝', '✌️', '🤞', '👌', '💪', '👉', '👀', '🫶'] },
+    { label: 'Hearts', emojis: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '💖', '💯'] },
+    { label: 'Things', emojis: ['🎉', '🎊', '🔥', '⭐', '✨', '🌟', '🏆', '🎯', '📣', '📅', '⏰', '✅', '❌', '⚠️', '💡', '📌', '🚀', '🎁', '☕'] },
+  ];
+
+  insertEmoji(emoji: string): void {
+    const el = this.composerRef?.nativeElement;
+    const start = el?.selectionStart ?? this.draft.length;
+    const end = el?.selectionEnd ?? start;
+    this.replaceRange(start, end, emoji, start + emoji.length);
+  }
+
   insertMention(token: string): void {
     const at = this.composerRef?.nativeElement?.selectionStart ?? this.draft.length;
     this.replaceRange(at, at, token + ' ', at + token.length + 1);
@@ -3269,17 +3321,59 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     // Object URLs render image/video previews without reading the whole file into memory.
     const previewUrl = (type === 'image' || type === 'video' || type === 'voice')
       ? URL.createObjectURL(file) : undefined;
-    this.pendingFiles = [...this.pendingFiles, { file, name: file.name, size: file.size, type, mime, previewUrl }];
+    const pending: PendingFile = { file, name: file.name, size: file.size, type, mime, previewUrl, progress: 0 };
+    this.pendingFiles = [...this.pendingFiles, pending];
+    this.startUpload(this.active, pending);
+  }
+
+  /**
+   * QA item 9: the upload starts the moment a file is picked, with its progress on the preview, so Send
+   * usually finds it already done. Send still waits for any upload in flight. Demo rows don't upload.
+   */
+  private startUpload(group: ChatItem, p: PendingFile): void {
+    if (!this.isLive(group)) { p.progress = 100; return; }
+    p.upload = this.uploadToStorage(group.id, p.file, p.name, p.mime, {
+      onProgress: pct => { p.progress = pct; },
+      onTask: t => { p.task = t; },
+    }).then(record => {
+      p.record = record;
+      p.progress = 100;
+      return record;
+    }, err => {
+      if (err?.code !== 'storage/canceled') {
+        console.error('upload', err);
+        p.error = 'Upload failed — remove it and try again';
+      }
+      throw err;
+    });
+    // A failure is shown on the preview; Send surfaces it again. Never an unhandled rejection.
+    p.upload.catch(() => {});
+  }
+
+  /** True while any picked file is still uploading — drives the composer's hint. */
+  get filesUploading(): boolean { return this.pendingFiles.some(p => !p.record && !p.error && (p.progress ?? 100) < 100); }
+
+  /** An abandoned upload: cancel it if running, delete what already landed (file and preview). */
+  private discardUpload(p: PendingFile): void {
+    if (p.task && !p.record) { try { p.task.cancel(); } catch { /* already finished */ } }
+    for (const url of [p.record?.['fileurl'], p.record?.['filethumbnail']]) {
+      if (url) deleteObject(ref(this.storage, url)).catch(() => { /* best effort */ });
+    }
   }
 
   removePendingFile(i: number): void {
     const gone = this.pendingFiles[i];
+    if (gone) this.discardUpload(gone);
     if (gone?.previewUrl) URL.revokeObjectURL(gone.previewUrl);
     this.pendingFiles = this.pendingFiles.filter((_, idx) => idx !== i);
   }
 
-  private clearPendingFiles(): void {
-    this.pendingFiles.forEach(p => { if (p.previewUrl) URL.revokeObjectURL(p.previewUrl); });
+  /** `sent` = the files went out with a message, so their uploads are kept; otherwise they're discarded. */
+  private clearPendingFiles(sent = false): void {
+    this.pendingFiles.forEach(p => {
+      if (!sent) this.discardUpload(p);
+      if (p.previewUrl) URL.revokeObjectURL(p.previewUrl);
+    });
     this.pendingFiles = [];
   }
 
@@ -3293,9 +3387,12 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     this.uploadingFiles = true;
     try {
       if (this.isLive(active)) {
+        // Uploads started when the files were picked; wait for any still running. A file whose upload
+        // failed is retried here once, so one bad moment on the network doesn't lose the message.
         const records: any[] = [];
         for (const p of staged) {
-          records.push(await this.uploadToStorage(active.id, p.file, p.name, p.mime));
+          records.push(p.record ?? await (p.upload ?? Promise.reject()).catch(() =>
+            this.uploadToStorage(active.id, p.file, p.name, p.mime)));
         }
         await this.writeMessage(active, text, records, replyTarget, buttons);
       } else {
@@ -3311,7 +3408,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
         src.messages = [...src.messages, msg];
         this.touch(active, text || this.attachmentSummary(attachments), at);
       }
-      this.clearPendingFiles();
+      this.clearPendingFiles(true);
       this.scrollToBottomSoon();
     } catch (err: any) {
       console.error('attach', err);
@@ -4016,6 +4113,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     if (this.tab === 'channels') { this.openChannelCreate(); return; }
     this.createOpen = true;
     this.cName = ''; this.cEventId = ''; this.cEventSearch = '';
+    this.cEventOpen = false; this.cApprovedUids = null; this.cApprovedLoading = false;
     this.loadLinkEvents();
     this.cSearch = ''; this.cSelected = [];
     this.cImageFile = null; this.cImagePreview = null; this.createNameError = '';
@@ -4046,9 +4144,19 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   clearGroupImage(): void { this.cImageFile = null; this.cImagePreview = null; }
 
   /** Search matches name OR email — an import list keys off email, so both have to be findable. */
+  /**
+   * Who the create dialog's Members list offers: everyone, or — once an event is picked — the A&H team
+   * plus participants approved for that event. People already ticked stay listed either way.
+   */
+  get createCandidates(): Person[] {
+    const approved = this.cApprovedUids;
+    if (!this.cEventId || !approved) return this.createPool;
+    return this.createPool.filter(p => p.source === 'team' || approved.has(p.id) || this.isPicked(p.id));
+  }
+
   get createShown(): Person[] {
     const q = this.cSearch.trim().toLowerCase();
-    const pool = this.createPool.filter(p =>
+    const pool = this.createCandidates.filter(p =>
       !q || p.name.toLowerCase().includes(q) || (this.emailOf(p.id) || '').toLowerCase().includes(q));
     // Picked people float to the top, so a long selection is never lost behind the cap below.
     const picked = pool.filter(p => this.isPicked(p.id));
@@ -4058,8 +4166,8 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   get createMatchCount(): number {
     const q = this.cSearch.trim().toLowerCase();
-    if (!q) return this.createPool.length;
-    return this.createPool.filter(p =>
+    if (!q) return this.createCandidates.length;
+    return this.createCandidates.filter(p =>
       p.name.toLowerCase().includes(q) || (this.emailOf(p.id) || '').toLowerCase().includes(q)).length;
   }
 
@@ -4420,6 +4528,56 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     const start = d(x?.['start_date']), end = d(x?.['end_date']);
     if (!start) return '';
     return !end || short(end) === short(start) ? short(start) : `${short(start)} – ${short(end)}`;
+  }
+
+  /** An event's name from the picker list (the create dialog's field label). */
+  eventNameById(id: string): string {
+    return this.linkEvents?.find(e => e.id === id)?.name || '';
+  }
+
+  toggleCreateEventPicker(): void {
+    this.cEventOpen = !this.cEventOpen;
+    if (this.cEventOpen) { this.cEventSearch = ''; this.loadLinkEvents(); }
+  }
+
+  /** A pick sets the event and closes the list, then narrows Members to the event's approved participants. */
+  pickCreateEvent(id: string): void {
+    this.cEventId = id;
+    this.cEventOpen = false;
+    this.cEventSearch = '';
+    this.loadApprovedFor(id);
+  }
+
+  private async loadApprovedFor(eventId: string): Promise<void> {
+    this.cApprovedUids = null;
+    if (!eventId) { this.cApprovedLoading = false; return; }
+    this.cApprovedLoading = true;
+    try {
+      const snap = await getDocs(query(
+        collection(this.firestore, 'event participation request'),
+        where('eventref', '==', doc(this.firestore, 'event collection', eventId)),
+        where('status', 'in', ['approved', 'attended']),
+      ));
+      if (this.cEventId !== eventId) return;          // the pick changed while this was loading
+      const uids = new Set<string>();
+      snap.docs.forEach(d => {
+        const pid = d.get('profileid') || d.get('participantid');
+        const uid = pid ? this.profileByDocId[pid]?.uid : null;
+        if (uid) uids.add(uid);
+      });
+      this.cApprovedUids = uids;
+    } catch (e) {
+      console.error('group-chat: approved participants', e);
+      this.notify('Could not load the event\'s approved participants — showing everyone');
+    } finally {
+      if (this.cEventId === eventId) this.cApprovedLoading = false;
+    }
+  }
+
+  /** Info: the Linked event field opens the list; a pick saves straight away and closes it (QA item 1). */
+  pickInfoEvent(id: string): void {
+    this.eventDraftId = id;
+    this.saveLinkedEvent();
   }
 
   startEditEvent(): void {

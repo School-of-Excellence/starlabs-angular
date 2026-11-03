@@ -1136,6 +1136,32 @@
 .wc-evname { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wc-evdates { font-size: 11.5px; color: var(--ink3); }
 .wc-evactions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+/* QA item 1: the linked-event field — shows the choice, opens the list below it. */
+.wc-evfield {
+  display: flex; align-items: center; gap: 8px; width: 100%; min-height: 34px; padding: 6px 10px; margin-top: 3px;
+  border: 1px solid var(--line3); border-radius: 10px; background: var(--field); color: var(--ink);
+  font-size: 13px; font-weight: 600; text-align: left; cursor: pointer;
+}
+.wc-evfield:hover, .wc-evfield.open { border-color: var(--blue-text); }
+.wc-evfield .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wc-evfield .placeholder { color: var(--ink3); font-weight: 500; }
+.wc-evfield mat-icon { font-size: 18px; width: 18px; height: 18px; color: var(--ink3); flex-shrink: 0; }
+.wc-evdrop { display: flex; flex-direction: column; }
+.wc-picknote.event mat-icon { color: var(--blue-text); }
+
+/* QA item 8: emoji picker above the composer. */
+.wc-emoji { margin: 0 0 6px; padding: 8px 10px 10px; border: 1px solid var(--line3); border-radius: 12px; background: var(--field); max-height: 220px; overflow-y: auto; }
+.wc-emoji-head { display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 700; color: var(--ink2); margin-bottom: 4px; }
+.wc-emoji-label { font-size: 10.5px; font-weight: 700; color: var(--ink3); text-transform: uppercase; letter-spacing: .4px; margin: 6px 0 2px; }
+.wc-emoji-grid { display: flex; flex-wrap: wrap; gap: 2px; }
+.wc-emoji-grid button { width: 34px; height: 34px; border: none; border-radius: 8px; background: transparent; font-size: 20px; line-height: 1; cursor: pointer; }
+.wc-emoji-grid button:hover { background: var(--sunken); }
+
+/* QA item 9: per-file upload progress on the composer previews. */
+.wc-preview { position: relative; }
+.wc-preview-progress { position: absolute; left: 6px; right: 6px; bottom: 4px; height: 3px; border-radius: 3px; background: var(--line3); overflow: hidden; }
+.wc-preview-progress span { display: block; height: 100%; background: var(--blue); transition: width .2s; }
+.wc-preview-error { font-size: 11px; font-weight: 600; color: var(--red); margin-top: 3px; }
 .wc-evactions .wc-primary-btn { height: 30px; padding: 0 14px; font-size: 14px; }
 .wc-slide-rename select {
   flex: 1; min-width: 0; height: 32px; padding: 0 8px; border-radius: 10px;

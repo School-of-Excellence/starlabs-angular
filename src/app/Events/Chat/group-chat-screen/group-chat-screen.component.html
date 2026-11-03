@@ -648,7 +648,25 @@
                   (click)="toggleAnnounce()">
             <mat-icon>campaign</mat-icon> announcement
           </button>
+          <button data-testid="gcs-composer-emoji" class="wide" [class.on]="emojiOpen" matTooltip="Emoji" (click)="emojiOpen = !emojiOpen">
+            <mat-icon>sentiment_satisfied</mat-icon> emoji
+          </button>
           <span class="wc-toolbar-hint">*bold* · _italic_ · • bullet · 1. number</span>
+        </div>
+
+        <!-- QA item 8: emoji picker — a tap puts the emoji at the caret; the panel stays open for more. -->
+        <div class="wc-emoji" *ngIf="emojiOpen && !recording && !recReview">
+          <div class="wc-emoji-head">
+            <span>Emoji</span>
+            <button data-testid="gcs-composer-emoji-close" class="wc-plain-btn" (click)="emojiOpen = false" matTooltip="Close"><mat-icon>close</mat-icon></button>
+          </div>
+          <div class="wc-emoji-set" *ngFor="let set of EMOJI_SETS; trackBy: trackByIndex">
+            <div class="wc-emoji-label">{{ set.label }}</div>
+            <div class="wc-emoji-grid">
+              <button data-testid="gcs-composer-emoji-pick" type="button" *ngFor="let e of set.emojis; trackBy: trackByIndex"
+                      (mousedown)="$event.preventDefault()" (click)="insertEmoji(e)">{{ e }}</button>
+            </div>
+          </div>
         </div>
 
         <!-- @mention autocomplete -->
@@ -713,10 +731,16 @@
               <button data-testid="gcs-preview-remove" class="wc-preview-x" (click)="removePendingFile(i)" matTooltip="Remove">
                 <mat-icon>close</mat-icon>
               </button>
+              <!-- QA item 9: the upload runs from the moment the file is picked. -->
+              <div class="wc-preview-progress" *ngIf="!p.error && (p.progress ?? 100) < 100">
+                <span [style.width.%]="p.progress || 2"></span>
+              </div>
+              <div class="wc-preview-error" *ngIf="p.error">{{ p.error }}</div>
             </div>
           </div>
-          <div class="wc-preview-hint" *ngIf="!uploadingFiles">Add a caption, then send</div>
-          <div class="wc-preview-hint" *ngIf="uploadingFiles">Uploading…</div>
+          <div class="wc-preview-hint" *ngIf="!uploadingFiles && filesUploading">Uploading… you can write a caption meanwhile</div>
+          <div class="wc-preview-hint" *ngIf="!uploadingFiles && !filesUploading">Uploaded — add a caption, then send</div>
+          <div class="wc-preview-hint" *ngIf="uploadingFiles">Sending…</div>
         </div>
 
         <!-- Buttons attached to the message being composed -->
@@ -873,28 +897,24 @@
 
         <!-- Provenance -->
         <div class="wc-block">
-          <!-- Linked event — the app's `linked_event`, also shown under the chat name in the thread header. -->
-          <div class="wc-kv" *ngIf="a.eventId && !editingEvent">
+          <!-- Linked event (`linked_event_ref`), also shown under the chat name in the thread header.
+               QA item 1: the field opens the event list; picking one saves it and closes the list. -->
+          <div class="wc-kv" *ngIf="a.eventId || (canEditChat && !isChannel(a))">
             <mat-icon>event</mat-icon>
             <div class="grow">
               <div class="wc-kv-label">Linked event</div>
-              <div class="wc-kv-value">{{ a.eventName || 'Loading…' }}</div>
+              <button data-testid="gcs-info-event-field" type="button" class="wc-evfield" *ngIf="canEditChat && !isChannel(a)"
+                      [class.open]="editingEvent" (click)="editingEvent ? cancelEditEvent() : startEditEvent()">
+                <span class="grow" [class.placeholder]="!a.eventId">{{ a.eventId ? (a.eventName || 'Loading…') : 'Choose an event' }}</span>
+                <mat-icon>{{ editingEvent ? 'expand_less' : 'expand_more' }}</mat-icon>
+              </button>
+              <div class="wc-kv-value" *ngIf="!(canEditChat && !isChannel(a))">{{ a.eventName || 'Loading…' }}</div>
             </div>
-            <button data-testid="gcs-info-event-edit" class="wc-slide-editbtn" *ngIf="canEditChat && !isChannel(a)"
-                    (click)="startEditEvent()" matTooltip="Edit linked event">
-              <mat-icon>edit</mat-icon>
-            </button>
           </div>
-          <button data-testid="gcs-info-event-add" class="wc-slide-adddesc" *ngIf="!a.eventId && !editingEvent && canEditChat && !isChannel(a)"
-                  (click)="startEditEvent()">
-            <mat-icon>add</mat-icon> Add linked event
-          </button>
-          <!-- Event picker: search + every event, newest first — the app's Group settings picker. -->
-          <div *ngIf="editingEvent" (keydown.escape)="cancelEditEvent()">
-          <div class="wc-evpick">
+          <div class="wc-evpick" *ngIf="editingEvent" (keydown.escape)="cancelEditEvent()">
             <div class="wc-search plain">
               <mat-icon>search</mat-icon>
-              <input data-testid="gcs-info-event-search" [(ngModel)]="eventSearch" placeholder="Search events"/>
+              <input data-testid="gcs-info-event-search" [(ngModel)]="eventSearch" placeholder="Search events" autofocus/>
               <button data-testid="gcs-info-event-search-clear" class="wc-search-clear" *ngIf="eventSearch" (click)="eventSearch = ''" matTooltip="Clear">
                 <mat-icon>close</mat-icon>
               </button>
@@ -902,14 +922,14 @@
             <div class="wc-evlist">
               <div class="wc-note center" *ngIf="!linkEvents">Loading events…</div>
               <button data-testid="gcs-info-event-none" type="button" class="wc-evrow" *ngIf="linkEvents && !eventSearch"
-                      [class.on]="!eventDraftId" (click)="eventDraftId = ''">
+                      [class.on]="!eventDraftId" (click)="pickInfoEvent('')">
                 <mat-icon>event_busy</mat-icon>
                 <span class="wc-evmain"><span class="wc-evname">No linked event</span></span>
                 <mat-icon class="wc-evcheck" *ngIf="!eventDraftId">check</mat-icon>
               </button>
               <button data-testid="gcs-info-event-option" type="button" class="wc-evrow"
                       *ngFor="let e of eventsMatching(eventSearch); trackBy: trackById"
-                      [class.on]="eventDraftId === e.id" (click)="eventDraftId = e.id">
+                      [class.on]="eventDraftId === e.id" (click)="pickInfoEvent(e.id)">
                 <mat-icon>event</mat-icon>
                 <span class="wc-evmain">
                   <span class="wc-evname">{{ e.name }}</span>
@@ -921,11 +941,6 @@
                 Nothing matches “{{ eventSearch }}”
               </div>
             </div>
-            <div class="wc-evactions">
-              <button data-testid="gcs-info-event-cancel" class="wc-ghost-btn" (click)="cancelEditEvent()">Cancel</button>
-              <button data-testid="gcs-info-event-save" class="wc-primary-btn" (click)="saveLinkedEvent()">Save</button>
-            </div>
-          </div>
           </div>
           <div class="wc-kv">
             <mat-icon>account_circle</mat-icon>
@@ -1157,8 +1172,12 @@
     <!-- ── Participant profile slide-over ───────────────────────────── -->
     <div class="wc-slide person" *ngIf="person as pp">
       <div class="wc-slide-head">
-        <span>{{ pp.doc?.source === 'team' ? 'Team profile' : 'Participant profile' }}</span>
-        <button data-testid="gcs-person-close" class="wc-close-btn" (click)="person = null"><mat-icon>close</mat-icon></button>
+        <!-- QA item 5: opened from Group Info → Back returns there instead of closing everything. -->
+        <button data-testid="gcs-person-back" class="wc-close-btn" *ngIf="personFromInfo" (click)="backToInfo()" matTooltip="Back to group info">
+          <mat-icon>arrow_back</mat-icon>
+        </button>
+        <span class="grow">{{ pp.doc?.source === 'team' ? 'Team profile' : 'Participant profile' }}</span>
+        <button data-testid="gcs-person-close" class="wc-close-btn" (click)="person = null; personFromInfo = false"><mat-icon>close</mat-icon></button>
       </div>
       <div class="wc-slide-body">
         <div class="wc-profile-hero">
@@ -1401,7 +1420,8 @@
 
   <!-- ── Create group / channel ─────────────────────────────────────── -->
   <ng-container *ngIf="createOpen">
-    <div data-testid="gcs-create-overlay" class="wc-overlay" (click)="createOpen = false"></div>
+    <!-- QA item 2: clicking outside no longer closes it — only Close / Cancel or a successful create. -->
+    <div data-testid="gcs-create-overlay" class="wc-overlay"></div>
     <div class="wc-dialog">
       <div class="wc-dialog-head">
         <span>{{ isGroupCreate ? 'New Group' : 'New Channel' }}</span>
@@ -1427,13 +1447,20 @@
             <button data-testid="gcs-create-image-remove" class="wc-link-btn" *ngIf="cImagePreview" (click)="clearGroupImage()">Remove</button>
           </div>
         </div>
-        <!-- The app's `linked_event_ref`: an event from `event collection`, newest first. Editable later from Info. -->
+        <!-- The app's `linked_event_ref`. QA item 1: the field opens the event list, a pick closes it. -->
         <div class="wc-field" *ngIf="isGroupCreate">
           <label>Linked event (optional)</label>
-          <div class="wc-evpick">
+          <div class="wc-evdrop" (keydown.escape)="cEventOpen = false">
+            <button data-testid="gcs-create-event-field" type="button" class="wc-evfield" [class.open]="cEventOpen"
+                    (click)="toggleCreateEventPicker()">
+              <mat-icon>event</mat-icon>
+              <span class="grow" [class.placeholder]="!cEventId">{{ cEventId ? (eventNameById(cEventId) || 'Loading…') : 'Choose an event' }}</span>
+              <mat-icon>{{ cEventOpen ? 'expand_less' : 'expand_more' }}</mat-icon>
+            </button>
+            <div class="wc-evpick" *ngIf="cEventOpen">
             <div class="wc-search plain">
               <mat-icon>search</mat-icon>
-              <input data-testid="gcs-create-event-search" [(ngModel)]="cEventSearch" placeholder="Search events"/>
+              <input data-testid="gcs-create-event-search" [(ngModel)]="cEventSearch" placeholder="Search events" autofocus/>
               <button data-testid="gcs-create-event-search-clear" class="wc-search-clear" *ngIf="cEventSearch" (click)="cEventSearch = ''" matTooltip="Clear">
                 <mat-icon>close</mat-icon>
               </button>
@@ -1441,14 +1468,14 @@
             <div class="wc-evlist">
               <div class="wc-note center" *ngIf="!linkEvents">Loading events…</div>
               <button data-testid="gcs-create-event-none" type="button" class="wc-evrow" *ngIf="linkEvents && !cEventSearch"
-                      [class.on]="!cEventId" (click)="cEventId = ''">
+                      [class.on]="!cEventId" (click)="pickCreateEvent('')">
                 <mat-icon>event_busy</mat-icon>
                 <span class="wc-evmain"><span class="wc-evname">No linked event</span></span>
                 <mat-icon class="wc-evcheck" *ngIf="!cEventId">check</mat-icon>
               </button>
               <button data-testid="gcs-create-event-option" type="button" class="wc-evrow"
                       *ngFor="let e of eventsMatching(cEventSearch); trackBy: trackById"
-                      [class.on]="cEventId === e.id" (click)="cEventId = e.id">
+                      [class.on]="cEventId === e.id" (click)="pickCreateEvent(e.id)">
                 <mat-icon>event</mat-icon>
                 <span class="wc-evmain">
                   <span class="wc-evname">{{ e.name }}</span>
@@ -1459,6 +1486,7 @@
               <div class="wc-note center" *ngIf="linkEvents && cEventSearch && !eventsMatching(cEventSearch).length">
                 Nothing matches “{{ cEventSearch }}”
               </div>
+            </div>
             </div>
           </div>
         </div>
@@ -1491,12 +1519,20 @@
             <span class="grow"></span>
             <span class="wc-pickcount">
               {{ cSearch ? createMatchCount + ' match' + (createMatchCount === 1 ? '' : 'es')
-                         : createPool.length + ' with an app account' }}
+                         : createCandidates.length + ' with an app account' }}
             </span>
           </div>
           <!-- The count looks like a truncation otherwise. Group membership is stored as uids, so a
                participant who has never signed in cannot be a member — and could not read the chat
                or be notified if they were. -->
+          <!-- QA item 3: with an event picked, only its approved participants (plus the A&H team) are listed. -->
+          <div class="wc-picknote event" *ngIf="cEventId">
+            <mat-icon>event_available</mat-icon>
+            <span *ngIf="cApprovedLoading">Loading participants approved for this event…</span>
+            <span *ngIf="!cApprovedLoading && cApprovedUids">
+              Showing participants approved for {{ eventNameById(cEventId) || 'this event' }} ({{ cApprovedUids.size }}), plus the A&amp;H team.
+            </span>
+          </div>
           <div class="wc-picknote" *ngIf="!cSearch">
             <mat-icon>info_outline</mat-icon>
             <span>Only participants with an app account can be added — a chat member is identified by their login.</span>

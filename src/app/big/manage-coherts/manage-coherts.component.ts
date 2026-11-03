@@ -1303,6 +1303,17 @@ export class ManageCohertsComponent {
   }
 
   // Create support chat document using the same cohort docid
+  /**
+   * The group chat's `linked_event_ref` — the same field the group chat screen and the app read and
+   * edit (a reference into `event collection`; the name is read from the event). Empty when the cohort
+   * has no event, so a cohort without one never clears a link someone set in the chat by hand.
+   */
+  private linkedEventFor(cohortData: any): { linked_event_ref?: DocumentReference } {
+    const ref = cohortData?.['eventref'];
+    return ref && typeof ref.path === 'string' && ref.path.startsWith('event collection/')
+      ? { linked_event_ref: ref } : {};
+  }
+
   async createSupportChat(cohortData: any) {
     // Use the same document ID as the cohort
     const supportChatDocId = cohortData['docid'];
@@ -1333,7 +1344,9 @@ export class ManageCohertsComponent {
       id: supportChatDocId,
       last_modification: new Date(),
       members: allMemberUids,
-      type:'group'
+      type:'group',
+      // QA (group chat item 4): a cohort's chat is linked to the cohort's event, like a chat linked by hand.
+      ...this.linkedEventFor(cohortData),
     };
 
     try {
@@ -1385,7 +1398,9 @@ export class ManageCohertsComponent {
           members: overallMembers,
           group_name: cohortData['name'],
           last_modification: new Date(),
-          type:'group'
+          type:'group',
+          // Keeps the chat linked to the cohort's event (and links chats created before this existed).
+          ...this.linkedEventFor(cohortData),
         });
         
         console.log('Support chat members replaced. Total members:', overallMembers.length, '(Participants:', participantUids.length, ', Mentors:', mentorUids.length, ', Team:', teamUids.length, ')');
