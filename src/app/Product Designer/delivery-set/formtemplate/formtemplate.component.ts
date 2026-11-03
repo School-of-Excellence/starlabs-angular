@@ -758,7 +758,13 @@ export class FormtemplateComponent {
     for (let i = 0; i < this.submittedClientForm.formarray.length; i++) {
       const element = this.submittedClientForm.formarray[i];
       if (!['label', 'video', 'audio'].includes(element['type'])) {
-        element["value"] = (value[`control${n}`] !== undefined && value[`control${n}`] !== null)
+        // SUBMIT path. The draft path (_performAutoSave) converts a time the same way; this one is the
+        // one that writes formsByClient, and it used to copy the matTimepicker's Date straight through —
+        // so every submitted answer was a Timestamp while its draft was "HH:mm". Every reader normalises,
+        // which is why nothing looked wrong on screen and only a raw document read caught it.
+        element["value"] = element['type'] === 'time'
+          ? timeToString(value[`control${n}`])
+          : (value[`control${n}`] !== undefined && value[`control${n}`] !== null)
           ? value[`control${n}`] : null;
         n++;
       }

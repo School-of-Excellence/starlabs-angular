@@ -91,6 +91,32 @@ live slider, inviting someone to uncomment it. Delete the method.
 `127.0.0.1:8080`, and `localhost` resolves to `::1` first — so the browser talked to the app. Stop the
 simulator app, or point the emulator host at `127.0.0.1`. Details in the hub journal.
 
+## 6. The miss the e2e caught — two stamping loops, not one
+
+CI on `5a1e60fb` failed `VATCF-12` / `VATCF-13` on one assertion: the submitted time was still a Timestamp
+(`{_seconds: 1793701800}` = 10:30 UTC — the right time, the wrong type).
+
+**Why.** Field values are stamped into `submittedClientForm` in **two** places, and the time conversion only
+went into the first:
+
+| | line | runs on | wrote |
+|---|---|---|---|
+| `_performAutoSave` | `:1042` | the **draft** | `"HH:mm"` ✔ |
+| `processFormArrayValues` | `:766` | the **submit** (callers `:693` and `:970`) | the raw `Date` ✘ |
+
+I had asserted the autosave loop was "the single place field values are stamped". It was not — I had grepped
+for `element['value'] =` and this one is written `element["value"] =` with double quotes. `form-assignment`
+has the same pair. All four submit call sites now convert.
+
+**Why nobody saw it.** Every reader normalises — the submit preview reads the raw control (a `Date`), the
+View-answer overlay and both Flutter surfaces accept a Timestamp — so all four screens displayed `"10:30"`
+over a wrongly typed document. Manual testing could not catch it; only a raw document read could, which is
+exactly what `expectAllAnswers` does. The live consequence was narrow but real: an **unpatched** app build
+still crashes on a Timestamp, which is the whole reason the contract exists.
+
+The lesson worth keeping: when a contract says "converted at every boundary", enumerate the boundaries from
+the write sites, not from one grep.
+
 ## Open, deliberately
 
 1. ~~The 1-based data already stored.~~ **Operator decision (2026-11-03): no migration.** Slider answers
