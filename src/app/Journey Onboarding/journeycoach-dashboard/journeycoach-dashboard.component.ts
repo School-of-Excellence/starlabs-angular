@@ -979,8 +979,6 @@ openOnboardingProduct(p: any, type: 'toOnboard' | 'within7' | 'plus7' | 'notAssu
         const lapsed = daysToRenewal != null && daysToRenewal < 0 && daysToRenewal >= -LAPSED && !isDiscontinued(meta['customerstatus']);
         const goingQuiet = subActive && daysSinceCoach != null && daysSinceCoach > QUIET;
         const openTickets = openTix[pid] ?? (Number(meta['customersupporttickets']) || 0);
-        const realOpenTickets = openTix[pid] ?? 0;
-        if (realOpenTickets > 0) ticketPeople++;
         if (renewalWindow) renew90++;
         if (goingQuiet) brk.quiet++;
         if (lapsed) brk.lapsed++;

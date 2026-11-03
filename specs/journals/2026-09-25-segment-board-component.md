@@ -727,3 +727,132 @@ Plan (approved): `specs/plans/2026-10-13-segment-ids-and-profileid.md`.
 **Revert:**
 - Code: restore from the previous commit (scratch copies in `engine.before-ids.ts` / `component.before-ids.ts`).
 - Data: the old docs still exist (archived, with `migratedto`). Un-archive them, archive the new ones and recreate the old list docs, which a list refresh does on the old ids.
+
+## 2026-10-22 · Segment groups; history fields renamed to updatedat / updatedby
+
+Plan (approved): `specs/plans/2026-10-22-segment-groups.md`.
+
+**Groups: reference only (operator)**
+- **Purpose:** a group labels what a segment is for. It never changes lists, order or sequence.
+- **Storage:**
+  - groups: `segmentboardgroups/{autoId}` with `{name, order, deleted, createdAt/By, updatedAt/By, deletedAt/By}` (By = profile id);
+  - on each segment: `segmentboardconfig.groupid`;
+  - a separate collection, so a rename is a single write (operator).
+- **Soft delete only:**
+  - the group doc is set to `deleted: true`;
+  - in the same batch, `groupid` is removed from every segment holding it (live and archived), each with a segment history entry ("Group removed: X (group deleted)");
+  - deleted groups stay readable, so old labels and history still resolve.
+- **Group history:** `segmentboardgroups/{id}/grouphistory`. Actions: `create`, `rename`, `segment-added`, `segment-removed`, `delete` (listing the removed segments). Fields `updatedby` (profile id) and `updatedat`, as the operator named them. Written in the same batch as the change (`writeGroupHistory`).
+- **Segment edits:** a group change on a segment is diffed like any field (`groupid` in `HIST_FIELDS`). It also writes `segment-removed` to the old group and `segment-added` to the new one (`saveSeg` → `groupHistory`).
+- **UI:**
+  - Group dropdown in the segment dialog (live groups, with an inline "New group…");
+  - label on the card (`sgb-card-group`) and a chip in the side panel;
+  - **Groups** in the header opens Manage groups: create, rename, delete with confirm, and per-group History;
+  - **Group** filter (groups + "No group"). It narrows the cards only (`renderMain`), not participants.
+- **Archive / unarchive:** these keep `groupid` and write no group entry.
+
+**History field rename (operator: match the group history)**
+- **New entries:** segment history now writes `updatedat` (serverTimestamp) and `updatedby` (profile id), in place of `at` and `by: {profileid}`.
+- **Reads accept both shapes:** `historyRow` normalises them.
+- **Per-segment History:** reads the whole subcollection and sorts it client-side, so entries not yet backfilled are not dropped by an `orderBy` on a missing field.
+- **Board-wide Change history:** orders by `updatedat`. This needs a new collection-group index on `segmenthistory.updatedat` (desc).
+- **Backfill of old entries:** part of the Migrate action. The banner shows while a collection-group `orderBy('at')` finds any entry.
+  - `updatedat = at`;
+  - `updatedby` = the profile id, resolved from `by.profileid`, then email → `profile_data`, then uid → `profile_data.user_ref`;
+  - an editor who can't be resolved keeps their `by`, but `at` is still renamed.
+- **Order:** the backfill runs after the id moves, so copied history gets renamed too.
+
+**Verified on the harness:**
+- **Old-format history** shows before the backfill.
+- **Groups:** a duplicate name is refused. Assign and move write `segment-added` / `segment-removed` in the right groups (with updatedby / updatedat), plus segment history `groupid` from → to.
+- **Filter:** by group and by "No group".
+- **Rename:** leaves the segment doc byte-identical.
+- **History panel:** group History lists create / segment-added / rename.
+- **Delete:** sets `deleted: true`, the doc remains, `groupid` is removed, and the segment entry reads "Group removed…". The deleted group is gone from the dropdown.
+- **Backfill:** converts 2 old entries and clears the banner.
+- The harness builder was rebuilt; the scratchpad had been cleared.
+- ng build ok; hook-diff aligned.
+
+**Rules (operator console):**
+- `segmentboardgroups`: read, create, update; no delete.
+- `segmentboardgroups/{id}/grouphistory`: read, create.
+- `segmenthistory`: update stays allowed until the backfill has run.
+
+**Revert:**
+- Code: restore from the previous commit (scratch copies `engine.before-groups.ts` / `component.before-groups.ts`).
+- Data: group docs and `groupid` fields are inert without the code. The backfill is not reversible in code (`at` is renamed), but the values are kept.
+
+## 2026-10-22 · Groups side panel + Select group to send
+
+**Operator ask:** group names in the side panel, the number of segments under each, the number that aren't grouped, and a way to select a whole group to send.
+
+**Changes:**
+- **Header:** **Groups** opens a side panel (`renderDrawer` kind `groups`). **Manage groups** inside it opens the create / rename / delete dialog.
+- **Rows:** each live group shows N segments · M participants, then **Not grouped**.
+  - Segments are those on the board; archived ones are left out.
+  - Participants are unique across the group's active segments, following the filters (`actionTargets({segs})`), i.e. exactly who a send reaches.
+  - A row expands to list its segments, and each opens on click.
+- **Select group:** ticks every active segment of the group (`S.cardSel`, `S.selGroup`).
+  - The selection bar reads "Group: X · N segments · M participants" and offers WhatsApp / Email / App / Recommend playlist.
+  - The selection bar now always counts unique people. It used to sum list sizes, which double-counted overlaps.
+- **Bug fixed during the build:** inserting the groups branch dropped the `else if(d.kind==='activity')` line, so Activity overwrote the Groups content. Restored.
+
+**Verified on the harness:**
+- Group "Core" with 2 overlapping segments shows 131 participants. The list sizes sum to 149; the unique count is 131.
+- Select group ticks both cards, the bar reads "Group: Core · 2 segments · 131 participants", and WhatsApp went to exactly 131.
+- Not grouped: 2 segments · 40 participants.
+- The expanded row lists its segments.
+
+ng build ok; hook-diff aligned (82). SGB-07 drives the panel (count, Not grouped, expand, Select group → bar label).
+
+**History backfill:** built, and run by the operator from the board's Migrate → "Update history". It has not been run on real data from here, because the production service account is read-only.
+
+**Revert:** point `act==='groups'` back to `openGroups()`, remove `groupsPanelHtml` / `selectGroup` / `S.selGroup`, and remove the selection bar's group label.
+
+## 2026-10-22 · Groups in an always-visible left panel
+
+**Operator ask:** "show the groups in the sidenav". The operator chose an always-visible left panel over the right-side panel.
+
+**Changes:**
+- The template gains `<nav id="gnav" data-testid="sgb-gnav">`. `.app` is a two-column grid (236px nav + board) and falls back to one column while the nav is hidden (loading).
+- `renderNav()` runs on every `render()` and lists:
+  - **All segments** (count);
+  - each live group: segment count, unique participants across its active segments, and **Select** on hover/active;
+  - **Not grouped**.
+- **Clicking a group** sets the Group filter to it, so only its cards show; **All segments** clears it.
+- **Select** fills the send bar ("Group: X · N segments · M participants").
+- **Pencil** opens Manage groups.
+- The right-side Groups panel and the header Groups button are gone (hooks `sgb-gp-*` and `sgb-groups-open` removed).
+- **Below 860px:** the nav is a horizontal chip row above the board.
+- **Guard:** Arrange cards clears the Group filter and search first. A filtered board would save an order missing the hidden cards, because `readOrder` only sees visible cards and `commitOrder` would drop the others from `displayOrder`.
+
+**Verified on the harness:**
+- **Panel contents:** All 4, Revenue 0, Core 2 · 131, Not grouped 2 · 40.
+- **Filtering:** Core shows its 2 cards and Not grouped its 2; All shows 4.
+- **Select:** Core gives "Group: Core · 2 segments · 131 participants".
+- **Phone:** no sideways scroll on the page.
+- **Checks:** ng build ok; hook-diff aligned (82). SGB-07 drives the panel.
+
+**Revert:** remove `#gnav` and `renderNav`, put the header Groups button back, and drop the "groups: always-visible left panel" CSS block.
+
+## 2026-10-22 · queue_token read on demand (production hit "Quota exceeded")
+
+**Context:** production Firestore was answering `resource-exhausted` ("Quota exceeded"). The board read `queue_token` (active + approved, possibly thousands of docs) on every open, only so that the Queue filter could work.
+
+**Change (operator):**
+- `load()` no longer reads `queue_token`.
+- `ensureTokens()` reads it the first time a queue or stage is picked in the Queue filter (from both the change handler and Select all), then keeps it for the visit.
+- State goes `none` → `loading` → `loaded`; `error` retries on the next use.
+- The panel shows "Loading queue members…" while it loads.
+- A reload resets the state and re-fetches only if a Queue filter is still applied.
+
+**Verified on the harness:**
+- 0 token reads on open and on opening the panel.
+- 1 read on picking a queue (50 match). Adding a stage (17 match) and re-picking after Clear all trigger no further reads.
+- ng build ok.
+
+**Still read on every open (candidates if the quota keeps running out):**
+- `participant metadata` (~3,500 docs);
+- `event collection` (all events, for the Live events filter), which could move on demand the same way.
+
+**Revert:** put `store.loadQueueTokens()` back in `load()`'s `Promise.all`, with the QTOK fill, and remove `ensureTokens`.

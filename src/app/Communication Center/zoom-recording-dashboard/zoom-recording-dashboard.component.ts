@@ -54,7 +54,7 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
   private queuedUuids = new Map<string, number>()
   private zoomUnsubs: Unsubscribe[] = []
 
-  readonly tableHeaders = ['meetingTopic', 'hostEmail', 'status', 'zoom', 'progress',
+  readonly tableHeaders = ['select', 'meetingTopic', 'hostEmail', 'status', 'zoom', 'progress',
     'totalSize', 'totalFiles', 'startTime', 'processingTime', 'file']
 
   // ── "still in Zoom?" tracking ────────────────────────────────────────────
@@ -138,6 +138,7 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
         return { id: doc.id, ...data, startTime: this.toDate(data['startTime']) }
       })
       this.applyFilter()
+      this.pruneSelection()
       if (openId) this.openFileModel(openId)
       this.loading = false
     }, () => { this.loading = false })
@@ -514,6 +515,90 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
     } finally {
       this.actionBusy = null
     }
+  }
+
+  // ---- Multi-select → Move to Zoom trash ----
+  // Only rows that can be trashed right now (completed, ✓ verified, still in
+  // Zoom) are selectable. Each selected recording still goes through the
+  // per-recording trash endpoint, which re-verifies it against Dropbox first
+  // and refuses anything that isn't fully backed up.
+  public selectedIds = new Set<string>()
+  public bulkTrash: {
+    running: boolean; total: number; done: number; moved: number; refused: number
+    problems: Array<{ topic: string; text: string }>
+  } | null = null
+
+  // Selectable rows within the current filter (all pages).
+  get selectableRows(): any[] {
+    return (this.recordsBackup.filteredData || []).filter((r) => this.canTrash(r))
+  }
+
+  isSelected(row: any): boolean { return this.selectedIds.has(row?.id) }
+
+  toggleSelect(row: any) {
+    if (!this.canTrash(row) || this.bulkTrash?.running) return
+    this.selectedIds.has(row.id) ? this.selectedIds.delete(row.id) : this.selectedIds.add(row.id)
+  }
+
+  get allSelectableSelected(): boolean {
+    const rows = this.selectableRows
+    return rows.length > 0 && rows.every((r) => this.selectedIds.has(r.id))
+  }
+
+  toggleSelectAll() {
+    if (this.bulkTrash?.running) return
+    const rows = this.selectableRows
+    if (this.allSelectableSelected) rows.forEach((r) => this.selectedIds.delete(r.id))
+    else rows.forEach((r) => this.selectedIds.add(r.id))
+  }
+
+  clearSelection() { if (!this.bulkTrash?.running) this.selectedIds.clear() }
+
+  // Drop selections that are no longer trashable (trashed, filtered out, re-checked).
+  private pruneSelection() {
+    if (this.bulkTrash?.running || !this.selectedIds.size) return
+    const ok = new Set(this.selectableRows.map((r) => r.id))
+    for (const id of [...this.selectedIds]) if (!ok.has(id)) this.selectedIds.delete(id)
+  }
+
+  get selectedRecords(): any[] {
+    return (this.recordsBackup.data || []).filter((r) => this.selectedIds.has(r.id))
+  }
+
+  get selectedBytes(): number {
+    return this.selectedRecords.reduce((s, r) => s + this.zoomTotal(r), 0)
+  }
+
+  async trashSelected() {
+    const records = this.selectedRecords.filter((r) => this.canTrash(r))
+    if (!records.length || this.bulkTrash?.running) return
+    const ok = window.confirm(
+      `Move ${records.length} recording(s) (${this.formatBytes(this.selectedBytes)}) to Zoom trash?\n\n` +
+      `Each one is re-verified against Dropbox first — any that is not fully backed up is skipped.\n` +
+      `Zoom keeps trashed recordings for 30 days.`)
+    if (!ok) return
+    this.bulkTrash = { running: true, total: records.length, done: 0, moved: 0, refused: 0, problems: [] }
+    const st = this.bulkTrash
+    let next = 0
+    const worker = async () => {
+      while (next < records.length) {
+        const r = records[next++]
+        try {
+          await this.migrationApi.trash(r.id)
+          st.moved++
+          this.selectedIds.delete(r.id)
+        } catch (e: any) {
+          st.refused++
+          const v: VerificationResult | undefined = e?.error?.verification
+          st.problems.push({ topic: r.meetingTopic, text: (e?.error?.error || e?.message || 'Could not move to trash') + (v && !v.ok ? ' — ' + this.describeProblems(v) : '') })
+        }
+        st.done++
+      }
+    }
+    // 2 at a time: each trash re-verifies against Dropbox and Zoom first.
+    await Promise.all([worker(), worker()])
+    st.running = false
+    this.loadZoomPresence()
   }
 
   // Per-row state for the table's trash button (the modal uses actionBusy /

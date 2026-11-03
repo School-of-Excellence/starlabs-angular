@@ -118,10 +118,10 @@
     <div class="prow head" *ngIf="onboardingProducts.length"><span class="hh l">Product / journey</span><span class="hh">To onboard</span><span class="hh">≤7d</span><span class="hh">7+ d</span><span class="hh">Not assured</span></div>
     <div data-testid="jcd-div-onb-product" class="prow" *ngFor="let p of onboardingProducts">
       <span class="pn">{{p.product}}</span>
-      <span class="cell dan" style="cursor:pointer" (click)="openOnboardingProduct(p, 'toOnboard')">{{p.toOnboard}}</span>
-      <span class="cell mut" style="cursor:pointer" (click)="openOnboardingProduct(p, 'within7')">{{p.within7}}</span>
-      <span class="cell warn" style="cursor:pointer" (click)="openOnboardingProduct(p, 'plus7')">{{p.plus7}}</span>
-      <span class="cell mut" style="cursor:pointer" (click)="openOnboardingProduct(p, 'notAssured')">{{p.notAssured}}</span>
+      <span class="cell dan" data-testid="jcd-onb-cell-toonboard" style="cursor:pointer" (click)="openOnboardingProduct(p, 'toOnboard')">{{p.toOnboard}}</span>
+      <span class="cell mut" data-testid="jcd-onb-cell-within7" style="cursor:pointer" (click)="openOnboardingProduct(p, 'within7')">{{p.within7}}</span>
+      <span class="cell warn" data-testid="jcd-onb-cell-plus7" style="cursor:pointer" (click)="openOnboardingProduct(p, 'plus7')">{{p.plus7}}</span>
+      <span class="cell mut" data-testid="jcd-onb-cell-notassured" style="cursor:pointer" (click)="openOnboardingProduct(p, 'notAssured')">{{p.notAssured}}</span>
     </div>
   </div>
 </div>

@@ -1,0 +1,143 @@
+<section class="epv">
+  <header class="epv-header">
+    <div>
+      <h1 class="epv-title">Evolution prep variations</h1>
+    </div>
+    <button mat-flat-button type="button" (click)="openNew()" data-testid="epv-new-button">
+      <mat-icon>add</mat-icon>
+      New variation
+    </button>
+  </header>
+
+  @if (loading) {
+    <div class="epv-state" role="status">
+      <mat-spinner diameter="28" />
+      <span>Loading variations</span>
+    </div>
+  } @else if (loadError) {
+    <div class="epv-state epv-state-error" role="alert" data-testid="epv-load-error">
+      <span>{{ loadError }}</span>
+      <button mat-stroked-button type="button" (click)="loadAll()" data-testid="epv-retry-button">Try again</button>
+    </div>
+  } @else {
+    <div class="epv-grid" [class.epv-grid-single]="!editorOpen">
+      <div class="epv-list" aria-label="Variations">
+        @if (variations.length === 0) {
+          <p class="epv-empty" data-testid="epv-empty">
+            No variations yet. Create one to start sending Evolution Prep.
+          </p>
+        }
+
+        @for (row of variations; track row.id) {
+          <article class="epv-card" [class.epv-card-active]="editorOpen && editingId === row.id" data-testid="epv-variation-row">
+            <div class="epv-card-head">
+              <h2 class="epv-card-title">{{ row.variationname }}</h2>
+              <div class="epv-card-actions">
+                <button mat-icon-button type="button" aria-label="Edit variation" (click)="openEdit(row)" data-testid="epv-edit-button">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button mat-icon-button type="button" aria-label="Delete variation" (click)="deleteTarget = row" data-testid="epv-delete-button">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+            </div>
+
+            <ol class="epv-chips">
+              @for (stage of row.stages; track $index) {
+                <li class="epv-chip">{{ stage.stagename }}</li>
+              }
+            </ol>
+
+            @if (deleteTarget?.id === row.id) {
+              <div class="epv-delete" role="alertdialog" aria-label="Confirm delete">
+                <span>Delete "{{ row.variationname }}"? This cannot be undone.</span>
+                <button mat-flat-button type="button" class="epv-danger" (click)="confirmDelete()" data-testid="epv-delete-confirm">Delete variation</button>
+                <button mat-stroked-button type="button" (click)="deleteTarget = null" data-testid="epv-delete-cancel">Keep it</button>
+              </div>
+            }
+          </article>
+        }
+      </div>
+
+      @if (editorOpen) {
+        <form class="epv-editor" [formGroup]="editor" (ngSubmit)="save()" aria-label="Variation editor">
+          <h2 class="epv-editor-title">{{ editingId ? 'Edit variation' : 'New variation' }}</h2>
+
+          <mat-form-field class="epv-name">
+            <mat-label>Variation name</mat-label>
+            <input matInput formControlName="variationname" autocomplete="off" data-testid="epv-name-input" />
+          </mat-form-field>
+
+          <h3 class="epv-stages-title">Stages, in the order participants complete them</h3>
+
+          <div formArrayName="stages" class="epv-stages" cdkDropList (cdkDropListDropped)="drop($event)">
+            @for (group of stages.controls; track group; let i = $index) {
+              <div class="epv-stage" cdkDrag [formGroupName]="i" data-testid="epv-stage-row">
+                <span class="epv-handle" cdkDragHandle aria-hidden="true"><mat-icon>drag_indicator</mat-icon></span>
+                <span class="epv-pos">{{ i + 1 }}</span>
+
+                <mat-form-field class="epv-f-name" subscriptSizing="dynamic">
+                  <mat-label>Stage name</mat-label>
+                  <input matInput formControlName="stagename" autocomplete="off" data-testid="epv-stage-name" />
+                </mat-form-field>
+
+                <mat-form-field class="epv-f-type" subscriptSizing="dynamic">
+                  <mat-label>Type</mat-label>
+                  <mat-select formControlName="stagetype" (selectionChange)="onTypeChange(group)" data-testid="epv-stage-type">
+                    @for (t of stageTypes; track t.value) {
+                      <mat-option [value]="t.value">{{ t.label }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+
+                @if (group.controls['stagetype'].value === 'ael') {
+                  <span class="epv-f-ref epv-note">Uses the built-in AEL screen. No reference needed.</span>
+                } @else {
+                  <mat-form-field class="epv-f-ref" subscriptSizing="dynamic">
+                    <mat-label>{{ group.controls['stagetype'].value === 'videoask' ? 'VideoAsk' : 'Form' }}</mat-label>
+                    <mat-select formControlName="refid" data-testid="epv-stage-reference">
+                      @for (o of group.controls['stagetype'].value === 'form' ? forms : videoAsks; track o.id) {
+                        <mat-option [value]="o.id">
+                          {{ o.label }}
+                        </mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                }
+
+                <span class="epv-row-actions">
+                  <button mat-icon-button type="button" aria-label="Remove stage" (click)="removeStage(i)" data-testid="epv-stage-remove">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </span>
+              </div>
+            }
+          </div>
+
+          <button mat-stroked-button type="button" class="epv-add" (click)="addStage()" data-testid="epv-add-stage">
+            <mat-icon>add</mat-icon>
+            Add stage
+          </button>
+
+          @if (errors.length > 0) {
+            <ul class="epv-messages epv-errors" role="alert" data-testid="epv-errors">
+              @for (e of errors; track $index) {
+                <li>{{ e }}</li>
+              }
+            </ul>
+          }
+
+          <div class="epv-footer">
+            <button mat-flat-button type="submit" [disabled]="saving" data-testid="epv-save">Save variation</button>
+            <button mat-stroked-button type="button" (click)="editorOpen = false" [disabled]="saving" data-testid="epv-cancel">
+              Cancel
+            </button>
+            @if (saving) {
+              <mat-spinner diameter="20" />
+            }
+          </div>
+        </form>
+      }
+    </div>
+  }
+</section>
