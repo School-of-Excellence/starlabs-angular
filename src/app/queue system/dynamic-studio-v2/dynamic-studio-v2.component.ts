@@ -2095,8 +2095,9 @@ export class DynamicStudioV2Component {
   canBringToStudio(token: any, stage: string){
      if(token["currentstage"] != stage) return false
      if(token["status"] == "ready") return true
-     return token["bookedslot"]?.[stage]?.startdate.toDate() <= new Date()
-   }
+     return token["bookedslot"]?.[stage]?.startdate?.toDate() <= new Date()
+      && token["bookedslot"]?.[stage]?.enddate?.toDate() > new Date()
+  }
 
   async onStudioSelect(studio){
     console.log("****** studio select ******");

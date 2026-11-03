@@ -1,7 +1,7 @@
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { ENTER, COMMA } from '@angular/cdk/keycodes';
 import { Component, ElementRef, Inject, OnInit, TemplateRef, ViewChild } from '@angular/core';
-import { collection, deleteDoc, doc, Firestore, getDoc, getDocs, orderBy, query, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
+import { collection, deleteDoc, doc, Firestore, getDoc, getDocs, or, orderBy, query, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
 import { FormGroup, Validators, FormBuilder, FormControl, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { MatChipInputEvent, MatChipsModule } from '@angular/material/chips';
 import { MatDialogRef, MAT_DIALOG_DATA, MatDialog } from '@angular/material/dialog';
@@ -535,9 +535,9 @@ export class QueueCreationV3Component {
       console.log(this.mapProductToMode) 
       console.log(this.mapProductToDeliverySequence, 'this.mapProductToDeliverySequence')
     })
-    getDocs(query(collection(this.firestore,'appointmenttype'),orderBy('appointmenttype'))).then(snap =>{
+    getDocs(query(collection(this.firestore, 'appointmenttype'),or(where('queueappointment', '==', true), where('groupappointment', '==', true)),orderBy('appointmenttype')))
+      .then(snap => {
       this.appointmentTypeList = snap.docs.map(e => ({ ...e.data(), docid: e.id }))
-      .filter(e => e['queueappointment'] === true || e['groupappointment'] === true)
     })
     //get delivery events forms queue
     // getDocs(collection(this.firestore, 'delivery events')).then((snap) => {

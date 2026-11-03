@@ -46,6 +46,8 @@ interface PlanningRow {
           slottype?: 'queue' | 'appointment';
           availabilityid?: string;
           hostref?: any;
+          appointmentref?: any;
+          bookedby?: any;
           title: string | null,
           description: string | null,
           startdate: Date | null;
@@ -215,7 +217,10 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
   appointmentSlotOptions: any[] = [];
   selectedAppointmentSlots: any[] = [];
   loadingAppointmentSlots: boolean = false;
-  searchAppointmentSlot: string = '';
+  appointmentDateStart: Date | null = null;
+  appointmentDateEnd: Date | null = null;
+  appointmentGroups: any[] = [];                      
+  appointmentSpecialistFilter: string | null = null;
 
   private storage = inject(Storage);
   private destroy$ = new Subject<void>();
@@ -1175,24 +1180,24 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
       if (!row.stageData[slot.stagename]) continue;
 
       if (slot.cohort && slot.cohort.length > 0) {
-       row.stageData[slot.stagename].cohortIds = slot.cohort;
-}
+        row.stageData[slot.stagename].cohortIds = slot.cohort;
+      }
 
       const startDate = slot.startdate ? slot.startdate.toDate() : null;
       const endDate = slot.enddate ? slot.enddate.toDate() : null;
 
       const bigparticipants = this.getBigParticipantsForSlot(
-        slot.variationid, 
-        slot.segmentid, 
-        slot.stagename, 
-        startDate, 
+        slot.variationid,
+        slot.segmentid,
+        slot.stagename,
+        startDate,
         endDate
       );
       const participants = this.getParticipantsForSlot(
-        slot.variationid, 
-        slot.segmentid, 
-        slot.stagename, 
-        startDate, 
+        slot.variationid,
+        slot.segmentid,
+        slot.stagename,
+        startDate,
         endDate
       );
 
@@ -1201,6 +1206,8 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
         slottype: slot.slottype,
         availabilityid: slot.availabilityid ?? null,
         hostref: slot.hostref ?? null,
+        appointmentref: slot.appointmentref ?? null,
+        bookedby: slot.bookedby ?? null,
         title: slot.title ?? null,
         description: slot.description ?? null,
         startdate: startDate ? new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()) : null,
@@ -1488,7 +1495,7 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
   //   });
   // }
 
-  removeDateFromStage(row: PlanningRow, stageName: string, dateIndex: number) {
+  async removeDateFromStage(row: PlanningRow, stageName: string, dateIndex: number) {
     const check = confirm('Are you sure want to remove the slot?');
     if (!check) {
       return null;
@@ -1496,7 +1503,14 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
 
     const dateRanges = row.stageData[stageName].dates;
     const entryToRemove = dateRanges[dateIndex];
-
+    if (entryToRemove['docid'] && entryToRemove['slottype'] === 'appointment') {
+      const snap = await getDoc(doc(this.firestore, 'queue availability', entryToRemove['docid']));
+      const slotData = snap.exists() ? snap.data() : null;
+      if (slotData && (slotData['appointmentref'] || slotData['bookedby'])) {
+        alert('This slot is already booked by a participant. Cancel the appointment first.');
+        return;
+      }
+    }
     if (entryToRemove['docid']) {
       deleteDoc(doc(this.firestore, 'queue availability', entryToRemove['docid'])).then(() => {
         dateRanges.splice(dateIndex, 1);
@@ -2241,7 +2255,7 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
   // Use setTimeout to ensure the view is ready
   setTimeout(() => {
     const dialogRef = this.dialog.open(this.dateEditDialog, {
-      width: '600px',
+      maxWidth: '95vw',
       maxHeight: '90vh',
       disableClose: false
     });
@@ -2340,7 +2354,7 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
     };
 
     const dialogRef = this.dialog.open(this.dateEditDialog, {
-      width: '500px'
+      maxWidth: '95vw'
     });
 
     dialogRef.afterClosed().subscribe(() => {
@@ -2362,6 +2376,7 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
     const dateEntry = row.stageData[stageName].dates[dateIndex];
     this.editingSlotType = dateEntry.slottype || 'queue';
     this.editingDateEntry = {
+      docid: dateEntry.docid ?? null,
       title: dateEntry.title ? dateEntry.title : null,
       description: dateEntry.description ? dateEntry.description : null,
       startdate: dateEntry.startdate ? new Date(dateEntry.startdate) : null,
@@ -2371,11 +2386,17 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
       maxslot: dateEntry.maxslot || 0,
       usedslot: dateEntry.usedslot || 0,
       bigparticipants: dateEntry.bigparticipants || [],
-      participants: dateEntry.participants || []
+      participants: dateEntry.participants || [],
+      hostref: dateEntry.hostref ?? null,
+      appointmentref: dateEntry.appointmentref ?? null,
+      bookedby: dateEntry.bookedby ?? null
     };
-
+    this.appointmentDateStart = null;
+    this.appointmentDateEnd = null;
+    this.appointmentSlotOptions = [];
+    this.selectedAppointmentSlots = [];
     const dialogRef = this.dialog.open(this.dateEditDialog, {
-      width: '500px'
+      maxWidth: '95vw'
     });
 
     dialogRef.afterClosed().subscribe(() => {
@@ -2802,12 +2823,17 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
   }
 
   async fetchAppointmentAvailability(stageName: string) {
+    if (!this.appointmentDateStart) return;
+
     this.loadingAppointmentSlots = true;
     this.appointmentSlotOptions = [];
+    this.appointmentGroups = [];
     this.selectedAppointmentSlots = [];
 
     const appointmentTypeRef = this.stageProperty[stageName]['actionresource'];
     const now = new Date();
+    const from = new Date(this.appointmentDateStart); from.setHours(0, 0, 0, 0);
+    const to = new Date(this.appointmentDateEnd || this.appointmentDateStart); to.setHours(23, 59, 59, 999);
 
     const availabilityDocs = await getDocs(query(
       collection(this.firestore, 'availability'),
@@ -2823,7 +2849,7 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
       slotsForType.forEach(s => {
         const slotStartDate = s.slotstart?.toDate ? s.slotstart.toDate() : new Date(s.slotstart);
 
-        if (s.available === true && s.booked !== true && slotStartDate >= now) {
+        if (s.available === true && s.booked !== true && slotStartDate >= now && slotStartDate >= from && slotStartDate <= to) {
           openSlots.push({
             availabilityid: availDoc.id,
             hostref: data['profileref'],
@@ -2837,9 +2863,16 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
     });
 
     openSlots.sort((a, b) => a.slotstart.toDate().getTime() - b.slotstart.toDate().getTime());
-    // Hide slots already reserved in  queue 
-    const reservedDocs = await getDocs(query(collection(this.firestore, 'queue availability'),where('slottype', '==', 'appointment')));
-    const reserved = reservedDocs.docs.map(d => d.data());
+
+    // Hide slots already reserved in a queue
+    const reservedDocs = await getDocs(query(
+      collection(this.firestore, 'queue availability'),
+      where('slottype', '==', 'appointment'),
+      where('startdate', '>=', Timestamp.fromDate(new Date(from.getTime() - 24 * 60 * 60 * 1000))),
+      where('startdate', '<=', Timestamp.fromDate(to))
+    ));
+    const editingDocId = this.editingDateIndex !== null ? this.editingDateEntry.docid : null;
+    const reserved = reservedDocs.docs.filter(d => d.id !== editingDocId).map(d => d.data());
 
     this.appointmentSlotOptions = openSlots.filter(open =>
       !reserved.some(r =>
@@ -2848,6 +2881,20 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
         r['enddate'].toMillis() > open.slotstart.toMillis()
       )
     );
+    const bySpecialist = new Map<string, any>();
+    for (const slot of this.appointmentSlotOptions) {
+      const hostId = slot.hostref.id;
+      if (!bySpecialist.has(hostId)) {
+        bySpecialist.set(hostId, { hostId, name: slot.specialistName, days: new Map() });
+      }
+      const days = bySpecialist.get(hostId).days;
+      const start = slot.slotstart.toDate();
+      const dayKey = start.toDateString();
+      if (!days.has(dayKey)) days.set(dayKey, { date: start, slots: [] });
+      days.get(dayKey).slots.push(slot);
+    }
+    this.appointmentGroups = [...bySpecialist.values()].map(g => ({ ...g, days: [...g.days.values()] }));
+    this.appointmentSpecialistFilter = null;
     this.loadingAppointmentSlots = false;
   }
 
@@ -2871,6 +2918,15 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
     }
 
     const batch = writeBatch(this.firestore);
+    const isEdit = this.editingDateIndex !== null;
+    if (isEdit) {
+      const oldSnap = await getDoc(doc(this.firestore, 'queue availability', this.editingDateEntry.docid));
+      const oldData = oldSnap.exists() ? oldSnap.data() : null;
+      if (oldData && (oldData['appointmentref'] || oldData['bookedby'])) {
+        alert('This slot has just been booked by a participant, so it cannot be changed.');
+        return;
+      }
+    }
     const pending: Array<{ row: PlanningRow, entry: any }> = [];
     let skipped = 0;
 
@@ -2889,25 +2945,35 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
         );
         if (isDuplicate) { skipped++; continue; }
 
-        const newDocRef = doc(collection(this.firestore, 'queue availability'));
+        const newDocRef = isEdit? doc(this.firestore, 'queue availability', this.editingDateEntry.docid): doc(collection(this.firestore, 'queue availability'));
 
-        batch.set(newDocRef, {
-          queueid: this.selectedQueue['docid'],
-          queueref: doc(this.firestore, 'queue generation', this.selectedQueue['docid']),
-          variationid: row.selectedVariation,
-          segmentid: row.selectedSegment,
-          stagename: stageName,
-          slottype: 'appointment',
-          startdate: slot.slotstart,
-          enddate: slot.slotend,
-          availabilityid: slot.availabilityid,
-          appointmenttypeid: this.stageProperty[stageName]['actionresource'].id,
-          hostref: slot.hostref,
-          appointmentref: null,
-          bookedby: null,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        });
+        if (isEdit) {
+          batch.update(newDocRef, {
+            startdate: slot.slotstart,
+            enddate: slot.slotend,
+            availabilityid: slot.availabilityid,
+            hostref: slot.hostref,
+            updatedAt: serverTimestamp()
+          });
+        } else {
+          batch.set(newDocRef, {
+            queueid: this.selectedQueue['docid'],
+            queueref: doc(this.firestore, 'queue generation', this.selectedQueue['docid']),
+            variationid: row.selectedVariation,
+            segmentid: row.selectedSegment,
+            stagename: stageName,
+            slottype: 'appointment',
+            startdate: slot.slotstart,
+            enddate: slot.slotend,
+            availabilityid: slot.availabilityid,
+            appointmenttypeid: this.stageProperty[stageName]['actionresource'].id,
+            hostref: slot.hostref,
+            appointmentref: null,
+            bookedby: null,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          });
+        }
 
         pending.push({
           row,
@@ -2935,9 +3001,12 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
 
     try {
       await batch.commit();
-      pending.forEach(p => p.row.stageData[stageName].dates.push(p.entry));
+      pending.forEach(p => {
+        if (isEdit) p.row.stageData[stageName].dates[this.editingDateIndex] = p.entry;
+        else p.row.stageData[stageName].dates.push(p.entry);
+      });
       this.dialog.closeAll();
-      let msg = `${pending.length} appointment slot(s) reserved`;
+      let msg = isEdit ? 'Appointment slot updated' : `${pending.length} appointment slot(s) reserved`;
       if (skipped > 0) msg += ` (${skipped} duplicate(s) skipped)`;
       this.guard.openSnackBar(msg, 'OK', 600);
     } catch (err) {
@@ -2946,29 +3015,16 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
     }
   }
 
-  getFilteredAppointmentSlots(): any[] {
-    const searchTerm = this.searchAppointmentSlot?.toLowerCase() || '';
-    if (!searchTerm) {
-      return this.appointmentSlotOptions;
-    }
-    return this.appointmentSlotOptions.filter(slot =>
-      slot.specialistName.toLowerCase().includes(searchTerm)
-    );
-  }
-
   toggleAppointmentSlotSelection(slot: any) {
     slot.selected = !slot.selected;
-    if (slot.selected) {
-      this.appointmentSlotOptions.forEach(otherSlot => {
-        if (otherSlot !== slot && otherSlot.selected &&
-            otherSlot.hostref?.id === slot.hostref?.id &&
-            otherSlot.slotstart.toMillis() < slot.slotend.toMillis() &&
-            otherSlot.slotend.toMillis() > slot.slotstart.toMillis()) {
-          otherSlot.selected = false;
-        }
-      });
-    }
     this.selectedAppointmentSlots = this.appointmentSlotOptions.filter(s => s.selected);
+    // Disable slots that overlap a selected slot of the same specialist
+    this.appointmentSlotOptions.forEach(s => {
+      s.blocked = !s.selected && this.selectedAppointmentSlots.some(o =>
+        o.hostref?.id === s.hostref?.id &&
+        o.slotstart.toMillis() < s.slotend.toMillis() &&
+        o.slotend.toMillis() > s.slotstart.toMillis()
+      );
+    });
   }
-
 }
