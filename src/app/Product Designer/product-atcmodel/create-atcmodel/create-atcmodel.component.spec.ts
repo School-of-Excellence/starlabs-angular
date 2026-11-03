@@ -236,7 +236,7 @@ describe('CreateAtcmodelComponent', () => {
         component.form.patchValue({ atcmodel: 'Forms model', evolutiontype: 'full' });
         component.setDeliveryForms(formDocs);
         component.addForm(forms[2]);
-        expect(component.formRows).toEqual([{ formid: 'f-sleep', name: 'Sleep Diary', filledby: null }]);
+        expect(component.formRows).toEqual([{ formid: 'f-sleep', name: 'Sleep Diary', filledby: null, participantview: true }]);
         expect(component.formsIncomplete).toBeTrue();
         expect(text('ca-form-filledby-required')).toBe('Choose who fills this form');
         expect(fixture.nativeElement.querySelector('[data-testid="ca-on-submit-2"]').disabled).toBeTrue();
@@ -365,7 +365,7 @@ describe('CreateAtcmodelComponent', () => {
       expect(await fileExists(oldImage)).toBeFalse();
     });
 
-    it('saves forms as [{ formid, filledby }] in form-name order; a new model with none saves []', async () => {
+    it('saves forms as [{ formid, filledby, participantview }] in form-name order; a new model with none saves []', async () => {
       if (!up) { pending('demo emulator not running'); return; }
       await setDoc(doc(firestore, 'delivery forms', `fa-${RUN}`), { formname: `B form ${RUN}` });
       await setDoc(doc(firestore, 'delivery forms', `fb-${RUN}`), { formname: `A form ${RUN}` });
@@ -378,9 +378,11 @@ describe('CreateAtcmodelComponent', () => {
       await component.onSubmit();
 
       const saved = (await getDoc(doc(firestore, 'atc model', id))).data();
+      // both participantview defaults in one read-back: fb was added in the dialog (true), fa was saved before the
+      // flag existed and so carries no key (false)
       expect(saved['forms']).toEqual([
-        { formid: `fb-${RUN}`, filledby: 'specialist' },
-        { formid: `fa-${RUN}`, filledby: 'participant' },
+        { formid: `fb-${RUN}`, filledby: 'specialist', participantview: true },
+        { formid: `fa-${RUN}`, filledby: 'participant', participantview: false },
       ]);
 
       TestBed.resetTestingModule();

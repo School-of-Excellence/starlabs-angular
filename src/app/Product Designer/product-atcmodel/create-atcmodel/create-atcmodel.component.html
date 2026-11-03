@@ -100,6 +100,13 @@
         <span class="ca-hint">{{ formRows.length ? formRows.length + (formRows.length === 1 ? ' form' : ' forms') : 'No forms yet' }}</span>
       </div>
 
+      <div *ngIf="formRows.length" class="ca-form-columns" aria-hidden="true">
+        <span>Form</span>
+        <span>Filled by</span>
+        <span class="ca-form-view-head">Participant can view</span>
+        <span></span>
+      </div>
+
       <div *ngFor="let row of formRows; trackBy: trackByFormId" data-testid="ca-form-row" class="ca-form-row">
         <div class="ca-form-name">
           <span *ngIf="row.name">{{ row.name }}</span>
@@ -111,6 +118,7 @@
           <mat-button-toggle data-testid="ca-form-participant" value="participant">Participant</mat-button-toggle>
           <mat-button-toggle data-testid="ca-form-sponsor" value="sponsor">Sponsor</mat-button-toggle>
         </mat-button-toggle-group>
+        <mat-checkbox data-testid="ca-form-participantview" class="ca-form-view" aria-label="Participant can view" [checked]="row.participantview" (change)="setParticipantView(row, $event.checked)"><span class="ca-form-view-label">Participant can view</span></mat-checkbox>
         <button data-testid="ca-form-remove" mat-icon-button type="button" class="ca-danger" aria-label="Remove form" (click)="removeForm(row.formid)">
           <mat-icon>delete_outline</mat-icon>
         </button>

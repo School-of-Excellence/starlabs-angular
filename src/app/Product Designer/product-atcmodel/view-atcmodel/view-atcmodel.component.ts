@@ -98,7 +98,7 @@ export class ViewAtcmodelComponent {
         doc : null,
         existing : this.atcmodelData
       },
-      width:'540px',
+      width:'920px',
       maxWidth: '95vw',
       maxHeight: '90vh',
       disableClose:true
@@ -112,7 +112,7 @@ export class ViewAtcmodelComponent {
         doc : doc,
         existing : this.atcmodelData
       },
-      width:'540px',
+      width:'920px',
       maxWidth: '95vw',
       maxHeight: '90vh',
       disableClose:true

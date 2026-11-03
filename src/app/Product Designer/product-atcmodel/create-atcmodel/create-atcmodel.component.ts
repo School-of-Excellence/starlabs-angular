@@ -14,13 +14,20 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 
-// Forms config (operator, 2026-10-28): forms: [{ formid, filledby }] on the model; formid = `delivery forms`
-// doc id; filledby has no default (the admin must pick one); the list is kept in form-name order.
+// Forms config (operator, 2026-10-28): forms: [{ formid, filledby, participantview }] on the model; formid =
+// `delivery forms` doc id; filledby has no default (the admin must pick one); the list is kept in form-name order.
 // 'sponsor' added 2026-11-02 (plan 2026-11-02-atc-sponsor-forms).
+//
+// participantview (operator, 2026-11-03): the participant app shows a form in the ATC only when it is true. Set
+// per row whatever filledby is, so a specialist-filled form can be shown to the participant too. The two defaults
+// differ ON PURPOSE: a row READ from Firestore with no such key is false, so none of the models configured before
+// today exposes anything until an admin ticks it; a row ADDED here starts true, since an admin adding a form
+// usually means the participant to see it. Saving a model writes the key onto every one of its rows.
 export type FilledBy = 'specialist' | 'participant' | 'sponsor'
 // name: undefined while the forms load, null when the form isn't an active delivery form
-export interface ModelForm { formid: string; name?: string | null; filledby: FilledBy | null }
+export interface ModelForm { formid: string; name?: string | null; filledby: FilledBy | null; participantview: boolean }
 
 // Image rules (operator, 2026-10-26): square (1:1) only, PNG / JPG / WebP, max 200 KB.
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
@@ -44,6 +51,7 @@ export function normaliseModelName(name: any): string {
     MatSelectModule,
     MatAutocompleteModule,
     MatButtonToggleModule,
+    MatCheckboxModule,
     TextFieldModule,
   ],
   templateUrl: './create-atcmodel.component.html',
@@ -111,7 +119,7 @@ export class CreateAtcmodelComponent {
       this.form.patchValue(this.data.doc)
       this.originalImage = this.data.doc?.image || null
       this.previewUrl = this.originalImage
-      this.formRows = (this.data.doc?.forms || []).map((f: any) => ({ formid: f.formid, name: undefined, filledby: f.filledby ?? null }))
+      this.formRows = (this.data.doc?.forms || []).map((f: any) => ({ formid: f.formid, name: undefined, filledby: f.filledby ?? null, participantview: f.participantview === true }))
       this.updateForms()
     }
 
@@ -186,7 +194,7 @@ export class CreateAtcmodelComponent {
     this.form.get('videourl').setValue(current)
   }
 
-  //// forms config (array of { formid, filledby }, kept in form-name order)
+  //// forms config (array of { formid, filledby, participantview }, kept in form-name order)
   // Only active forms: a soft-deleted form has delete:true. Most forms have no delete field at all, so a Firestore
   // `!=` filter would drop them too — the deleted ones are filtered out here instead.
   setDeliveryForms(docs: { id: string, data: () => any }[]) {
@@ -197,7 +205,7 @@ export class CreateAtcmodelComponent {
 
   addForm(option: { formid: string, formname: string }) {
     if (this.formRows.some(r => r.formid === option.formid)) return
-    this.formRows = [...this.formRows, { formid: option.formid, name: option.formname, filledby: null }]
+    this.formRows = [...this.formRows, { formid: option.formid, name: option.formname, filledby: null, participantview: true }]
     this.formSearch = ''
     this.updateForms()
   }
@@ -205,6 +213,10 @@ export class CreateAtcmodelComponent {
   setFilledBy(row: ModelForm, filledby: FilledBy) {
     row.filledby = filledby
     this.updateForms()
+  }
+
+  setParticipantView(row: ModelForm, participantview: boolean) {
+    row.participantview = participantview
   }
 
   removeForm(formid: string) {
@@ -311,7 +323,7 @@ export class CreateAtcmodelComponent {
       const value: any = {
         ...this.form.value,
         atcmodel: this.typedName,
-        forms: this.formRows.map(r => ({ formid: r.formid, filledby: r.filledby })),
+        forms: this.formRows.map(r => ({ formid: r.formid, filledby: r.filledby, participantview: r.participantview })),
       }
       let image: string | null = this.originalImage
       let replacedImage: string | null = null
