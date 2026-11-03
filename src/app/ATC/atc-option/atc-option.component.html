@@ -1,50 +1,83 @@
-<div class="mainscreen">
-    <div *ngIf="initiatedATC.length != 0">
-      <div class="title">ATC Initiated To You</div>
-      <ul>
-        <li *ngFor="let atc of initiatedATC; let i = index">
-          Initiated By - {{mapProfile[atc.data()["initiatedby"].path].name}}
-          <button [attr.data-testid]="'atco-initiated-select-' + i" mat-icon-button class="selectbtn" (click)="selecteATC('initiated', atc)">
-            <mat-icon class="icon">check</mat-icon>
-          </button>
-        </li>
-      </ul>
-    </div>
-    <br>
-    <div *ngIf="draftOption.length != 0">
-      <div class="title">Draft ATC</div>
-      <ul>
-        <li *ngFor="let atc of draftOption; let i = index">
-          <span>Last updated - {{ draftDate(atc) ? (draftDate(atc) | date: "medium") : atc.data()["date"] }}</span>
-          <span class="source-badge" [class.local]="isLocalDraft(atc)">
-            {{ isLocalDraft(atc) ? 'On this device — not synced' : 'Synced (server)' }}
+<div class="atco">
+  <header class="atco-head">
+    <h2 class="atco-title">{{ draftOption.length != 0 ? 'Continue a saved draft?' : 'Pick up where you left off' }}</h2>
+    <p class="atco-sub" *ngIf="draftOption.length != 0">
+      {{ draftOption.length == 1 ? 'There is a saved draft' : 'There are ' + draftOption.length + ' saved drafts' }} for this participant.
+      Continue one, or start fresh.
+    </p>
+    <p class="atco-sub" *ngIf="draftOption.length == 0">Choose one to start with, or close to carry on.</p>
+  </header>
+
+  <div class="atco-body">
+    <!-- ATCs initiated to you -->
+    <section class="atco-section" *ngIf="initiatedATC.length != 0">
+      <div class="atco-label">ATC initiated to you</div>
+      <div class="atco-card" *ngFor="let atc of initiatedATC; let i = index">
+        <div class="atco-card-main">
+          <span class="atco-card-title">Initiated by {{mapProfile[atc.data()["initiatedby"].path].name}}</span>
+        </div>
+        <div class="atco-card-actions">
+          <button [attr.data-testid]="'atco-initiated-select-' + i" mat-flat-button class="atco-btn atco-btn-primary" (click)="selecteATC('initiated', atc)">Open</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Saved drafts -->
+    <section class="atco-section" *ngIf="draftOption.length != 0">
+      <div class="atco-label">Saved drafts</div>
+      <div class="atco-card" *ngFor="let atc of draftOption; let i = index">
+        <div class="atco-card-main">
+          <span class="atco-card-title">
+            {{ atc.data()["product"] || 'Draft' }}
           </span>
-          <!-- Flag drafts started from an AI generation so the specialist opens THIS draft
-               (same queue_atc_generation doc id) instead of creating a fresh one. -->
-          <span *ngIf="atc.data()['aiedited']" class="aiatc-badge">
-            <mat-icon class="icon">auto_awesome</mat-icon> AI ATC draft
+          <span class="atco-card-meta">
+            Last saved {{ draftDate(atc) ? (draftDate(atc) | date: "d MMM y, h:mm a") : atc.data()["date"] }}
           </span>
-          <button [attr.data-testid]="'atco-draft-select-' + i" mat-icon-button class="selectbtn" (click)="selecteATC('draft', atc)">
-            <mat-icon class="icon">check</mat-icon>
+          <div class="atco-badges">
+            <span class="atco-badge" [class.atco-badge-local]="isLocalDraft(atc)">
+              <mat-icon class="atco-badge-icon">{{ isLocalDraft(atc) ? 'cloud_off' : 'cloud_done' }}</mat-icon>
+              {{ isLocalDraft(atc) ? 'On this device — not synced' : 'Synced' }}
+            </span>
+            <!-- Drafts started from an AI generation: open THIS draft (same queue_atc_generation doc id)
+                 instead of creating a fresh one. -->
+            <span *ngIf="atc.data()['aiedited']" class="atco-badge atco-badge-ai">
+              <mat-icon class="atco-badge-icon">auto_awesome</mat-icon> AI ATC draft
+            </span>
+          </div>
+        </div>
+        <div class="atco-card-actions">
+          <button [attr.data-testid]="'atco-draft-delete-' + i" mat-icon-button class="atco-icon-btn" aria-label="Delete this draft" (click)="deleteDraft(atc, i)">
+            <mat-icon>delete_outline</mat-icon>
           </button>
-          <button [attr.data-testid]="'atco-draft-delete-' + i" mat-icon-button class="deletebtn" (click)="deleteDraft(atc, i)">
-            <mat-icon class="icon">delete_outline</mat-icon>
-          </button>
-        </li>
-      </ul>
-    </div>
-    <div *ngIf="assignments.length != 0">
-      <span class="d-flex justify-content-center"><h4>ATC Assignments </h4></span>
-      <ul>
-        <li *ngFor="let item of assignments;let i = index;">
-          {{mapProfile[item.data()['profileid']]['name']}} - <b>{{item.data()['directive']}}</b> given by <span *ngFor="let eis of item.data()['author'];let j = index"><b>{{mapProfile[eis]['name']}}, </b></span> on {{item.data()['created'].toDate() | date : 'medium'}}
-          <button [attr.data-testid]="'atco-assignment-select-' + i" mat-icon-button class="selectbtn" (click)="selecteATC('assignment', item)">
-            <mat-icon class="icon">check</mat-icon>
-          </button>
-        </li>
-      </ul>
-    </div>
-    <div class="actionbox">
-      <button data-testid="atco-close" class="closebtn" mat-stroked-button (click)="close()">Close</button>
-    </div>
+          <button [attr.data-testid]="'atco-draft-select-' + i" mat-flat-button class="atco-btn atco-btn-primary" (click)="selecteATC('draft', atc)">Continue</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ATC assignments -->
+    <section class="atco-section" *ngIf="assignments.length != 0">
+      <div class="atco-label">ATC assignments</div>
+      <div class="atco-card" *ngFor="let item of assignments; let i = index">
+        <div class="atco-card-main">
+          <span class="atco-card-title">{{mapProfile[item.data()['profileid']]['name']}}</span>
+          <span class="atco-card-text">{{item.data()['directive']}}</span>
+          <span class="atco-card-meta">
+            Given by <span *ngFor="let eis of item.data()['author']; let j = index">{{mapProfile[eis]['name']}}{{ j < item.data()['author'].length - 1 ? ', ' : '' }}</span>
+            · {{item.data()['created'].toDate() | date : 'd MMM y, h:mm a'}}
+          </span>
+        </div>
+        <div class="atco-card-actions">
+          <button [attr.data-testid]="'atco-assignment-select-' + i" mat-flat-button class="atco-btn atco-btn-primary" (click)="selecteATC('assignment', item)">Start</button>
+        </div>
+      </div>
+    </section>
   </div>
+
+  <footer class="atco-foot">
+    <!-- Closing returns no choice: the screen carries on without a draft (a new ATC, or the saved ATC on Edit) -->
+    <button data-testid="atco-close" mat-flat-button class="atco-btn" [class.atco-btn-fresh]="draftOption.length != 0" [class.atco-btn-ghost]="draftOption.length == 0" (click)="close()">
+      <mat-icon *ngIf="draftOption.length != 0">note_add</mat-icon>
+      {{ draftOption.length != 0 ? 'Start fresh' : 'Close' }}
+    </button>
+  </footer>
+</div>
