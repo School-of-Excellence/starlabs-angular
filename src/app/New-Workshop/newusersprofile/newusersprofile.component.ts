@@ -448,7 +448,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   }
 
   // Midnight (start) or 23:59:59.999 (end) of the picked day; null when the
-  // control is empty or holds a date the adapter could not parse.
+  // control is empty or holds a date the adapter could not parse
   private dayBound(value: Date | null, edge: 'start' | 'end'): number | null {
     if (!(value instanceof Date) || Number.isNaN(value.getTime())) return null;
     return edge === 'start'
