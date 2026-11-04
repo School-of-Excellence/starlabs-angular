@@ -224,8 +224,9 @@
             <!-- [required]="![null,undefined].includes(form.required) ? form.required : false" -->
             <mat-slider data-testid="fa-change-auto-save-2" 
               class="custom-slider"
-              [min]="1"
-              [max]="form.options.length"
+              [min]="0"
+              [max]="form.options.length - 1"
+              [displayWith]="labelFor(form.options)"
               [step]="1"
               [discrete]="true"
               [showTickMarks]="true"
@@ -237,7 +238,7 @@
             <span class="slider-max-label">{{form.options[form.options.length - 1]}}</span>
           </div>
           <div class="slider-value">
-            Current value: <strong>{{deliveryForm.get(form.formcontrol).value}}</strong>
+            Current value: <strong>{{sliderLabel(form.options, deliveryForm.get(form.formcontrol).value)}}</strong>
           </div>
           <mat-error *ngIf="deliveryForm.get(form.formcontrol).touched && deliveryForm.get(form.formcontrol).hasError('required')">
             Please select a value
@@ -325,7 +326,7 @@
             <div *ngIf="['slider'].includes(form.flippingquestion.type)" class="flipping-sliders">
               <div *ngFor="let flippingvalue of (form.flippingquestion.value || {}) | keyvalue" class="flipping-slider-item">
                 <div class="flipping-slider-label">
-                  {{flippingvalue.key}}: <strong>{{form.flippingquestion.value[$any(flippingvalue.key)]}}</strong>
+                  {{flippingvalue.key}}: <strong>{{sliderLabel(form.flippingquestion.options, form.flippingquestion.value[$any(flippingvalue.key)])}}</strong>
                 </div>
                 <div class="slider-container">
                   <span class="slider-min-label">{{form.flippingquestion.options[0]}}</span>
@@ -343,8 +344,9 @@
                   </mat-slider> -->
                   <mat-slider data-testid="fa-change-on-slider-flipping-value-change-4"
                     class="custom-slider"
-                    [min]="1"
-                    [max]="10"
+                    [min]="0"
+                    [max]="form.flippingquestion.options.length - 1"
+                    [displayWith]="labelFor(form.flippingquestion.options)"
                     [step]="1"
                     [discrete]="true"
                     [showTickMarks]="true"
