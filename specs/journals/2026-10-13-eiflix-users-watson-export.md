@@ -132,3 +132,124 @@ Already correct: Total New Users (filters movedtoexist), App Logs and consumptio
 used isNewUserProfile).
 Tests: a unit case for the paid rows, the resolver and the export User Type (111/111). The
 eiflix-ops-dashboard e2e file was re-run; the machine was heavily loaded at the time.
+
+## 2026-10-21 — Shared People Send dialog + Hot Leads "Send to Slack"
+- New shared component `New-Workshop/people-send-dialog/`. The operator will reuse it on other screens.
+  - It loads NOTHING: the caller passes `{ title, subtitle?, rows: [{ name, email, phonenumber,
+    journey }] }` (`people-send-dialog.model.ts`).
+  - The table has a checkbox column first, sortable Name / Email / Phone / Journey, a paginator
+    (10/25/50/100), and a search box across all four fields.
+  - The header box picks everyone the search shows, across pages. A "N selected · shown of total"
+    count sits beside it.
+  - **Send** is enabled only with at least one pick, and deliberately has no action yet; the
+    operator will define it next.
+  - Hook prefix `psd`.
+- Layering: the dashboard's side panel (z-index 1001) sits above the CDK overlay container (1000). The
+  dialog adds `psd-over-panels` to the overlay container while open (global rule in `styles.css`,
+  z-index 1100) and removes it on destroy, so any screen with a high side panel works without
+  per-screen CSS.
+- Hot Leads panel only: a "Send to Slack" button (`eif-send-to-slack`) on its own full-width line
+  under the toolbar. The toolbar now wraps; other panels are unchanged. It passes `panel.viewRows`,
+  so the panel's search / cohort / journey filter applies, and journey comes from `journeyTag`
+  (blank for new users).
+- Tests:
+  - Model unit spec: 2/2.
+  - Hub WS-71: seeds two people over 3h and one under, then drives the button and the whole dialog;
+    it passes.
+  - The readiness gate is MATCHED (dialog 14/14 hooks, dashboard 119/119).
+  - The hub commit is local, waiting for a full-suite run before push.
+- 2026-10-22: **Export CSV** in the People Send dialog (`psd-export`), beside Send.
+  - Enabled only with at least one pick.
+  - Exports exactly the selected people (Name, Email, Phone, Journey), in the table's current sort
+    order, from what the caller passed. No reads.
+  - Includes a byte-order mark so Excel keeps names intact.
+  - File name `<title-slug>-<yyyy-mm-dd>.csv`, e.g. `send-to-slack-2026-10-22.csv`.
+  - CSV text and file name are pure helpers in `people-send-dialog.model.ts`; the unit spec is 4/4.
+  - Hub WS-71 checks the button is disabled, enabled, the file name, the header, and that only the
+    selected person is exported; it passes. Two hub commits are local.
+- 2026-10-22: Send to Slack moved into the Default / Export row (operator). The three buttons don't
+  fit beside the cohort switch in the 460px panel, so in the Hot Leads panel only
+  (`eod-ptool-row-hot`) the switch takes its own full-width line and the three buttons share the next
+  line, right-aligned. Other panels are unchanged. WS-71 still passes.
+
+## 2026-10-23 — EiFlix App Logs: From–To date range
+- The App Logs header has From / To date fields and Clear beside Today / 7D / 30D, the same markup and
+  behaviour as the Users section.
+  - The range applies once both dates are set; "Pick both dates to apply the range" shows while only
+    one is.
+  - Dates can be picked in either order, and nothing after today can be picked.
+  - Clear (or any preset) empties the pickers and goes back to that preset.
+- `logRange` gains 'custom'. `fetchLoginRows(days)` now wraps `fetchLoginRowsBetween(start, end)`,
+  which adds an upper bound on `date`. That is still a single-field range, so no new index.
+- The EiFlix Report keeps its own window. A custom range sets `logFetchedDays = 0`, so the report
+  never borrows rows that aren't "the last N days".
+- The count line reads "… EiFlix log(s) for Sep 28 – Oct 13".
+- Hub WS-72 covers the hint, two windows (each holding exactly one seeded login) and Clear. WS-31 still
+  passes. The hub commit is local.
+- 2026-10-28: People Send dialog gains the **country code** with the phone and a **User Type** column.
+  - The row model adds `countrycode`, read from either `countrycode` or `countryCode` (participant
+    metadata and new_user_data spell it differently), with "+" added when missing.
+  - It also adds `usertype`, which the caller decides. Phone shows as "+91 9876543210"
+    (`peopleSendPhone`); with no code it shows just the number.
+  - User Type is sortable, searchable, and shown as a chip (New user is orange, Existing grey).
+  - The CSV is now Name, Email, Phone (with code), User Type, Journey.
+  - The Hot Leads caller sets usertype with the panel's own rule: New user only when tagged, so
+    movedtoexist people are Existing; unknown is ''.
+  - Unit spec 5/5. WS-71 checks both spellings, both types and the CSV columns; it passes. Hub
+    commits are local.
+
+## 2026-10-28 — Send to Slack actually sends (eiflixtouchpoints -> cloud function -> Slack)
+- Pattern chosen by the operator: the same app-writes-a-doc / cloud-function-posts flow as
+  slackAskAH and slackLoveLetter. The webhook URL never reaches the browser; a browser JSON post to a
+  Slack webhook is blocked by CORS anyway.
+- **Dialog (shared, still Slack-agnostic):** `data.send(rows)` comes from the caller and returns
+  `{ ok, message }`.
+  - Send passes the selected people in table order and shows "Sending…".
+  - The message appears on its own right-aligned line (`psd-send-status`).
+  - Picks clear on success. Without `data.send`, Send does nothing.
+- **Hot Leads caller:** writes ONE doc to the new collection `eiflixtouchpoints` (name chosen by the
+  operator):
+  `{ docid, webhookdoc: 'eiflixhotleads', heading, subheading, people: [{ name, email, phone, journey }], count, sentby, senton, status: 'pending' }`.
+  - `heading` / `subheading` are the side panel's title / caption. The operator wants nothing fixed
+    in the Slack message, because the dialog will be opened from other screens.
+  - Journey (`slackJourneyLabel`): a new user gets "New user"; otherwise the journey, or
+    "No journey".
+  - The caller watches the doc for up to 60 s. 'sent' shows "Sent N people to <channel>", 'failed'
+    shows the error, and no answer shows "Queued … no confirmation yet".
+- **Cloud function** `eiflixtouchpointslack` in `cloud-function/functions/components/workshop.js`,
+  exported in `index.js`. It is NOT committed or deployed; the operator handles that.
+  - onDocumentCreated `eiflixtouchpoints/{docid}`.
+  - Reads `slack webhookurls/<webhookdoc>` in production, or `slackDevTest` elsewhere, the same as
+    the other Slack functions.
+  - Posts via axios using the pure `eiflixTouchpointSlackMessages(people, heading, subheading)`:
+    the heading, a context line with the subheading and head-count, then one section per person;
+    45 people per message, under Slack's 50-block cap.
+  - Writes back `status` / `channel` / `messages` / `webhookused` / `error` / `processedon`.
+  - Checked locally with node: escaping, "—" for blanks, and 100 people split into 3 messages.
+- Firestore rules are open (`allow read, write: if true`), so the new collection needs no rule change.
+- Tests:
+  - Unit 117/117, including `slackJourneyLabel`.
+  - Hub WS-71 checks the written doc and plays the function's 'sent' and 'failed' verdicts. The hub's
+    emulator runs the hub's copy of the functions, which won't have the new one until it is pushed.
+    It passes. The hub commit is local.
+- 2026-10-28 (after the first live post): the operator wanted the Slack message laid out in columns,
+  with the summary line highlighted.
+  - `eiflixTouchpointSlackMessages` now builds Slack's **table** block: a bold header row
+    (Name | Email | Phone | Journey) and one row per person. Slack allows one table and 100 rows per
+    message, so people go 99 per message.
+  - The summary (subheading · head-count) is a bold section, no longer a grey context line.
+  - If the workspace refuses the table block (HTTP 400, e.g. invalid_blocks), the handler re-sends
+    the same columns as an aligned monospace block (`eiflixTouchpointSlackTextMessages`: padded,
+    long values cut with "…", 25 rows per code block, which stays under the 3000-character limit).
+  - The doc records `format: 'table' | 'text'`.
+  - Checked locally with node (row counts, escaping, block sizes for 1200 people). It needs a
+    redeploy of `eiflixtouchpointslack` only. The app is unchanged.
+- 2026-10-28 (revised): the operator did NOT want a table, because the team copies the details out of
+  Slack. Their chosen layout is one block per person as two columns, label | value, one field per row
+  (Name / Email / Phone / Journey).
+  - Built with section `fields` alternating label/value; fields fill left-to-right, so labels form
+    one column and values the next.
+  - The bold summary line stays.
+  - The table block and the monospace fallback were removed, along with `format` on the doc.
+  - 48 people per message (header + summary + 48 sections = Slack's 50-block cap).
+  - Checked locally with node. Needs a redeploy of `eiflixtouchpointslack`.

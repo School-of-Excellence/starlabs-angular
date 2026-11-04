@@ -839,6 +839,11 @@ body.eod-scroll-lock .toolbar {
 }
 /* End Journey Coach Dashboard dark-mode overlay block */
 
+/* People Send dialog (New-Workshop/people-send-dialog): some screens' side panels sit above the CDK
+   overlay layer (EiFlix operations dashboard panel = 1001). While the dialog is open it adds this class
+   so the dialog — and anything it opens — shows above them. Removed again when it closes. */
+.cdk-overlay-container.psd-over-panels { z-index: 1100; }
+
 /* Map Appointment Role dialog (panelClass 'mard-dialog') — StarLabs Operations surface. The dialog's own
    body scrolls (max-height 90vh in its component CSS); this only rounds and clips the outer surface. */
 .mard-dialog .mat-mdc-dialog-surface {
