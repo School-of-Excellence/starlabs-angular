@@ -2,6 +2,8 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { doc, getDoc, getFirestore } from '@angular/fire/firestore';
 import { MatIconModule } from '@angular/material/icon';
+import { timeToString } from '../../shared/time-value';
+import { sliderLabel } from '../../shared/slider-value';
 
 @Component({
   selector: 'app-form-overlay-view',
@@ -57,11 +59,13 @@ export class FormOverlayViewComponent {
 
   private buildFormDisplayData(row: any, formTemplate: any, submittedFormData: any): any {
     const formValues: any = {};
+    const flippingValues: any = {};
     let controlIndex = 0;
     if (submittedFormData['formarray']) {
       for (const field of submittedFormData['formarray']) {
         if (['label', 'video', 'audio'].includes(field.type)) continue;
         formValues[`control${controlIndex}`] = field.value;
+        flippingValues[`control${controlIndex}`] = field.flippingquestion?.value ?? null;
         controlIndex++;
       }
     }
@@ -79,6 +83,7 @@ export class FormOverlayViewComponent {
       }
 
       const fieldValue = formValues[`control${controlIndex}`];
+      const flippingAnswers = flippingValues[`control${controlIndex}`];
       controlIndex++;
       questionNumber++;
 
@@ -91,6 +96,7 @@ export class FormOverlayViewComponent {
         required: field.required || false,
         fieldType: field.type,
         value: this.formatFieldValueForOverlay(field, fieldValue),
+        flipping: this.formatFlippingForOverlay(field, flippingAnswers),
         isEmpty: !fieldValue || (Array.isArray(fieldValue) && fieldValue.length === 0)
       });
     }
@@ -111,6 +117,23 @@ export class FormOverlayViewComponent {
     };
   }
 
+  // A multicheckbox / multiselect can carry a follow-up slider per chosen option (`flippingquestion`), whose
+  // answers are a { option: value } map on the submitted doc. They were never rendered here, so a form with
+  // sub-questions showed only its checkbox answer. The number is shown as the fill screen shows it, not
+  // resolved through `options` — the stored value is a raw slider reading and resolving it here would invent
+  // an answer it does not have.
+  private formatFlippingForOverlay(field: any, answers: any): { title: string, range: string, lines: string[] } | null {
+    if (field.flipping !== true || !answers) return null;
+    const chosen = Object.keys(answers);
+    if (chosen.length === 0) return null;
+    const options = field.flippingquestion?.options;
+    return {
+      title: field.flippingquestion?.fieldname || 'Follow-up',
+      range: options?.length ? `${options[0]} – ${options[options.length - 1]}` : '',
+      lines: chosen.map(option => `${option}: ${sliderLabel(options, answers[option])}`)
+    };
+  }
+
   private formatFieldValueForOverlay(field: any, value: any): string {
     if (!value && value !== 0) return 'Not answered';
 
@@ -118,13 +141,15 @@ export class FormOverlayViewComponent {
       case 'date':
         if (value?.toDate) return value.toDate().toLocaleDateString();
         try { return new Date(value).toLocaleDateString(); } catch { return String(value); }
+      case 'time':
+        return timeToString(value) ?? String(value);
       case 'Checkbox':
         return value ? 'Yes' : 'No';
       case 'MultiSelect':
       case 'multicheckbox':
         return Array.isArray(value) ? value.join(', ') : String(value);
       case 'slider':
-        let result = String(value);
+        let result = sliderLabel(field.options, value);
         if (field.options?.length > 0) result += ` (Range: ${field.options[0]}-${field.options[field.options.length - 1]})`;
         return result;
       case 'array':

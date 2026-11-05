@@ -260,7 +260,7 @@
           <th mat-header-cell *matHeaderCellDef mat-sort-header>Referred by</th>
           <td mat-cell *matCellDef="let u">
             <span *ngIf="isSubscriber(u)" class="chip chip-sub">Subscriber</span>
-            <span *ngIf="!isSubscriber(u) && referredBy(u)">{{ referredBy(u) }}</span>
+            <span *ngIf="!isSubscriber(u) && referredBy(u)" data-testid="new-referred-by">{{ referredBy(u) }}</span>
             <span *ngIf="!isSubscriber(u) && !referredBy(u)">—</span>
           </td>
         </ng-container>

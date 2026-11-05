@@ -11,40 +11,42 @@
                 <!-- <span class="rowlab">Select Event</span> -->
                 <mat-form-field>
                     <mat-label>Select Event</mat-label>
-                    <mat-select [(ngModel)]="selectedEvent" (selectionChange)="filterCommunications()">
+                    <mat-select data-testid="cgp-filter-event" [(ngModel)]="selectedEvent" (selectionChange)="filterCommunications()">
                         <mat-option>
                             <ngx-mat-select-search [(ngModel)]="eventSearch" name="event Search"
                                 [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'"
                                 ngDefaultControl></ngx-mat-select-search>
                         </mat-option>
                         <mat-option [value]="null">None</mat-option>
-                        <mat-option *ngFor="let event of getFilteredEvents(this.eventSearch)" [value]="event.docid">{{event?.name ?? 'no title'}}</mat-option>
+                        <mat-option data-testid="cgp-filter-event-option" *ngFor="let event of getFilteredEvents(this.eventSearch)" [value]="event.docid">{{event?.name ?? 'no title'}}</mat-option>
                     </mat-select>
                 </mat-form-field>
             </div>
             <div>
                 <mat-form-field>
                     <mat-label>Search Communication</mat-label>
-                    <input matInput [(ngModel)]="communicationSearch" (input)="filterCommunications()">
+                    <input data-testid="cgp-filter-search" matInput [(ngModel)]="communicationSearch" (input)="filterCommunications()">
                 </mat-form-field>
             </div>
             <div>
                 <mat-form-field>
                     <mat-label>Select Participant</mat-label>
-                    <mat-select [(ngModel)]="selectedParticipant" (selectionChange)="filterCommunications()" multiple>
+                    <mat-select data-testid="cgp-filter-participant" [(ngModel)]="selectedParticipant" (selectionChange)="filterCommunications()" multiple>
                         <mat-option>
                             <ngx-mat-select-search [(ngModel)]="participantSearch" name="participant Search"
                                 [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'"
                                 ngDefaultControl></ngx-mat-select-search>
                         </mat-option>
                         <mat-option [value]="null">None</mat-option>
-                        <mat-option *ngFor="let p of getFilteredParticipants()" [value]="p?.profileid">{{p?.name}}</mat-option>
+                        <mat-option data-testid="cgp-filter-participant-option" *ngFor="let p of getFilteredParticipants()" [value]="p?.profileid">{{p?.name}}</mat-option>
                     </mat-select>
                 </mat-form-field>
-            <button (click)="refresPage()" mat-stroked-button> <mat-icon>refresh</mat-icon> Refresh </button>
+            </div>
+            <button data-testid="cgp-toolbar-refresh" (click)="refresPage()" mat-stroked-button> <mat-icon>refresh</mat-icon> Refresh </button>
         </div>
         <div class="header-warp">
             <div class="header">
+                <button data-testid="cgp-cal-prev-month" (click)="prevMonth()" type="button">‹</button>
                 <span>{{ displayedMonth | date:'MMMM yyyy' }}</span>
                 <button data-testid="cgp-cal-next-month" (click)="nextMonth()" type="button">›</button>
             </div>
@@ -54,6 +56,7 @@
                     <svg class="check" viewBox="0 0 16 16" fill="none">
                         <path d="M3 8.5L6.5 12L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                     </svg>
+                    {{event?.name}}
                 </button>
             </div>
             
@@ -77,7 +80,7 @@
                         <div class="dow">Fri</div>
                         <div class="dow">Sat</div>
                         <div class="dow">Sun</div>
-                        <div class="day" *ngFor="let days of calendarDays" [class.out]="!days.isCurrentMonth" (click)="days.isCurrentMonth && openCommunicationDaySidePanel(days?.date)">
+                        <div data-testid="cgp-cal-day" class="day" *ngFor="let days of calendarDays" [class.out]="!days.isCurrentMonth" (click)="days.isCurrentMonth && openCommunicationDaySidePanel(days?.date)">
                             <div *ngIf="days.isCurrentMonth">
                                 <div class="dhead">
                                     <span class="dn">{{days?.date?.getDate()}}</span>
@@ -95,7 +98,7 @@
                                             {{getAppNotificationForDay(days?.date)?.length ?? 0}}
                                         </span>
                                     </div>
-                                    <button class="add-btn" *ngIf="showAddButtonInDateCell(days?.date)" (click)="onCommunicationAddClick(days?.date);$event.stopPropagation()" title="Add communication" aria-label="Add communication">
+                                    <button data-testid="cgp-cal-add" class="add-btn" *ngIf="showAddButtonInDateCell(days?.date)" (click)="onCommunicationAddClick(days?.date);$event.stopPropagation()" title="Add communication" aria-label="Add communication">
                                         <mat-icon>add</mat-icon>
                                     </button>
                                 </div>
@@ -106,9 +109,9 @@
                                             <span class="sd" style="background:var(--s-draft); flex-shrink:0; width:8px; height:8px; border-radius:50%;"></span>
                                             <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; font-size: 13px;">{{comm?.title ?? ''}}</span>
                                             </div>
-                                            <button class="comm-dup-btn" (click)="onCommunicationDuplicate(comm); $event.stopPropagation()"><mat-icon>file_copy</mat-icon></button>
+                                            <button data-testid="cgp-cal-dup" class="comm-dup-btn" (click)="onCommunicationDuplicate(comm); $event.stopPropagation()"><mat-icon>file_copy</mat-icon></button>
                                         </button>
-                                        <button *ngIf="getCommunicationForDay(days?.date)?.length > 3" type="button" class="show-more-btn">
+                                        <button data-testid="cgp-cal-showmore" *ngIf="getCommunicationForDay(days?.date)?.length > 3" type="button" class="show-more-btn">
                                             <span>Show {{ getCommunicationForDay(days?.date).length - 3 }} more</span>
                                             <span class="show-more-icon">+</span>
                                         </button>
@@ -300,7 +303,7 @@
 
                         <mat-form-field appearance="outline" class="cf-field cf-field-event">
                             <mat-label>Select Event</mat-label>
-                            <mat-select formControlName="eventref">
+                            <mat-select data-testid="cgp-form-eventref" formControlName="eventref">
                                 <mat-option>
                                     <ngx-mat-select-search formControlName="eventsearch" name="event Search" [placeholderLabel]="'Search'"
                                         [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
@@ -323,7 +326,7 @@
                                 <div class="cf-email-config">
                                     <mat-form-field appearance="outline" class="cf-field cf-field-tmpl">
                                         <mat-label>Select Email Template</mat-label>
-                                        <mat-select formControlName="emailtemplate">
+                                        <mat-select data-testid="cgp-form-emailtemplate" formControlName="emailtemplate">
                                             <mat-option>
                                                 <ngx-mat-select-search formControlName="emailsearch" name="event Search" [placeholderLabel]="'Search'"
                                                     [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
@@ -711,10 +714,10 @@
         <aside class="drawer" aria-label="Communications for the day">
             <div class="dh">
                 <div class="r1">
-                    <button class="nav" title="Previous day" (click)="onPreSidePanelClick()" [disabled]="!showPreSidePanel()"><span>‹</span></button>
+                    <button data-testid="cgp-side-prev" class="nav" title="Previous day" (click)="onPreSidePanelClick()" [disabled]="!showPreSidePanel()"><span>‹</span></button>
                     <h3>{{expandedCommunication?.date | date}}</h3>
-                    <button class="nav" title="Next day" (click)="onNextSidePanelClick()" [disabled]="!showNextSidePanel()"><span>›</span></button>
-                    <button class="x" title="Close" (click)="closeCommunicationDaySidePanel()">×</button>
+                    <button data-testid="cgp-side-next" class="nav" title="Next day" (click)="onNextSidePanelClick()" [disabled]="!showNextSidePanel()"><span>›</span></button>
+                    <button data-testid="cgp-side-close" class="x" title="Close" (click)="closeCommunicationDaySidePanel()">×</button>
                 </div>
                 <div class="sub">{{expandedCommunication?.communications?.length}} communications</div>
                 <div class="tot">
@@ -736,7 +739,7 @@
                         </svg>App 165
                     </span> -->
                 </div>
-                <input class="inp" placeholder="Search this day" [(ngModel)]="expandedCommunication.communicationSearch">
+                <input data-testid="cgp-side-search" class="inp" placeholder="Search this day" [(ngModel)]="expandedCommunication.communicationSearch">
             </div>
             <div class="db">
                 <div class="grp" *ngFor="let event of getCommunicationsForSidePanel() | keyvalue">
@@ -744,8 +747,8 @@
                     <div class="row" style="border-left-color:#1f5bd8;background:rgba(31,91,216,0.04);" *ngFor="let comm of event?.value">
                         <div><b>{{comm?.title ?? 'Unknown'}}</b></div>
                         <div class="acts">
-                            <button title="Duplicate" (click)="onCommunicationDuplicate(comm)">⧉</button>
-                            <button title="Open" (click)="onCummunicationClick(comm);$event.stopPropagation()" >Open</button>
+                            <button data-testid="cgp-side-dup" title="Duplicate" (click)="onCommunicationDuplicate(comm)">⧉</button>
+                            <button data-testid="cgp-side-open" title="Open" (click)="onCummunicationClick(comm);$event.stopPropagation()" >Open</button>
                         </div>
                     </div>
                 </div>

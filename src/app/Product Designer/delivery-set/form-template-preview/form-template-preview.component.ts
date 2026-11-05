@@ -6,6 +6,8 @@ import { MatButtonModule } from '@angular/material/button';
 import { FormGroup, FormBuilder, Validators, FormControl, FormArray, ReactiveFormsModule  , FormsModule} from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { timeToString } from '../../../shared/time-value';
+import { sliderLabel } from '../../../shared/slider-value';
 
 @Component({
   selector: 'app-form-template-preview',
@@ -85,9 +87,33 @@ export class FormTemplatePreviewComponent {
         fieldname: field.fieldname,
         type: field.type,
         array: field.array || null,
-        value: formValues[field.formcontrol] || null
+        // a time control hands back a Date, and the stored answer is "HH:mm": show the time either way.
+        // a slider control hands back the OPTION INDEX, and the fill screen shows the option, so resolve it
+        // here too — otherwise the preview reads one apart from the form it is previewing.
+        value: (field.type === 'time'
+          ? timeToString(formValues[field.formcontrol])
+          : field.type === 'slider'
+          ? sliderLabel(field.options, formValues[field.formcontrol])
+          : formValues[field.formcontrol]) || null,
+        // the follow-up slider answers for a flipping question, which this preview never showed
+        flipping: this.flippingLines(field)
       }))
       .filter(field => field.value !== null && field.value !== undefined && (field.type === 'Checkbox' ? field.value === true : field.value !== ''));
+  }
+
+  /** A flipping question's { option: value } answers, as "option: value" lines, plus its heading and the two
+   *  end labels. The number is shown as the fill screen shows it, not resolved through `options`. */
+  flippingLines(field: any): { title: string, range: string, lines: string[] } | null {
+    const answers = field.flippingquestion?.value;
+    if (field.flipping !== true || !answers) return null;
+    const chosen = Object.keys(answers);
+    if (chosen.length === 0) return null;
+    const options = field.flippingquestion?.options;
+    return {
+      title: field.flippingquestion?.fieldname || 'Follow-up',
+      range: options?.length ? `${options[0]} – ${options[options.length - 1]}` : '',
+      lines: chosen.map(option => `${option}: ${sliderLabel(options, answers[option])}`)
+    };
   }
 
   isSimpleValue(value: any): boolean {

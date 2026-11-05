@@ -24,6 +24,7 @@ import { AhNotificationComponent } from '../../Participants Profile Management/p
 import { MapRecommendedplaylistToparticipantComponentComponent } from '../../Participants Profile Management/participants-analytics/map-recommendedplaylist-toparticipant.component/map-recommendedplaylist-toparticipant.component.component';
 import { MatCheckboxChange , MatCheckboxModule } from '@angular/material/checkbox';
 import { writeBatch } from 'firebase/firestore';
+import { diffCohortMembers, isRandomizeCategory } from '../cohort-randomize-dialog/cohort-randomize.logic';
 
 
 @Component({
@@ -3146,6 +3147,79 @@ export class CohortManagementComponent {
 
   // function to duplicate selected cohorts: pick a target marathon (same or another),
   // then walk each selected cohort through the create cohort dialog in 'duplicate' mode
+  // Randomize is offered only when every ticked cohort is educational or operational.
+  getRandomizeSourceCohorts(): any[] {
+    const ticked = this.cohortsList.filter((c: any) => this.selectedCohortIds.has(c.docid))
+    return ticked.every((c: any) => isRandomizeCategory(c['cohortCategory'])) ? ticked : []
+  }
+
+  async openRandomizeDialog(): Promise<void> {
+    const sources = this.getRandomizeSourceCohorts()
+    if (sources.length === 0) return
+
+    const { CohortRandomizeDialogComponent } = await import('../cohort-randomize-dialog/cohort-randomize-dialog.component')
+    const dialogRef = this.dialog.open(CohortRandomizeDialogComponent, {
+      width: '1100px',
+      maxWidth: '95vw',
+      height: '90vh',
+      autoFocus: false,
+      disableClose: true,
+      data: {
+        sources,
+        cohorts: this.cohortsList,
+        events: Object.values(this.mapEvent),
+        // A function, not the map: mapProfile is replaced when it finishes loading, which can be after the dialog opens.
+        profileName: (id: string) => this.mapProfile[id] || this.mapParticipantMetaData[id]?.['name'] || id,
+        mapMarathon: this.mapMarathon,
+      },
+    })
+    const result = await firstValueFrom(dialogRef.afterClosed())
+    if (result?.plan?.length) await this.applyRandomizePlan(result.plan)
+  }
+
+  // Overwrites each selected cohort with its shuffled list. Nobody leaves the source or specialist cohorts.
+  private async applyRandomizePlan(plan: any[]): Promise<void> {
+    try {
+      const batch = writeBatch(this.firestore)
+      const saved: { cohort: any, added: string[], removed: string[] }[] = []
+
+      for (const group of plan) {
+        const participantIds: string[] = [...group.specialistIds, ...group.participantIds]
+
+        // Read the cohort again so the logs and chat match what is actually being replaced.
+        const cohortRef = doc(this.firestore, 'big cohorts', group.cohort.docid)
+        const currentIds: string[] = (await getDoc(cohortRef)).data()?.['participantidlist'] ?? []
+        const { added, removed } = diffCohortMembers(currentIds, participantIds)
+        batch.update(cohortRef, { participantidlist: participantIds })
+
+        if (group.cohort.enableGroupChat && group.cohort.chatref) {
+          const chatFields = { group_name: group.cohort.name, last_modification: new Date(), type: 'group' }
+          const addedUids = await this.getUidsFromProfileIds(added)
+          const removedUids = await this.getUidsFromProfileIds(removed)
+          if (addedUids.length > 0) batch.update(group.cohort.chatref, { ...chatFields, members: arrayUnion(...addedUids) })
+          if (removedUids.length > 0) batch.update(group.cohort.chatref, { ...chatFields, members: arrayRemove(...removedUids) })
+        }
+        saved.push({ cohort: group.cohort, added, removed })
+      }
+
+      await batch.commit()
+      for (const entry of saved) {
+        await this.createLogsForParticipants(entry.cohort, entry.added, 'added')
+        await this.createLogsForParticipants(entry.cohort, entry.removed, 'removed')
+      }
+
+      const added = saved.reduce((total, entry) => total + entry.added.length, 0)
+      const removed = saved.reduce((total, entry) => total + entry.removed.length, 0)
+      this.toggleSelectMode()
+      this.selectbarExpanded = false
+      this.loadCohorts()
+      this.authguard.openSnackBar(`${saved.length} cohort(s) updated: ${added} added, ${removed} removed`, 'ok', 3000)
+    } catch (error) {
+      console.error('Error saving randomized cohorts:', error)
+      alert('Error saving randomized cohorts. Please try again.')
+    }
+  }
+
   async duplicateSelectedCohorts(): Promise<void> {
     if (this.selectedCohortIds.size === 0) return
     const sources = this.cohortsList.filter((c: any) => this.selectedCohortIds.has(c.docid))

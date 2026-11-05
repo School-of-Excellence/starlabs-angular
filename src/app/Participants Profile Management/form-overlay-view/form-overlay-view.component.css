@@ -162,6 +162,22 @@
   font-style: italic;
 }
 
+.question-flipping {
+  margin-top: 8px;
+}
+
+.flipping-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #555;
+  margin-bottom: 2px;
+}
+
+.flipping-range {
+  font-weight: 400;
+  color: #888;
+}
+
 .question-notes {
   font-size: 11px;
   color: #888;

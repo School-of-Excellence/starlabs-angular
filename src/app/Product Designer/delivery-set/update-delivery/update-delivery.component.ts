@@ -762,6 +762,8 @@ export class UpdateDeliveryComponent {
       // this.loading = true
       var docid = value.docid ?? doc(collection(this.firestore,col)).id
       value['docid'] = docid
+      // every form carries `delete` so screens can query active forms: new / active → false, a deleted form stays true
+      value['delete'] = this.data?.['delete'] === true
       console.log(value);
       const docRef = doc(this.firestore,col,docid)
       setDoc(docRef, this.stripUndefined(value), {merge:true}).then(()=>{
@@ -811,6 +813,26 @@ export class UpdateDeliveryComponent {
         delete : true
       }).then(()=> {
         this.openSnackBar("Form Deleted")
+        this.closeDialog()
+      }).catch(err=>{
+        this.loading = false
+        alert(err)
+      })
+    }
+  }
+  restoreForm(){
+    if(!confirm("Restore this form? It becomes available again.")){
+      return
+    }
+    let col = "delivery forms"
+    this.loading = true
+    if(this.data != null){
+      const docRef = doc(this.firestore,col,this.data['docid'])
+      updateDoc(docRef,{
+        delete : false
+      }).then(()=> {
+        this.data['delete'] = false
+        this.openSnackBar("Form Restored")
         this.closeDialog()
       }).catch(err=>{
         this.loading = false
