@@ -319,8 +319,10 @@
                             {{ dateEntry.slottype === 'appointment' ? 'Appointment' : 'Queue' }}
                           </span>
                         </div>
-                        <mat-icon class="btn-delete" [matTooltip]="dateEntry.startdate && dateEntry.enddate && dateEntry.participants?.length > 0 ? 'Participants Confirmed for this slot' : 'Remove slot'" 
-                          (click)="dateEntry.startdate && dateEntry.enddate && dateEntry.participants?.length > 0 ? null : removeDateFromStage(row, stage, i)" [attr.data-testid]="'qp-slotdel-' + row.id + '-' + stage + '-' + i">delete</mat-icon>
+                        <mat-icon class="btn-delete"
+                          [matTooltip]="(dateEntry.appointmentref || dateEntry.bookedby || dateEntry.usedslot > 0 || dateEntry.participants?.length > 0) ? 'Booked - cancel the booking first' : 'Remove slot'"
+                          (click)="removeDateFromStage(row, stage, i)"
+                          [attr.data-testid]="'qp-slotdel-' + row.id + '-' + stage + '-' + i">delete</mat-icon>
                       </div>
                       <div style="display: flex;flex-direction: row;justify-content: space-between;">
                         <div class="date-row">
