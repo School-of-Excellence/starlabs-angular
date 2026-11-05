@@ -107,7 +107,10 @@ export class MapAppointmentRoleComponent implements OnDestroy{
         rolelist: this.roleList
       },
       disableClose: true,
-      autoFocus: false
+      autoFocus: false,
+      width: '680px',
+      maxWidth: '95vw',
+      panelClass: 'mard-dialog'
     })
   }
 

@@ -3118,3 +3118,27 @@
 }
 .sale-sort button.on { background: rgba(12, 138, 95, 0.12); color: #0c8a5f; opacity: 1; }
 
+
+/* Sale Achieved panel: purchase date range + the total of the buyers listed (operator 2026-11-02). */
+.sale-range { display: flex; align-items: flex-end; gap: 8px; margin: 0 0 8px; }
+.sale-range-field { display: flex; flex-direction: column; gap: 2px; flex: 1 1 0; min-width: 0; margin: 0; }
+.sale-range-field span { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.6; }
+.sale-range-field input {
+  width: 100%; box-sizing: border-box; height: 32px; padding: 0 8px;
+  border: 1px solid rgba(23, 24, 28, 0.18); border-radius: 8px; background: #ffffff;
+  font: inherit; font-size: 13px; color: #17181c;
+}
+.sale-range-field input:focus { outline: none; border-color: #0c8a5f; box-shadow: 0 0 0 2px rgba(12, 138, 95, 0.15); }
+.sale-range-clear {
+  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; padding: 0; border: 1px solid rgba(23, 24, 28, 0.14); border-radius: 8px;
+  background: transparent; color: inherit; cursor: pointer;
+}
+.sale-range-clear mat-icon { font-size: 18px; width: 18px; height: 18px; }
+.sale-panel-total {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  margin: 0 0 10px; padding: 10px 12px; border-radius: 10px;
+  background: rgba(12, 138, 95, 0.08); border: 1px solid rgba(12, 138, 95, 0.18);
+}
+.sale-panel-total-label { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.7; }
+.sale-panel-total-amt { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; color: #0c8a5f; }

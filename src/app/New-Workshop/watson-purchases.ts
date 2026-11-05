@@ -142,6 +142,34 @@ export function sortSaleBuyers<T extends { saleTotal?: number; saleLastDate?: nu
 }
 
 /**
+ * Sale Achieved panel date range (operator 2026-11-02): keeps only the purchases dated From..To — both
+ * 'yyyy-mm-dd' read as LOCAL whole days, either one blank for an open end, a reversed pair swapped — and
+ * recomputes each buyer's total, label and latest date from what is left. Buyers left with no purchase
+ * drop out. Both blank returns the list untouched.
+ */
+export function saleBuyersInRange<T extends { salePurchases?: any[] }>(buyers: T[], from: string, to: string): T[] {
+  let s = anyToDate(from);
+  let e = anyToDate(to);
+  if (!s && !e) return buyers;
+  if (s && e && s > e) [s, e] = [e, s];
+  const lo = s ? new Date(s.getFullYear(), s.getMonth(), s.getDate()).getTime() : -Infinity;
+  const hi = e ? new Date(e.getFullYear(), e.getMonth(), e.getDate(), 23, 59, 59, 999).getTime() : Infinity;
+  const out: T[] = [];
+  for (const b of buyers) {
+    const rows = (b.salePurchases || []).filter((r) => r?.date instanceof Date && r.date.getTime() >= lo && r.date.getTime() <= hi);
+    if (!rows.length) continue;
+    const total = rows.reduce((a, r) => a + (r.amount ?? 0), 0);
+    out.push({ ...b, salePurchases: rows, saleTotal: total, saleTotalLabel: formatRupees(total), saleLastDate: Math.max(...rows.map((r) => r.date.getTime())) });
+  }
+  return out;
+}
+
+/** Rupee total of the buyers listed — the Sale Achieved panel's "Total value". */
+export function saleBuyersTotal(buyers: { saleTotal?: number }[]): number {
+  return buyers.reduce((a, b) => a + (Number(b?.saleTotal) || 0), 0);
+}
+
+/**
  * Sale Achieved export: ONE ROW PER PURCHASE, in panel order, each person's purchases oldest first —
  * person details repeated so every row stands alone in a spreadsheet. Amount is a number (rupees).
  */

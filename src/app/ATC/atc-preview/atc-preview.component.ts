@@ -12,6 +12,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { FormsModule } from '@angular/forms';
 import { Location } from '@angular/common';
+import { isWiSHProduct } from '../shared/atc-product';
 
 @Component({
   selector: 'app-atc-preview',
@@ -400,5 +401,17 @@ export class AtcPreviewComponent {
     } else {
       console.log('else');
     }
+  }
+
+  // ---- 2026-10-23: template sections on a saved ATC (EI Solution ask / WiSH outcomes) ----
+  askLabel(value: string): string {
+    var labels = { self: "Self", spouse: "Spouse", family: "Family", friends: "Friends", sponsors: "Sponsors" }
+    return labels[value] ?? value
+  }
+  outcomeNumber(index: number): string {
+    return (index + 1 < 10 ? "0" : "") + (index + 1)
+  }
+  isWiSHModel(product: any): boolean {
+    return isWiSHProduct(product)
   }
 }

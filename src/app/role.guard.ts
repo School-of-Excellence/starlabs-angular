@@ -40,7 +40,7 @@ export function roleGuard(allowedRoles: string[]): CanActivateFn {
           return false;
         }
         try {
-          const currentRoles = (await authService.getRoles()) || {};
+          const currentRoles = (await authService.getRoles(user.uid)) || {};
           const hasRole = allowedRoles.some(role => currentRoles[role] === true);
           if (!hasRole) {
             dialog.open(ConfirmComponent, {
