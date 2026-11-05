@@ -1,0 +1,144 @@
+<div class="sut-page">
+
+  <header class="sut-head">
+    <h1>Signed URL test</h1>
+    <p>
+      Records store a <strong>bare object path</strong> — no download URL, no token.
+      Every URL below is minted at view time and expires. Paste a path into a browser and
+      nothing loads; that is the point.
+    </p>
+  </header>
+
+  <!-- ── Section 1 — upload ─────────────────────────────────────────── -->
+  <section class="sut-card">
+    <h2>1 · Upload a record</h2>
+
+    <div class="sut-row">
+      <mat-form-field appearance="outline" class="sut-name">
+        <mat-label>Record name</mat-label>
+        <input matInput
+               data-testid="sut-name"
+               [(ngModel)]="recordName"
+               [disabled]="uploading"
+               placeholder="e.g. Intro clip" />
+      </mat-form-field>
+
+      <label class="sut-file">
+        <input type="file"
+               data-testid="sut-file"
+               multiple
+               accept="image/*,audio/*,video/*"
+               (change)="onPick($event)"
+               [disabled]="uploading" />
+      </label>
+
+      <button mat-raised-button
+              color="primary"
+              data-testid="sut-upload"
+              [disabled]="uploading || !recordName.trim() || picked.length === 0"
+              (click)="upload()">
+        <mat-icon>cloud_upload</mat-icon>
+        Upload
+      </button>
+    </div>
+
+    <p class="sut-picked" *ngIf="picked.length">
+      {{ picked.length }} file(s) selected:
+      <span *ngFor="let f of picked; let last = last">{{ f.name }}<span *ngIf="!last">, </span></span>
+    </p>
+
+    <mat-progress-bar *ngIf="uploading" mode="determinate" [value]="uploadPct"></mat-progress-bar>
+
+    <p class="sut-status" data-testid="sut-status" *ngIf="uploadStatus">{{ uploadStatus }}</p>
+  </section>
+
+  <!-- ── Section 2 — table ──────────────────────────────────────────── -->
+  <section class="sut-card">
+    <div class="sut-row sut-row--between">
+      <h2>2 · Records</h2>
+      <div class="sut-actions">
+        <button mat-stroked-button data-testid="sut-reload" (click)="reload()" [disabled]="loading">
+          <mat-icon>refresh</mat-icon> Reload
+        </button>
+        <button mat-stroked-button data-testid="sut-refresh-urls" (click)="forceRefresh()" [disabled]="loading">
+          <mat-icon>autorenew</mat-icon> Re-request URLs
+        </button>
+      </div>
+    </div>
+
+    <p class="sut-stats" data-testid="sut-stats">
+      callable round-trips <b>{{ stats.calls }}</b> ·
+      signed <b>{{ stats.signed }}</b> ·
+      cache hits <b>{{ stats.cacheHits }}</b> ·
+      passthrough URLs <b>{{ stats.passthrough }}</b> ·
+      failed <b>{{ stats.failed }}</b>
+    </p>
+
+    <mat-progress-bar *ngIf="loading" mode="indeterminate"></mat-progress-bar>
+
+    <table mat-table [dataSource]="records" class="sut-table" *ngIf="records.length; else empty">
+
+      <ng-container matColumnDef="media">
+        <th mat-header-cell *matHeaderCellDef>Media</th>
+        <td mat-cell *matCellDef="let r">
+          <span class="sut-spinner" *ngIf="r.resolving">resolving…</span>
+
+          <ng-container *ngIf="!r.resolving">
+            <img *ngIf="kind(r) === 'image' && r.resolvedUrl"
+                 class="sut-thumb" [src]="r.resolvedUrl" [alt]="r.name" />
+
+            <audio *ngIf="kind(r) === 'audio' && r.resolvedUrl"
+                   controls preload="none" [src]="r.resolvedUrl"></audio>
+
+            <video *ngIf="kind(r) === 'video' && r.resolvedUrl"
+                   class="sut-video" controls preload="metadata" [src]="r.resolvedUrl"></video>
+
+            <a *ngIf="kind(r) === 'other' && r.resolvedUrl"
+               [href]="r.resolvedUrl" target="_blank" rel="noopener">open</a>
+
+            <span class="sut-fail" *ngIf="r.resolvedUrl === null">could not resolve</span>
+          </ng-container>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="name">
+        <th mat-header-cell *matHeaderCellDef>Name</th>
+        <td mat-cell *matCellDef="let r">
+          {{ r.name }}
+          <small class="sut-dim">{{ prettySize(r.size) }}</small>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="path">
+        <th mat-header-cell *matHeaderCellDef>Stored value (what is in Firestore)</th>
+        <td mat-cell *matCellDef="let r"><code class="sut-path">{{ r.path }}</code></td>
+      </ng-container>
+
+      <ng-container matColumnDef="type">
+        <th mat-header-cell *matHeaderCellDef>Type</th>
+        <td mat-cell *matCellDef="let r">{{ r.contentType }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="expires">
+        <th mat-header-cell *matHeaderCellDef>URL expires in</th>
+        <td mat-cell *matCellDef="let r">{{ expiresIn(r) }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef></th>
+        <td mat-cell *matCellDef="let r">
+          <button mat-icon-button data-testid="sut-delete" (click)="remove(r)" title="Delete record (leaves the object = orphan)">
+            <mat-icon>delete_outline</mat-icon>
+          </button>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="columns"></tr>
+      <tr mat-row *matRowDef="let row; columns: columns;"></tr>
+    </table>
+
+    <ng-template #empty>
+      <p class="sut-dim" data-testid="sut-empty" *ngIf="!loading">No records yet — upload one above.</p>
+    </ng-template>
+  </section>
+</div>

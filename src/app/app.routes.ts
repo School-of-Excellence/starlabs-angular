@@ -377,6 +377,11 @@ export const routes: Routes = [
   {path: 'queue-atc-generation', loadComponent: () => import('./ATC-Ops/atc-generation-ops/atc-generation-ops.component').then(m => m.AtcGenerationOpsComponent), canActivate: [authGuard]},
   {path: 'queue-atc-usage', loadComponent: () => import('./ATC-Ops/atc-usage-dashboard/atc-usage-dashboard.component').then(m => m.AtcUsageDashboardComponent), canActivate: [authGuard]},
 
+  // Storage signed-URL harness (2026-11-04). Self-contained test screen: owns the
+  // `signed_url_test` collection and the `signed-url-test/` Storage prefix, touches
+  // nothing else. Safe to delete along with both once the model is validated.
+  {path: 'signedurltest', loadComponent: () => import('./Test/signed-url-test/signed-url-test.component').then(m => m.SignedURLTestComponent), canActivate: [authGuard]},
+
   // Wildcard must stay LAST — it catches every unmatched path
   {path: '**',loadComponent: () =>import('./exceptionalrouting/exceptionalrouting.component').then(m => m.ExceptionalroutingComponent)},
 ];
