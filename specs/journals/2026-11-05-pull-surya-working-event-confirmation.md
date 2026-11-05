@@ -35,3 +35,12 @@ Hub: `test/epc-surya-rewrite-hooks` (worktree `~/Projects/Functions/starlabs-e2e
 origin/main) registers her 4 new hooks (`epc-tab-start-date`, `epc-tab-end-date`, `pf-potsplit-sales`,
 `ued-cancel`). hook-diff aligned 0/0 for both folders. Revert: restore `product-funnel.component.{html,ts,css}`
 to `origin/surya-development`.
+
+## Rollout gate: 73 unhooked elements (2026-11-05, after push)
+Console blocked the rollout on `27a3c74e`: the 4 new hooks only exist on the hub branch (not hub main), and
+Surya's markup added 73 interactive elements with no `data-testid` (gate counts head − base unhooked
+`<button>/<a>`/(click)/(change) tags per template). Hooked all 73 with literal ids, one prefix per component:
+`ued-req-*` (8, the required-fields checklist), `epc-overview-create-event`, `epc-overview-configure-cta`,
+`epc-row-edit(-loading)`, and 61 `pf-*` (arena cards, tickets, checklist, comms, bulk bar, result chips,
+column filter, ticket dialog `pf-ticket-*`, filter popup `pf-fpop-*`, checklist dialog `pf-cl-*`). Hub branch
+registers them in events-controls-addressable. Local gate: MATCHED. Revert: drop the `data-testid` attrs only.

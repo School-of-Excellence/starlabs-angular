@@ -924,21 +924,21 @@
                                     </div>
 
                                     <ul class="req">
-                                        <li [class.ok]="r.name" role="button" tabindex="0"
+                                        <li data-testid="ued-req-name" [class.ok]="r.name" role="button" tabindex="0"
                                             (click)="!r.name && rName.scrollIntoView({ behavior: 'smooth', block: 'center' })">Event name</li>
-                                        <li [class.ok]="r.atc" role="button" tabindex="0"
+                                        <li data-testid="ued-req-atc" [class.ok]="r.atc" role="button" tabindex="0"
                                             (click)="!r.atc && rAtc.scrollIntoView({ behavior: 'smooth', block: 'center' })">ATC model</li>
-                                        <li [class.ok]="r.desc" role="button" tabindex="0"
+                                        <li data-testid="ued-req-desc" [class.ok]="r.desc" role="button" tabindex="0"
                                             (click)="!r.desc && rDesc.scrollIntoView({ behavior: 'smooth', block: 'center' })">Description</li>
-                                        <li [class.ok]="r.dates" role="button" tabindex="0"
+                                        <li data-testid="ued-req-dates" [class.ok]="r.dates" role="button" tabindex="0"
                                             (click)="!r.dates && rDates.scrollIntoView({ behavior: 'smooth', block: 'center' })">Event dates</li>
-                                        <li [class.ok]="r.lastreg" role="button" tabindex="0"
+                                        <li data-testid="ued-req-lastreg" [class.ok]="r.lastreg" role="button" tabindex="0"
                                             (click)="!r.lastreg && rLastReg.scrollIntoView({ behavior: 'smooth', block: 'center' })">Last registration date</li>
-                                        <li [class.ok]="r.venue" role="button" tabindex="0"
+                                        <li data-testid="ued-req-venue" [class.ok]="r.venue" role="button" tabindex="0"
                                             (click)="!r.venue && rVenue.scrollIntoView({ behavior: 'smooth', block: 'center' })">Venue</li>
-                                        <li [class.ok]="r.address" role="button" tabindex="0"
+                                        <li data-testid="ued-req-address" [class.ok]="r.address" role="button" tabindex="0"
                                             (click)="!r.address && rAddress.scrollIntoView({ behavior: 'smooth', block: 'center' })">Address</li>
-                                        <li [class.ok]="r.hosts" role="button" tabindex="0"
+                                        <li data-testid="ued-req-hosts" [class.ok]="r.hosts" role="button" tabindex="0"
                                             (click)="!r.hosts && rHosts.scrollIntoView({ behavior: 'smooth', block: 'center' })">Hosts</li>
                                     </ul>
                                 </ng-container>

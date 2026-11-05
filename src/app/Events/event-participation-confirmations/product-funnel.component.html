@@ -12,16 +12,16 @@
 
   <!-- ============ Sub events ============ -->
   <div class="fcard-wrap">
-    <div class="fcard" [class.active]="a?.docid === arena?.docid" *ngFor="let a of subEvents" (click)="toggleArena(a)">
+    <div data-testid="pf-arena-card" class="fcard" [class.active]="a?.docid === arena?.docid" *ngFor="let a of subEvents" (click)="toggleArena(a)">
       <div class="fn">{{ a?.title }}</div>
       <div class="fdate">{{ a?.startdate?.toDate() | date:'MMM d' }} – {{ a?.enddate?.toDate() | date:'MMM d, y' }}</div>
     </div>
 
-    <button type="button" class="edit-event-btn" (click)="openEventEditor(eventId['docid'])" *ngIf="!eventId?.isQueueEvent">
+    <button data-testid="pf-edit-event" type="button" class="edit-event-btn" (click)="openEventEditor(eventId['docid'])" *ngIf="!eventId?.isQueueEvent">
       <mat-icon class="edit-event-icon">edit</mat-icon>
       Edit event
     </button>
-    <button type="button"
+    <button data-testid="pf-journey-card-toggle" type="button"
         class="jtoggle"
         *ngIf="segmentList.approved.length > 0"
         [class.on]="showJourneyCard"
@@ -96,11 +96,11 @@
               <div class="tk-row">
                 <span class="tk-label"><span class="tk-dot"></span>Open</span>
                 <span class="tk-chips">
-                  <button type="button" class="tkc event" [class.act]="selectedTicketCategory === 'ep'"
+                  <button data-testid="pf-tickets-ep" type="button" class="tkc event" [class.act]="selectedTicketCategory === 'ep'"
                     [attr.aria-pressed]="selectedTicketCategory === 'ep'" (click)="toggleTickets('ep')">
                     Event &amp; Process : <b>{{ openTickets?.eventProcessTickets ?? 0 }}</b>
                   </button>
-                  <button type="button" class="tkc other" [class.act]="selectedTicketCategory === 'others'"
+                  <button data-testid="pf-tickets-other" type="button" class="tkc other" [class.act]="selectedTicketCategory === 'others'"
                     [attr.aria-pressed]="selectedTicketCategory === 'others'" (click)="toggleTickets('others')">
                     Other : <b>{{ openTickets?.others ?? 0 }}</b>
                   </button>
@@ -130,7 +130,7 @@
           <div class="checklist-head">
             <span class="checklist-title">
               <h3 class="checklist-heading">Checklist</h3>
-              <button type="button" class="checklist-add" title="Add checklist item" (click)="addCheckList()">+</button>
+              <button data-testid="pf-checklist-add" type="button" class="checklist-add" title="Add checklist item" (click)="addCheckList()">+</button>
             </span>
           </div>
   
@@ -145,7 +145,7 @@
               <div class="checklist-item">
                 <span class="checklist-name">
                   <span class="checklist-name-text">
-                    <button type="button"
+                    <button data-testid="pf-checklist-column" type="button"
                             class="checklist-col-btn"
                             [class.on]="columnRegistry[checklist.key]"
                             title="Show as a table column"
@@ -158,10 +158,10 @@
                   </span>
   
                   <div class="checklist-actions">
-                    <button type="button" class="checklist-del" title="Delete checklist" (click)="deleteCheckList(checklist?.key)">
+                    <button data-testid="pf-checklist-delete" type="button" class="checklist-del" title="Delete checklist" (click)="deleteCheckList(checklist?.key)">
                       <mat-icon class="checklist-icon">delete</mat-icon>
                     </button>
-                    <button type="button" class="checklist-edit" title="Edit checklist" (click)="editCheckList(checklist?.key)">
+                    <button data-testid="pf-checklist-edit" type="button" class="checklist-edit" title="Edit checklist" (click)="editCheckList(checklist?.key)">
                       <mat-icon class="checklist-icon">edit</mat-icon>
                     </button>
                   </div>
@@ -174,12 +174,12 @@
                 </div>
               </div>
   
-              <button type="button" class="checklist-cell checklist-count checklist-count-clear"
+              <button data-testid="pf-checklist-count-clear" type="button" class="checklist-cell checklist-count checklist-count-clear"
                       [class.on]="selectedChecklist?.checklistId === checklist?.key && selectedChecklist?.type === 'clear'"
                       (click)="onChecklistFilterClick(checklist?.key, 'clear')">
                 {{ getClearCountForCheckList(checklist.value) }}
               </button>
-              <button type="button" class="checklist-cell checklist-count checklist-count-not"
+              <button data-testid="pf-checklist-count-notclear" type="button" class="checklist-cell checklist-count checklist-count-not"
                       [class.on]="selectedChecklist?.checklistId === checklist?.key && selectedChecklist?.type === 'not clear'"
                       (click)="onChecklistFilterClick(checklist?.key, 'not clear')">
                 {{ getNonClearCountForCheckList(checklist.value) }}
@@ -195,7 +195,7 @@
         <div class="comm-head">
           <span class="comm-title">
             <h3 class="comm-heading">Communication</h3>
-            <!-- <button type="button" class="comm-add" title="New communication" (click)="addCommunication()">+</button> -->
+            <!-- <button data-testid="pf-comm-add" type="button" class="comm-add" title="New communication" (click)="addCommunication()">+</button> -->
           </span>
           <span class="comm-total">{{ communications.length }}</span>
         </div>
@@ -213,17 +213,17 @@
           <div class="comm-row" *ngFor="let comm of communications; trackBy: trackByCommunication">
             <span class="comm-msg">{{ comm.title }}</span>
 
-            <button type="button" class="comm-cell comm-count" [class.zero]="getEmailStats(comm['docid'])?.sent === 0" >
+            <button data-testid="pf-comm-email" type="button" class="comm-cell comm-count" [class.zero]="getEmailStats(comm['docid'])?.sent === 0" >
               <span class="comm-frac">{{ getEmailStats(comm['docid'])?.sent ?? 0}}<small>/{{ getEmailStats(comm['docid'])?.total }}</small></span>
             </button>
-            <button type="button" class="comm-cell comm-count" [class.zero]="getWatiStats(comm['docid'])?.sent === 0" >
+            <button data-testid="pf-comm-whatsapp" type="button" class="comm-cell comm-count" [class.zero]="getWatiStats(comm['docid'])?.sent === 0" >
               <span class="comm-frac">{{ getWatiStats(comm['docid'])?.sent }}<small>/{{ getWatiStats(comm['docid'])?.total }}</small></span>
             </button>
-            <button type="button" class="comm-cell comm-count" [class.zero]="getAppNotificationStats(comm['docid'])?.sent === 0" >
+            <button data-testid="pf-comm-app" type="button" class="comm-cell comm-count" [class.zero]="getAppNotificationStats(comm['docid'])?.sent === 0" >
               <span class="comm-frac">{{ getAppNotificationStats(comm['docid'])?.sent }}<small>/{{ getAppNotificationStats(comm['docid'])?.total }}</small></span>
             </button>
             
-            <!-- <button type="button"
+            <!-- <button data-testid="pf-comm-channel" type="button"
                     class="comm-cell comm-count"
                     *ngFor="let ch of communicationChannels"
                     [class.zero]="m.sent[ch.key] === 0"
@@ -365,8 +365,8 @@
         </mat-select>
       </mat-form-field>
 
-      <button mat-stroked-button class="sx-ghost" (click)="handleImportClick()" *ngIf="showSelect">Import</button>
-      <input type="file" #inputFile (change)="onChange($event)" style="display: none;">
+      <button data-testid="pf-bar-import" mat-stroked-button class="sx-ghost" (click)="handleImportClick()" *ngIf="showSelect">Import</button>
+      <input data-testid="pf-import-file" type="file" #inputFile (change)="onChange($event)" style="display: none;">
 
       <button data-testid="pf-bar-finalize" mat-flat-button class="sx-approve" *ngIf="canFinalize" (click)="finalizeAttendance()"
         matTooltipClass="sx-tip" matTooltip="Close the event: mark no-show on approved participants who did not attend, and lock the final numbers">
@@ -443,9 +443,9 @@
           <select class="sel" #selectforbulk>
             <option *ngFor="let key of getManualChecklist()" [value]="key">{{ checkListMap[key]?.title }}</option>
           </select>
-          <button type="button" class="bk c" (click)="bulkManualUpdate(selectforbulk.value, 'clear')">✓ Clear</button>
-          <button type="button" class="bk nc" (click)="bulkManualUpdate(selectforbulk.value, 'not clear')">✕ Not clear</button>
-          <button type="button" class="bx" title="Unselect all" (click)="selection.clear()">×</button>
+          <button data-testid="pf-bulk-clear" type="button" class="bk c" (click)="bulkManualUpdate(selectforbulk.value, 'clear')">✓ Clear</button>
+          <button data-testid="pf-bulk-notclear" type="button" class="bk nc" (click)="bulkManualUpdate(selectforbulk.value, 'not clear')">✕ Not clear</button>
+          <button data-testid="pf-bulk-unselect" type="button" class="bx" title="Unselect all" (click)="selection.clear()">×</button>
         </div>
       </ng-container>
 
@@ -462,13 +462,13 @@
         <span class="result-chip" *ngFor="let chip of getFilterChips(); trackBy: trackChip">
           <span class="result-chip-label">{{ chip.label }}:</span>
           <span class="result-chip-value">{{ chip.value }}</span>
-          <button type="button" class="result-chip-remove" aria-label="Remove filter" (click)="removeFilterChip(chip)">
+          <button data-testid="pf-result-filter-remove" type="button" class="result-chip-remove" aria-label="Remove filter" (click)="removeFilterChip(chip)">
             <mat-icon class="result-chip-icon">close</mat-icon>
           </button>
         </span>
       </div>
 
-      <button type="button" class="result-bar-clear" (click)="clearAllFilters()">Clear all</button>
+      <button data-testid="pf-result-filter-clear-all" type="button" class="result-bar-clear" (click)="clearAllFilters()">Clear all</button>
     </div>
 
     <!-- ============ Selected columns ============ -->
@@ -478,13 +478,13 @@
       <div class="result-bar-chips">
         <span class="result-chip" *ngFor="let chip of displayColumns">
           <span class="result-chip-value">{{ columnRegistry[chip]?.label ?? chip }}</span>
-          <button type="button" class="result-chip-remove" aria-label="Remove column" (click)="removeColumnChip(chip)">
+          <button data-testid="pf-result-column-remove" type="button" class="result-chip-remove" aria-label="Remove column" (click)="removeColumnChip(chip)">
             <mat-icon class="result-chip-icon">close</mat-icon>
           </button>
         </span>
       </div>
 
-      <button type="button" class="result-bar-clear" (click)="clearAllColumns()">Clear all columns</button>
+      <button data-testid="pf-result-column-clear-all" type="button" class="result-bar-clear" (click)="clearAllColumns()">Clear all columns</button>
     </div>
 
     <!-- ============ Participants table ============ -->
@@ -507,7 +507,7 @@
                 <!-- columns with a filter -->
                 <div class="th-in" *ngIf="columnRegistry[column].showFilter">
                   <span class="th-label">{{ columnRegistry[column].label }}</span>
-                  <button type="button" class="fbtn" title="Filter" [class.on]="filterMap[column] || sortColumn?.column === column" (click)="openFilterCard(column, $event)">
+                  <button data-testid="pf-col-filter" type="button" class="fbtn" title="Filter" [class.on]="filterMap[column] || sortColumn?.column === column" (click)="openFilterCard(column, $event)">
                     <mat-icon class="fbtn-icon">filter_alt</mat-icon>
                   </button>
                 </div>
@@ -585,7 +585,7 @@
                       </ng-container>
                     </ng-container>
 
-                    <button *ngSwitchCase="'tickets'" type="button" class="open-ticket-chip-tab" (click)="openTicketDetail(row)">
+                    <button data-testid="pf-row-open-ticket" *ngSwitchCase="'tickets'" type="button" class="open-ticket-chip-tab" (click)="openTicketDetail(row)">
                       Open Tickets
                       <b>{{ cell.value ?? columnRegistry[column].defaultHtml }}</b>
                     </button>
@@ -664,12 +664,12 @@
                           <ng-container *ngIf="columnRegistry[column]?.checklist; else plainValue">
 
                             <!-- MANUAL: checkbox + status -->
-                            <label class="checklist-cell-manual"
+                            <label data-testid="pf-row-checklist-manual" class="checklist-cell-manual"
                                   *ngIf="checkListMap[column]?.type === 'manual'; else autoPill"
                                   [class.checklist-cell-clear]="cell.value === 'clear'"
                                   [class.checklist-cell-not]="cell.value !== 'clear'"
                                   (click)="$event.stopPropagation()">
-                              <input type="checkbox"
+                              <input data-testid="pf-row-checklist-check" type="checkbox"
                                     class="checklist-cell-check"
                                     [checked]="cell.value === 'clear'"
                                     (change)="onManualChecklistChange(row, column, $any($event.target).checked)">
@@ -812,32 +812,32 @@
      ===================================================================== -->
 <ng-template #ticketdetail>
   <div class="sx-modal" *ngIf="selectedParticipantsTicket">
-    <div class="sx-modal-scrim" (click)="closeTicketDetail()"></div>
+    <div data-testid="pf-ticket-scrim" class="sx-modal-scrim" (click)="closeTicketDetail()"></div>
 
     <div class="sx-modal-box tkdlg" role="dialog" aria-modal="true" aria-labelledby="tkTitle">
 
       <div class="dlg-h">
         <h3 id="tkTitle" class="dlg-title">Tickets · {{ selectedParticipantsTicket?.name }}</h3>
-        <button type="button" class="x" aria-label="Close" (click)="closeTicketDetail()">×</button>
+        <button data-testid="pf-ticket-close" type="button" class="x" aria-label="Close" (click)="closeTicketDetail()">×</button>
       </div>
 
       <div class="dlg-b">
 
         <!-- Open tab -->
         <div class="tktabs">
-          <button type="button" class="on">Open <b>{{ selectedParticipantsTicket?.customersupporttickets }}</b></button>
+          <button data-testid="pf-ticket-tab-open" type="button" class="on">Open <b>{{ selectedParticipantsTicket?.customersupporttickets }}</b></button>
         </div>
 
         <!-- category filter -->
         <div class="tkcat">
           <span>Category</span>
-          <button type="button" [class.on]="selectedParticipantsTicket.selectedCategory === 'all'" (click)="selectedParticipantsTicket.selectedCategory = 'all'">All <b>{{ selectedParticipantsTicket?.epTickets?.length + selectedParticipantsTicket?.otherTickets?.length }}</b></button>
-          <button type="button" [class.on]="selectedParticipantsTicket.selectedCategory === 'ep'" (click)="selectedParticipantsTicket.selectedCategory = 'ep'">Events &amp; Process <b>{{ selectedParticipantsTicket?.epTickets?.length }}</b></button>
-          <button type="button" [class.on]="selectedParticipantsTicket.selectedCategory === 'others'" (click)="selectedParticipantsTicket.selectedCategory = 'others'">Others <b>{{ selectedParticipantsTicket?.otherTickets?.length }}</b></button>
+          <button data-testid="pf-ticket-cat-all" type="button" [class.on]="selectedParticipantsTicket.selectedCategory === 'all'" (click)="selectedParticipantsTicket.selectedCategory = 'all'">All <b>{{ selectedParticipantsTicket?.epTickets?.length + selectedParticipantsTicket?.otherTickets?.length }}</b></button>
+          <button data-testid="pf-ticket-cat-ep" type="button" [class.on]="selectedParticipantsTicket.selectedCategory === 'ep'" (click)="selectedParticipantsTicket.selectedCategory = 'ep'">Events &amp; Process <b>{{ selectedParticipantsTicket?.epTickets?.length }}</b></button>
+          <button data-testid="pf-ticket-cat-other" type="button" [class.on]="selectedParticipantsTicket.selectedCategory === 'others'" (click)="selectedParticipantsTicket.selectedCategory = 'others'">Others <b>{{ selectedParticipantsTicket?.otherTickets?.length }}</b></button>
         </div>
 
         <!-- ticket rows -->
-        <button type="button" class="tkrow" *ngFor="let t of getTickets(); trackBy: trackByTicketNo" [title]="t.issue" (click)="onTicketClick(t)">
+        <button data-testid="pf-ticket-row" type="button" class="tkrow" *ngFor="let t of getTickets(); trackBy: trackByTicketNo" [title]="t.issue" (click)="onTicketClick(t)">
           <span class="tkno">#{{ t.ticketno }}</span>
           <span class="tks">
             <span class="subj" [title]="t.issue">{{ t.issue }}</span>
@@ -851,7 +851,7 @@
       </div>
 
       <div class="dlg-f">
-        <button type="button" class="btn" (click)="closeTicketDetail()">Close</button>
+        <button data-testid="pf-ticket-done" type="button" class="btn" (click)="closeTicketDetail()">Close</button>
       </div>
     </div>
   </div>
@@ -872,16 +872,16 @@
 </ng-template>
 
 <ng-template #filterPopupTpl let-key>
-  <div class="fpop"
+  <div data-testid="pf-fpop" class="fpop"
        [style.width.px]="filterPopup?.width"
        (click)="$event.stopPropagation()">
 
     <!-- sort -->
     <ng-container *ngIf="columnRegistry[filterPopup?.column]?.type !== 'relation'">
-      <button type="button" class="srt" [class.on]="filterPopup?.column === sortColumn?.column && sortColumn?.type === 'asc'" (click)="toggleSort(filterPopup?.column, 'asc')">
+      <button data-testid="pf-fpop-sort-asc" type="button" class="srt" [class.on]="filterPopup?.column === sortColumn?.column && sortColumn?.type === 'asc'" (click)="toggleSort(filterPopup?.column, 'asc')">
         Sort A → Z
       </button>
-      <button type="button" class="srt" [class.on]="filterPopup?.column === sortColumn?.column && sortColumn?.type === 'desc'" (click)="toggleSort(filterPopup?.column, 'desc')">
+      <button data-testid="pf-fpop-sort-desc" type="button" class="srt" [class.on]="filterPopup?.column === sortColumn?.column && sortColumn?.type === 'desc'" (click)="toggleSort(filterPopup?.column, 'desc')">
         Sort Z → A
       </button>
       <div class="fpop-divider"></div>
@@ -896,8 +896,8 @@
     </div>
 
     <div class="ff">
-      <button type="button" class="fpop-btn" (click)="closeFilterPopup()">Cancel</button>
-      <button type="button" class="fpop-btn pri" (click)="saveFilterPopup()">OK</button>
+      <button data-testid="pf-fpop-cancel" type="button" class="fpop-btn" (click)="closeFilterPopup()">Cancel</button>
+      <button data-testid="pf-fpop-save" type="button" class="fpop-btn pri" (click)="saveFilterPopup()">OK</button>
     </div>
   </div>
 </ng-template>
@@ -906,7 +906,7 @@
 <ng-template #textSection>
   <div class="fl2">
     <span>Contains</span>
-    <button type="button" class="fl2-btn" (click)="filterPopClearAll()">Clear</button>
+    <button data-testid="pf-fpop-text-clear" type="button" class="fl2-btn" (click)="filterPopClearAll()">Clear</button>
   </div>
   <input type="text" class="fpop-search" placeholder="Type to match"
          [value]="filterPopup.filterOption?.text ?? ''"
@@ -918,8 +918,8 @@
   <div class="fl2">
     <span>Filter by values</span>
     <span>
-      <button type="button" class="fl2-btn" (click)="filterPopSelectAll()">Select all</button>
-      <button type="button" class="fl2-btn" (click)="filterPopClearAll()">Clear</button>
+      <button data-testid="pf-fpop-enum-select-all" type="button" class="fl2-btn" (click)="filterPopSelectAll()">Select all</button>
+      <button data-testid="pf-fpop-enum-clear" type="button" class="fl2-btn" (click)="filterPopClearAll()">Clear</button>
     </span>
   </div>
 
@@ -932,7 +932,7 @@
 
   <div class="opts">
     <label class="opt" *ngFor="let o of getFilterPopOptions()">
-      <input type="checkbox"
+      <input data-testid="pf-fpop-enum-option" type="checkbox"
              class="opt-check"
              [checked]="filterPopup?.filterOption.selectedOption.includes(o.key)"
              (change)="filterPopupToggleOptions(o.key)">
@@ -947,7 +947,7 @@
 <ng-template #dateSection>
   <div class="fl2">
     <span>Date range</span>
-    <button type="button" class="fl2-btn" (click)="filterPopClearAll()">Clear</button>
+    <button data-testid="pf-fpop-date-clear" type="button" class="fl2-btn" (click)="filterPopClearAll()">Clear</button>
   </div>
 
   <mat-form-field class="fpop-date-field" appearance="outline" subscriptSizing="dynamic">
@@ -964,7 +964,7 @@
 <ng-template #numberSection>
   <div class="fl2">
     <span>Range</span>
-    <button type="button" class="fl2-btn" (click)="filterPopClearAll()">Clear</button>
+    <button data-testid="pf-fpop-number-clear" type="button" class="fl2-btn" (click)="filterPopClearAll()">Clear</button>
   </div>
 
   <div class="rng">
@@ -983,7 +983,7 @@
 <ng-template #productSection>
   <div class="fl2">
     <span>Consumed products</span>
-    <button type="button" class="fl2-btn" (click)="filterPopClearAll()">Clear</button>
+    <button data-testid="pf-fpop-product-clear" type="button" class="fl2-btn" (click)="filterPopClearAll()">Clear</button>
   </div>
 
   <div class="rule-list">
@@ -1008,13 +1008,13 @@
         <input matInput type="number" min="0" required [(ngModel)]="r.count">
       </mat-form-field>
 
-      <button type="button" class="rule-remove" aria-label="Remove product" (click)="removeProductFromPopup(i)">
+      <button data-testid="pf-fpop-product-remove" type="button" class="rule-remove" aria-label="Remove product" (click)="removeProductFromPopup(i)">
         <mat-icon class="rule-remove-icon">delete</mat-icon>
       </button>
     </div>
   </div>
 
-  <button type="button" class="rule-add" (click)="addProductFilterPopup()">
+  <button data-testid="pf-fpop-product-add" type="button" class="rule-add" (click)="addProductFilterPopup()">
     <mat-icon class="rule-add-icon">add</mat-icon>
     Add product
   </button>
@@ -1026,13 +1026,13 @@
      ===================================================================== -->
 <ng-template #checklistpopup>
   <div class="sx-modal">
-    <div class="sx-modal-scrim" (click)="closeChecklistPopup()"></div>
+    <div data-testid="pf-cl-scrim" class="sx-modal-scrim" (click)="closeChecklistPopup()"></div>
 
     <div class="sx-modal-box" role="dialog" aria-modal="true" aria-labelledby="checklistPopupTitle">
 
       <div class="dlg-h">
         <h3 id="checklistPopupTitle" class="dlg-title">Add checklist item</h3>
-        <button type="button" class="x" aria-label="Close" (click)="closeChecklistPopup()">×</button>
+        <button data-testid="pf-cl-close" type="button" class="x" aria-label="Close" (click)="closeChecklistPopup()">×</button>
       </div>
 
       <form class="dlg-b" [formGroup]="checkListForm">
@@ -1057,7 +1057,7 @@
 
                 <div class="set-h">
                   <span>Group {{ gi + 1 }}</span>
-                  <button type="button"
+                  <button data-testid="pf-cl-group-remove" type="button"
                           class="icon-btn"
                           *ngIf="checklistForm.controls.length > 1"
                           aria-label="Remove group"
@@ -1086,7 +1086,7 @@
                           </mat-select>
                         </mat-form-field>
 
-                        <button type="button"
+                        <button data-testid="pf-cl-attr-remove" type="button"
                                 class="icon-btn"
                                 aria-label="Remove attribute"
                                 (click)="removeChecklistGroupCondition(gi, ai)">
@@ -1160,13 +1160,13 @@
                               <input matInput type="number" min="0" formControlName="count" required>
                             </mat-form-field>
 
-                            <button type="button" class="rule-remove" aria-label="Remove product" (click)="removeProductRuleForCheckList(a, ri)">
+                            <button data-testid="pf-cl-product-remove" type="button" class="rule-remove" aria-label="Remove product" (click)="removeProductRuleForCheckList(a, ri)">
                               <mat-icon class="rule-remove-icon">delete</mat-icon>
                             </button>
                           </div>
                         </div>
 
-                        <button type="button" class="rule-add" (click)="addProductRuleForCheckList(a)">
+                        <button data-testid="pf-cl-product-add" type="button" class="rule-add" (click)="addProductRuleForCheckList(a)">
                           <mat-icon class="rule-add-icon">add</mat-icon>
                           Add product
                         </button>
@@ -1176,18 +1176,18 @@
                   </ng-container>
                 </div>
 
-                <button type="button" class="link" (click)="addCheckListCondition(gi)">+ AND attribute</button>
+                <button data-testid="pf-cl-condition-add" type="button" class="link" (click)="addCheckListCondition(gi)">+ AND attribute</button>
               </div>
             </ng-container>
           </div>
 
-          <button type="button" class="btn ghost" (click)="addChecklistConditionGroup()">+ OR group</button>
+          <button data-testid="pf-cl-group-add" type="button" class="btn ghost" (click)="addChecklistConditionGroup()">+ OR group</button>
         </div>
       </form>
 
       <div class="dlg-f">
-        <button type="button" class="btn" (click)="closeChecklistPopup()">Cancel</button>
-        <button type="button"
+        <button data-testid="pf-cl-cancel" type="button" class="btn" (click)="closeChecklistPopup()">Cancel</button>
+        <button data-testid="pf-cl-save" type="button"
                 class="btn pri"
                 [disabled]="!checkListForm?.value?.title?.trim()"
                 (click)="saveChecklist()">
