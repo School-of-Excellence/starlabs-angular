@@ -100,7 +100,7 @@ export class BookAppointmentComponent implements OnInit, OnChanges{
   goback:boolean = false
   // groupappointment variables
   isGroupAppointment: boolean = false
-  maxBooking: number = 0
+  mapAppointmentData = {}
 
   constructor(
     private firestore: Firestore,
@@ -144,7 +144,10 @@ export class BookAppointmentComponent implements OnInit, OnChanges{
   }
 
   ngOnInit(): void {
-    this.guard.getAppointmentMap().then(data => this.mapAppointments = data.map)
+    this.guard.getAppointmentMap().then(data => {
+      this.mapAppointments = data.map
+      this.mapAppointmentData = data.mapData 
+    })
     this.guard.getAppointmentRolesMap().then(data => this.mapRoles = data?.map ?? {})
     this.guard.getProductMap().then(data => this.mapProduct = data)
     this.guard.getProfileMap().then(data =>{
@@ -236,6 +239,7 @@ export class BookAppointmentComponent implements OnInit, OnChanges{
     // this.displaySlot = []
     this.selectedSlot = null
     this.selectedDate = null
+    this.isGroupAppointment = this.mapAppointmentData[this.selectedAppointment.id]?.["groupappointment"] == true
     this.matDialog.open(LoadingProgressComponent, {disableClose : true, data : {type : "spinner", msg : "Loading..."}})
     console.log(this.selectedAppointment)
     // Roles and their specialists: AppointmentBookingService.rolesFor (shared with the studio's calendar booking).
