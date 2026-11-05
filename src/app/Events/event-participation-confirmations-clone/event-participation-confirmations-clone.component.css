@@ -17,7 +17,7 @@
 .tab-close mat-icon { font-size: 16px; height: 16px; width: 16px; }
 
 /* Overview */
-.ov { max-width: 1180px; margin: 0 auto; padding: 16px 22px 40px; }
+.ov { max-width: 1280px; margin: 0 auto; padding: 16px 22px 40px; }
 .ov-eyebrow { font-size: 14px; font-weight: 600; color: rgba(60,60,67,.6); letter-spacing: .2px; padding-top: 6px; }
 .ov-title { font-size: 30px; font-weight: 700; letter-spacing: -.5px; margin: 3px 0 4px; line-height: 1.05; }
 .ov-sub { font-size: 15px; color: rgba(60,60,67,.6); margin-bottom: 16px; }
@@ -165,3 +165,23 @@
   transform: none;
   box-shadow: none;
 }
+
+/* edit column (last column of the all-events table) */
+.ev-act { width: 110px; text-align: right; white-space: nowrap; }
+
+.ev-edit-btn {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0 6px 0 0;
+  padding: 5px 10px;
+  border: 1px solid #eceef2;
+  border-radius: 7px;
+  background: #fff;
+  color: #1d2330;
+  font: 600 12px Inter, system-ui, sans-serif;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.ev-edit-btn:hover { background: #eaf1ff; border-color: #cfdcf7; color: #1f5bd8; }
+.ev-edit-btn:focus-visible { outline: 2px solid #1f5bd8; outline-offset: 2px; }
+.ev-edit-btn:disabled { background: #f3f4f6; color: #b5bac4; cursor: default; }

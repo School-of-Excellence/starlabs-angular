@@ -1,20 +1,36 @@
-import { Component, ElementRef, Input, OnDestroy, OnInit, TemplateRef, ViewChild } from '@angular/core';
+import { Component, ElementRef, Input, OnDestroy, OnInit, Query, TemplateRef, ViewChild } from '@angular/core';
+import { CommonModule, DatePipe, formatDate } from '@angular/common';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { Router } from '@angular/router';
+import { AbstractControl, FormArray, FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators, ValueChangeEvent } from '@angular/forms';
+
+// ===================== Firebase =====================
 import {
-  Firestore, collection, query, where, getDocs,
-  doc, writeBatch, serverTimestamp, updateDoc, setDoc,
+  Firestore,
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+  writeBatch,
+  serverTimestamp,
+  updateDoc,
+  setDoc,
   collectionData,
   Timestamp,
-  arrayUnion, 
+  arrayUnion,
   arrayRemove,
   orderBy,
+  DocumentReference,
+  DocumentData,
+  QueryConstraint,
 } from '@angular/fire/firestore';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { environment } from '../../../../environments/environment';
-import { CommonModule, DatePipe, formatDate } from '@angular/common';
-import { AbstractControl, FormArray, FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators, ValueChangeEvent } from '@angular/forms';
+import { Storage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
+
+// ===================== Angular material / cdk =====================
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule, MAT_SELECT_CONFIG } from '@angular/material/select';
+import { MatSelectModule, MAT_SELECT_CONFIG, MatSelectChange } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -24,30 +40,72 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatSnackBar, MAT_SNACK_BAR_DEFAULT_OPTIONS } from '@angular/material/snack-bar';
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatNativeDateModule } from '@angular/material/core';
 import { SelectionModel } from '@angular/cdk/collections';
-import { Storage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
-import * as XLSX from 'xlsx';
+import { OverlayModule } from '@angular/cdk/overlay';
+import { ScrollingModule } from '@angular/cdk/scrolling';
 
+// ===================== Third party =====================
+import * as XLSX from 'xlsx';
+import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
+import { combineLatest, count, Subject, Subscription, switchMap, takeUntil } from 'rxjs';
+
+// ===================== Project =====================
+import { environment } from '../../../../environments/environment';
 import { AuthguardService } from '../../../authguard.service';
 import { ProfilePictureComponent } from '../../../ProfilePicture/profile-picture/profile-picture.component';
 import { BulkAddProductsComponent } from '../../../Participants Profile Management/participants-analytics/bulk-add-products/bulk-add-products.component';
 import { WatiInputComponent } from '../../../Participants Profile Management/participants-analytics/wati-input/wati-input.component';
 import { AhNotificationComponent } from '../../../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component';
 import { EmailInputComponent } from '../../../Participants Profile Management/participants-analytics/email-input/email-input.component';
-import { Subject, Subscription, takeUntil } from 'rxjs';
-import { Router } from '@angular/router';
-import { MatDatepickerModule } from '@angular/material/datepicker';
-import { OverlayModule } from '@angular/cdk/overlay';
-import { ScrollingModule } from '@angular/cdk/scrolling';
-import { MatNativeDateModule } from '@angular/material/core';
-import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 import { UpdateEventDetailComponent } from '../../event-list/update-event-detail/update-event-detail.component';
+import { EventCtaConfigComponent } from '../../event-list/event-cta-config/event-cta-config.component';
 
-type SegmentKey = 'potential' | 'requested' | 'notRequested' | 'eligible' | 'upgrade'  | 'addon' | 'continuity' | 'noteligible'|'noProduct' | 'inQueue' | 'approved' | 'attended' | 'noShow' | 'unattended' | 'revoked' | 'overallRequested';
+// ===================== Types & Interfaces =====================
 
-interface ImportPreviewRow { name: string; email: string; }
-interface Split { key: string; label: string; count: number; }
-interface JourneyRow { key: string; label: string; total: number; first: number; repeat: number; members?: string[]; isGroup?: boolean; }
+type SegmentKey =
+  | 'potential'
+  | 'requested'
+  | 'notRequested'
+  | 'eligible'
+  | 'upgrade'
+  | 'addon'
+  | 'continuity'
+  | 'noteligible'
+  | 'noProduct'
+  | 'inQueue'
+  | 'approved'
+  | 'attended'
+  | 'noShow'
+  | 'unattended'
+  | 'revoked'
+  | 'overallRequested';
+
+type ColumnType = 'text' | 'enum' | 'number' | 'date' | 'relation' | 'none';
+
+type OperatorType = 'text' | 'enum' | 'number' | 'date' | 'relation';
+
+interface ImportPreviewRow {
+  name: string;
+  email: string;
+}
+
+interface Split {
+  key: string;
+  label: string;
+  count: number;
+}
+
+interface JourneyRow {
+  key: string;
+  label: string;
+  total: number;
+  first: number;
+  repeat: number;
+  members?: string[];
+  isGroup?: boolean;
+}
 
 interface PRow {
   profileid: string;
@@ -61,10 +119,10 @@ interface PRow {
   isRequested: boolean;
   isApproved: boolean;
   isEligible: boolean;
-  isUpgrade : boolean;
-  isAddon : boolean;
-  isContinuity : boolean;
-  notEligible : boolean;
+  isUpgrade: boolean;
+  isAddon: boolean;
+  isContinuity: boolean;
+  notEligible: boolean;
   isNoProduct: boolean;
   isInQueueReq: boolean;
   isNotRequested: boolean;
@@ -74,8 +132,8 @@ interface PRow {
   attended: boolean;
   scanned: boolean;
   attendanceState: string;
-  revokedBy: string;      // resolved display name (or raw profile id) of who revoked
-  revokedDate: number;    // millis
+  revokedBy: string; // resolved display name (or raw profile id) of who revoked
+  revokedDate: number; // millis
   reason: string;
   requestedDate: number;
   journey: string;
@@ -83,34 +141,33 @@ interface PRow {
   subActive: boolean;
   finance: string;
   phone: string;
-  checklist : Array<string>;
+  checklist: Array<string>;
   purchaseValue: number | null;
   paid: number | null;
   customerStatus: string;
-  completedProduct?: boolean;   // this product's id is in the participant's consumedproducts → "repeat"
+  completedProduct?: boolean; // this product's id is in the participant's consumedproducts → "repeat"
   metaLoaded: boolean;
   subLoaded: boolean;
   metaError: boolean;
-  recentEventParticipationReq : any
+  recentEventParticipationReq: any;
 }
 
 interface Ticket {
   ticketno: number | string;
   issue: string;
-  status: string;                                  
+  status: string;
   category: string | null;
-  reporteddate: any;   
-  ticketid : string;
-  isEp : boolean;                             
+  reporteddate: any;
+  ticketid: string;
+  isEp: boolean;
 }
 
-interface FilterChip{
-  label : string,
-  value : string,
-  type : "column" | 'search'
+interface FilterChip {
+  key?: string;
+  label: string;
+  value: string;
+  type: 'column' | 'search';
 }
-
-type ColumnType = 'text' | 'enum' | 'number' | 'date' | 'relation' | 'none';
 
 interface ColumnConfig {
   label: string;
@@ -119,32 +176,25 @@ interface ColumnConfig {
   defaultColumn: boolean;
   visible: () => boolean;
   showFilter: boolean;
-  avaibaleOptions ?: Array<string>,
-  checklist ?: boolean 
+  avaibaleOptions?: Array<string>;
+  checklist?: boolean;
 }
-
-type OperatorType = 'text' | 'enum' | 'number' | 'date' | 'relation';
 
 interface Condition {
   field: string;
   op: string;
-  value?: any;                                  
-  where?: { productid: string };                 
-  compare?: { op: 'eq' | 'gte' | 'lte' | 'gt' | 'lt'; value: number };  
+  value?: any;
+  where?: { productid: string };
+  compare?: { op: 'eq' | 'gte' | 'lte' | 'gt' | 'lt'; value: number };
 }
 
 interface OperatorConfig {
-  label: string;                                 
-  test: (cell: any, cond: Condition) => boolean; 
-  isComplete: (cond: Condition) => boolean;     
+  label: string;
+  test: (cell: any, cond: Condition) => boolean;
+  isComplete: (cond: Condition) => boolean;
 }
 
-interface FilterChip{
-  key? : string,
-  label : string,
-  value : string,
-  type : "column" | 'search'
-}
+// ===================== Component =====================
 
 @Component({
   selector: 'app-product-funnel',
@@ -187,6 +237,8 @@ interface FilterChip{
   styleUrl: './product-funnel.component.css',
 })
 export class ProductFunnelComponent implements OnInit, OnDestroy {
+  // ================================== Inputs & View Children =========================
+
   // @Input() arena: any;
   @Input() arenaId = null;
   @Input() eventName = '';
@@ -198,9 +250,16 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
   @ViewChild('failuresTpl') failuresTpl!: TemplateRef<any>;
   @ViewChild('ticketdetail') ticketdetail!: TemplateRef<any>;
   @ViewChild('checklistpopup') checklistpopup!: TemplateRef<any>;
+  @ViewChild('importTpl') importTpl!: TemplateRef<any>;
+  @ViewChild('inputFile') inputFile: ElementRef;
 
+  // ================================== Constants & Config =========================
+
+  // approve / initiate
   readonly INITIATE_CHUNK_SIZE = 20;
   readonly INITIATE_CHUNK_DELAY_MS = 5000;
+  readonly EVENT_CHECKLIST = 'event_checklist';
+
   readonly financeOptions = [
     { value: 'all', label: 'All finance' },
     { value: 'locked', label: 'Locked' },
@@ -209,21 +268,18 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     { value: 'fully paid', label: 'Fully paid' },
   ];
 
-  readonly EVENT_CHECKLIST = 'event_checklist';
-
-  private UP_LIVE_PRODUCT_IDS: readonly string[] = [
-    '0ayiNALL1HDVvCXDHcZ4',
-    'N0MhGQnxP9S8TdavuRJR',
-    'Rq9cu2Z3FSuILXdwYtca',
+  readonly customerFilterOptions = [
+    { key: 'active', label: 'Active' },
+    { key: 'non active', label: 'Non active' },
+    { key: 'discontinued', label: 'Discontinued' },
   ];
 
-  private CPM_PRODUCT_IDS: readonly string[] = [
-    'AED3TRIhKpyCtIWQvQMc',
-    'TnlqL6gUvDSx105YIPC5',
-    'TxnrP4kevFZCPHFtxj7Z',
-    'ZvANGjeQnKeIbGXiY0un',
-  ];
+  // product ids
+  private UP_LIVE_PRODUCT_IDS: readonly string[] = ['0ayiNALL1HDVvCXDHcZ4', 'N0MhGQnxP9S8TdavuRJR', 'Rq9cu2Z3FSuILXdwYtca'];
 
+  private CPM_PRODUCT_IDS: readonly string[] = ['AED3TRIhKpyCtIWQvQMc', 'TnlqL6gUvDSx105YIPC5', 'TxnrP4kevFZCPHFtxj7Z', 'ZvANGjeQnKeIbGXiY0un'];
+
+  // funnel cards
   readonly cards: {
     key: SegmentKey;
     label: string;
@@ -319,10 +375,8 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
   ];
 
   // Card lookup + a grouped breakdown tree (depth = indentation; bar = share of the group total).
-  readonly cardMap = this.cards.reduce(
-    (m, c) => ((m[c.key] = c), m),
-    {} as Record<SegmentKey, (typeof this.cards)[number]>,
-  );
+  readonly cardMap = this.cards.reduce((m, c) => ((m[c.key] = c), m), {} as Record<SegmentKey, (typeof this.cards)[number]>);
+
   readonly funnelTree: {
     about: string;
     total: SegmentKey;
@@ -356,482 +410,28 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       ],
     },
   ];
-  // Share of a row within its panel total, for the proportion bar + percent label.
-  barPct(key: SegmentKey, total: SegmentKey): number {
-    const t = this.counts[total] || 0;
-    return t ? Math.min(100, Math.round((this.counts[key] / t) * 100)) : 0;
-  }
 
-  // Per-segment breakdown by the actual customerstatus values found (only non-zero buckets).
-  statusSplits: Record<SegmentKey, Split[]> = {} as Record<SegmentKey, Split[]>;
-  customerStatusList: { key: string; label: string }[] = []; // distinct statuses, for the filter
-  splitsReady = false;
-  // Loads customerstatus for every row in the background, then computes the breakdown.
-  private async loadSplits() {
-    try {
-      await this.loadMeta(this.rows);
-      this.computeSplits(this.rows);
-      this.splitsReady = true;
-    } catch (e) {
-      console.log('split load failed', e);
-    }
-  }
-  // Group key (merges case/spacing) and display label for a raw customerstatus value.
-  statusKey(s: string): string {
-    return (
-      (s || '')
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, '') || 'notset'
-    );
-  }
-  private statusLabel(s: string): string {
-    return (s || '').trim() || 'Not set';
-  }
-  // Per-segment customerstatus counts (only non-zero buckets), shown inline in the summary.
-  statusSplit(key: SegmentKey): Split[] {
-    return this.statusSplits[key] ?? [];
-  }
+  // colors
   private readonly statusColors: Record<string, string> = {
     active: '#1f8a3b',
-    nonactive: '#c25e00',
+    'non active': '#c25e00',
     discontinued: '#d70015',
     notset: '#8e8e93',
   };
-  private readonly statusPalette = [
-    '#534ab7',
-    '#1d9e75',
-    '#d4537e',
-    '#854f0b',
-    '#185fa5',
-    '#993556',
-  ];
-  statusColor(key: string): string {
-    if (this.statusColors[key]) return this.statusColors[key];
-    const idx = this.customerStatusList.findIndex((s) => s.key === key);
-    return this.statusPalette[(idx >= 0 ? idx : 0) % this.statusPalette.length];
-  }
-  private computeSplits(rows: PRow[]): void {
-    const keys: SegmentKey[] = [
-      'potential',
-      'requested',
-      'notRequested',
-      'eligible',
-      'noProduct',
-      'inQueue',
-      'approved',
-      'attended',
-      'noShow',
-      'unattended',
-      'revoked',
-    ];
-    const out = {} as Record<SegmentKey, Split[]>;
-    const allStatuses = new Map<string, string>();
-    for (const k of keys) {
-      const inSeg = rows.filter((r) => this.matchesSegment(r, k));
-      const m = new Map<string, Split>();
-      for (const r of inSeg) {
-        const gk = this.statusKey(r.customerStatus);
-        const label = this.statusLabel(r.customerStatus);
-        allStatuses.set(gk, label);
-        const e = m.get(gk) ?? { key: gk, label, count: 0 };
-        e.count++;
-        m.set(gk, e);
-      }
-      out[k] = [...m.values()]
-        .filter((e) => e.count > 0)
-        .sort((a, b) => b.count - a.count);
-    }
-    this.statusSplits = out;
-    this.customerStatusList = [...allStatuses.entries()]
-      .map(([key, label]) => ({ key, label }))
-      .sort((a, b) => a.label.localeCompare(b.label));
 
-    // Approved cohort by journey, each split into first-timer vs repeat (for the cross-tab card).
-    const jm = new Map<string, JourneyRow>();
-    for (const r of rows) {
-      if (!r.isApproved) continue;
-      const label = (r.journey || '').trim() || 'Not set';
-      const e = jm.get(label) ?? {
-        key: label,
-        label,
-        total: 0,
-        first: 0,
-        repeat: 0,
-      };
-      e.total++;
-      if (r.completedProduct) e.repeat++;
-      else e.first++;
-      jm.set(label, e);
-    }
-    this.approvedByJourney = [...jm.values()].sort((a, b) => b.total - a.total);
-    this.rebuildDisplayedJourneys();
-  }
+  private readonly statusPalette = ['#534ab7', '#1d9e75', '#d4537e', '#854f0b', '#185fa5', '#993556'];
 
-  mapProfile: Record<string, any> = {};
-  mapEmailData: Record<string, any> = {};
-  mapProduct: Record<string, string> = {};
-  mapJourney: Record<string, string> = {};
+  private readonly journeyPalette = ['#1f8a3b', '#0060df', '#534ab7', '#c25e00', '#0f6e56', '#d4537e', '#185fa5'];
 
-  deliverySetList: any[] = [];
-  selectedDeliverySet: string | null = null;
-  queueVariationList: any[] = [];
-  mapQueueVariation: Record<string, string> = {};
-  selectedQueueVariation: string | null = null;
+  // column groups
+  string = ['current journey', 'customerstatus', 'financialstatus', 'status', 'venuefee', 'email', 'emi status', 'participantmode', 'paymentplan', 'phonenumber'];
 
-  rows: PRow[] = [];
-  segment: SegmentKey = 'eligible';
-  searchText = '';
-  financeFilter = 'all';
-  // Customer-status filter (clicking the Active / Non-Active / Discontinued chips below Potential, or the dropdown).
-  customerFilter = 'all'; // 'all' or a key from customerFilterOptions
-  readonly customerFilterOptions = [
-    { key: 'active', label: 'Active' },
-    { key: 'nonactive', label: 'Non active' },
-    { key: 'discontinued', label: 'Discontinued' },
-  ];
-  selection = new SelectionModel<PRow>(true, []);
+  numberange = ['paid', 'up! count', 'cpm! count', 'atccount', 'totalpurchasevalue'];
 
-  counts: Record<SegmentKey, number> = {
-    potential: 0,
-    requested: 0,
-    notRequested: 0,
-    eligible: 0,
-    upgrade: 0,
-    addon: 0,
-    continuity: 0,
-    noteligible: 0,
-    noProduct: 0,
-    inQueue: 0,
-    approved: 0,
-    attended: 0,
-    noShow: 0,
-    unattended: 0,
-    revoked: 0,
-    overallRequested: 0,
-  };
-
-  // Everyone who ever raised their hand for this event — including the terminal outcomes
-  // (unattended / revoked), who were approved once and then had their product cancelled.
-  // `requested` excludes the approved cohort, and terminal rows are excluded from both
-  // (see loadData), so these four buckets are disjoint — no double-count.
-  get overallRequested(): number {
-    return (
-      this.counts.requested +
-      this.counts.approved +
-      this.counts.unattended +
-      this.counts.revoked
-    );
-  }
-
-  // Customer-status split of the Potential pool (Active / Non-Active / Discontinued), shown as
-  // clickable chips below the Potential card. Counts come from the precomputed statusSplits.
-  potentialStatusCount(key: string): number {
-    return (
-      (this.statusSplits['potential'] ?? []).find((s) => s.key === key)
-        ?.count ?? 0
-    );
-  }
-  // Click a chip: jump to Potential and toggle that customer-status filter.
-  setCustomerChip(key: string): void {
-    this.segment = 'potential';
-    this.customerFilter = this.customerFilter === key ? 'all' : key;
-    this.pageIndex = 0;
-    this.defaultSelection();
-    this.refreshMeta();
-  }
-
-  // Approved cohort broken down by journey, each split into first-timer vs repeat — for the
-  // "Approved by journey" cross-tab card (computed in computeSplits once journeys are loaded).
-  // Repeat = this product's id is in the participant's `consumedproducts` (participant metadata),
-  // captured per-row as PRow.completedProduct during loadMeta.
-  approvedByJourney: JourneyRow[] = [];
-  journeyFilter = 'all'; // 'all', a journey label, or a group key ('grp:<name>')
-  journeyFilterMembers = new Set<string>(); // journey labels the current filter covers (union for groups)
-  frFilter = 'all'; // 'all' | 'first' | 'repeat'
-  // Persisted per-event grouping: journey label → group name. Stored in localStorage keyed by arenaevent id.
-  journeyGroups: Record<string, string> = {};
-  groupEditMode = false;
-  journeySel = new Set<string>(); // journeys ticked in edit mode, waiting to be grouped
-  groupNameInput = ''; // name to apply when grouping the current selection
-  private readonly journeyPalette = [
-    '#1f8a3b',
-    '#0060df',
-    '#534ab7',
-    '#c25e00',
-    '#0f6e56',
-    '#d4537e',
-    '#185fa5',
-  ];
-  journeyColor(key: string): string {
-    const i = this.displayedJourneys.findIndex((j) => j.key === key);
-    return this.journeyPalette[(i < 0 ? 0 : i) % this.journeyPalette.length];
-  }
-
-  private journeyGroupsKey(): string {
-    return 'epc_journey_groups_' + (this.arena?.['docid'] ?? 'unknown');
-  }
-  private loadJourneyGroups(): void {
-    try {
-      if (typeof localStorage === 'undefined') return;
-      const raw = localStorage.getItem(this.journeyGroupsKey());
-      this.journeyGroups = raw ? JSON.parse(raw) || {} : {};
-    } catch {
-      this.journeyGroups = {};
-    }
-    this.rebuildDisplayedJourneys();
-  }
-  private saveJourneyGroups(): void {
-    try {
-      if (typeof localStorage === 'undefined') return;
-      localStorage.setItem(
-        this.journeyGroupsKey(),
-        JSON.stringify(this.journeyGroups),
-      );
-    } catch {
-      /* storage unavailable — grouping just won't persist */
-    }
-    this.rebuildDisplayedJourneys();
-  }
-  toggleGroupEdit(): void {
-    this.groupEditMode = !this.groupEditMode;
-    this.journeySel = new Set(); // clear any pending selection when entering/leaving edit mode
-    this.groupNameInput = '';
-  }
-  // Distinct group names already in use, for the datalist / add-to-existing.
-  get existingGroupNames(): string[] {
-    return [
-      ...new Set(
-        Object.values(this.journeyGroups)
-          .map((g) => (g || '').trim())
-          .filter(Boolean),
-      ),
-    ].sort();
-  }
-  isJourneySel(label: string): boolean {
-    return this.journeySel.has(label);
-  }
-  toggleJourneySel(label: string): void {
-    if (this.journeySel.has(label)) this.journeySel.delete(label);
-    else this.journeySel.add(label);
-  }
-  // Group the ticked journeys under the typed name (creates the group or adds to an existing one). Persists.
-  groupSelected(): void {
-    const name = (this.groupNameInput || '').trim();
-    if (!name || !this.journeySel.size) return;
-    this.journeySel.forEach((label) => {
-      this.journeyGroups[label] = name;
-    });
-    this.saveJourneyGroups();
-    this.journeySel = new Set();
-    this.groupNameInput = '';
-  }
-  // Remove the ticked journeys from whatever group they're in. Persists.
-  ungroupSelected(): void {
-    if (!this.journeySel.size) return;
-    this.journeySel.forEach((label) => {
-      delete this.journeyGroups[label];
-    });
-    this.saveJourneyGroups();
-    this.journeySel = new Set();
-  }
-  // Disband a whole group (all its journeys become ungrouped). Persists.
-  ungroupGroup(groupName: string): void {
-    Object.keys(this.journeyGroups).forEach((label) => {
-      if (this.journeyGroups[label] === groupName)
-        delete this.journeyGroups[label];
-    });
-    this.saveJourneyGroups();
-  }
-
-  // The rows actually shown in the card: journeys sharing a group name collapse into one aggregated
-  // row (summing total/first/repeat, members = the grouped journey labels); ungrouped journeys stay as-is.
-  //
-  // This MUST be a cached field, not a getter. As a getter it returned fresh objects on every change
-  // detection pass, so *ngFor (identity tracking) destroyed and rebuilt every row continuously — a real
-  // mouse click then never fired, because mousedown and mouseup landed on different DOM nodes.
-  // Rebuilt only when the journeys or the grouping actually change. trackBy below is a second guard.
-  displayedJourneys: JourneyRow[] = [];
-  private rebuildDisplayedJourneys(): void {
-    const groups = new Map<string, JourneyRow>();
-    const singles: JourneyRow[] = [];
-    for (const j of this.approvedByJourney) {
-      const g = (this.journeyGroups[j.label] || '').trim();
-      if (!g) {
-        singles.push({ ...j, members: [j.label] });
-        continue;
-      }
-      const key = 'grp:' + g;
-      const e = groups.get(key) ?? {
-        key,
-        label: g,
-        total: 0,
-        first: 0,
-        repeat: 0,
-        members: [],
-        isGroup: true,
-      };
-      e.total += j.total;
-      e.first += j.first;
-      e.repeat += j.repeat;
-      e.members!.push(j.label);
-      groups.set(key, e);
-    }
-    this.displayedJourneys = [...groups.values(), ...singles].sort(
-      (a, b) => b.total - a.total,
-    );
-  }
-  trackJourneyKey = (_: number, j: JourneyRow) => j.key;
-  trackBreakdown = (_: number, b: { journey: string }) => b.journey;
-  trackParticipant = (_: number, p: PRow) => p.profileid;
-
-  // Participants for a journey/group are shown in a mat-menu overlay (see the card template),
-  // so the card itself stays compact regardless of how many people are in a group.
-  private journeyLabelOf(r: PRow): string {
-    return (r.journey || '').trim() || 'Not set';
-  }
-  // The approved participants whose journey falls inside this group, sorted by name.
-  groupParticipants(row: JourneyRow): PRow[] {
-    const members = new Set(row.members ?? [row.label]);
-    return this.rows
-      .filter((r) => r.isApproved && members.has(this.journeyLabelOf(r)))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }
-  // Which journeys are inside this group, and who is approved under each — powers the overlay panels.
-  // Every member journey is listed even if it currently has no matching participants.
-  // `fr` narrows to first-timers ('first') or repeats ('repeat'); 'all' is the whole approved cohort.
-  groupJourneyBreakdown(
-    row: JourneyRow,
-    fr: 'all' | 'first' | 'repeat' = 'all',
-  ): { journey: string; participants: PRow[] }[] {
-    const members = row.members ?? [row.label];
-    const byJourney = new Map<string, PRow[]>();
-    members.forEach((m) => byJourney.set(m, []));
-    for (const r of this.rows) {
-      if (!r.isApproved) continue;
-      const isRepeat = !!r.completedProduct;
-      if (fr === 'first' && isRepeat) continue;
-      if (fr === 'repeat' && !isRepeat) continue;
-      const lbl = this.journeyLabelOf(r);
-      if (byJourney.has(lbl)) byJourney.get(lbl)!.push(r);
-    }
-    return [...members]
-      .sort((a, b) => a.localeCompare(b))
-      .map((m) => ({
-        journey: m,
-        participants: (byJourney.get(m) ?? []).sort((a, b) =>
-          a.name.localeCompare(b.name),
-        ),
-      }));
-  }
-
-  // Click a journey/group row → filter the table to the union of its journeys (clears the first/repeat sub-filter).
-  // The participant list lives in the overlay opened by the people icon, not here.
-  setJourneyChip(row: JourneyRow): void {
-    this.segment = 'approved';
-    const same = this.journeyFilter === row.key && this.frFilter === 'all';
-    this.journeyFilter = same ? 'all' : row.key;
-    this.journeyFilterMembers = same
-      ? new Set()
-      : new Set(row.members ?? [row.label]);
-    this.frFilter = 'all';
-    this.pageIndex = 0;
-    this.defaultSelection();
-    this.refreshMeta();
-  }
-  // Click a first-timer/repeat pill under a journey/group → filter to that union ∩ that group (toggles off if repeated).
-  setJourneyFr(row: JourneyRow, frKey: string): void {
-    this.segment = 'approved';
-    const same = this.journeyFilter === row.key && this.frFilter === frKey;
-    this.journeyFilter = same ? 'all' : row.key;
-    this.journeyFilterMembers = same
-      ? new Set()
-      : new Set(row.members ?? [row.label]);
-    this.frFilter = same ? 'all' : frKey;
-    this.pageIndex = 0;
-    this.defaultSelection();
-    this.refreshMeta();
-  }
-  private journeyMatches(r: PRow): boolean {
-    if (this.journeyFilter === 'all') return true;
-    return this.journeyFilterMembers.has((r.journey || '').trim() || 'Not set');
-  }
-  private frMatches(r: PRow): boolean {
-    if (this.frFilter === 'all') return true;
-    const isRepeat = !!r.completedProduct;
-    return this.frFilter === 'repeat' ? isRepeat : !isRepeat;
-  }
-
-  // Post-approval checks (Queue stage) — shown only on the approved cohort.
-  queueStageByPid = new Map<string, string>(); // queue_token.currentstage per participant (queue events)
-  queueStagesLoaded = false;
-  private queueStagesLoading = false;
-
-  // owner email → row, and active-queue profile ids — used by bulk import categorisation
-  private ownerByEmail = new Map<string, PRow>();
-  private activeProfileIds = new Set<string>();
-  importPreview: {
-    total: number;
-    willAdd: ImportPreviewRow[];
-    inQueue: ImportPreviewRow[];
-    noProduct: ImportPreviewRow[];
-  } | null = null;
-  importExpand = { willAdd: false, inQueue: false, noProduct: false };
-  private pendingImportRows: PRow[] = [];
-
-  pageSize = 10;
-  pageIndex = 0;
-  loading = true;
-  loadError = false;
-
-  // progress dialog state
-  progress = { msg: '', value: 0, total: 0, eta: '' };
-  mapEligibility = {};
-  eticketEligibilitySubscription: Subscription | null = null;
-
-  participantMetadata = {};
-  participantSalesMap = {};
-  last30daysSale = 0;
-  isSalesSelected = false;
-
-  openTickets = {
-    eventProcessTickets: 0,
-    others: 0,
-  };
-  selectedTicketCategory: 'all' | 'ep' | 'others' = 'all';
-  selectedParticipantsTicket = null;
-
-  selectedEvent = null;
-  subEvents = [];
-  arena = null;
-
-  private destroy$ = new Subject<void>();
-
-  // displayColumns = ['select' , 'name' , 'requested date' , 'current journey' , 'subscriptionend' , 'customerstatus' , 'financialstatus' , 'paid' , 'status' , 'tickets']
-  displayColumns = [];
-  columSearch = '';
-
-  string = [
-    'current journey',
-    'customerstatus',
-    'financialstatus',
-    'status',
-    'venuefee',
-    'email',
-    'emi status',
-    'participantmode',
-    'paymentplan',
-    'phonenumber',
-  ];
-  numberange = [
-    'paid',
-    'up! count',
-    'cpm! count',
-    'atccount',
-    'totalpurchasevalue',
-  ];
   daterange = ['requestedDate', 'subscriptionend', 'subscriptionstart'];
+
   noFilter = ['select', 'name', 'tickets'];
+
   dynamicColumns = [
     'up! count',
     'cpm! count',
@@ -847,20 +447,108 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     'subscriptionstart',
     'totalpurchasevalue',
   ];
+
   computeProduct = ['addons', 'consumedproducts', 'unconsumedproducts'];
 
-  // filterMap = {};
-  filterPopup = null;
-
-  filterOrigin: HTMLElement | null = null;
-
-  sortColumn: { column: string; type: 'asc' | 'desc' } = null;
-
+  // filter operators
   comparisons = ['==', '>=', '<='];
 
-  filterMap: Record<string, Condition[]> = {};
-
   reverseCompareMap = { eq: '==', gte: '>=', lte: '<=' };
+
+  readonly legacyCompareMap = { '==': 'eq', '>=': 'gte', '<=': 'lte' };
+
+  private isEmpty = (v: any) => v === null || v === undefined || v === '';
+
+  private readonly CMP = {
+    eq: (a: number, b: number) => a === b,
+    gte: (a: number, b: number) => a >= b,
+    lte: (a: number, b: number) => a <= b,
+    gt: (a: number, b: number) => a > b,
+    lt: (a: number, b: number) => a < b,
+  };
+
+  // Shared by every type
+  private readonly emptyOps: Record<string, OperatorConfig> = {
+    is_empty: {
+      label: 'Is empty',
+      test: (cell) => this.isEmpty(cell),
+      isComplete: () => true,
+    },
+    is_not_empty: {
+      label: 'Is not empty',
+      test: (cell) => !this.isEmpty(cell),
+      isComplete: () => true,
+    },
+  };
+
+  readonly operatorRegistry: Record<OperatorType, Record<string, OperatorConfig>> = {
+    text: {
+      contains: {
+        label: 'Contains',
+        test: (cell, c) => !this.isEmpty(cell) && String(cell).toLowerCase().includes(String(c.value).toLowerCase()),
+        isComplete: (c) => !this.isEmpty(c.value),
+      },
+      equals: {
+        label: 'Equals',
+        test: (cell, c) => !this.isEmpty(cell) && String(cell).trim().toLowerCase() === String(c.value).trim().toLowerCase(),
+        isComplete: (c) => !this.isEmpty(c.value),
+      },
+      ...this.emptyOps,
+    },
+
+    enum: {
+      in: {
+        label: 'Is any of',
+        test: (cell, c) => (c.value as any[]).includes(cell),
+        isComplete: (c) => Array.isArray(c.value) && c.value.length > 0,
+      },
+      not_in: {
+        label: 'Is none of',
+        test: (cell, c) => !(c.value as any[]).includes(cell),
+        isComplete: (c) => Array.isArray(c.value) && c.value.length > 0,
+      },
+      ...this.emptyOps,
+    },
+
+    number: {
+      between: {
+        label: 'Between',
+        test: (cell, c) => {
+          if (this.isEmpty(cell)) return false;
+          const n = Number(cell);
+          if (isNaN(n)) return false;
+          const { min, max } = c.value ?? {};
+          return (this.isEmpty(min) || n >= Number(min)) && (this.isEmpty(max) || n <= Number(max));
+        },
+        isComplete: (c) => !this.isEmpty(c.value?.min) || !this.isEmpty(c.value?.max),
+      },
+      ...this.emptyOps,
+    },
+
+    date: {
+      between: {
+        label: 'Between',
+        test: (cell, c) => {
+          const t = this.toMillis(cell);
+          if (!t) return false;
+          const { start, end } = c.value ?? {};
+          const s = this.isEmpty(start) ? -Infinity : this.toDate(start).setHours(0, 0, 0, 0);
+          const e = this.isEmpty(end) ? Infinity : this.toDate(end).setHours(23, 59, 59, 999);
+          return s <= t && t <= e;
+        },
+        isComplete: (c) => !this.isEmpty(c.value?.start) || !this.isEmpty(c.value?.end),
+      },
+      ...this.emptyOps,
+    },
+
+    relation: {
+      count: {
+        label: 'Product count',
+        test: (cell, c) => this.CMP[c.compare.op](cell?.[c.where.productid] ?? 0, c.compare.value),
+        isComplete: (c) => !!c.where?.productid && !!c.compare && c.compare.op in this.CMP && !this.isEmpty(c.compare.value) && !isNaN(Number(c.compare.value)),
+      },
+    },
+  };
 
   readonly columnRegistry: Record<string, ColumnConfig> = {
     select: {
@@ -1074,143 +762,174 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     },
   };
 
-  private isEmpty = (v: any) => v === null || v === undefined || v === '';
+  // ================================== State =========================
 
-  private readonly CMP = {
-    eq: (a: number, b: number) => a === b,
-    gte: (a: number, b: number) => a >= b,
-    lte: (a: number, b: number) => a <= b,
-    gt: (a: number, b: number) => a > b,
-    lt: (a: number, b: number) => a < b,
+  // arena / event
+  selectedEvent = null;
+  subEvents = [];
+  arena = null;
+  loggedInProfile;
+
+  // lookup maps
+  mapProfile: Record<string, any> = {};
+  mapEmailData: Record<string, any> = {};
+  mapProduct: Record<string, string> = {};
+  mapJourney: Record<string, string> = {};
+
+  // delivery sets & queue variations
+  deliverySetList: any[] = [];
+  selectedDeliverySet: string | null = null;
+  queueVariationList: any[] = [];
+  mapQueueVariation: Record<string, string> = {};
+  selectedQueueVariation: string | null = null;
+
+  // participant data points ( live subscriptions )
+  participantMetadata = {};
+  participantProductMap = {};
+  participantRequestMap = {};
+  participantSalesMap = {};
+  eticketLogMap = {};
+  tokenMap = {};
+  cohortParticipants = [];
+  communicationMap = {};
+  communicationEmailLog = {};
+  communicationwatilLog = {};
+  communicationAppNotificationLog = {}
+  revokedByMap = {};
+  // approvedMap = {};
+  // requestedMap = {};
+
+  mapEligibility = {};
+  subscribtions: { [key: string]: Subscription } = {};
+  eticketEligibilitySubscription: Subscription | null = null;
+
+  // rows, segments & counts
+  rows: PRow[] = [];
+  segment: SegmentKey = 'eligible';
+  searchText = '';
+  financeFilter = 'all';
+  customerFilter = 'all'; // 'all' or a key from customerFilterOptions
+  selection = new SelectionModel<string>(true, []);
+
+  counts: Record<SegmentKey, number> = {
+    potential: 0,
+    requested: 0,
+    notRequested: 0,
+    eligible: 0,
+    upgrade: 0,
+    addon: 0,
+    continuity: 0,
+    noteligible: 0,
+    noProduct: 0,
+    inQueue: 0,
+    approved: 0,
+    attended: 0,
+    noShow: 0,
+    unattended: 0,
+    revoked: 0,
+    overallRequested: 0,
   };
 
-  readonly legacyCompareMap = { '==': 'eq', '>=': 'gte', '<=': 'lte' };
-
-  // Shared by every type
-  private readonly emptyOps: Record<string, OperatorConfig> = {
-    is_empty: {
-      label: 'Is empty',
-      test: (cell) => this.isEmpty(cell),
-      isComplete: () => true,
-    },
-    is_not_empty: {
-      label: 'Is not empty',
-      test: (cell) => !this.isEmpty(cell),
-      isComplete: () => true,
-    },
+  segmentList: Record<SegmentKey, Array<string>> = {
+    potential: [],
+    requested: [],
+    notRequested: [],
+    eligible: [],
+    upgrade: [],
+    addon: [],
+    continuity: [],
+    noteligible: [],
+    noProduct: [],
+    inQueue: [],
+    approved: [],
+    attended: [],
+    noShow: [],
+    unattended: [],
+    revoked: [],
+    overallRequested: [],
   };
 
-  readonly operatorRegistry: Record<
-    OperatorType,
-    Record<string, OperatorConfig>
-  > = {
-    text: {
-      contains: {
-        label: 'Contains',
-        test: (cell, c) =>
-          !this.isEmpty(cell) &&
-          String(cell).toLowerCase().includes(String(c.value).toLowerCase()),
-        isComplete: (c) => !this.isEmpty(c.value),
-      },
-      equals: {
-        label: 'Equals',
-        test: (cell, c) =>
-          !this.isEmpty(cell) &&
-          String(cell).trim().toLowerCase() ===
-            String(c.value).trim().toLowerCase(),
-        isComplete: (c) => !this.isEmpty(c.value),
-      },
-      ...this.emptyOps,
-    },
+  // funnel splits
+  statusSplits: Record<SegmentKey, Split[]> = {} as Record<SegmentKey, Split[]>;
+  customerStatusList: { key: string; label: string }[] = []; // distinct statuses, for the filter
+  splitsReady = false;
 
-    enum: {
-      in: {
-        label: 'Is any of',
-        test: (cell, c) => (c.value as any[]).includes(cell),
-        isComplete: (c) => Array.isArray(c.value) && c.value.length > 0,
-      },
-      not_in: {
-        label: 'Is none of',
-        test: (cell, c) => !(c.value as any[]).includes(cell),
-        isComplete: (c) => Array.isArray(c.value) && c.value.length > 0,
-      },
-      ...this.emptyOps,
-    },
+  // journey grouping
+  approvedByJourney: JourneyRow[] = [];
+  displayedJourneys: JourneyRow[] = [];
+  journeyFilter = 'all';
+  journeyFilterMembers = new Set<string>();
+  frFilter = 'all'; // 'all' | 'first' | 'repeat'
+  journeyGroups: Record<string, string> = {};
+  groupEditMode = false;
+  journeySel = new Set<string>(); // journeys ticked in edit mode, waiting to be grouped
+  groupNameInput = ''; // name to apply when grouping the current selection
 
-    number: {
-      between: {
-        label: 'Between',
-        test: (cell, c) => {
-          if (this.isEmpty(cell)) return false;
-          const n = Number(cell);
-          if (isNaN(n)) return false;
-          const { min, max } = c.value ?? {};
-          return (
-            (this.isEmpty(min) || n >= Number(min)) &&
-            (this.isEmpty(max) || n <= Number(max))
-          );
-        },
-        isComplete: (c) =>
-          !this.isEmpty(c.value?.min) || !this.isEmpty(c.value?.max),
-      },
-      ...this.emptyOps,
-    },
+  // queue stage
+  queueStageByPid = new Map<string, string>(); // queue_token.currentstage per participant (queue events)
+  queueStagesLoaded = false;
+  private queueStagesLoading = false;
 
-    date: {
-      between: {
-        label: 'Between',
-        test: (cell, c) => {
-          const t = this.toMillis(cell);
-          if (!t) return false;
-          const { start, end } = c.value ?? {};
-          const s = this.isEmpty(start)
-            ? -Infinity
-            : this.toDate(start).setHours(0, 0, 0, 0);
-          const e = this.isEmpty(end)
-            ? Infinity
-            : this.toDate(end).setHours(23, 59, 59, 999);
-          return s <= t && t <= e;
-        },
-        isComplete: (c) =>
-          !this.isEmpty(c.value?.start) || !this.isEmpty(c.value?.end),
-      },
-      ...this.emptyOps,
-    },
+  // bulk import
+  // owner email → row, and active-queue profile ids — used by bulk import categorisation
+  private ownerByEmail = new Map<string, PRow>();
+  private activeProfileIds = new Set<string>();
+  importPreview: {
+    total: number;
+    willAdd: ImportPreviewRow[];
+    inQueue: ImportPreviewRow[];
+    noProduct: ImportPreviewRow[];
+  } | null = null;
+  importExpand = { willAdd: false, inQueue: false, noProduct: false };
+  private pendingImportRows: PRow[] = [];
+  private importDialogRef: any = null;
+  isExcelFile: boolean;
 
-    relation: {
-      count: {
-        label: 'Product count',
-        test: (cell, c) =>
-          this.CMP[c.compare.op](
-            cell?.[c.where.productid] ?? 0,
-            c.compare.value,
-          ),
-        isComplete: (c) =>
-          !!c.where?.productid &&
-          !!c.compare &&
-          c.compare.op in this.CMP &&
-          !this.isEmpty(c.compare.value) &&
-          !isNaN(Number(c.compare.value)),
-      },
-    },
+  // pagination & loading
+  pageSize = 10;
+  pageIndex = 0;
+  loading = true;
+  loadError = false;
+
+  // progress dialog state
+  progress = { msg: '', value: 0, total: 0, eta: '' };
+
+  // sales & tickets
+  last30daysSale = 0;
+  isSalesSelected = false;
+  openTickets = {
+    eventProcessTickets: 0,
+    others: 0,
   };
+  selectedTicketCategory: 'all' | 'ep' | 'others' = 'all';
+  selectedParticipantsTicket = null;
 
+  // table columns, filters & sorting
+  // displayColumns = ['select' , 'name' , 'requested date' , 'current journey' , 'subscriptionend' , 'customerstatus' , 'financialstatus' , 'paid' , 'status' , 'tickets']
+  displayColumns = [];
+  cachedColumns = [];
+  columSearch = '';
+  // filterMap = {};
+  filterPopup = null;
+  filterOrigin: HTMLElement | null = null;
+  sortColumn: { column: string; type: 'asc' | 'desc' } = null;
+  filterMap: Record<string, Condition[]> = {};
+
+  // checklist
   checkListMap = {};
   appliedCheckList: ColumnConfig[] = [];
   overAllEventCheckList = [];
   checkListForm: FormGroup;
-
-  //import
-  isExcelFile: boolean;
-  @ViewChild('inputFile') inputFile: ElementRef;
-
-  loggedInProfile;
-
   selectedChecklist = null;
 
-  subscribtions : {[key : string] : Subscription} = {}
-  participantRequestMap = {};
-  eticketLogMap = {}
+  // streams
+  private destroy$ = new Subject<void>();
+  eventParticipationRequest$ = new Subject<any>();
+  participantProduct$ = new Subject<any>();
+
+  showJourneyCard = false; 
+
+  // ================================== Constructor & Lifecycle =========================
 
   constructor(
     public firestore: Firestore,
@@ -1224,86 +943,85 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     private form: FormBuilder,
     private authService: AuthguardService,
   ) {
-    // getDocs(collection(this.firestore, 'participant metadata'))
-    //   .then((participantMetadataSnap) => {
-    //     for (const docref of participantMetadataSnap.docs) {
-    //       const participant = docref.data();
-
-    //       const profileId = participant['profileid'] ?? null;
-    //       if (profileId) {
-    //         this.participantMetadata[profileId] = participant;
-    //       }
-    //     }
-    //   })
-    //   .catch((error) => console.log(error));
-
-    collectionData(collection(this.firestore, 'participant metadata')).pipe(takeUntil(this.destroy$)).subscribe((participantMetadataSnap)=>{
-      const participantMetadata = {}; 
-      console.log('participant metadata')
-      for (const participant of participantMetadataSnap) {
-          const profileId = participant['profileid'] ?? null;
-
-          if (profileId) {
-            if ( Object.hasOwn( this.participantMetadata , profileId)) {
-              Object.assign( this.participantMetadata[profileId] , participant)
-            }
-            this.participantMetadata[profileId] = participant;
-          }
-        }
-        // this.participantMetadata = participantMetadata;
-    })
     this.authService.getRoles().then((data) => (this.loggedInProfile = data));
+    this.guard.getProfileMap().then((profile) => {
+      this.mapProfile = profile.docdata;
+      this.mapEmailData = profile.mapEmailData;
+    });
+    this.guard.getProductMap().then((mapProduct) => (this.mapProduct = mapProduct));
+    this.guard.getJourneyMap().then((mapJourney) => (this.mapJourney = mapJourney));
   }
 
   async ngOnInit() {
-    const profile = await this.guard.getProfileMap();
-    this.mapProfile = profile.docdata;
-    this.mapEmailData = profile.mapEmailData;
-    this.mapProduct = await this.guard.getProductMap();
-    this.mapJourney = await this.guard.getJourneyMap();
-    // await this.loadData();
     this.loadETicketEligibilty();
     this.loadSalesLeads();
     this.initAppliedCheckList();
+    this.loadEventCommunication();
+    this.loadArenaETicket();
+    this.journeyGroupsKey();
+    this.loadDasbordData();
     await this.fetchSubEvent();
-    if (this.arenaId && this.subEvents.length > 0) {
-      const arenaEvent = this.subEvents.find((arena) => {
-        const docid = arena['docid'] ?? null;
-        return this.arenaId === docid;
-      });
+    if (this.subEvents.length > 0) {
+      let arenaEvent = null;
+      if (this.arenaId) {
+        arenaEvent = this.subEvents.find((arena) => {
+          const docid = arena['docid'] ?? null;
+          return this.arenaId === docid;
+        });
+      } else {
+        arenaEvent = this.subEvents[0];
+      }
 
       if (arenaEvent) {
         await this.toggleArena(arenaEvent);
       }
-    }
+    };
+    this.loading = false;
   }
 
   ngOnDestroy(): void {
     if (this.eticketEligibilitySubscription) {
       this.eticketEligibilitySubscription.unsubscribe();
     }
+    Object.values(this.subscribtions).forEach((sub)=>{
+      sub.unsubscribe();
+    })
     this.destroy$.next();
     this.destroy$.complete();
   }
 
+  // ================================== Data Loading =========================
+
+  // function to fetch all participant metadata
+  // async fetchParticipantMetadata() {
+  //   return collectionData(collection(this.firestore, 'participant metadata')).subscribe((participantMetadataSnap) => {
+  //     const participantMetadata = {};
+  //     console.log('participant metadata');
+  //     for (const participant of participantMetadataSnap) {
+  //       const profileId = participant['profileid'] ?? null;
+
+  //       if (profileId) {
+  //         if (Object.hasOwn(participantMetadata, profileId)) {
+  //           Object.assign(participantMetadata[profileId], participant);
+  //         }
+  //         participantMetadata[profileId] = participant;
+  //       }
+  //     }
+  //     this.participantMetadata = participantMetadata;
+  //   });
+  // }
+
+  // function to fetch sub events ( arenas ) of the event
   async fetchSubEvent() {
     const subEvents = [];
     if (this.eventId) {
-      const collName = this.eventId?.isQueueEvent
-        ? 'queue generation'
-        : 'event collection';
-      const eventDocRef = doc(
-        this.firestore,
-        `${collName}/${this.eventId?.docid}`,
-      );
-      const q = query(
-        collection(this.firestore, 'arena events'),
-        where('eventref', '==', eventDocRef),
-      );
+      const collName = this.eventId?.isQueueEvent ? 'queue generation' : 'event collection';
+      const eventDocRef = doc(this.firestore, `${collName}/${this.eventId?.docid}`);
+      const q = query(collection(this.firestore, 'arena events'), where('eventref', '==', eventDocRef));
       const arenaSnap = await getDocs(q);
       arenaSnap.docs.forEach((arenaRef) => {
         const arena = arenaRef.data();
-        subEvents.push(arena);
+        if(arena['delete'] !== true) subEvents.push(arena);
       });
     }
 
@@ -1317,446 +1035,670 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     this.subEvents = subEvents;
   }
 
+  // function to select an arena and push its queries to the live streams
   async toggleArena(arena) {
-    this.arena = arena;
-    // await this.loadData();
-    this.loadEventParticipationRequest();
-    
-    // this.loadETicketEligibilty();
-  }
-
-  get productName() {
-    return this.mapProduct[this.arena?.['productref']?.id] ?? 'Product';
-  }
-
-  async initAppliedCheckList() {
-    await this.loadEventCheckList();
-    const storage = JSON.parse(
-      localStorage.getItem(this.EVENT_CHECKLIST) ?? '{}',
-    );
-    const checklist = storage[this.eventId?.docid] ?? [];
-    for (const checkListId of checklist) {
-      this.columnRegistry[checkListId] = {
-        label: this.checkListMap[checkListId]?.title,
-        type: 'enum',
-        defaultHtml: '—',
-        defaultColumn: false,
-        visible: () => !['potential', 'notRequested'].includes(this.segment),
-        showFilter: true,
-        checklist: true,
-      };
-    }
-  }
-
-  initials(name: string): string {
-    return (
-      (name || '?')
-        .split(/\s+/)
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((p) => p[0])
-        .join('')
-        .toUpperCase() || '?'
-    );
-  }
-
-  async loadData() {
     this.loading = true;
-    this.loadError = false;
-    this.splitsReady = false;
-    this.queueStageByPid = new Map<string, string>();
-    this.queueStagesLoaded = false;
-    const arena = this.arena;
-    const eligibility = arena['eligibility'] ?? {};
-    const productConsumption = eligibility['productconsumption'] ?? [];
-    const customerStatus = eligibility['customerstatus'] ?? [];
-    const eligibilityJourney = eligibility['journeyid'] ?? [];
-    const overAllRequestedParticipants: Set<string> = new Set();
+    this.arena = arena;
+    const arenaId = this.arena['docid'] ?? null;
+    const productref = this.arena['productref'] ?? null;
 
-    this.loadJourneyGroups(); // per-event journey grouping from localStorage (keyed by arenaevent id)
-    try {
-      const dataQueries = [
-        getDocs(
-          query(
-            collection(this.firestore, 'participantsproduct'),
-            where('productref', '==', arena['productref']),
-            where('status', '==', null),
-          ),
-        ),
-        getDocs(
-          query(
-            collection(this.firestore, 'event participation request'),
-            where('arenaeventid', '==', arena['docid']),
-            where('status', 'in', [
-              'requested',
-              'approved',
-              'attended',
-              'unattended',
-              'revoked',
-            ]),
-          ),
-        ),
-        getDocs(
-          query(
-            collection(this.firestore, 'arena e-ticket log'),
-            where('eventref', '==', arena['eventref']),
-          ),
-        ),
-      ];
-
-      if (eligibility?.cohortid?.length > 0) {
-        const cohortQuery = query(
-          collection(this.firestore, 'big cohorts'),
-          where('docid', 'in', eligibility?.cohortid),
-        );
-        dataQueries.push(getDocs(cohortQuery));
-      }
-      const [ownSnap, eprSnap, scanSnap, cohorts] =
-        await Promise.all(dataQueries);
-
-      const cohortParticipants = [];
-
-      if (cohorts) {
-        cohorts?.docs.forEach((docref) => {
-          const participant = docref.data()['participantidlist'] ?? [];
-          for (const pid of participant) {
-            if (!cohortParticipants.includes(pid)) {
-              cohortParticipants.push(pid);
-            }
-          }
-        });
-      }
-
-      const owners = new Map<string, string>();
-      ownSnap.docs.forEach((d) => {
-        const x = d.data();
-        if (x['profileid'] && !owners.has(x['profileid']))
-          owners.set(x['profileid'], x['docid'] ?? d.id);
-      });
-
-      const requestedData = new Map<string, any>();
-      const approvedReq = new Map<string, string>();
-      const attendedIds = new Set<string>();
-      const unattendedIds = new Set<string>();
-      const revokedIds = new Set<string>();
-      const revokedByPid = new Map<string, string>();
-      const revokedDatePid = new Map<string, number>();
-      const attendanceStateByPid = new Map<string, string>();
-      const bucketByPid = new Map<string, string>();
-      const reqDateByPid = new Map<string, number>();
-      const checkList = new Map<string, Array<string>>();
-      const recentRequestDocument = new Map<string, any>();
-
-      eprSnap.docs.forEach((d) => {
-        const x = d.data();
-        const pid = x['profileid'];
-        if (!pid) return;
-        const requestDate = x['doccreateddate'] ?? null;
-        overAllRequestedParticipants.add(pid);
-        const check = x['checklist'] ?? [];
-        // checkList.set(pid , check);
-        if (recentRequestDocument.has(pid)) {
-          const reqData = recentRequestDocument.get(pid);
-          const oldRequestDate = reqData['doccreateddate'] ?? null;
-          if (requestDate && requestDate > oldRequestDate) {
-            recentRequestDocument.set(pid, x);
-            checkList.set(pid, check);
-          }
-        } else {
-          recentRequestDocument.set(pid, x);
-          checkList.set(pid, check);
-        }
-        const created = this.toMillis(x['doccreateddate']);
-        if (created) reqDateByPid.set(pid, created);
-        if (x['status'] == 'approved') {
-          approvedReq.set(pid, x['docid'] ?? d.id);
-          attendanceStateByPid.set(pid, x['attendance_state'] ?? '');
-        } else if (x['status'] == 'attended') {
-          attendedIds.add(pid);
-          approvedReq.set(pid, x['docid'] ?? d.id);
-          attendanceStateByPid.set(pid, x['attendance_state'] ?? 'attended');
-        } else if (x['status'] == 'unattended') {
-          unattendedIds.add(pid);
-          attendanceStateByPid.set(pid, 'unattended');
-        } else if (x['status'] == 'revoked') {
-          revokedIds.add(pid);
-          attendanceStateByPid.set(pid, 'revoked');
-          if (x['revoked_by']) revokedByPid.set(pid, x['revoked_by']);
-          const rd = this.toMillis(x['revoked_date']);
-          if (rd) revokedDatePid.set(pid, rd);
-        } else if (x['status'] == 'requested') {
-          requestedData.set(pid, { ...x, docid: x['docid'] ?? d.id });
-          if (x['epc_bucket']) bucketByPid.set(pid, x['epc_bucket']);
-        }
-      });
-      // NOTE: unattended/revoked are NO LONGER terminal — by operator directive they stay visible in every
-      // live bucket they still qualify for (owner / requested), in ADDITION to their own
-      // terminal segment. So we intentionally do NOT strip them from requestedData/cohort/owner sets here.
-
-      // Eligibility buckets are precomputed by the rollup (epc_bucket on each requested doc).
-      // When every requested participant carries one, use them and SKIP the queue_token scan;
-      // otherwise fall back to reading active tokens and computing the split live.
-      const useBuckets =
-        requestedData.size > 0 &&
-        [...requestedData.keys()].every((pid) => bucketByPid.has(pid));
-      const active = new Set<string>();
-      if (!useBuckets) {
-        const tokSnap = await getDocs(
-          query(
-            collection(this.firestore, 'queue_token'),
-            where('queueref', '==', arena['eventref']),
-          ),
-        );
-        tokSnap.docs.forEach((d) => {
-          const x = d.data();
-          if (
-            (x['tokenstatus'] ?? '').toString().toLowerCase() == 'active' &&
-            x['profile_id']
-          )
-            active.add(x['profile_id']);
-        });
-      }
-
-      const scanned = new Set<string>();
-      scanSnap.docs.forEach((d) => {
-        const x = d.data();
-        if (x['profileid']) scanned.add(x['profileid']);
-      });
-
-      // Approved cohort = `event participation request` with status 'approved' or 'attended', ONLY.
-      // (operator directive) A physical e-ticket scan no longer confers membership of any bucket — it is
-      // kept solely as the `· scanned` badge on the row. Every 'attended' EPR doc also lands in
-      // approvedReq, so attended stays a subset of approved.
-      // Cohort members are not "requested" — they are removed from requestedData below.
-      const cohort = new Set<string>([...approvedReq.keys()]);
-      cohort.forEach((p) => requestedData.delete(p));
-
-      // (removed) previously unattended/revoked were dropped from cohort/owner sets so they only showed in
-      // their terminal segment. Per operator directive they now stay in every live bucket they qualify for.
-      // Consequence: a revoked person who still owns the product is in BOTH `potential` and `revoked`; the
-      // counts and the `overallRequested` aggregate are computed from de-duplicated rows below to avoid
-      // inflation.
-
-      const ids = new Set<string>([
-        ...owners.keys(),
-        ...requestedData.keys(),
-        ...cohort,
-        ...unattendedIds,
-        ...revokedIds,
-      ]);
-      const rows: PRow[] = [];
-      ids.forEach((pid) => {
-        const prof = this.participantMetadata[pid] ?? {};
-        const isUnattended = unattendedIds.has(pid);
-        const isRevoked = revokedIds.has(pid);
-        // Terminal states (unattended/revoked) are no longer gated out of the live buckets: a person keeps
-        // whatever live membership their source data still gives them AND retains their terminal flag.
-        const isOwner = owners.has(pid);
-        const isScanned = scanned.has(pid);
-        const participantEligibleBucket = this.participantBucket(
-          pid,
-          isOwner,
-          customerStatus,
-          productConsumption,
-          eligibilityJourney,
-          cohortParticipants,
-        );
-        // Approval and attendance are both EPR-only (operator directive): a row is approved when its
-        // `event participation request` doc has status 'approved' or 'attended', and attended only when
-        // that status is 'attended'. An e-ticket scan confers neither — it survives as `scanned` for the
-        // `· scanned` badge and nothing else.
-        const isAttended = attendedIds.has(pid);
-        const inCohort = approvedReq.has(pid);
-        const isRequested = requestedData.has(pid);
-        const bucket = useBuckets ? bucketByPid.get(pid) : undefined;
-        const inQueue = bucket ? bucket === 'inQueue' : active.has(pid);
-        const isEligible =
-          isRequested && participantEligibleBucket === 'eligibile' && !inQueue;
-        const isUpgrade =
-          isRequested && participantEligibleBucket === 'upgrade' && !inQueue;
-        const isAddon =
-          isRequested && participantEligibleBucket === 'addon' && !inQueue;
-        const isContinuity =
-          isRequested && participantEligibleBucket === 'continuity' && !inQueue;
-        const notEligible =
-          isRequested &&
-          participantEligibleBucket === 'not eligibile' &&
-          !inQueue;
-        const isNoProduct = bucket
-          ? bucket === 'noProduct'
-          : isRequested && !isOwner;
-        const isInQueueReq = bucket
-          ? bucket === 'inQueue'
-          : isRequested && isOwner && inQueue;
-        const isNotRequested = isOwner && !isRequested && !inCohort;
-        const reason = isNoProduct
-          ? 'No product'
-          : isInQueueReq
-            ? 'In active queue'
-            : isUnattended
-              ? 'Product cancelled'
-              : isRevoked
-                ? 'Revoked — product cancelled'
-                : '';
-        rows.push({
-          recentEventParticipationReq: recentRequestDocument.get(pid),
-          profileid: pid,
-          name: prof['name'] ?? 'Unknown',
-          email: prof['email'] ?? '',
-          photo: prof['profile'] ?? prof['photoURL'] ?? '',
-          participantproductid: owners.get(pid) ?? null,
-          approvedRequestId: approvedReq.get(pid) ?? null,
-          requestData: requestedData.get(pid) ?? null,
-          isOwner,
-          isRequested,
-          isApproved: inCohort,
-          isEligible,
-          isNoProduct,
-          isInQueueReq,
-          isNotRequested,
-          isUnattended,
-          isRevoked,
-          inQueue,
-          isUpgrade,
-          isAddon,
-          isContinuity,
-          notEligible,
-          attended: isAttended,
-          scanned: isScanned,
-          attendanceState: attendanceStateByPid.get(pid) ?? '',
-          revokedBy: (() => {
-            const rb = revokedByPid.get(pid);
-            return rb ? (this.participantMetadata[rb]?.['name'] ?? rb) : '';
-          })(),
-          revokedDate: revokedDatePid.get(pid) ?? 0,
-          reason,
-          requestedDate: reqDateByPid.get(pid) ?? 0,
-          journey: '',
-          subscriptionend: 0,
-          subActive: false,
-          finance: '',
-          phone: prof['number'] ?? prof['phone'] ?? '',
-          checklist: checkList.get(pid) ?? [],
-          purchaseValue: null,
-          paid: null,
-          customerStatus: '',
-          metaLoaded: false,
-          subLoaded: false,
-          metaError: false,
-        });
-      });
-      rows.sort((a, b) => a.name.localeCompare(b.name));
-      this.rows = rows;
-
-      // Indexes for bulk import categorisation.
-      this.ownerByEmail = new Map<string, PRow>();
-      rows.forEach((r) => {
-        if (r.isOwner && r.email)
-          this.ownerByEmail.set(r.email.trim().toLowerCase(), r);
-      });
-      this.activeProfileIds = active;
-
-      this.counts = {
-        potential: owners.size,
-        requested: requestedData.size,
-        // Row-derived (de-duplicated): a terminal person can now also be an owner, so counting owner keys
-        // directly would mis-classify them. `isNotRequested` already excludes requested/cohort membership.
-        notRequested: rows.filter((r) => r.isNotRequested).length,
-        eligible: rows.filter((r) => r.isEligible).length,
-        upgrade: rows.filter((r) => r.isUpgrade).length,
-        addon: rows.filter((r) => r.isAddon).length,
-        continuity: rows.filter((r) => r.isContinuity).length,
-        noteligible: rows.filter((r) => r.notEligible).length,
-        noProduct: rows.filter((r) => r.isNoProduct).length,
-        inQueue: rows.filter((r) => r.isInQueueReq).length,
-        approved: cohort.size,
-        attended: rows.filter((r) => r.attended).length,
-        noShow: rows.filter((r) => r.attendanceState === 'no_show').length,
-        unattended: rows.filter((r) => r.isUnattended).length,
-        revoked: rows.filter((r) => r.isRevoked).length,
-        // De-duplicated union — a revoked person who still owns the product / has a live request sits in
-        // more than one source set, so a raw sum would double-count. Count unique rows matching the same
-        // predicate as the segment filter.
-        overallRequested: rows.filter(
-          (r) => r.isRequested || r.isApproved || r.isUnattended || r.isRevoked,
-        ).length,
-      };
-
-      this.deliverySetList = await this.loadDeliverySets(arena);
-      await this.loadVariations(arena);
-
-      this.calculateSales(overAllRequestedParticipants);
-      this.calculateCustomerTickets(overAllRequestedParticipants);
-      this.defaultSelection();
-      this.refreshMeta();
-      // Splits need customerstatus for ALL rows — load it in the background so the screen shows immediately.
-      this.loadSplits();
-    } catch (err) {
-      console.log('confirmations load failed', err);
-      this.loadError = true;
-      this.snackbar.open('Could not load participants', 'OK', {
-        duration: 4000,
-      });
-    } finally {
-      this.loading = false;
+    await this.loadEligibleCohorts();
+    this.loadQueueToken();
+    if (productref) {
+      const q = query(collection(this.firestore, 'participantsproduct'), where('productref', '==', productref), where('status', '==', null));
+      this.participantProduct$.next(q);
     }
+    if (arenaId) {
+      const q = query(
+        collection(this.firestore, 'event participation request'),
+        where('arenaeventid', '==', arenaId),
+        where('status', 'in', ['requested', 'approved', 'attended', 'unattended', 'revoked']),
+        orderBy('doccreateddate', 'asc'),
+      );
+      this.eventParticipationRequest$.next(q);
+    }
+
+    this.deliverySetList = await this.loadDeliverySets(arena);
+    await this.loadVariations(arena);
   }
 
+  // function to load dashboard data ( metadata + product + request live streams )
+  loadDasbordData() {
+    const participantMetadata$ = collectionData(collection(this.firestore, 'participant metadata'));
+    const productData$ = this.participantProduct$.pipe(switchMap((q) => collectionData(q)));
+    const reqData$ = this.eventParticipationRequest$.pipe(switchMap((q) => collectionData(q)));
+    combineLatest(participantMetadata$, productData$, reqData$)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(([participantMetadataSnap, participantProductSnap, requestSnap]) => {
+        const participantMetadata = {};
+        const participantProductMap = {};
+        const participantRequestMap: { [key: string]: any } = {};
+        // const revokedData: { [key: string]: any } = {};
 
-  loadEventParticipationRequest(){
+        for (const participant of participantMetadataSnap) {
+          const profileId = participant['profileid'] ?? null;
+
+          if (profileId) {
+            if (Object.hasOwn(participantMetadata, profileId)) {
+              Object.assign(participantMetadata[profileId], participant);
+            }
+            participantMetadata[profileId] = participant;
+          }
+        }
+
+        for (const product of participantProductSnap) {
+          const profileId = product['profileid'] ?? null;
+          if (product) {
+            participantProductMap[profileId] = product;
+          }
+        }
+
+        for (const req of requestSnap) {
+          const profileId = req['profileid'] ?? null;
+          if (profileId) {
+            participantRequestMap[profileId] = participantRequestMap[profileId] ?? [];
+            participantRequestMap[profileId]?.push(req);
+            // if (Object.hasOwn(participantRequestMap , profileId)) {
+            //   const existReq = participantRequestMap[profileId];
+            //   if (req['status'] === 'revoked' && existReq['status'] !== 'revoked') {
+            //     if (existReq['requestData']) {
+            //       const oldRevoke = this.toDate(existReq['requestData']['doccreateddate']) ?? null;
+            //       const currentRevoke = this.toDate(req['doccreateddate']) ?? null;
+            //       if (currentRevoke && currentRevoke > oldRevoke) {
+            //         participantRequestMap[profileId]['requestData'] = req;
+            //       }
+            //     } else {
+            //       participantRequestMap[profileId]['requestData'] = req;
+            //     }
+            //   }
+            //   const oldRequestDate = this.toDate(req['doccreateddate']) ?? null;
+            //   const currentReqDate = this.toDate(participantRequestMap[profileId]['doccreateddate']) ?? null;
+            //   if (currentReqDate && currentReqDate > oldRequestDate) {
+
+            //   }
+            //   if () {
+
+            //   }
+            // }
+          }
+        }
+
+        this.participantMetadata = participantMetadata;
+        this.participantProductMap = participantProductMap;
+        this.participantRequestMap = participantRequestMap;
+
+        this.processEventRequest();
+        this.calculateSales(Object.keys(participantRequestMap));
+        this.calculateCustomerTickets(Object.keys(participantRequestMap));
+        const overAll = new Set([...Object.keys(participantRequestMap), ...Object.keys(participantProductMap)]);
+        this.computeSplits([...overAll]);
+        this.defaultSelection();
+        this.loading = false;
+        this.splitsReady = true;
+      });
+  }
+
+  // // function to load rows, counts and buckets ( one time read )
+  // async loadData() {
+  //   this.loading = true;
+  //   this.loadError = false;
+  //   this.splitsReady = false;
+  //   this.queueStageByPid = new Map<string, string>();
+  //   this.queueStagesLoaded = false;
+  //   const arena = this.arena;
+  //   const eligibility = arena['eligibility'] ?? {};
+  //   const productConsumption = eligibility['productconsumption'] ?? [];
+  //   const customerStatus = eligibility['customerstatus'] ?? [];
+  //   const eligibilityJourney = eligibility['journeyid'] ?? [];
+  //   const overAllRequestedParticipants: Set<string> = new Set();
+
+  //   this.loadJourneyGroups(); // per-event journey grouping from localStorage (keyed by arenaevent id)
+  //   try {
+  //     const dataQueries = [
+  //       getDocs(query(collection(this.firestore, 'participantsproduct'), where('productref', '==', arena['productref']), where('status', '==', null))),
+  //       getDocs(query(collection(this.firestore, 'event participation request'), where('arenaeventid', '==', arena['docid']), where('status', 'in', ['requested', 'approved', 'attended', 'unattended', 'revoked']))),
+  //       getDocs(query(collection(this.firestore, 'arena e-ticket log'), where('eventref', '==', arena['eventref']))),
+  //     ];
+
+  //     if (eligibility?.cohortid?.length > 0) {
+  //       const cohortQuery = query(collection(this.firestore, 'big cohorts'), where('docid', 'in', eligibility?.cohortid));
+  //       dataQueries.push(getDocs(cohortQuery));
+  //     }
+  //     const [ownSnap, eprSnap, scanSnap, cohorts] = await Promise.all(dataQueries);
+
+  //     const cohortParticipants = [];
+
+  //     if (cohorts) {
+  //       cohorts?.docs.forEach((docref) => {
+  //         const participant = docref.data()['participantidlist'] ?? [];
+  //         for (const pid of participant) {
+  //           if (!cohortParticipants.includes(pid)) {
+  //             cohortParticipants.push(pid);
+  //           }
+  //         }
+  //       });
+  //     }
+
+  //     const owners = new Map<string, string>();
+  //     ownSnap.docs.forEach((d) => {
+  //       const x = d.data();
+  //       if (x['profileid'] && !owners.has(x['profileid'])) owners.set(x['profileid'], x['docid'] ?? d.id);
+  //     });
+
+  //     const requestedData = new Map<string, any>();
+  //     const approvedReq = new Map<string, string>();
+  //     const attendedIds = new Set<string>();
+  //     const unattendedIds = new Set<string>();
+  //     const revokedIds = new Set<string>();
+  //     const revokedByPid = new Map<string, string>();
+  //     const revokedDatePid = new Map<string, number>();
+  //     const attendanceStateByPid = new Map<string, string>();
+  //     const bucketByPid = new Map<string, string>();
+  //     const reqDateByPid = new Map<string, number>();
+  //     const checkList = new Map<string, Array<string>>();
+  //     const recentRequestDocument = new Map<string, any>();
+
+  //     eprSnap.docs.forEach((d) => {
+  //       const x = d.data();
+  //       const pid = x['profileid'];
+  //       if (!pid) return;
+  //       const requestDate = x['doccreateddate'] ?? null;
+  //       overAllRequestedParticipants.add(pid);
+  //       const check = x['checklist'] ?? [];
+  //       // checkList.set(pid , check);
+  //       if (recentRequestDocument.has(pid)) {
+  //         const reqData = recentRequestDocument.get(pid);
+  //         const oldRequestDate = reqData['doccreateddate'] ?? null;
+  //         if (requestDate && requestDate > oldRequestDate) {
+  //           recentRequestDocument.set(pid, x);
+  //           checkList.set(pid, check);
+  //         }
+  //       } else {
+  //         recentRequestDocument.set(pid, x);
+  //         checkList.set(pid, check);
+  //       }
+  //       const created = this.toMillis(x['doccreateddate']);
+  //       if (created) reqDateByPid.set(pid, created);
+  //       if (x['status'] == 'approved') {
+  //         approvedReq.set(pid, x['docid'] ?? d.id);
+  //         attendanceStateByPid.set(pid, x['attendance_state'] ?? '');
+  //       } else if (x['status'] == 'attended') {
+  //         attendedIds.add(pid);
+  //         approvedReq.set(pid, x['docid'] ?? d.id);
+  //         attendanceStateByPid.set(pid, x['attendance_state'] ?? 'attended');
+  //       } else if (x['status'] == 'unattended') {
+  //         unattendedIds.add(pid);
+  //         attendanceStateByPid.set(pid, 'unattended');
+  //       } else if (x['status'] == 'revoked') {
+  //         revokedIds.add(pid);
+  //         attendanceStateByPid.set(pid, 'revoked');
+  //         if (x['revoked_by']) revokedByPid.set(pid, x['revoked_by']);
+  //         const rd = this.toMillis(x['revoked_date']);
+  //         if (rd) revokedDatePid.set(pid, rd);
+  //       } else if (x['status'] == 'requested') {
+  //         requestedData.set(pid, { ...x, docid: x['docid'] ?? d.id });
+  //         if (x['epc_bucket']) bucketByPid.set(pid, x['epc_bucket']);
+  //       }
+  //     });
+  //     // NOTE: unattended/revoked are NO LONGER terminal — by operator directive they stay visible in every
+  //     // live bucket they still qualify for (owner / requested), in ADDITION to their own
+  //     // terminal segment. So we intentionally do NOT strip them from requestedData/cohort/owner sets here.
+
+  //     // Eligibility buckets are precomputed by the rollup (epc_bucket on each requested doc).
+  //     // When every requested participant carries one, use them and SKIP the queue_token scan;
+  //     // otherwise fall back to reading active tokens and computing the split live.
+  //     const useBuckets = requestedData.size > 0 && [...requestedData.keys()].every((pid) => bucketByPid.has(pid));
+  //     const active = new Set<string>();
+  //     if (!useBuckets) {
+  //       const tokSnap = await getDocs(query(collection(this.firestore, 'queue_token'), where('queueref', '==', arena['eventref'])));
+  //       tokSnap.docs.forEach((d) => {
+  //         const x = d.data();
+  //         if ((x['tokenstatus'] ?? '').toString().toLowerCase() == 'active' && x['profile_id']) active.add(x['profile_id']);
+  //       });
+  //     }
+
+  //     const scanned = new Set<string>();
+  //     scanSnap.docs.forEach((d) => {
+  //       const x = d.data();
+  //       if (x['profileid']) scanned.add(x['profileid']);
+  //     });
+
+  //     const cohort = new Set<string>([...approvedReq.keys()]);
+  //     cohort.forEach((p) => requestedData.delete(p));
+
+  //     const ids = new Set<string>([...owners.keys(), ...requestedData.keys(), ...cohort, ...unattendedIds, ...revokedIds]);
+  //     const rows: PRow[] = [];
+  //     ids.forEach((pid) => {
+  //       const prof = this.participantMetadata[pid] ?? {};
+  //       const isUnattended = unattendedIds.has(pid);
+  //       const isRevoked = revokedIds.has(pid);
+  //       // Terminal states (unattended/revoked) are no longer gated out of the live buckets: a person keeps
+  //       // whatever live membership their source data still gives them AND retains their terminal flag.
+  //       const isOwner = owners.has(pid);
+  //       const isScanned = scanned.has(pid);
+  //       const participantEligibleBucket = this.participantBucket(pid, isOwner, customerStatus, productConsumption, eligibilityJourney, eligibility?.cohortid ?? [], cohortParticipants);
+  //       // Approval and attendance are both EPR-only (operator directive): a row is approved when its
+  //       // `event participation request` doc has status 'approved' or 'attended', and attended only when
+  //       // that status is 'attended'. An e-ticket scan confers neither — it survives as `scanned` for the
+  //       // `· scanned` badge and nothing else.
+  //       const isAttended = attendedIds.has(pid);
+  //       const inCohort = approvedReq.has(pid);
+  //       const isRequested = requestedData.has(pid);
+  //       const bucket = useBuckets ? bucketByPid.get(pid) : undefined;
+  //       const inQueue = bucket ? bucket === 'inQueue' : active.has(pid);
+  //       const isEligible = isRequested && participantEligibleBucket === 'eligible' && !inQueue;
+  //       const isUpgrade = isRequested && participantEligibleBucket === 'upgrade' && !inQueue;
+  //       const isAddon = isRequested && participantEligibleBucket === 'addon' && !inQueue;
+  //       const isContinuity = isRequested && participantEligibleBucket === 'continuity' && !inQueue;
+  //       const notEligible = isRequested && participantEligibleBucket === 'noteligible' && !inQueue;
+  //       const isNoProduct = bucket ? bucket === 'noProduct' : isRequested && !isOwner;
+  //       const isInQueueReq = bucket ? bucket === 'inQueue' : isRequested && isOwner && inQueue;
+  //       const isNotRequested = isOwner && !isRequested && !inCohort;
+  //       const reason = isNoProduct ? 'No product' : isInQueueReq ? 'In active queue' : isUnattended ? 'Product cancelled' : isRevoked ? 'Revoked — product cancelled' : '';
+  //       rows.push({
+  //         recentEventParticipationReq: recentRequestDocument.get(pid),
+  //         profileid: pid,
+  //         name: prof['name'] ?? 'Unknown',
+  //         email: prof['email'] ?? '',
+  //         photo: prof['profile'] ?? prof['photoURL'] ?? '',
+  //         participantproductid: owners.get(pid) ?? null,
+  //         approvedRequestId: approvedReq.get(pid) ?? null,
+  //         requestData: requestedData.get(pid) ?? null,
+  //         isOwner,
+  //         isRequested,
+  //         isApproved: inCohort,
+  //         isEligible,
+  //         isNoProduct,
+  //         isInQueueReq,
+  //         isNotRequested,
+  //         isUnattended,
+  //         isRevoked,
+  //         inQueue,
+  //         isUpgrade,
+  //         isAddon,
+  //         isContinuity,
+  //         notEligible,
+  //         attended: isAttended,
+  //         scanned: isScanned,
+  //         attendanceState: attendanceStateByPid.get(pid) ?? '',
+  //         revokedBy: (() => {
+  //           const rb = revokedByPid.get(pid);
+  //           return rb ? (this.participantMetadata[rb]?.['name'] ?? rb) : '';
+  //         })(),
+  //         revokedDate: revokedDatePid.get(pid) ?? 0,
+  //         reason,
+  //         requestedDate: reqDateByPid.get(pid) ?? 0,
+  //         journey: '',
+  //         subscriptionend: 0,
+  //         subActive: false,
+  //         finance: '',
+  //         phone: prof['number'] ?? prof['phone'] ?? '',
+  //         checklist: checkList.get(pid) ?? [],
+  //         purchaseValue: null,
+  //         paid: null,
+  //         customerStatus: '',
+  //         metaLoaded: false,
+  //         subLoaded: false,
+  //         metaError: false,
+  //       });
+  //     });
+  //     rows.sort((a, b) => a.name.localeCompare(b.name));
+  //     this.rows = rows;
+
+  //     // Indexes for bulk import categorisation.
+  //     this.ownerByEmail = new Map<string, PRow>();
+  //     rows.forEach((r) => {
+  //       if (r.isOwner && r.email) this.ownerByEmail.set(r.email.trim().toLowerCase(), r);
+  //     });
+  //     this.activeProfileIds = active;
+
+  //     this.counts = {
+  //       potential: owners.size,
+  //       requested: requestedData.size,
+  //       // Row-derived (de-duplicated): a terminal person can now also be an owner, so counting owner keys
+  //       // directly would mis-classify them. `isNotRequested` already excludes requested/cohort membership.
+  //       notRequested: rows.filter((r) => r.isNotRequested).length,
+  //       eligible: rows.filter((r) => r.isEligible).length,
+  //       upgrade: rows.filter((r) => r.isUpgrade).length,
+  //       addon: rows.filter((r) => r.isAddon).length,
+  //       continuity: rows.filter((r) => r.isContinuity).length,
+  //       noteligible: rows.filter((r) => r.notEligible).length,
+  //       noProduct: rows.filter((r) => r.isNoProduct).length,
+  //       inQueue: rows.filter((r) => r.isInQueueReq).length,
+  //       approved: cohort.size,
+  //       attended: rows.filter((r) => r.attended).length,
+  //       noShow: rows.filter((r) => r.attendanceState === 'no_show').length,
+  //       unattended: rows.filter((r) => r.isUnattended).length,
+  //       revoked: rows.filter((r) => r.isRevoked).length,
+  //       // De-duplicated union — a revoked person who still owns the product / has a live request sits in
+  //       // more than one source set, so a raw sum would double-count. Count unique rows matching the same
+  //       // predicate as the segment filter.
+  //       overallRequested: rows.filter((r) => r.isRequested || r.isApproved || r.isUnattended || r.isRevoked).length,
+  //     };
+
+  //     this.deliverySetList = await this.loadDeliverySets(arena);
+  //     await this.loadVariations(arena);
+
+  //     // this.calculateSales(overAllRequestedParticipants);
+  //     // this.calculateCustomerTickets(overAllRequestedParticipants);
+  //     this.defaultSelection();
+  //     // this.refreshMeta();
+  //     // Splits need customerstatus for ALL rows — load it in the background so the screen shows immediately.
+  //     this.loadSplits();
+  //   } catch (err) {
+  //     console.log('confirmations load failed', err);
+  //     this.loadError = true;
+  //     this.snackbar.open('Could not load participants', 'OK', {
+  //       duration: 4000,
+  //     });
+  //   } finally {
+  //     this.loading = false;
+  //   }
+  // }
+
+  // function to retry loading data
+  // retry() {
+  //   this.loadData();
+  // }
+
+  // function to load event participation requests ( live )
+  loadEventParticipationRequest() {
     const arenaId = this.arena['docid'];
     if (this.subscribtions['eventrequest']) {
       this.subscribtions['eventrequest']?.unsubscribe();
     }
     if (arenaId) {
-      const q = query(collection(this.firestore, 'event participation request'),where('arenaeventid', '==', arenaId),
-            where('status', 'in', ['requested','approved','attended','unattended','revoked']))
-      this.subscribtions['eventrequest'] = collectionData(q).subscribe((requestSnap)=>{
-        const participantRequestMap = {};
-        
-        requestSnap.forEach((req)=>{
+      const q = query(collection(this.firestore, 'event participation request'), where('arenaeventid', '==', arenaId), where('status', 'in', ['requested', 'approved', 'attended', 'unattended', 'revoked']));
+      this.subscribtions['eventrequest'] = collectionData(q).subscribe((requestSnap) => {
+        const participantRequestMap: { [key: string]: Array<any> } = {};
+
+        requestSnap.forEach((req) => {
           const profileId = req['profileid'] ?? null;
           if (profileId) {
-            if (Object.hasOwn(participantRequestMap, profileId)) {
-              const reqData = participantRequestMap[profileId];
-              const oldRequestDate = reqData['doccreateddate'] ?? null;
-              const currentReqDate = req['doccreateddate'] ?? null;
-              if (currentReqDate && currentReqDate > oldRequestDate) {
-                participantRequestMap[profileId] = req;
-              }
-            }
-            participantRequestMap[profileId] = req;
+            // if (Object.hasOwn(participantRequestMap, profileId)) {
+            //   const reqData = participantRequestMap[profileId];
+            //   const oldRequestDate = this.toDate(reqData['doccreateddate']) ?? null;
+            //   const currentReqDate = this.toDate(req['doccreateddate']) ?? null;
+            //   if (currentReqDate && currentReqDate > oldRequestDate) {
+            //     participantRequestMap[profileId] = req;
+            //   }
+            // }
+            participantRequestMap[profileId] = participantRequestMap[profileId] ?? [];
+            participantRequestMap[profileId]?.push(req);
           }
-        })
+        });
 
         this.participantRequestMap = participantRequestMap;
-      })
+        this.processEventRequest();
+        this.loading = false;
+        this.splitsReady = true;
+      });
     }
   }
 
+  // function to load arena e-ticket logs ( live )
   async loadArenaETicket() {
-    const q = query(collection(this.firestore, 'arena e-ticket log'),where('eventref', '==', this.arena['eventref']),)
     if (this.subscribtions['arenaticket']) {
       this.subscribtions['arenaticket'].unsubscribe();
     }
+    const eventRef = doc(this.firestore, 'event collection', this.eventId?.['docid']);
+    const q = query(collection(this.firestore, 'arena e-ticket log'), where('eventref', '==', eventRef));
     try {
-      this.subscribtions['arenaticket'] = collectionData(q).subscribe((logSnap)=>{
-        const eticketLogMap : {[key : string] : Array<any>} = {};
+      this.subscribtions['arenaticket'] = collectionData(q).subscribe((logSnap) => {
+        const eticketLogMap: { [key: string]: Array<any> } = {};
         for (const log of logSnap) {
           const productId = log['product']?.id;
           if (productId) {
-            eticketLogMap[productId] =  eticketLogMap[productId] ?? [];
-            eticketLogMap[productId].push(log)
+            eticketLogMap[productId] = eticketLogMap[productId] ?? [];
+            eticketLogMap[productId].push(log);
           }
-        };
+        }
 
         this.eticketLogMap = eticketLogMap;
-      })
+      });
     } catch (error) {
-      console.log('Error from loading arena e-tickets log : ' , error)
+      console.log('Error from loading arena e-tickets log : ', error);
     }
   }
 
+  // function to load queue tokens ( live )
+  async loadQueueToken() {
+    const arenaEventref = this.arena['eventref'] as DocumentReference;
+    if (!arenaEventref || arenaEventref?.parent.id !== 'queue generation') return;
+    if (this.subscribtions['queue_token']) {
+      this.subscribtions['queue_token'].unsubscribe();
+    }
+    try {
+      const tokenMap: { [key: string]: Array<any> } = {};
+      const q = query(collection(this.firestore, 'queue_token'), where('queueref', '==', arenaEventref));
+      this.subscribtions['queue_token'] = collectionData(q).subscribe((tokenSnap) => {
+        for (const token of tokenSnap) {
+          const profileId = token['profile_id'] ?? null;
+          if (profileId) {
+            tokenMap[profileId] = tokenMap[profileId] ?? [];
+            tokenMap[profileId].push(token);
+          }
+        }
+        this.tokenMap = tokenMap;
+        this.processEventRequest();
+      });
+    } catch (error) {
+      console.log('Error fetching queue tokens : ', error);
+    }
+  }
+
+  // function to load event communications ( live )
+  async loadEventCommunication() {
+    if (this.eventId['docid']) {
+      const collectionName = this.eventId?.isQueueEvent ? 'queue generation' : 'event collection';
+      const eventRef = doc(this.firestore, collectionName, this.eventId['docid']);
+      if (this.subscribtions['eventcommunications']) {
+        this.subscribtions['eventcommunications'].unsubscribe();
+      }
+      const q = query(collection(this.firestore, 'communication planner'), where('eventref', '==', eventRef));
+      this.subscribtions['eventcommunications'] = collectionData(q, { idField: 'docid' }).subscribe((communicationPlannerSnap) => {
+        const communicationMap = {};
+        for (const comm of communicationPlannerSnap) {
+          const docid = comm['docid'];
+          communicationMap[docid] = comm;
+        }
+        const communicationChunks = [];
+        const keys = Object.keys(communicationMap);
+        for (let i = 0; i < keys.length; i+=30) communicationChunks.push(keys.slice(i , i + 30));
+        this.fetchEmailArchieve(communicationChunks);
+        this.fetchWatiArchieve(communicationChunks);
+        this.fetchAppNotification(communicationChunks);
+        this.communicationMap = communicationMap;
+      });
+    }
+  }
+
+  // fetch email archive data
+  async fetchEmailArchieve(communicationChunks : string[]) {
+    const communicationEmailLog = {};
+
+    for (const chunk of communicationChunks) {
+      const emailQuery = query(collection(this.firestore, 'email archive') , where('communicationplannerid' , 'in' , chunk));
+      const emailSnap = await getDocs(emailQuery);
+      for (const emailRef of emailSnap.docs) {
+        const email = emailRef.data();
+        const communicationId = email['communicationplannerid'];
+        communicationEmailLog[communicationId] = communicationEmailLog[communicationId] ?? [];
+        communicationEmailLog[communicationId]?.push(email);
+      }
+    }
+    
+    this.communicationEmailLog = communicationEmailLog;
+  }
+
+   // fetch wati archive data
+  async fetchWatiArchieve(communicationChunks : string[]) {
+    const communicationwatilLog = {};
+
+    for (const chunk of communicationChunks) {
+      const watiQuery = query(collection(this.firestore, 'wati archive') , where('communicationplannerid' , 'in' , chunk));
+      const watiSnap = await getDocs(watiQuery);
+      for (const watiRef of watiSnap.docs) {
+        const wati = watiRef.data();
+        const communicationId = wati['communicationplannerid'];
+        communicationwatilLog[communicationId] = communicationwatilLog[communicationId] ?? [];
+        communicationwatilLog[communicationId]?.push(wati);
+      }
+    }
+    this.communicationwatilLog = communicationwatilLog;
+  }
+
+  // fetch email archive data
+  async fetchAppNotification(communicationChunks : string[]) {
+    const communicationAppNotificationLog = {};
+
+    for (const chunk of communicationChunks) {
+      const appNotificationQuery = query(collection(this.firestore, 'notificationrecord') , where('communicationplannerid' , 'in' , chunk));
+      const appNotificationSnap = await getDocs(appNotificationQuery);
+      for (const notifyRef of appNotificationSnap.docs) {
+        const notify = notifyRef.data();
+        const communicationId = notify['communicationplannerid'];
+        communicationAppNotificationLog[communicationId] = communicationAppNotificationLog[communicationId] ?? [];
+        communicationAppNotificationLog[communicationId]?.push(notify);
+      }
+    }
+    
+    this.communicationAppNotificationLog = communicationAppNotificationLog;
+  }
+
+
+  getEmailStats(communicationId : string){
+    let total = 0;
+    let send = 0;
+
+    const emailArchieve = this.communicationEmailLog[communicationId] ?? [];
+    for (const archieve of emailArchieve) {
+      const emails = archieve['emailid']?.length ?? 0;
+      const sent = archieve['sent']?.length ?? 0;
+      total+= emails;
+      send += sent; 
+    }
+
+    return {
+      total,
+      sent : send
+    }
+  }
+
+  getWatiStats(communicationId : string){
+    let total = 0;
+    let send = 0;
+
+    const watiArchieve = this.communicationwatilLog[communicationId] ?? [];
+    for (const archieve of watiArchieve) {
+      const wati = archieve['numbers']?.length ?? 0;
+      const sent = archieve['sent']?.length ?? 0;
+      total+= wati;
+      send += sent; 
+    }
+
+    return {
+      total,
+      sent : send
+    }
+  }
+
+
+  getAppNotificationStats(communicationId : string){
+    let total = 0;
+    let send = 0;
+
+    const appNotificationArchieve = this.communicationAppNotificationLog[communicationId] ?? [];
+    for (const archieve of appNotificationArchieve) {
+      const appNotification = archieve['profileid']?.length ?? 0;
+      const sent = archieve['profilesuccess']?.length ?? 0;
+      total+= appNotification;
+      send += sent; 
+    }
+
+    return {
+      total,
+      sent : send
+    }
+  }
+
+
+  // async loadParticipantsPrducts(){
+  //   if(this.subscribtions['participantproducts']){
+  //     this.subscribtions['participantproducts'].unsubscribe();
+  //   };
+  //   const productref = this.arena['productref'] ?? null;
+
+  //   if (productref) {
+  //     try {
+  //       const participantProductMap = {};
+  //       const q = query(collection(this.firestore, 'participantsproduct'),where('productref', '==', productref),where('status', '==', null),);
+  //       this.subscribtions['participantproducts'] = collectionData(q).subscribe((participantProductSnap)=>{
+  //         for (const product of participantProductSnap) {
+  //           const profileId = product['profileid'] ?? null;
+  //           if (product) {
+  //             participantProductMap[profileId] = product;
+  //           }
+  //         }
+  //         this.participantProductMap = participantProductMap;
+  //       })
+  //     } catch (error) {
+  //       console.log(error)
+  //     }
+  //   }
+  // }
+
+  // function to load participants products ( live )
+  async loadParticipantsPrducts() {
+    if (this.subscribtions['participantproducts']) {
+      this.subscribtions['participantproducts'].unsubscribe();
+    }
+    const productref = this.arena['productref'] ?? null;
+
+    if (productref) {
+      try {
+        const participantProductMap = {};
+        const q = query(collection(this.firestore, 'participantsproduct'), where('productref', '==', productref), where('status', '==', null));
+        this.subscribtions['participantproducts'] = collectionData(q).subscribe((participantProductSnap) => {
+          for (const product of participantProductSnap) {
+            const profileId = product['profileid'] ?? null;
+            if (product) {
+              participantProductMap[profileId] = product;
+            }
+          }
+          this.participantProductMap = participantProductMap;
+        });
+      } catch (error) {
+        console.log(error);
+      }
+    }
+  }
+
+  // function to load participants of eligible cohorts
+  async loadEligibleCohorts() {
+    try {
+      const cohorts = (this.arena['eligibility']?.['cohortid'] ?? []) as Array<string>;
+      if (cohorts?.length > 0) {
+        const cohortParticipants = [];
+        const q = query(collection(this.firestore, 'big cohorts'), where('docid', 'in', cohorts));
+        const cohortSnap = await getDocs(q);
+        for (const cohortRef of cohortSnap.docs) {
+          const cohort = cohortRef.data();
+          const participant = cohort['participantidlist'] ?? [];
+          for (const pid of participant) {
+            if (!cohortParticipants.includes(pid)) {
+              cohortParticipants.push(pid);
+            }
+          }
+        }
+        this.cohortParticipants = cohortParticipants;
+      }
+    } catch (error) {
+      console.log('Error in loading eligible cohorts : ', error);
+    }
+  }
+
+  // function to load event checklists
   async loadEventCheckList() {
     const checkListMap = {};
     const eventId = this.eventId?.docid ?? null;
@@ -1766,11 +1708,7 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     const evenref = doc(this.firestore, `event collection/${eventId}`);
     try {
       const collRef = collection(this.firestore, 'event checklist');
-      const q = query(
-        collRef,
-        where('delete', '==', false),
-        where('eventref', '==', evenref),
-      );
+      const q = query(collRef, where('delete', '==', false), where('eventref', '==', evenref));
       const checkListSnap = await getDocs(q);
       checkListSnap.docs.forEach((docref) => {
         const checkDoc = docref.data();
@@ -1782,95 +1720,25 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     }
   }
 
-  participantBucket(
-    pid: string,
-    isOwner: boolean,
-    customerStatus: Array<string>,
-    productConsumption: Array<any>,
-    eligibilityJourney: Array<string>,
-    cohortParticipants: Array<string>,
-  ) {
-    const metadata = this.participantMetadata[pid] ?? null;
-    if (metadata) {
-      const journey =
-        metadata['activejourney'] ?? metadata['lastcompletedjourney'] ?? null;
-      const status = metadata['customerstatus'] ?? null;
-      const consumedproducts = {};
-
-      for (const product of metadata['consumedproducts'] ?? []) {
-        consumedproducts[product] = consumedproducts[product] ?? 0;
-        consumedproducts[product] = consumedproducts[product] + 1;
-      }
-
-      const journeyMatch =
-        eligibilityJourney.length === 0 || eligibilityJourney.includes(journey);
-      const cohortMatch =
-        cohortParticipants.length === 0 || cohortParticipants.includes(pid);
-      const consumptionMatch = productConsumption.every((product) => {
-        const productId = product?.productid;
-        if (product['operator'] === '==') {
-          return (consumedproducts[productId] ?? 0) === product?.count;
-        } else if (product['operator'] === '>=') {
-          return (consumedproducts[productId] ?? 0) >= product?.count;
-        } else if (product['operator'] === '<=') {
-          return (consumedproducts[productId] ?? 0) <= product?.count;
-        } else {
-          return false;
-        }
-      });
-
-      if (status == 'active') {
-        if (!consumptionMatch || !cohortMatch) return 'not eligibile';
-        if (!journeyMatch) return 'upgrade';
-        if (!isOwner) return 'addon';
-        return 'eligibile';
-      }
-
-      if (status == 'non active') {
-        // if (!consumptionMatch || !cohortMatch) return 'not eligibile';
-        if (customerStatus.includes('non active') && isOwner)
-          return 'eligibile';
-        if (journeyMatch) return 'continuity';
-        return 'upgrade';
-      }
-    }
-    return 'not eligibile';
-  }
-
-  retry() {
-    this.loadData();
-  }
-
+  // function to load delivery sets of the product
   private async loadDeliverySets(arena: any): Promise<any[]> {
-    const snap = await getDocs(
-      query(
-        collection(this.firestore, 'productToDeliverySequence'),
-        where('product', '==', arena['productref']),
-      ),
-    );
-    return snap.docs.length
-      ? (snap.docs[0].data()['deliveryoptions'] ?? [])
-      : [];
+    const snap = await getDocs(query(collection(this.firestore, 'productToDeliverySequence'), where('product', '==', arena['productref'])));
+    return snap.docs.length ? (snap.docs[0].data()['deliveryoptions'] ?? []) : [];
   }
 
+  // function to load queue variations
   private async loadVariations(arena: any) {
     this.queueVariationList = [];
     this.mapQueueVariation = {};
     if (arena['type'] != 'queue') return;
-    const snap = await getDocs(
-      query(
-        collection(this.firestore, 'queue variation'),
-        where('queueref', '==', arena['eventref']),
-      ),
-    );
+    const snap = await getDocs(query(collection(this.firestore, 'queue variation'), where('queueref', '==', arena['eventref'])));
     snap.docs.forEach((d) => {
       this.mapQueueVariation[d.id] = d.data()['variationname'];
       this.queueVariationList.push({ id: d.id, data: d.data() });
     });
   }
 
-  // Core metadata (name, number, finance, customerstatus…). Chunked by 30 (Firestore `in` max), concurrent.
-  // Does NOT touch PJP — subscriptionend is loaded separately + lazily so big events stay fast.
+  // function to load participant meta for rows
   private async loadMeta(rows: PRow[]) {
     const pending = rows.filter((r) => !r.metaLoaded);
     if (pending.length === 0) return;
@@ -1883,42 +1751,23 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     await Promise.all(
       chunks.map(async (chunk) => {
         try {
-          // const snap = await getDocs(query(collection(this.firestore, 'participant metadata'), where('profileid', 'in', chunk)));
-          // const metaById: Record<string, any> = {};
-          // snap.docs.forEach(d => { const x = d.data(); if (x['profileid']) metaById[x['profileid']] = x; });
           chunk.forEach((pid) => {
             const row = byId.get(pid);
             if (!row) return;
             const m = this.participantMetadata[pid] ?? {};
-            // Current journey depends on customer status: active → activejourney,
-            // non active → lastcompletedjourney, otherwise → lastsubscribedjourney.
-            const cs = (m['customerstatus'] ?? '')
-              .toString()
-              .trim()
-              .toLowerCase();
-            const journeyId =
-              cs === 'active'
-                ? m['activejourney']
-                : cs === 'non active'
-                  ? m['lastcompletedjourney']
-                  : m['lastsubscribedjourney'];
+            const cs = (m['customerstatus'] ?? '').toString().trim().toLowerCase();
+            const journeyId = cs === 'active' ? m['activejourney'] : cs === 'non active' ? m['lastcompletedjourney'] : m['lastsubscribedjourney'];
             row.journey = this.mapJourney[journeyId] ?? '';
             row.finance = m['financialstatus'] ?? '';
             row.purchaseValue = m['pp_totalpurchasevalue'] ?? null;
             row.paid = m['pp_totalpaid'] ?? null;
             row.customerStatus = m['customerstatus'] ?? '';
             // "Repeat" = this product is already in the participant's consumedproducts (product ids).
-            row.completedProduct =
-              !!productId &&
-              Array.isArray(m['consumedproducts']) &&
-              m['consumedproducts'].some(
-                (p: any) => String(p) === String(productId),
-              );
+            row.completedProduct = !!productId && Array.isArray(m['consumedproducts']) && m['consumedproducts'].some((p: any) => String(p) === String(productId));
             // Name + number come from participant metadata (profile_data value stays only as fallback).
             if (m['name']) row.name = m['name'];
             const metaNum = m['phonenumber'] ?? m['number'];
-            if (metaNum !== undefined && metaNum !== null && metaNum !== '')
-              row.phone = metaNum.toString();
+            if (metaNum !== undefined && metaNum !== null && metaNum !== '') row.phone = metaNum.toString();
             row.metaLoaded = true;
           });
         } catch (e) {
@@ -1948,28 +1797,20 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     await Promise.all(
       chunks.map(async (chunk) => {
         try {
-          const snap = await getDocs(
-            query(
-              collection(this.firestore, 'participantjourneyproduct'),
-              where('profileid', 'in', chunk),
-            ),
-          );
+          const snap = await getDocs(query(collection(this.firestore, 'participantjourneyproduct'), where('profileid', 'in', chunk)));
           const subByPid: Record<string, number> = {};
           snap.docs.forEach((d) => {
             const x = d.data();
             const pid = x['profileid'];
             if (!pid) return;
             const ms = this.toMillis(x['subscriptionend']);
-            if (ms && (!subByPid[pid] || ms > subByPid[pid]))
-              subByPid[pid] = ms;
+            if (ms && (!subByPid[pid] || ms > subByPid[pid])) subByPid[pid] = ms;
           });
           chunk.forEach((pid) => {
             const row = byId.get(pid);
             if (!row) return;
             row.subscriptionend = subByPid[pid] ?? 0;
-            row.subActive = row.subscriptionend
-              ? row.subscriptionend >= now
-              : false;
+            row.subActive = row.subscriptionend ? row.subscriptionend >= now : false;
             row.subLoaded = true;
           });
         } catch (e) {
@@ -1983,36 +1824,38 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     );
   }
 
-  private refreshMeta() {
-    this.loadMeta(this.pagedRows);
-    this.loadSubscriptions(this.pagedRows); // PJP only for the visible page
-    // Finance + customer + journey filters depend on metadata, so load it for the whole segment when any is active.
-    if (
-      this.financeFilter !== 'all' ||
-      this.customerFilter !== 'all' ||
-      this.journeyFilter !== 'all'
-    )
-      this.loadMeta(this.segmentMembers());
+  // private refreshMeta() {
+  //   this.loadMeta(this.pagedRows);
+  //   this.loadSubscriptions(this.pagedRows); // PJP only for the visible page
+  //   // Finance + customer + journey filters depend on metadata, so load it for the whole segment when any is active.
+  //   if (
+  //     this.financeFilter !== 'all' ||
+  //     this.customerFilter !== 'all' ||
+  //     this.journeyFilter !== 'all'
+  //   )
+  //     this.loadMeta(this.segmentMembers());
+  // }
+
+  // function to load splits in the background
+  private async loadSplits() {
+    try {
+      await this.loadMeta(this.rows);
+      this.splitsReady = true;
+    } catch (e) {
+      console.log('split load failed', e);
+    }
   }
 
-  // functoin to load e-tickes eligibility
+  // function to load e-tickes eligibility
   async loadETicketEligibilty() {
     const eventid = this.eventId['docid'];
     if (!eventid) return;
     if (this.eticketEligibilitySubscription) {
       this.eticketEligibilitySubscription.unsubscribe();
     }
-    const eligibilityCollRef = collection(
-      this.firestore,
-      'e-ticket eligibility',
-    );
-    const eligibilityQuery = query(
-      eligibilityCollRef,
-      where('eventid', '==', eventid),
-    );
-    this.eticketEligibilitySubscription = collectionData(
-      eligibilityQuery,
-    ).subscribe((eligibilitysnap) => {
+    const eligibilityCollRef = collection(this.firestore, 'e-ticket eligibility');
+    const eligibilityQuery = query(eligibilityCollRef, where('eventid', '==', eventid));
+    this.eticketEligibilitySubscription = collectionData(eligibilityQuery).subscribe((eligibilitysnap) => {
       this.mapEligibility = {};
       for (let i = 0; i < eligibilitysnap.length; i++) {
         const element = eligibilitysnap[i];
@@ -2021,6 +1864,7 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     });
   }
 
+  // function to load sales leads of last 30 days
   async loadSalesLeads() {
     const arenaEndDate = new Date(this.eventEnd) ?? new Date();
     const start = new Date(arenaEndDate);
@@ -2030,11 +1874,7 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     start.setDate(start.getDate() - 30);
     end.setHours(23, 59, 59, 999);
 
-    const salesQuery = query(
-      collection(this.firestore, 'salesleads'),
-      where('purchasedate', '>=', start),
-      where('purchasedate', '<=', end),
-    );
+    const salesQuery = query(collection(this.firestore, 'salesleads'), where('purchasedate', '>=', start), where('purchasedate', '<=', end));
 
     const salesLeadsSnap = await getDocs(salesQuery);
 
@@ -2042,140 +1882,42 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       const sale = saleRef.data();
       const participantId = sale['profileid'] ?? null;
 
-      if (
-        participantId &&
-        ['new', 'addon', 'upgrade'].includes(sale['journeytype'])
-      ) {
-        participantSalesMap[participantId] =
-          participantSalesMap[participantId] ?? [];
+      if (participantId && ['new', 'addon', 'upgrade'].includes(sale['journeytype'])) {
+        participantSalesMap[participantId] = participantSalesMap[participantId] ?? [];
         participantSalesMap[participantId]?.push(sale);
       }
     }
 
     this.participantSalesMap = participantSalesMap;
-    console.log(this.participantSalesMap);
   }
 
-  calculateSales(overAllRequestedParticipants: Set<string>) {
-    let last30daysSale = 0;
-    for (const pid of [...overAllRequestedParticipants]) {
-      if (this.isnewParticipant(pid)) {
-        last30daysSale++;
-      }
+  // function to load applied checklists from localstorage
+  async initAppliedCheckList() {
+    await this.loadEventCheckList();
+    const storage = JSON.parse(localStorage.getItem(this.EVENT_CHECKLIST) ?? '{}');
+    const checklist = storage[this.eventId?.docid] ?? [];
+    for (const checkListId of checklist) {
+      this.columnRegistry[checkListId] = {
+        label: this.checkListMap[checkListId]?.title,
+        type: 'enum',
+        defaultHtml: '—',
+        defaultColumn: false,
+        visible: () => !['potential', 'notRequested'].includes(this.segment),
+        showFilter: true,
+        checklist: true,
+      };
     }
-    this.last30daysSale = last30daysSale;
   }
 
-  isnewParticipant(pid: string) {
-    const sales = this.participantSalesMap[pid];
-    const product = this.arena['productref']?.id;
-    const journey = this.arena?.['eligibility']?.journeyid ?? [];
-    if (sales) {
-      for (const sale of sales) {
-        if (
-          (['new', 'upgrade'].includes(sale?.journeytype) &&
-            journey.includes(sale?.journey)) ||
-          sales?.addon?.includes(product)
-        ) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
-  calculateCustomerTickets(overAllRequestedParticipants: Set<string>) {
-    const openTickets = {
-      eventProcessTickets: 0,
-      others: 0,
-    };
-    for (const pid of [...overAllRequestedParticipants]) {
-      const metadata = this.participantMetadata[pid] ?? null;
-      if (metadata) {
-        const customersupport = metadata['customersupport'] ?? {};
-        for (const [ticketId, ticket] of Object.entries(
-          customersupport,
-        ) as any) {
-          if (ticket?.category === 'Events & Process') {
-            openTickets.eventProcessTickets++;
-          } else {
-            openTickets.others++;
-          }
-        }
-      }
-    }
-    this.openTickets = openTickets;
-  }
-
-  // Venue fee column — exempted / paid / not paid, from the e-ticket eligibility mirror
-  getVenueFeeStatus(row: any): string {
-    const eventParticipationId = row['approvedRequestId'];
-    const eligibility = this.mapEligibility[eventParticipationId];
-    if ([null, undefined].includes(eligibility)) {
-      return 'Not paid';
-    }
-    if (eligibility['exempted'] === true) {
-      return 'Exempted';
-    }
-    return eligibility['venue_fee_paid'] === true ? 'Paid' : 'Not paid';
-  }
-
-  // ---- Segments ----
-  setSegment(s: SegmentKey) {
-    this.segment = s;
-    this.journeyFilter = 'all'; // the journey filter is scoped to the Approved-by-journey card; clear it on navigation
-    this.journeyFilterMembers = new Set();
-    this.frFilter = 'all'; // same for the first-timer/repeat filter
-    this.pageIndex = 0;
-    this.defaultSelection();
-    this.refreshMeta();
-    if (this.showApprovalChecks) this.ensureQueueStages();
-  }
-
-  // ---- Post-approval checks (Queue stage) ----
-  get showApprovalChecks(): boolean {
-    return (
-      this.segment === 'approved' ||
-      this.segment === 'attended' ||
-      this.segment === 'noShow'
-    );
-  }
-
-  // ---- Post-approval checks ----
-  get showAfterApprovalChecks(): boolean {
-    return (
-      this.segment === 'approved' ||
-      this.segment === 'attended' ||
-      this.segment === 'noShow' ||
-      this.segment === 'unattended' ||
-      this.segment === 'revoked' ||
-      this.segment === 'overallRequested'
-    );
-  }
-
-  // get colSpan(): number {
-  //   return (this.showSelect ? 1 : 0) + 8 + (this.showApprovalChecks ? 1 : 0);
-  // }
   // Lazily load queue_token.currentstage for the whole event once (queue events only).
   async ensureQueueStages() {
-    if (
-      this.queueStagesLoaded ||
-      this.queueStagesLoading ||
-      this.arena?.['type'] !== 'queue'
-    )
-      return;
+    if (this.queueStagesLoaded || this.queueStagesLoading || this.arena?.['type'] !== 'queue') return;
     this.queueStagesLoading = true;
     try {
-      const snap = await getDocs(
-        query(
-          collection(this.firestore, 'queue_token'),
-          where('queueref', '==', this.arena['eventref']),
-        ),
-      );
+      const snap = await getDocs(query(collection(this.firestore, 'queue_token'), where('queueref', '==', this.arena['eventref'])));
       snap.docs.forEach((d) => {
         const x = d.data();
-        if (x['profile_id'] && x['currentstage'])
-          this.queueStageByPid.set(x['profile_id'], x['currentstage']);
+        if (x['profile_id'] && x['currentstage']) this.queueStageByPid.set(x['profile_id'], x['currentstage']);
       });
       this.queueStagesLoaded = true;
     } catch (e) {
@@ -2184,10 +1926,154 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       this.queueStagesLoading = false;
     }
   }
-  private inSegment(r: PRow): boolean {
-    return this.matchesSegment(r, this.segment);
+
+  // ================================== Segment Processing =========================
+
+  // function to get potential participants ( product owners )
+  getPotentialParticipants() {
+    const participants = Object.keys(this.participantProductMap);
+    return participants;
   }
 
+  // function to process event requests into segment lists
+  async processEventRequest() {
+    const eventRequestedParticipants = Object.keys(this.participantRequestMap);
+    const arena = this.arena;
+    const eligibility = arena['eligibility'] ?? {};
+    const productConsumption = eligibility['productconsumption'] ?? [];
+    const customerStatus = eligibility['customerstatus'] ?? [];
+    const eligibilityJourney = eligibility['journeyid'] ?? [];
+    const eligibleCohort = eligibility['cohortid'] ?? [];
+    const cohortParticipants = [...this.cohortParticipants];
+    const counts: Record<SegmentKey, Array<string>> = {
+      potential: [],
+      requested: [],
+      notRequested: [],
+      eligible: [],
+      upgrade: [],
+      addon: [],
+      continuity: [],
+      noteligible: [],
+      noProduct: [],
+      inQueue: [],
+      approved: [],
+      attended: [],
+      noShow: [],
+      unattended: [],
+      revoked: [],
+      overallRequested: [],
+    };
+    const potential = this.getPotentialParticipants();
+    const queueParticipants = Object.keys(this.tokenMap).filter((pid: string) => {
+      const active = (this.tokenMap[pid] ?? []).some((token: any) => token['tokenstatus']?.trim()?.toLocaleLowerCase() === 'active');
+      return active;
+    });
+
+    const revokedByMap = {};
+
+    for (const pid of eventRequestedParticipants) {
+      const participantsRequest = this.participantRequestMap[pid] ?? [];
+      if (queueParticipants.includes(pid)) counts['inQueue'].push(pid);
+      for (const req of participantsRequest) {
+        const status = req['status'] ?? null;
+        switch (status) {
+          case 'attended':
+            counts['attended'].push(pid);
+            break;
+          case 'unattended':
+            counts['unattended'].push(pid);
+            break;
+          case 'approved':
+            counts['approved'].push(pid);
+            break;
+          case 'revoked':
+            counts['revoked'].push(pid);
+            revokedByMap[pid] = req;
+            break;
+          default:
+            counts['requested'].push(pid);
+            const bucket = this.participantBucket(pid, potential.includes(pid), customerStatus, productConsumption, eligibilityJourney, eligibleCohort, cohortParticipants);
+            counts[bucket].push(pid);
+            break;
+        }
+        if (req['attendance_state'] === 'no_show') {
+          counts['noShow'].push(pid)
+        }
+      }
+    }
+
+    counts['potential'] = potential;
+    for (const pid of potential) {
+      if (!eventRequestedParticipants.includes(pid)) {
+        counts['notRequested'].push(pid);
+      }
+    }
+
+    const unique = [...counts['requested'], ...counts['approved'], ...counts['attended'], ...counts['unattended'], ...counts['revoked']];
+    counts['overallRequested'] = [...unique];
+    this.segmentList = counts;
+    this.revokedByMap = revokedByMap;
+  }
+
+  // function to find the eligibility bucket of a participant
+  participantBucket(
+    pid: string,
+    isOwner: boolean,
+    customerStatus: Array<string>,
+    productConsumption: Array<any>,
+    eligibilityJourney: Array<string>,
+    eligibleCohorts: Array<string>,
+    cohortParticipants: Array<string>,
+  ): SegmentKey {
+    const metadata = this.participantMetadata[pid] ?? null;
+    if (metadata) {
+      const journey = metadata['activejourney'] ?? metadata['lastcompletedjourney'] ?? null;
+      const status = metadata['customerstatus'] ?? null;
+      const consumedproducts = {};
+
+      for (const product of metadata['consumedproducts'] ?? []) {
+        consumedproducts[product] = consumedproducts[product] ?? 0;
+        consumedproducts[product] = consumedproducts[product] + 1;
+      }
+
+      const journeyMatch = eligibilityJourney.length === 0 || eligibilityJourney.includes(journey);
+      const cohortMatch = eligibleCohorts.length === 0 || cohortParticipants.includes(pid);
+      const consumptionMatch = productConsumption.every((product) => {
+        const productId = product?.productid;
+        if (product['operator'] === '==') {
+          return (consumedproducts[productId] ?? 0) === product?.count;
+        } else if (product['operator'] === '>=') {
+          return (consumedproducts[productId] ?? 0) >= product?.count;
+        } else if (product['operator'] === '<=') {
+          return (consumedproducts[productId] ?? 0) <= product?.count;
+        } else {
+          return false;
+        }
+      });
+
+      if (status == 'active') {
+        if (!consumptionMatch || !cohortMatch) return 'noteligible';
+        if (!journeyMatch) return 'upgrade';
+        if (!isOwner) return 'addon';
+        return 'eligible';
+      }
+
+      if (status == 'non active') {
+        // if (!consumptionMatch || !cohortMatch) return 'not eligibile';
+        if (customerStatus.includes('non active') && isOwner) return 'eligible';
+        if (journeyMatch) return 'continuity';
+        return 'upgrade';
+      }
+    }
+    return 'noteligible';
+  }
+
+  // function to check participant is attended
+  isAttended(pid: string) {
+    return this.segmentList['attended'].includes(pid);
+  }
+
+  // function to check a row belongs to the given segment
   private matchesSegment(r: PRow, key: SegmentKey): boolean {
     switch (key) {
       case 'potential':
@@ -2226,30 +2112,355 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     return false;
   }
 
+  // function to check the current segment
+  private inSegment(pid): boolean {
+    return this.matchesSegment(pid, this.segment);
+  }
+
+  // function to change the segment
+  setSegment(s: SegmentKey) {
+    this.segment = s;
+    this.journeyFilter = 'all'; // the journey filter is scoped to the Approved-by-journey card; clear it on navigation
+    this.journeyFilterMembers = new Set();
+    this.frFilter = 'all'; // same for the first-timer/repeat filter
+    this.customerFilter = 'all';
+    this.pageIndex = 0;
+    this.defaultSelection();
+    // this.refreshMeta();
+    // if (this.showApprovalChecks) this.ensureQueueStages();
+  }
+
+  // ---- Post-approval checks (Queue stage) ----
+  get showApprovalChecks(): boolean {
+    return this.segment === 'approved' || this.segment === 'attended' || this.segment === 'noShow';
+  }
+
+  // ---- Post-approval checks ----
+  get showAfterApprovalChecks(): boolean {
+    return this.segment === 'approved' || this.segment === 'attended' || this.segment === 'noShow' || this.segment === 'unattended' || this.segment === 'revoked' || this.segment === 'overallRequested';
+  }
+
+  // get colSpan(): number {
+  //   return (this.showSelect ? 1 : 0) + 8 + (this.showApprovalChecks ? 1 : 0);
+  // }
+
+  // ================================== Funnel Splits & Journeys =========================
+
+  // function to get status key
+  statusKey(s: string): string {
+    return (
+      (s || '')
+        .trim()
+        .toLowerCase() || 'notset'
+    );
+  }
+
+  // function to get status label
+  private statusLabel(s: string): string {
+    return (s || '').trim() || 'Not set';
+  }
+
+  // function to get status splits of a segment
+  statusSplit(key: SegmentKey): Split[] {
+    return this.statusSplits[key] ?? [];
+  }
+
+  // function to get status color
+  statusColor(key: string): string {
+    if (this.statusColors[key]) return this.statusColors[key];
+    const idx = this.customerStatusList.findIndex((s) => s.key === key);
+    return this.statusPalette[(idx >= 0 ? idx : 0) % this.statusPalette.length];
+  }
+
+  // function to compute status splits and approved by journey
+  private computeSplits(plist: Array<string>): void {
+    const keys: SegmentKey[] = ['potential', 'requested', 'notRequested', 'eligible', 'noProduct', 'inQueue', 'approved', 'attended', 'noShow', 'unattended', 'revoked'];
+    const out = {} as Record<SegmentKey, Split[]>;
+    const allStatuses = new Map<string, string>();
+    for (const k of keys) {
+      const inSeg = this.segmentList[k];
+      const m = new Map<string, Split>();
+      for (const pid of inSeg) {
+        const customerStatus = this.participantMetadata['customerstatus'] ?? 'none';
+        const gk = this.statusKey(customerStatus);
+        const label = this.statusLabel(customerStatus);
+        allStatuses.set(gk, label);
+        const e = m.get(gk) ?? { key: gk, label, count: 0 };
+        e.count++;
+        m.set(gk, e);
+      }
+      out[k] = [...m.values()].filter((e) => e.count > 0).sort((a, b) => b.count - a.count);
+    }
+    this.statusSplits = out;
+    this.customerStatusList = [...allStatuses.entries()].map(([key, label]) => ({ key, label })).sort((a, b) => a.label.localeCompare(b.label));
+
+    const jm = new Map<string, JourneyRow>();
+    for (const pid of plist) {
+      if (!this.segmentList['approved'].includes(pid)) continue;
+      const journey = this.getColumnValue('current journey', pid);
+      const completedProduct = (this.participantMetadata[pid]?.['consumedproducts'] ?? [])?.includes(this.arena['productref']?.id);
+      const label = (this.mapJourney[journey] || '').trim() || 'Not set';
+      const e = jm.get(label) ?? {
+        key: label,
+        label,
+        total: 0,
+        first: 0,
+        repeat: 0,
+      };
+      e.total++;
+      if (completedProduct) e.repeat++;
+      else e.first++;
+      jm.set(label, e);
+    }
+    this.approvedByJourney = [...jm.values()].sort((a, b) => b.total - a.total);
+    this.rebuildDisplayedJourneys();
+  }
+
+  // get overallRequested(): number {
+  //   return (
+  //     this.counts.requested +
+  //     this.counts.approved +
+  //     this.counts.unattended +
+  //     this.counts.revoked
+  //   );
+  // }
+
+  // function to count potential participants of a customer status
+  potentialStatusCount(key: string): number {
+    return (this.segmentList['potential'] ?? []).filter((pid) => this.participantMetadata[pid]?.['customerstatus'] === key)?.length;
+  }
+
+  // function to handle customer status chip click
+  setCustomerChip(key: string): void {
+    this.segment = 'potential';
+    this.customerFilter = this.customerFilter === key ? 'all' : key;
+    this.pageIndex = 0;
+    this.defaultSelection();
+  }
+
+  // function to get journey color
+  journeyColor(key: string): string {
+    const i = this.displayedJourneys.findIndex((j) => j.key === key);
+    return this.journeyPalette[(i < 0 ? 0 : i) % this.journeyPalette.length];
+  }
+
+  // function to get localstorage key of journey groups
+  private journeyGroupsKey(): string {
+    return 'epc_journey_groups_' + (this.arena?.['docid'] ?? 'unknown');
+  }
+
+  // function to load journey groups from localstorage
+  private loadJourneyGroups(): void {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      const raw = localStorage.getItem(this.journeyGroupsKey());
+      this.journeyGroups = raw ? JSON.parse(raw) || {} : {};
+    } catch {
+      this.journeyGroups = {};
+    }
+    this.rebuildDisplayedJourneys();
+  }
+
+  // function to save journey groups in localstorage
+  private saveJourneyGroups(): void {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      localStorage.setItem(this.journeyGroupsKey(), JSON.stringify(this.journeyGroups));
+    } catch {
+      /* storage unavailable — grouping just won't persist */
+    }
+    this.rebuildDisplayedJourneys();
+  }
+
+  // function to toggle journey group edit mode
+  toggleGroupEdit(): void {
+    this.groupEditMode = !this.groupEditMode;
+    this.journeySel = new Set(); // clear any pending selection when entering/leaving edit mode
+    this.groupNameInput = '';
+  }
+
+  // Distinct group names already in use, for the datalist / add-to-existing.
+  get existingGroupNames(): string[] {
+    return [
+      ...new Set(
+        Object.values(this.journeyGroups)
+          .map((g) => (g || '').trim())
+          .filter(Boolean),
+      ),
+    ].sort();
+  }
+
+  // function to check journey is selected for grouping
+  isJourneySel(label: string): boolean {
+    return this.journeySel.has(label);
+  }
+
+  // function to toggle journey selection for grouping
+  toggleJourneySel(label: string): void {
+    if (this.journeySel.has(label)) this.journeySel.delete(label);
+    else this.journeySel.add(label);
+  }
+
+  // Group the ticked journeys under the typed name (creates the group or adds to an existing one). Persists.
+  groupSelected(): void {
+    const name = (this.groupNameInput || '').trim();
+    if (!name || !this.journeySel.size) return;
+    this.journeySel.forEach((label) => {
+      this.journeyGroups[label] = name;
+    });
+    this.saveJourneyGroups();
+    this.journeySel = new Set();
+    this.groupNameInput = '';
+  }
+
+  // Remove the ticked journeys from whatever group they're in. Persists.
+  ungroupSelected(): void {
+    if (!this.journeySel.size) return;
+    this.journeySel.forEach((label) => {
+      delete this.journeyGroups[label];
+    });
+    this.saveJourneyGroups();
+    this.journeySel = new Set();
+  }
+
+  // Disband a whole group (all its journeys become ungrouped). Persists.
+  ungroupGroup(groupName: string): void {
+    Object.keys(this.journeyGroups).forEach((label) => {
+      if (this.journeyGroups[label] === groupName) delete this.journeyGroups[label];
+    });
+    this.saveJourneyGroups();
+  }
+
+  // function to rebuild journeys shown in the card ( groups + singles )
+  private rebuildDisplayedJourneys(): void {
+    const groups = new Map<string, JourneyRow>();
+    const singles: JourneyRow[] = [];
+    for (const j of this.approvedByJourney) {
+      const g = (this.journeyGroups[j.label] || '').trim();
+      if (!g) {
+        singles.push({ ...j, members: [j.label] });
+        continue;
+      }
+      const key = 'grp:' + g;
+      const e = groups.get(key) ?? {
+        key,
+        label: g,
+        total: 0,
+        first: 0,
+        repeat: 0,
+        members: [],
+        isGroup: true,
+      };
+      e.total += j.total;
+      e.first += j.first;
+      e.repeat += j.repeat;
+      e.members!.push(j.label);
+      groups.set(key, e);
+    }
+    this.displayedJourneys = [...groups.values(), ...singles].sort((a, b) => b.total - a.total);
+  }
+
+  // function to get journey label of a row
+  private journeyLabelOf(r: PRow): string {
+    return (r.journey || '').trim() || 'Not set';
+  }
+
+  // The approved participants whose journey falls inside this group, sorted by name.
+  groupParticipants(row: JourneyRow): PRow[] {
+    const members = new Set(row.members ?? [row.label]);
+    return this.rows.filter((r) => r.isApproved && members.has(this.journeyLabelOf(r))).sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  // Which journeys are inside this group, and who is approved under each — powers the overlay panels.
+  // Every member journey is listed even if it currently has no matching participants.
+  // `fr` narrows to first-timers ('first') or repeats ('repeat'); 'all' is the whole approved cohort.
+  groupJourneyBreakdown(row: JourneyRow, fr: 'all' | 'first' | 'repeat' = 'all'): { journey: string; participants: PRow[] }[] {
+    const members = row.members ?? [row.label];
+    const byJourney = new Map<string, PRow[]>();
+    members.forEach((m) => byJourney.set(m, []));
+    for (const r of this.rows) {
+      if (!r.isApproved) continue;
+      const isRepeat = !!r.completedProduct;
+      if (fr === 'first' && isRepeat) continue;
+      if (fr === 'repeat' && !isRepeat) continue;
+      const lbl = this.journeyLabelOf(r);
+      if (byJourney.has(lbl)) byJourney.get(lbl)!.push(r);
+    }
+    return [...members]
+      .sort((a, b) => a.localeCompare(b))
+      .map((m) => ({
+        journey: m,
+        participants: (byJourney.get(m) ?? []).sort((a, b) => a.name.localeCompare(b.name)),
+      }));
+  }
+
+  // Click a journey/group row → filter the table to the union of its journeys (clears the first/repeat sub-filter).
+  // The participant list lives in the overlay opened by the people icon, not here.
+  setJourneyChip(row: JourneyRow): void {
+    this.segment = 'approved';
+    const same = this.journeyFilter === row.key && this.frFilter === 'all';
+    this.journeyFilter = same ? 'all' : row.key;
+    this.journeyFilterMembers = same ? new Set() : new Set(row.members ?? [row.label]);
+    this.frFilter = 'all';
+    this.pageIndex = 0;
+    this.defaultSelection();
+    // this.refreshMeta();
+  }
+
+  // Click a first-timer/repeat pill under a journey/group → filter to that union ∩ that group (toggles off if repeated).
+  setJourneyFr(row: JourneyRow, frKey: string): void {
+    this.segment = 'approved';
+    const same = this.journeyFilter === row.key && this.frFilter === frKey;
+    this.journeyFilter = same ? 'all' : row.key;
+    this.journeyFilterMembers = same ? new Set() : new Set(row.members ?? [row.label]);
+    this.frFilter = same ? 'all' : frKey;
+    this.pageIndex = 0;
+    this.defaultSelection();
+    // this.refreshMeta();
+  }
+
+  // function to check a row matches the journey filter
+  private journeyMatches(r: PRow): boolean {
+    if (this.journeyFilter === 'all') return true;
+    return this.journeyFilterMembers.has((r.journey || '').trim() || 'Not set');
+  }
+
+  // function to check a participant matches first / repeat filter
+  private frMatches(pid: string): boolean {
+    if (this.frFilter === 'all') return true;
+    const consumedProducts = this.participantMetadata[pid]?.['consumedproducts'] ?? [];
+    const isRepeat = consumedProducts?.includes(this.arena['productref']?.id);
+    return this.frFilter === 'repeat' ? isRepeat : !isRepeat;
+  }
+
+  // ================================== Table Rows =========================
+
+  // function to check finance filter
   private financeMatches(r: PRow): boolean {
     if (this.financeFilter === 'all') return true;
-    const norm = (r.finance || '')
-      .toLowerCase()
-      .replace('fullypaid', 'fully paid')
-      .replace(/\s+/g, ' ')
-      .trim();
+    const norm = (r.finance || '').toLowerCase().replace('fullypaid', 'fully paid').replace(/\s+/g, ' ').trim();
     return norm === this.financeFilter;
   }
 
-  private customerMatches(r: PRow): boolean {
+  // function to check customer status filter
+  private customerMatches(pid : string) :  boolean {
     if (this.customerFilter === 'all') return true;
-    return this.statusKey(r.customerStatus) === this.customerFilter;
+    const metadata = this.participantMetadata[pid];
+    console.log(this.statusKey(metadata?.customerstatus))
+    return this.statusKey(metadata?.customerstatus) === this.customerFilter;
   }
 
-  private salesType(r: PRow): boolean {
+  // function to check sales filter
+  private salesType(pid): boolean {
     if (!this.isSalesSelected) return true;
-    const pid = r?.profileid;
+    // const pid = r?.profileid;
     return this.isnewParticipant(pid);
   }
 
-  private ticketCategory(r: PRow): boolean {
+  // function to check ticket category filter
+  private ticketCategory(pid): boolean {
     if (this.selectedTicketCategory === 'all') return true;
-    const pid = r?.profileid;
+    // const pid = r?.profileid;
     const metadata = this.participantMetadata[pid] ?? null;
     if (metadata) {
       const customersupport = metadata['customersupport'] ?? {};
@@ -2268,203 +2479,162 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     return false;
   }
 
-  segmentMembers(): PRow[] {
-    const s = this.searchText.trim().toLowerCase();
-    return this.rows.filter(
-      (r) =>
-        this.inSegment(r) &&
-        (!s ||
-          r.name.toLowerCase().includes(s) ||
-          r.email.toLowerCase().includes(s)),
-    );
+  // function to get participants of the current segment
+  tableRows() {
+    const eventRequestedParticipants = Object.keys(this.participantRequestMap);
+    // return [...this.segmentList['potential'] , ...eventRequestedParticipants];
+    return this.segment ? this.segmentList[this.segment] : [];
   }
 
-  get segmentRows(): PRow[] {
+  // function to get segment members after search
+  segmentMembers() {
+    const s = this.searchText.trim().toLowerCase();
+    return this.tableRows().filter((pid) => {
+      const participant = this.participantMetadata[pid] ?? null;
+      if (!participant) return false
+      const name = participant['name']?.trim()?.toLocaleLowerCase() ?? '';
+      const email = participant['email']?.trim()?.toLocaleLowerCase() ?? '';
+      return name.toLowerCase().includes(s) || email.toLowerCase().includes(s);
+    });
+  }
+
+  get segmentRows() {
     return this.segmentMembers()
-      .filter(
-        (r) =>
-          this.financeMatches(r) &&
-          this.customerMatches(r) &&
-          this.journeyMatches(r) &&
-          this.frMatches(r) &&
-          this.salesType(r) &&
-          this.ticketCategory(r) &&
-          this.filterByCheckList(r) &&
-          this.filterRows(r),
-      )
+      .filter((pid) => this.frMatches(pid) && this.customerMatches(pid) && this.salesType(pid) && this.ticketCategory(pid) && this.filterByCheckList(pid) && this.filterRows(pid))
       .sort((a, b) => this.sortRow(a, b));
   }
 
-  get pagedRows(): PRow[] {
+  get pagedRows(): string[] {
     const start = this.pageIndex * this.pageSize;
     return this.segmentRows.slice(start, start + this.pageSize);
   }
 
   get isFiltered(): boolean {
-    return (
-      this.financeFilter !== 'all' ||
-      this.customerFilter !== 'all' ||
-      this.journeyFilter !== 'all' ||
-      this.frFilter !== 'all' ||
-      this.searchText.trim().length > 0 ||
-      Object.keys(this.filterMap).length > 0
-    );
+    return this.financeFilter !== 'all' || this.customerFilter !== 'all' || this.journeyFilter !== 'all' || this.frFilter !== 'all' || this.searchText.trim().length > 0 || Object.keys(this.filterMap).length > 0;
   }
 
+  // function to handle page change
   onPage(e: PageEvent) {
     this.pageIndex = e.pageIndex;
     this.pageSize = e.pageSize;
-    this.refreshMeta();
-  }
-  onSearch() {
-    this.pageIndex = 0;
-    this.refreshMeta();
-  }
-  onFinance() {
-    this.pageIndex = 0;
-    this.refreshMeta();
-  }
-  onCustomer() {
-    this.pageIndex = 0;
-    this.refreshMeta();
+    // this.refreshMeta();
   }
 
+  // function to handle search
+  onSearch() {
+    this.pageIndex = 0;
+    // this.refreshMeta();
+  }
+
+  // function to handle finance filter change
+  onFinance() {
+    this.pageIndex = 0;
+    // this.refreshMeta();
+  }
+
+  // function to handle customer filter change
+  onCustomer() {
+    this.pageIndex = 0;
+    // this.refreshMeta();
+  }
+
+  // ================================== Selection =========================
+
   // ---- Selection: approve on Eligible + Not requested, attendance on Approved/Attended/No-show ----
-  get selectionMode(): 'approve' | 'attend' | 'none' {
-    if (this.segment === 'eligible' || this.segment === 'notRequested')
-      return 'approve';
-    if (
-      this.segment === 'approved' ||
-      this.segment === 'noShow' ||
-      this.segment === 'attended'
-    )
-      return 'attend';
+  get selectionMode(): 'approve' | 'attend' | 'checklist' |'none' {
+    if (this.segment === 'eligible' || this.segment === 'notRequested') return 'approve';
+    if (this.segment === 'approved' || this.segment === 'noShow' || this.segment === 'attended') return 'attend';
+    if (this.segment === 'overallRequested' || this.segment === 'revoked') return 'checklist' 
     return 'none';
   }
+
   get showSelect() {
     return this.selectionMode !== 'none';
   }
 
   // An owner is approvable whether or not they requested (matches initiate-event-product).
-  private isApprovable(r: PRow) {
-    return (r.isEligible || r.isNotRequested) && !!r.participantproductid;
+  private isApprovable(pid: string) {
+    return (this.segmentList['eligible'].includes(pid) || this.segmentList['notRequested'].includes(pid)) && this.participantProductMap[pid];
   }
 
+  // function to clear selection on segment change
   private defaultSelection() {
     // Start every segment with nothing checked — the user opts in.
     this.selection.clear();
     this.selection;
   }
-  isSelectable(r: PRow) {
-    if (this.selectionMode === 'approve') return this.isApprovable(r);
-    if (this.selectionMode === 'attend') return r.isApproved; // approved rows; attended ones can still be marked unattended
+
+  // function to check a participant can be selected
+  isSelectable(pid: string) {
+    if (this.selectionMode === 'approve') return this.isApprovable(pid);
+    if (this.selectionMode === 'attend') return this.segmentList['approved'].includes(pid); // approved rows; attended ones can still be marked unattended
+    if (this.selectionMode === 'checklist') return true; 
     return false;
   }
-  toggleRow(r: PRow) {
-    if (this.isSelectable(r)) this.selection.toggle(r);
+
+  // function to toggle a row selection
+  toggleRow(pid: string) {
+    if (this.isSelectable(pid)) this.selection.toggle(pid);
   }
+
   private get selectableInView() {
     return this.segmentRows.filter((r) => this.isSelectable(r));
   }
+
+  // function to check all rows in view are selected
   isAllSelected() {
     const v = this.selectableInView;
     return v.length > 0 && v.every((r) => this.selection.isSelected(r));
   }
+
+  // function to check any row in view is selected
   hasSelectionInView() {
     return this.selectableInView.some((r) => this.selection.isSelected(r));
   }
+
+  // function to toggle select all rows in view
   masterToggle() {
     const v = this.selectableInView;
     if (this.isAllSelected()) v.forEach((r) => this.selection.deselect(r));
     else v.forEach((r) => this.selection.select(r));
   }
+
   get readyCount() {
     return this.selection.selected.filter((r) => this.isApprovable(r)).length;
   }
+
   get selectedToMark() {
-    return this.selection.selected.filter((r) => r.isApproved && !r.attended);
+    return this.selection.selected.filter((pid: string) => this.segmentList['approved'].includes(pid) && !this.segmentList['attended'].includes(pid));
   }
+
   get selectedToUnattend() {
-    return this.selection.selected.filter((r) => r.isApproved);
+    return this.selection.selected.filter((pid: string) => this.segmentList['approved'].includes(pid));
   }
+
   // Requested (not yet approved) rows that have an actual request doc to revoke.
   get selectedToRevokeRequested() {
-    return this.selection.selected.filter(
-      (r) => !!r.requestData?.['docid'] && !r.isApproved,
-    );
+    return this.selection.selected.filter((pid: string) => this.segmentList['requested'].includes(pid) && !this.segmentList['approved'].includes(pid));
   }
 
-  // ---- Display helpers ----
-  formatMonthYear(ms: number): string {
-    return ms
-      ? new Date(ms).toLocaleDateString(undefined, {
-          month: 'short',
-          year: 'numeric',
-        })
-      : '';
-  }
-  // Compact money for the table (Indian scale): 5000 -> 5K, 122000 -> 1.2L, 25000000 -> 2.5Cr.
-  shortAmount(v: any): string {
-    const n = +(v || 0);
-    if (!n) return '0';
-    const abs = Math.abs(n);
-    const fmt = (x: number, unit: number) =>
-      (x / unit).toFixed(abs % unit === 0 ? 0 : 1).replace(/\.0$/, '');
-    if (abs >= 1e7) return fmt(n, 1e7) + 'Cr';
-    if (abs >= 1e5) return fmt(n, 1e5) + 'L';
-    if (abs >= 1e3) return fmt(n, 1e3) + 'K';
-    return String(n);
-  }
-  financeDotClass(f: string): string {
-    const n = (f || '')
-      .toLowerCase()
-      .replace('fullypaid', 'fully paid')
-      .replace(/\s+/g, ' ')
-      .trim();
-    if (n === 'regular' || n === 'fully paid') return 'd-ok';
-    if (n === 'defaulted') return 'd-bad';
-    if (n === 'locked') return 'd-org';
-    return '';
-  }
-  toMillis(d: any): number {
-    try {
-      if (d?.toMillis) return d.toMillis();
-      if (d?.toDate) return d.toDate().getTime();
-      if (d) return new Date(d).getTime();
-    } catch {}
-    return 0;
-  }
-  private etaText(remainingChunks: number): string {
-    const secs =
-      Math.max(0, remainingChunks) * (this.INITIATE_CHUNK_DELAY_MS / 1000);
-    if (secs <= 0) return '';
-    if (secs < 60) return `~${Math.round(secs)}s remaining`;
-    return `~${Math.ceil(secs / 60)} min remaining`;
-  }
+  // ================================== Approve =========================
 
-  // ---- Approve ----
+  // function to get the reason approve is disabled
   approveDisabledReason(): string {
-    if (this.readyCount === 0)
-      return 'Select at least one eligible participant';
-    if (!this.selectedDeliverySet)
-      return 'Pick a delivery sequence to enable approve';
-    if (
-      this.arena?.['type'] === 'queue' &&
-      this.queueVariationList.length > 0 &&
-      !this.selectedQueueVariation
-    )
-      return 'Pick a queue variation';
+    if (this.readyCount === 0) return 'Select at least one eligible participant';
+    if (!this.selectedDeliverySet) return 'Pick a delivery sequence to enable approve';
+    if (this.arena?.['type'] === 'queue' && this.queueVariationList.length > 0 && !this.selectedQueueVariation) return 'Pick a queue variation';
     return '';
   }
+
+  // function to check approve is enabled
   canApprove(): boolean {
     return this.approveDisabledReason() === '';
   }
 
+  // function to approve selected participants
   async approveSelected() {
     if (!this.canApprove()) return;
-    const selected = this.selection.selected.filter((r) =>
-      this.isApprovable(r),
-    );
+    const selected = this.selection.selected.filter((r) => this.isApprovable(r));
     if (!selected.length) return;
     const canApp = await this.checkForParentEventApproval(selected);
     if (canApp?.length > 0) {
@@ -2473,12 +2643,11 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       return;
     }
 
-    await this.loadMeta(selected);
-    const risky = selected.filter((r) =>
-      ['locked', 'defaulted'].includes(
-        (r.finance || '').toLowerCase().replace(/\s+/g, ' ').trim(),
-      ),
-    );
+    // await this.loadMeta(selected);
+    const risky = selected.filter((pid: string) => {
+      const finance = this.participantMetadata[pid]?.financialstatus;
+      return ['locked', 'defaulted'].includes((finance || '').toLowerCase().replace(/\s+/g, ' ').trim());
+    });
 
     const ref = this.dialog.open(this.confirmTpl, {
       width: '420px',
@@ -2487,9 +2656,7 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       data: {
         title: 'Approve participants',
         body: `Approve ${selected.length} eligible participant(s) with delivery sequence “${this.selectedDeliverySet}”.`,
-        warn: risky.length
-          ? `${risky.length} have Locked or Defaulted finance.`
-          : '',
+        warn: risky.length ? `${risky.length} have Locked or Defaulted finance.` : '',
         confirm: `Approve ${selected.length}`,
       },
     });
@@ -2498,55 +2665,23 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     await this.runApprove(selected);
   }
 
-  private async checkForParentEventApproval(selected: PRow[]) {
+  // function to check participants are approved for the hero event
+  private async checkForParentEventApproval(selected: string[]) {
     const hereEvent = this.subEvents.find((arena) => arena?.heroevent);
     if (hereEvent && !this.arena?.heroevent) {
-      // const eligibility = hereEvent['eligibility'] ?? {};
-      // const productConsumption = eligibility['productconsumption'] ?? [];
-      // const customerStatus = eligibility['customerstatus'] ?? [];
-      // const eligibilityJourney = eligibility['journeyid'] ?? [];
-      // const selectedCohorts = eligibility['cohortid'] ?? [];
-      // const cohortParticipants = [];
-
-      // if (selectedCohorts?.length > 0) {
-      //   const cohortQuery = query(
-      //     collection(this.firestore, 'big cohorts'),
-      //     where('docid', 'in', selectedCohorts),
-      //   );
-      //   const cohorts = await getDocs(cohortQuery);
-      //   cohorts?.docs.forEach((docref) => {
-      //     const participant = docref.data()['participantidlist'] ?? [];
-      //     for (const pid of participant) {
-      //       if (!cohortParticipants.includes(pid)) {
-      //         cohortParticipants.push(pid);
-      //       }
-      //     }
-      //   });
-      // }
-
       const total = selected.length;
-      const chunks: PRow[][] = [];
-      for (let i = 0; i < total; i += 30)
-        chunks.push(selected.slice(i, i + 30));
+      const chunks: string[][] = [];
+      for (let i = 0; i < total; i += 30) chunks.push(selected.slice(i, i + 30));
       const noApprovedForHeroEvent = [];
 
       for (const chunk of chunks) {
-        const profileIds = chunk?.map((row) => row?.profileid);
-        console.log(hereEvent?.docid);
-        console.log(profileIds);
-        const q = query(
-          collection(this.firestore, 'event participation request'),
-          where('arenaeventid', '==', hereEvent?.docid),
-          where('profileid', 'in', profileIds),
-        );
+        const profileIds = chunk;
+        const q = query(collection(this.firestore, 'event participation request'), where('arenaeventid', '==', hereEvent?.docid), where('profileid', 'in', profileIds));
         const snap = await getDocs(q);
-        console.log(snap.docs.length);
         snap.docs.forEach((docref) => {
           const data = docref.data();
           const name = this.participantMetadata[data['profileid']]?.name;
-          if (
-            !['approved', 'attended', 'unattended'].includes(data['status'])
-          ) {
+          if (!['approved', 'attended', 'unattended'].includes(data['status'])) {
             noApprovedForHeroEvent.push(name);
           }
         });
@@ -2557,11 +2692,11 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     return [];
   }
 
-  private async runApprove(selected: PRow[]) {
+  // function to run approve in chunks
+  private async runApprove(selected: string[]) {
     const total = selected.length;
-    const chunks: PRow[][] = [];
-    for (let i = 0; i < total; i += this.INITIATE_CHUNK_SIZE)
-      chunks.push(selected.slice(i, i + this.INITIATE_CHUNK_SIZE));
+    const chunks: string[][] = [];
+    for (let i = 0; i < total; i += this.INITIATE_CHUNK_SIZE) chunks.push(selected.slice(i, i + this.INITIATE_CHUNK_SIZE));
 
     this.progress = {
       msg: 'Approving...',
@@ -2576,47 +2711,45 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       panelClass: 'sx-dialog',
     });
     let success = 0;
-    const failed: PRow[] = [];
+    const failed: string[] = [];
 
     for (let c = 0; c < chunks.length; c++) {
       const chunk = chunks[c];
       try {
         const batch = writeBatch(this.firestore);
         for (const row of chunk) {
+          const participantproductid = this.participantProductMap[row]?.['docid'] ?? null;
+          const requestData = this.getRecentRequestData(this.participantRequestMap[row]);
+          if (!participantproductid) continue;
           let participationId: string;
           let participationData: any;
-          if (row.requestData) {
-            participationId = row.requestData['docid'];
+          if (requestData) {
+            if (requestData['status'] !== 'requested') continue;
+            participationId = requestData['docid'];
             participationData = {
               eventref: this.arena['eventref'],
               productref: this.arena['productref'],
               status: 'approved',
-              profileid: row.profileid,
-              participantproductid: row.participantproductid,
+              profileid: row,
+              participantproductid: participantproductid,
               arenaeventid: this.arena['docid'],
               initiatedfrom: 'web',
             };
           } else {
-            participationId = doc(
-              collection(this.firestore, 'event participation request'),
-            ).id;
+            participationId = doc(collection(this.firestore, 'event participation request')).id;
             participationData = {
               docid: participationId,
               doccreateddate: serverTimestamp(),
               eventref: this.arena['eventref'],
               productref: this.arena['productref'],
               status: 'approved',
-              profileid: row.profileid,
-              participantproductid: row.participantproductid,
+              profileid: row,
+              participantproductid: participantproductid,
               arenaeventid: this.arena['docid'],
               initiatedfrom: 'web',
             };
           }
-          const participationRef = doc(
-            this.firestore,
-            'event participation request',
-            participationId,
-          );
+          const participationRef = doc(this.firestore, 'event participation request', participationId);
           batch.set(participationRef, participationData, { merge: true });
           const productData: any = {
             eventref: this.arena['eventref'],
@@ -2626,31 +2759,19 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
             deliverytype: this.selectedDeliverySet,
             'statusdate.initiated': serverTimestamp(),
           };
-          if (this.arena['type'] == 'queue')
-            productData['queuevariationid'] = this.selectedQueueVariation;
-          batch.update(
-            doc(
-              this.firestore,
-              'participantsproduct',
-              row.participantproductid!,
-            ),
-            productData,
-          );
+          if (this.arena['type'] == 'queue') productData['queuevariationid'] = this.selectedQueueVariation;
+          batch.update(doc(this.firestore, 'participantsproduct', participantproductid!), productData);
         }
         await batch.commit();
         success += chunk.length;
       } catch (err) {
         failed.push(...chunk);
       }
-      this.progress.value = Math.round(
-        ((success + failed.length) / total) * 100,
-      );
+      this.progress.value = Math.round(((success + failed.length) / total) * 100);
       this.progress.eta = this.etaText(chunks.length - 1 - c);
       if (c < chunks.length - 1) {
         this.progress.msg = `Waiting before next batch — ${success} / ${total} done`;
-        await new Promise((res) =>
-          setTimeout(res, this.INITIATE_CHUNK_DELAY_MS),
-        );
+        await new Promise((res) => setTimeout(res, this.INITIATE_CHUNK_DELAY_MS));
         this.progress.msg = 'Approving...';
       }
     }
@@ -2664,7 +2785,7 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
           width: '420px',
           autoFocus: false,
           panelClass: 'sx-dialog',
-          data: { success, total, failed: failed.map((f) => f.name) },
+          data: { success, total, failed: failed },
         })
         .afterClosed()
         .subscribe((res) => {
@@ -2674,17 +2795,32 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       this.snackbar.open(`Approved ${success} of ${total}`, 'OK', {
         duration: 4000,
       });
-      await this.loadData();
+      // await this.loadData();
     }
   }
 
+  // function to get remaining time text
+  private etaText(remainingChunks: number): string {
+    const secs = Math.max(0, remainingChunks) * (this.INITIATE_CHUNK_DELAY_MS / 1000);
+    if (secs <= 0) return '';
+    if (secs < 60) return `~${Math.round(secs)}s remaining`;
+    return `~${Math.ceil(secs / 60)} min remaining`;
+  }
+
+  // ================================== Attendance & Revoke =========================
+
   // ---- Attendance ----
-  async markAttended(rows: PRow[]) {
-    const targets = rows.filter((r) => r.approvedRequestId && !r.attended);
+  async markAttended(plist: string[]) {
+    const targets = plist
+      .map((pid) => {
+        const reqDoc = this.getRecentRequestData(this.participantRequestMap[pid] ?? []);
+        return reqDoc ? { profileid: pid, approvedRequestId: reqDoc['docid'], attended: this.segmentList['attended'].includes(pid) } : {};
+      })
+      .filter((r) => r.approvedRequestId && !r.attended);
     if (!targets.length) return;
-    const wasNoShow = targets.filter(
-      (r) => r.attendanceState === 'no_show',
-    ).length;
+    // const wasNoShow = targets.filter(
+    //   (r) => r.attendanceState === 'no_show',
+    // ).length;
     this.progress = {
       msg: 'Marking attended...',
       value: 0,
@@ -2698,13 +2834,7 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       panelClass: 'sx-dialog',
     });
     try {
-      const refList = targets.map((r) =>
-        doc(
-          this.firestore,
-          'event participation request',
-          r.approvedRequestId!,
-        ),
-      );
+      const refList = targets.map((r) => doc(this.firestore, 'event participation request', r.approvedRequestId!));
       const batch = writeBatch(this.firestore);
       targets.forEach((r, i) => {
         batch.update(refList[i], {
@@ -2720,23 +2850,16 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       });
       for (let i = 0; i < refList.length; i += 10) {
         const sub = refList.slice(i, i + 10);
-        const delSnap = await getDocs(
-          query(
-            collection(this.firestore, 'deliverables'),
-            where('fileref', 'array-contains-any', sub),
-          ),
-        );
-        delSnap.docs.forEach((d) =>
-          batch.update(d.ref, { status: 'completed' }),
-        );
+        const delSnap = await getDocs(query(collection(this.firestore, 'deliverables'), where('fileref', 'array-contains-any', sub)));
+        delSnap.docs.forEach((d) => batch.update(d.ref, { status: 'completed' }));
       }
       await batch.commit();
-      targets.forEach((r) => {
-        r.attended = true;
-        r.attendanceState = 'attended';
-      });
-      this.counts.attended += targets.length;
-      this.counts.noShow = Math.max(0, this.counts.noShow - wasNoShow);
+      // targets.forEach((r) => {
+      //   r.attended = true;
+      //   r.attendanceState = 'attended';
+      // });
+      // this.counts.attended += targets.length;
+      // this.counts.noShow = Math.max(0, this.counts.noShow - wasNoShow);
       this.selection.clear();
       this.snackbar.open(`Marked ${targets.length} attended`, 'OK', {
         duration: 4000,
@@ -2752,8 +2875,13 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
   // ---- Mark not attended (destructive): status -> 'unattended' AND cancel the product ----
   // Mirrors the legacy "Mark as Not Attended": cancels participantsproduct, deletes the events_profiles
   // record, and nulls the deliverables. Use this DURING the event; no-show (product-preserving) is at finalize.
-  async markUnattended(rows: PRow[]) {
-    const targets = rows.filter((r) => r.approvedRequestId);
+  async markUnattended(plist: string[]) {
+    const targets = plist
+      .map((pid) => {
+        const reqDoc = this.getRecentRequestData(this.participantRequestMap[pid] ?? []);
+        return reqDoc ? { profileid: pid, approvedRequestId: reqDoc['docid'] } : {};
+      })
+      .filter((r) => r.approvedRequestId);
     if (!targets.length) return;
     const ref = this.dialog.open(this.confirmTpl, {
       width: '440px',
@@ -2783,51 +2911,23 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     });
     try {
       const batch = writeBatch(this.firestore);
-      const reqRefs = targets.map((r) =>
-        doc(
-          this.firestore,
-          'event participation request',
-          r.approvedRequestId!,
-        ),
-      );
+      const reqRefs = targets.map((r) => doc(this.firestore, 'event participation request', r.approvedRequestId!));
       targets.forEach((r, i) => {
         batch.update(reqRefs[i], { status: 'unattended' });
       });
       // Delete the events_profiles record for each (profile + event).
       for (const r of targets) {
-        const epSnap = await getDocs(
-          query(
-            collection(this.firestore, 'events_profiles'),
-            where(
-              'profile_ref',
-              '==',
-              doc(this.firestore, 'profile_data', r.profileid),
-            ),
-            where('event_ref', '==', this.arena['eventref']),
-          ),
-        );
+        const epSnap = await getDocs(query(collection(this.firestore, 'events_profiles'), where('profile_ref', '==', doc(this.firestore, 'profile_data', r.profileid)), where('event_ref', '==', this.arena['eventref'])));
         epSnap.docs.forEach((d) => batch.delete(d.ref));
       }
       // Cancel the product from the deliverable (matches event-participation-approve), then null the deliverables.
       for (let i = 0; i < reqRefs.length; i += 10) {
         const sub = reqRefs.slice(i, i + 10);
-        const delSnap = await getDocs(
-          query(
-            collection(this.firestore, 'deliverables'),
-            where('fileref', 'array-contains-any', sub),
-          ),
-        );
+        const delSnap = await getDocs(query(collection(this.firestore, 'deliverables'), where('fileref', 'array-contains-any', sub)));
         delSnap.docs.forEach((d) => {
           const dd = d.data();
           if (dd['participantproductid']) {
-            batch.update(
-              doc(
-                this.firestore,
-                'participantsproduct',
-                dd['participantproductid'],
-              ),
-              { status: 'cancelled' },
-            );
+            batch.update(doc(this.firestore, 'participantsproduct', dd['participantproductid']), { status: 'cancelled' });
           }
           batch.update(d.ref, { status: null });
         });
@@ -2837,7 +2937,7 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
         duration: 4000,
       });
       this.selection.clear();
-      await this.loadData();
+      // await this.loadData();
     } catch (e) {
       console.log(e);
       this.snackbar.open('Could not mark not attended', 'OK', {
@@ -2853,11 +2953,17 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
   // auto-open the shared bulk-add-products dialog, pre-loaded with the revoked profiles + this event's product,
   // so an admin can create a fresh product for them in one flow.
   get selectedToRevoke() {
-    return this.selection.selected.filter((r) => r.isApproved);
+    return this.selection.selected.filter((r) => this.segmentList['approved'].includes(r));
   }
 
-  async markRevoked(rows: PRow[]) {
-    const targets = rows.filter((r) => r.approvedRequestId);
+  async markRevoked(pids: string[]) {
+    const targets = pids
+      .map((pid) => {
+        const reqDoc = this.getRecentRequestData(this.participantRequestMap[pid] ?? []);
+        return reqDoc;
+      })
+      .filter((reqDoc) => reqDoc && reqDoc['docid'] && reqDoc['profileid']);
+
     if (!targets.length) return;
     const ref = this.dialog.open(this.confirmTpl, {
       width: '440px',
@@ -2888,15 +2994,8 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     let committed = false;
     try {
       const batch = writeBatch(this.firestore);
-      const reqRefs = targets.map((r) =>
-        doc(
-          this.firestore,
-          'event participation request',
-          r.approvedRequestId!,
-        ),
-      );
-      const revokedBy =
-        (this.guard.loggedinProfile as any)?.['profileid'] ?? null;
+      const reqRefs = targets.map((reqData: any) => doc(this.firestore, 'event participation request', reqData['docid']));
+      const revokedBy = (this.guard.loggedinProfile as any)?.['profileid'] ?? null;
       targets.forEach((r, i) => {
         batch.update(reqRefs[i], {
           status: 'revoked',
@@ -2905,40 +3004,20 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
         });
       });
       // Delete the events_profiles record for each (profile + event).
-      for (const r of targets) {
+      for (const reqData of targets) {
         const epSnap = await getDocs(
-          query(
-            collection(this.firestore, 'events_profiles'),
-            where(
-              'profile_ref',
-              '==',
-              doc(this.firestore, 'profile_data', r.profileid),
-            ),
-            where('event_ref', '==', this.arena['eventref']),
-          ),
+          query(collection(this.firestore, 'events_profiles'), where('profile_ref', '==', doc(this.firestore, 'profile_data', reqData['profileid'])), where('event_ref', '==', this.arena['eventref'])),
         );
         epSnap.docs.forEach((d) => batch.delete(d.ref));
       }
       // Cancel the product from the deliverable, then null the deliverables.
       for (let i = 0; i < reqRefs.length; i += 10) {
         const sub = reqRefs.slice(i, i + 10);
-        const delSnap = await getDocs(
-          query(
-            collection(this.firestore, 'deliverables'),
-            where('fileref', 'array-contains-any', sub),
-          ),
-        );
+        const delSnap = await getDocs(query(collection(this.firestore, 'deliverables'), where('fileref', 'array-contains-any', sub)));
         delSnap.docs.forEach((d) => {
           const dd = d.data();
           if (dd['participantproductid']) {
-            batch.update(
-              doc(
-                this.firestore,
-                'participantsproduct',
-                dd['participantproductid'],
-              ),
-              { status: 'cancelled' },
-            );
+            batch.update(doc(this.firestore, 'participantsproduct', dd['participantproductid']), { status: 'cancelled' });
           }
           batch.update(d.ref, { status: null });
         });
@@ -2956,11 +3035,15 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     if (!committed) return;
 
     // Auto-open the bulk-add dialog with the revoked profiles + this event's product to create a new product.
-    const participants = targets.map((r) => ({
-      profileid: r.profileid,
-      name: r.name,
-      email: r.email,
-    }));
+    const participants = targets.map((r) => {
+      const metadata = this.participantMetadata[r['profileid']];
+
+      return {
+        profileid: metadata?.profileid,
+        name: metadata?.name,
+        email: metadata?.email,
+      };
+    });
     console.log('REVOKE→bulk-add', {
       productrefId: this.arena?.['productref']?.id,
       productrefResolvesToName: this.mapProduct[this.arena?.['productref']?.id],
@@ -2977,7 +3060,7 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       .subscribe(async () => {
         const seq = this.selectedDeliverySet,
           variation = this.selectedQueueVariation;
-        await this.loadData();
+        // await this.loadData();
         this.selectedDeliverySet = seq;
         this.selectedQueueVariation = variation;
       });
@@ -2985,18 +3068,22 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
 
   // Single per-row entry point: approved rows take the heavy path (cancel product etc.),
   // requested rows take the lightweight status-only path.
-  revoke(row: PRow) {
-    if (row.isApproved) this.markRevoked([row]);
-    else this.markRevokedRequested([row]);
+  revoke(pid: string) {
+    if (this.segmentList['approved'].includes(pid)) this.markRevoked([pid]);
+    else this.markRevokedRequested([pid]);
   }
 
   // ---- Revoke a still-REQUESTED participant (lightweight): status -> 'revoked' only. ----
   // Requested people have no initiated product / event profile / deliverables yet, so unlike
   // markRevoked() this ONLY flips the request status and records who/when — nothing else is touched.
-  async markRevokedRequested(rows: PRow[]) {
-    const targets = rows.filter(
-      (r) => r.requestData?.['docid'] && !r.isApproved,
-    );
+  async markRevokedRequested(pids: string[]) {
+    const targets = pids
+      .map((pid) => {
+        const reqDoc = this.getRecentRequestData(this.participantRequestMap[pid] ?? []);
+        return reqDoc;
+      })
+      .filter((reqDoc) => reqDoc && reqDoc['docid'] && reqDoc['profileid'] && reqDoc['status'] !== 'approved');
+
     if (!targets.length) return;
     const ref = this.dialog.open(this.confirmTpl, {
       width: '440px',
@@ -3026,26 +3113,18 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     });
     try {
       const batch = writeBatch(this.firestore);
-      const revokedBy =
-        (this.guard.loggedinProfile as any)?.['profileid'] ?? null;
-      for (const r of targets) {
-        batch.update(
-          doc(
-            this.firestore,
-            'event participation request',
-            r.requestData['docid'],
-          ),
-          {
-            status: 'revoked',
-            revoked_by: revokedBy,
-            revoked_date: serverTimestamp(),
-          },
-        );
+      const revokedBy = (this.guard.loggedinProfile as any)?.['profileid'] ?? null;
+      for (const reqData of targets) {
+        batch.update(doc(this.firestore, 'event participation request', reqData['docid']), {
+          status: 'revoked',
+          revoked_by: revokedBy,
+          revoked_date: serverTimestamp(),
+        });
       }
       await batch.commit();
       this.snackbar.open(`Revoked ${targets.length}`, 'OK', { duration: 4000 });
       this.selection.clear();
-      await this.loadData();
+      // await this.loadData();
     } catch (e) {
       console.log(e);
       this.snackbar.open('Could not revoke', 'OK', { duration: 4000 });
@@ -3054,27 +3133,87 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     }
   }
 
+  // function to get revoked data of a participant
+  getRevokedData(pid: string) {
+    const revokeData = this.getRecentRevokedDoc(pid);
+    return revokeData;
+  }
+
+  // function to get the recent revoked request of a participant
+  getRecentRevokedDoc(pid: string) {
+    const request = this.participantRequestMap[pid] ?? [];
+    if (!request || request.length === 0) return null;
+    let result = null;
+    for (let i = 0; i < request.length; i++) {
+      if (request['status'] === 'revoked') {
+        const r = request[i];
+        if (result) {
+          const oldRequestDate = this.toDate(result['doccreateddate']) ?? null;
+          const currentReqDate = this.toDate(r['doccreateddate']) ?? null;
+          if (currentReqDate && currentReqDate > oldRequestDate) {
+            result = r;
+          }
+        } else {
+          result = r;
+        }
+      }
+    }
+
+    return result;
+  }
+
+  // function to get the name of the profile who revoked the participant
+  revokedByName(pid: string) {
+    return this.participantMetadata[this.revokedByMap[pid]?.revoked_by || '']?.name ?? '';
+  }
+
+  // ---- Assign product (no-product rows) ----
+  assignProduct(pid: string) {
+    const metadata = this.participantMetadata[pid] ?? null;
+    if (!metadata) return;
+    const participants = [{ profileid: pid, name: metadata?.name, email: metadata?.email }];
+    this.dialog
+      .open(BulkAddProductsComponent, {
+        data: { participants, productrefId: this.arena?.['productref']?.id },
+        width: '70vw',
+        disableClose: true,
+        panelClass: 'sx-dialog-surface',
+      })
+      .afterClosed()
+      .subscribe(async () => {
+        const seq = this.selectedDeliverySet,
+          variation = this.selectedQueueVariation;
+        // await this.loadData();
+        this.selectedDeliverySet = seq;
+        this.selectedQueueVariation = variation;
+      });
+  }
+
+  // ================================== Finalize Attendance =========================
+
   // ---- Finalize attendance (after the event): mark no-show + lock the frozen snapshot ----
   // Product-preserving: writes only namespaced fields (attendance on the request, snapshot on the arena doc).
   get eventEnded(): boolean {
     return !!this.eventEnd && Date.now() > this.eventEnd;
   }
+
   get alreadyFinalized(): boolean {
     return !!this.arena?.['epc_snapshot'];
   }
-  get pendingNoShow(): PRow[] {
-    return this.rows.filter(
-      (r) => r.isApproved && !r.attended && r.attendanceState !== 'no_show',
-    );
+
+  get pendingNoShow(): string[] {
+    return this.segmentList['approved'].filter((pid : string) => !this.segmentList['attended'].includes(pid));
   }
+
   get canFinalize(): boolean {
     return this.eventEnded && !this.alreadyFinalized;
   }
+
   get frozenStats() {
     const s = this.arena?.['epc_snapshot'];
-    const att = s ? s['attended'] || 0 : this.counts.attended;
-    const app = s ? s['approved'] || 0 : this.counts.approved;
-    const pot = s ? s['potential'] || 0 : this.counts.potential;
+    const att = s ? s['attended'] || 0 : this.segmentList['attended'].length;
+    const app = s ? s['approved'] || 0 : this.segmentList['approved'].length;
+    const pot = s ? s['potential'] || 0 : this.segmentList['potential'].length;
     return {
       attended: att,
       approved: app,
@@ -3084,9 +3223,15 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     };
   }
 
+  // function to finalize attendance
   async finalizeAttendance() {
     if (!this.canFinalize) return;
-    const targets = this.pendingNoShow.filter((r) => r.approvedRequestId);
+    const targets = this.pendingNoShow
+      .map((pid) => {
+        const reqDoc = this.getRecentRequestData(this.participantRequestMap[pid] ?? []);
+        return reqDoc?.['docid'] ? { approvedRequestId : reqDoc['docid'] } : null;
+      })
+      .filter((reqDoc) => reqDoc);
     const ref = this.dialog.open(this.confirmTpl, {
       width: '420px',
       autoFocus: false,
@@ -3120,55 +3265,39 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
         const chunk = targets.slice(i, i + 400);
         const batch = writeBatch(this.firestore);
         chunk.forEach((r) => {
-          batch.update(
-            doc(
-              this.firestore,
-              'event participation request',
-              r.approvedRequestId!,
-            ),
-            {
-              attendance_state: 'no_show',
-              attendance_source: 'manual',
-              attendance_marked_at: serverTimestamp(),
-            },
-          );
+          batch.update(doc(this.firestore, 'event participation request', r.approvedRequestId!), {
+            attendance_state: 'no_show',
+            attendance_source: 'manual',
+            attendance_marked_at: serverTimestamp(),
+          });
         });
         await batch.commit();
-        this.progress.value = Math.round(
-          (Math.min(i + chunk.length, targets.length) / targets.length) * 100,
-        );
+        this.progress.value = Math.round((Math.min(i + chunk.length, targets.length) / targets.length) * 100);
       }
-      targets.forEach((r) => {
-        r.attendanceState = 'no_show';
-      });
-      this.counts.noShow += targets.length;
+      // targets.forEach((r) => {
+      //   r.attendanceState = 'no_show';
+      // });
+      // this.counts.noShow += targets.length;
 
       const snapshot = {
-        potential: this.counts.potential,
-        requested: this.counts.requested,
-        notRequested: this.counts.notRequested,
-        eligible: this.counts.eligible,
-        noProduct: this.counts.noProduct,
-        inQueue: this.counts.inQueue,
-        approved: this.counts.approved,
-        attended: this.counts.attended,
-        noShow: this.counts.noShow,
+        potential: this.segmentList['potential'].length,
+        requested: this.segmentList['requested'].length,
+        notRequested: this.segmentList['notRequested'].length,
+        eligible: this.segmentList['eligible'].length,
+        upgrade: this.segmentList['upgrade'].length,
+        addon: this.segmentList['addon'].length,
+        continuity: this.segmentList['continuity'].length,
+        inQueue: this.segmentList['inQueue'].length,
+        approved: this.segmentList['approved'].length,
+        attended: this.segmentList['attended'].length,
+        noShow: this.segmentList['noShow'].length,
       };
-      await updateDoc(
-        doc(this.firestore, 'arena events', this.arena['docid']),
-        {
-          epc_snapshot: snapshot,
-          epc_snapshot_at: serverTimestamp(),
-        },
-      );
+      await updateDoc(doc(this.firestore, 'arena events', this.arena['docid']), {
+        epc_snapshot: snapshot,
+        epc_snapshot_at: serverTimestamp(),
+      });
       this.arena['epc_snapshot'] = snapshot;
-      this.snackbar.open(
-        targets.length
-          ? `Finalized — ${targets.length} marked no-show`
-          : 'Event finalized',
-        'OK',
-        { duration: 4000 },
-      );
+      this.snackbar.open(targets.length ? `Finalized — ${targets.length} marked no-show` : 'Event finalized', 'OK', { duration: 4000 });
     } catch (e) {
       console.log(e);
       this.snackbar.open('Could not finalize', 'OK', { duration: 4000 });
@@ -3177,32 +3306,9 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     }
   }
 
-  // ---- Assign product (no-product rows) ----
-  assignProduct(row: PRow) {
-    const participants = [
-      { profileid: row.profileid, name: row.name, email: row.email },
-    ];
-    this.dialog
-      .open(BulkAddProductsComponent, {
-        data: { participants, productrefId: this.arena?.['productref']?.id },
-        width: '70vw',
-        disableClose: true,
-        panelClass: 'sx-dialog-surface',
-      })
-      .afterClosed()
-      .subscribe(async () => {
-        const seq = this.selectedDeliverySet,
-          variation = this.selectedQueueVariation;
-        await this.loadData();
-        this.selectedDeliverySet = seq;
-        this.selectedQueueVariation = variation;
-      });
-  }
+  // ================================== Bulk Import =========================
 
   // ---- Bulk import (Excel) — mirrors initiate-event-product, incl. non-requesters ----
-  @ViewChild('importTpl') importTpl!: TemplateRef<any>;
-  private importDialogRef: any = null;
-
   downloadSampleExcel() {
     const ws = XLSX.utils.aoa_to_sheet([
       ['name', 'email'],
@@ -3213,6 +3319,7 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     XLSX.writeFile(wb, 'participants_sample.xlsx');
   }
 
+  // function to import participants from excel and preview them
   importParticipants() {
     const input = document.createElement('input');
     input.type = 'file';
@@ -3229,10 +3336,7 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
-          const wb = XLSX.read(
-            new Uint8Array(e.target!.result as ArrayBuffer),
-            { type: 'array' },
-          );
+          const wb = XLSX.read(new Uint8Array(e.target!.result as ArrayBuffer), { type: 'array' });
           const sheet = wb.Sheets[wb.SheetNames[0]];
           const json = XLSX.utils.sheet_to_json(sheet, {
             header: 1,
@@ -3254,11 +3358,7 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
           this.pendingImportRows = [];
           parsed.forEach((p) => {
             const owner = this.ownerByEmail.get(p.email);
-            if (
-              owner &&
-              (owner.inQueue || this.activeProfileIds.has(owner.profileid))
-            )
-              inQueue.push(p);
+            if (owner && (owner.inQueue || this.activeProfileIds.has(owner.profileid))) inQueue.push(p);
             else if (owner) {
               willAdd.push(p);
               this.pendingImportRows.push(owner);
@@ -3286,8 +3386,7 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
           this.snackbar.open('Could not read file', 'OK', { duration: 4000 });
         }
       };
-      reader.onerror = () =>
-        this.snackbar.open('Could not read file', 'OK', { duration: 4000 });
+      reader.onerror = () => this.snackbar.open('Could not read file', 'OK', { duration: 4000 });
       reader.readAsArrayBuffer(file);
     });
     input.click();
@@ -3308,17 +3407,13 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       });
       return;
     }
-    if (
-      this.arena?.['type'] === 'queue' &&
-      this.queueVariationList.length > 0 &&
-      !this.selectedQueueVariation
-    ) {
+    if (this.arena?.['type'] === 'queue' && this.queueVariationList.length > 0 && !this.selectedQueueVariation) {
       this.snackbar.open('Pick a queue variation first, then import', 'OK', {
         duration: 5000,
       });
       return;
     }
-    await this.runApprove(rows);
+    await this.runApprove([]);
   }
 
   // Assign the product to the imported "no product" people via the shared bulk-add dialog.
@@ -3349,12 +3444,13 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       .subscribe(async () => {
         const seq = this.selectedDeliverySet,
           variation = this.selectedQueueVariation;
-        await this.loadData();
+        // await this.loadData();
         this.selectedDeliverySet = seq;
         this.selectedQueueVariation = variation;
       });
   }
 
+  // function to export the imported no product list
   exportImportNoProduct() {
     const ws = XLSX.utils.json_to_sheet(this.importPreview?.noProduct ?? []);
     const wb = XLSX.utils.book_new();
@@ -3362,13 +3458,103 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     XLSX.writeFile(wb, 'import_no_product.xlsx');
   }
 
+  // function to ask for the sample excel or open the file picker
+  handleImportClick() {
+    const sampleDownload = confirm('Do you want to download sample Import Excel');
+    if (sampleDownload) {
+      const data = [
+        { name: 'John Doe', email: 'john@example.com' },
+        { name: 'Jane Smith', email: 'jane@example.com' },
+        { name: 'surya', email: 'surya.thiruvengadam@soexcellence.com' },
+      ];
+
+      const worksheet: XLSX.WorkSheet = XLSX.utils.json_to_sheet(data);
+
+      const workbook: XLSX.WorkBook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Sample');
+
+      XLSX.writeFile(workbook, 'sample_format.xlsx');
+      return;
+    }
+    this.inputFile.nativeElement.click();
+  }
+
+  // function to select the table rows matching the uploaded excel emails
+  onChange(evt: Event) {
+    const target = evt.target as HTMLInputElement;
+    const file = target.files?.[0];
+
+    if (!file) return;
+
+    this.isExcelFile = /\.(xls|xlsx)$/i.test(file.name);
+
+    if (!this.isExcelFile) {
+      this.inputFile.nativeElement.value = '';
+      console.log('Invalid file type. Please upload an Excel file.');
+      return;
+    }
+
+    if (target.files.length > 1) {
+      this.inputFile.nativeElement.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = (e: ProgressEvent<FileReader>) => {
+      const arrayBuffer = e.target?.result as ArrayBuffer;
+
+      try {
+        const wb: XLSX.WorkBook = XLSX.read(arrayBuffer, {
+          type: 'array',
+          cellDates: true,
+        });
+
+        const wsname: string = wb.SheetNames[0];
+        const ws: XLSX.WorkSheet = wb.Sheets[wsname];
+
+        const data = XLSX.utils.sheet_to_json(ws);
+
+        console.log('Imported List', data.length);
+
+        data
+          // .filter((e: any) => this.emailList.includes(e.email))
+          .forEach((g: any) => {
+            const matched = this.segmentRows.find((pid: string) => {
+              const email = this.participantMetadata[pid]?.['email'];
+              return email === g['email'];
+            });
+            console.log(matched, 'matchd');
+
+            if (matched) {
+              this.selection.toggle(matched);
+            } else {
+              console.log('Unmatched', g['email']);
+            }
+          });
+      } catch (error) {
+        console.error('Error processing file:', error);
+      }
+    };
+
+    this.inputFile.nativeElement.value = '';
+    reader.readAsArrayBuffer(file);
+  }
+
+  // ================================== Communications =========================
+
   // ---- Communications (sends to the current segment's participants) ----
-  get commsRecipients(): PRow[] {
+  get commsRecipients(): string[] {
     return this.selection.selected;
   }
 
+  get communications() {
+    return Object.values(this.communicationMap);
+  }
+
+  // function to send whatsapp message
   sendWhatsApp() {
-    const recipients = this.commsRecipients;
+    const recipients = this.commsRecipients.map((pid) => this.participantMetadata[pid]);
     if (!recipients.length) {
       this.snackbar.open('No participants to message', 'OK', {
         duration: 3000,
@@ -3392,16 +3578,13 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       .subscribe((result) => {
         if (!result) return;
         const failed = result === 'failed' || result?.status === 'failed';
-        this.snackbar.open(
-          failed ? 'WhatsApp send failed' : 'WhatsApp message sent',
-          'OK',
-          { duration: 4000 },
-        );
+        this.snackbar.open(failed ? 'WhatsApp send failed' : 'WhatsApp message sent', 'OK', { duration: 4000 });
       });
   }
 
+  // function to send app notification
   sendNotification() {
-    const recipients = this.commsRecipients;
+    const recipients = this.commsRecipients.map((pid) => this.participantMetadata[pid]);
     if (!recipients.length) {
       this.snackbar.open('No participants to notify', 'OK', { duration: 3000 });
       return;
@@ -3421,14 +3604,8 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
         try {
           let image: string | null = null;
           if (result['notificationimage']) {
-            const path =
-              'Notification Images/' +
-              new Date().toISOString() +
-              result['notificationimage'].name;
-            const up = await uploadBytes(
-              ref(this.storage, path),
-              result['notificationimage'],
-            );
+            const path = 'Notification Images/' + new Date().toISOString() + result['notificationimage'].name;
+            const up = await uploadBytes(ref(this.storage, path), result['notificationimage']);
             image = await getDownloadURL(up.ref);
           }
           await this.guard.saveNotificationRecord({
@@ -3443,11 +3620,7 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
             profileid: profileids,
             receivingapp: result['receivingapp'] ?? 'breakthroughsapp',
           });
-          this.snackbar.open(
-            `Notification sent to ${profileids.length}`,
-            'OK',
-            { duration: 4000 },
-          );
+          this.snackbar.open(`Notification sent to ${profileids.length}`, 'OK', { duration: 4000 });
         } catch (e) {
           console.log(e);
           this.snackbar.open('Could not send notification', 'OK', {
@@ -3457,8 +3630,9 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       });
   }
 
+  // function to send email
   sendEmail() {
-    const recipients = this.commsRecipients;
+    const recipients = this.commsRecipients.map((pid) => this.participantMetadata[pid]);
     if (!recipients.length) {
       this.snackbar.open('No participants to email', 'OK', { duration: 3000 });
       return;
@@ -3480,29 +3654,19 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
         if (!result) return;
         try {
           if (result['status'] === 'queued' || result['status'] === 'send') {
-            await setDoc(
-              doc(collection(this.firestore, 'email archive'), result['docid']),
-              result,
-              { merge: true },
-            );
+            await setDoc(doc(collection(this.firestore, 'email archive'), result['docid']), result, { merge: true });
             this.snackbar.open('Email queued', 'OK', { duration: 4000 });
           } else if (result['status'] === 'validated') {
             const url =
-              environment.firebase.projectId === 'starlabs-test'
-                ? 'https://us-central1-starlabs-test.cloudfunctions.net/sendBatchEmail'
-                : 'https://us-central1-fir-sample-aae4a.cloudfunctions.net/sendBatchEmail';
+              environment.firebase.projectId === 'starlabs-test' ? 'https://us-central1-starlabs-test.cloudfunctions.net/sendBatchEmail' : 'https://us-central1-fir-sample-aae4a.cloudfunctions.net/sendBatchEmail';
             const payload: any = { ...result, archiveid: result['docid'] };
             this.http
               .post(url, JSON.stringify(payload), {
                 responseType: 'text',
-                headers: new HttpHeaders().set(
-                  'Content-Type',
-                  'application/json',
-                ),
+                headers: new HttpHeaders().set('Content-Type', 'application/json'),
               })
               .subscribe({
-                next: () =>
-                  this.snackbar.open('Email sent', 'OK', { duration: 4000 }),
+                next: () => this.snackbar.open('Email sent', 'OK', { duration: 4000 }),
                 error: (e) => {
                   console.log(e);
                   this.snackbar.open('Error sending email', 'OK', {
@@ -3518,6 +3682,8 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       });
   }
 
+  // ================================== Export =========================
+
   // Funnel-bucket label for a row (used in export "Eligibility" column).
   eligibilityLabel(r: PRow): string {
     if (r.isUnattended) return 'Unattended';
@@ -3531,79 +3697,136 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     return '';
   }
 
-  async exportList() {
+  // function to export the current segment list to excel
+  exportList() {
     const rows = this.segmentRows;
     if (!rows.length) {
       this.snackbar.open('Nothing to export', 'OK', { duration: 3000 });
       return;
     }
-    // Make sure every row in the segment has its metadata before exporting (not just the visible page).
-    this.progress = {
-      msg: 'Preparing export…',
-      value: 0,
-      total: rows.length,
-      eta: '',
-    };
-    const pref = this.dialog.open(this.progressTpl, {
-      width: '360px',
-      disableClose: true,
-      autoFocus: false,
-      panelClass: 'sx-dialog',
-    });
+
     try {
-      await Promise.all([this.loadMeta(rows), this.loadSubscriptions(rows)]);
-      const data = rows.map((r) => {
-        const due =
-          typeof r.purchaseValue === 'number' && typeof r.paid === 'number'
-            ? r.purchaseValue - r.paid
-            : '';
-        const rd = r.requestedDate ? new Date(r.requestedDate) : null;
-        return {
-          Name: r.name,
-          Email: r.email || '',
-          Phone: r.phone || '',
-          // Real Excel date value (date-only) so it sorts/filters as a date; time in its own column.
-          'Requested date': rd
-            ? new Date(rd.getFullYear(), rd.getMonth(), rd.getDate())
-            : '',
-          'Requested time': rd ? formatDate(rd, 'h:mm:ss a', 'en-US') : '',
-          'Active journey': r.journey || '',
-          'Total purchase value': r.purchaseValue ?? '',
-          'Total paid': r.paid ?? '',
-          Due: due,
-          'Financial status': r.finance || '',
-          Subscription:
-            (r.subActive ? 'Active' : r.subscriptionend ? 'Expired' : '') +
-            (r.subscriptionend
-              ? ' ' + this.formatMonthYear(r.subscriptionend)
-              : ''),
-          'Customer status': r.customerStatus || '',
-          Eligibility: this.eligibilityLabel(r),
-          Reason: r.reason || '',
-          Attended: r.attended ? 'Yes' : 'No',
-          'Venue Fee': this.getVenueFeeStatus(r),
-        };
-      });
-      const ws = XLSX.utils.json_to_sheet(data, {
-        cellDates: true,
-        dateNF: 'yyyy-mm-dd',
-      });
+      // name , email and phone are always exported , then the columns shown in the table
+      const columns = ['name', 'email', 'phonenumber'];
+      for (const column of this.tableColumns) {
+        if (column === 'select' || columns.includes(column)) continue;
+        columns.push(column);
+      }
+
+      const data: any[] = [];
+      for (const row of rows) {
+        const item: any = {};
+
+        for (const column of columns) {
+          const config = this.columnRegistry[column];
+          if (!config) continue;
+
+          const label = config.label;
+          const value = this.getColumnValue(column, row);
+
+          if (config.type === 'date') {
+            let date = this.toDate(value);
+            if (date && isNaN(date.getTime())) date = null;
+
+            // real Excel date (date only) so it sorts and filters as a date
+            item[label] = date ? new Date(date.getFullYear(), date.getMonth(), date.getDate()) : '';
+
+            // if (column === 'requestedDate') item['Requested time'] = date ? formatDate(date, 'h:mm:ss a', 'en-US') : '';
+            // if (column === 'subscriptionend') item['Subscription status'] = date ? (row.subActive ? 'Active' : 'Expired') : '';
+          } else if (column === 'current journey') {
+            item[label] = this.mapJourney[value];
+          } else if (config.type === 'relation') {
+            const products = [];
+            for (const [id, count] of Object.entries(value ?? {})) {
+              products.push(`${this.mapProduct[id] ?? id} - ${count}`);
+            }
+            item[label] = products.join('; ');
+          } else if (config.checklist) {
+            item[label] = value === 'clear' ? 'Clear' : 'Not clear';
+          } else {
+            item[label] = value ?? '';
+          }
+        }
+
+        data.push(item);
+      }
+
+      const ws = XLSX.utils.json_to_sheet(data, { cellDates: true, dateNF: 'yyyy-mm-dd' });
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Participants');
       XLSX.writeFile(wb, `${this.productName}_${this.segment}.xlsx`);
-      this.snackbar.open(`Exported ${rows.length} rows`, 'OK', {
-        duration: 3000,
-      });
+
+      this.snackbar.open(`Exported ${rows.length} rows`, 'OK', { duration: 3000 });
     } catch (e) {
       console.log(e);
       this.snackbar.open('Could not export', 'OK', { duration: 4000 });
-    } finally {
-      pref.close();
     }
   }
 
-  readonly trackByIndex = (i: number) => i;
+  // ================================== Sales & Tickets =========================
 
+  // function to calculate last 30 days sales
+  calculateSales(overAllRequestedParticipants: Array<string>) {
+    let last30daysSale = 0;
+    for (const pid of overAllRequestedParticipants) {
+      if (this.isnewParticipant(pid)) {
+        last30daysSale++;
+      }
+    }
+    this.last30daysSale = last30daysSale;
+  }
+
+  // function to check participant is a new sale
+  isnewParticipant(pid: string) {
+    const sales = this.participantSalesMap[pid];
+    const product = this.arena['productref']?.id;
+    const journey = this.arena?.['eligibility']?.journeyid ?? [];
+    if (sales) {
+      for (const sale of sales) {
+        if ((['new', 'upgrade'].includes(sale?.journeytype) && journey.includes(sale?.journey)) || sale?.addon?.includes(product)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  // function to calculate open customer tickets
+  calculateCustomerTickets(overAllRequestedParticipants: Array<string>) {
+    const openTickets = {
+      eventProcessTickets: 0,
+      others: 0,
+    };
+    for (const pid of overAllRequestedParticipants) {
+      const metadata = this.participantMetadata[pid] ?? null;
+      if (metadata) {
+        const customersupport = metadata['customersupport'] ?? {};
+        for (const [ticketId, ticket] of Object.entries(customersupport) as any) {
+          if (ticket?.category === 'Events & Process') {
+            openTickets.eventProcessTickets++;
+          } else {
+            openTickets.others++;
+          }
+        }
+      }
+    }
+    this.openTickets = openTickets;
+  }
+
+  // Venue fee column — exempted / paid / not paid, from the e-ticket eligibility mirror
+  getVenueFeeStatus(eventParticipationId: any): string {
+    // const eventParticipationId = row['approvedRequestId'];
+    const eligibility = this.mapEligibility[eventParticipationId];
+    if ([null, undefined].includes(eligibility)) {
+      return 'Not paid';
+    }
+    if (eligibility['exempted'] === true) {
+      return 'Exempted';
+    }
+    return eligibility['venue_fee_paid'] === true ? 'Paid' : 'Not paid';
+  }
+
+  // function to toggle sales filter
   toggleSaleClick() {
     this.isSalesSelected = !this.isSalesSelected;
     this.segment = 'overallRequested';
@@ -3611,6 +3834,7 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     this.defaultSelection();
   }
 
+  // function to toggle tickets filter
   toggleTickets(category: 'all' | 'ep' | 'others') {
     if (this.selectedTicketCategory === category) {
       this.selectedTicketCategory = 'all';
@@ -3622,15 +3846,14 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     this.defaultSelection();
   }
 
+  // function to open ticket detail popup
   openTicketDetail(pid: string) {
     const metadata = this.participantMetadata[pid] ?? null;
     if (metadata) {
       const epTickets = [];
       const otherTickets = [];
 
-      for (const [ticketId, t] of Object.entries(
-        metadata?.customersupport ?? {},
-      ) as any) {
+      for (const [ticketId, t] of Object.entries(metadata?.customersupport ?? {}) as any) {
         const cat = t?.category ?? 'Unknown';
         const isEp = cat === 'Events & Process';
         const ticket = { ...t, category: cat, isEp, ticketid: ticketId };
@@ -3641,12 +3864,8 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
         }
       }
 
-      epTickets.sort(
-        (a, b) => this.toMillis(b.reporteddate) - this.toMillis(a.reporteddate),
-      );
-      otherTickets.sort(
-        (a, b) => this.toMillis(b.reporteddate) - this.toMillis(a.reporteddate),
-      );
+      epTickets.sort((a, b) => this.toMillis(b.reporteddate) - this.toMillis(a.reporteddate));
+      otherTickets.sort((a, b) => this.toMillis(b.reporteddate) - this.toMillis(a.reporteddate));
 
       const selectedParticipantsTicket = {
         profileid: pid,
@@ -3662,52 +3881,46 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     }
   }
 
+  // function to close ticket detail popup
   closeTicketDetail() {
     this.selectedParticipantsTicket = null;
     this.dialog.closeAll();
   }
 
+  // function to get tickets of the selected category
   getTickets() {
     if (this.selectedParticipantsTicket) {
-      const selectedCategory =
-        this.selectedParticipantsTicket?.selectedCategory;
+      const selectedCategory = this.selectedParticipantsTicket?.selectedCategory;
       if (selectedCategory === 'ep') {
         return this.selectedParticipantsTicket?.epTickets;
       } else if (selectedCategory === 'others') {
         return this.selectedParticipantsTicket?.otherTickets;
       } else {
-        return [
-          ...this.selectedParticipantsTicket?.epTickets,
-          ...this.selectedParticipantsTicket?.otherTickets,
-        ];
+        return [...this.selectedParticipantsTicket?.epTickets, ...this.selectedParticipantsTicket?.otherTickets];
       }
     }
     return [];
   }
 
-  trackByTicketNo = (_: number, t: Ticket) => t.ticketno;
-
+  // function to get reported date of a ticket
   reportedDate(t: Ticket): Date | null {
     const d = t.reporteddate;
     if (!d) return null;
     return typeof d.toDate === 'function' ? d.toDate() : new Date(d);
   }
 
+  // function to handle ticket click
   onTicketClick(t: Ticket) {
     this.closeTicketDetail();
-    this.router.navigateByUrl(
-      `/customersupportdashboard/ticket/${t?.ticketid}/${t.ticketno}`,
-    );
+    this.router.navigateByUrl(`/customersupportdashboard/ticket/${t?.ticketid}/${t.ticketno}`);
   }
 
-  trackByColumnKey = (_: number, column: any) => column.key;
-  trackChip = (_: number, chip: FilterChip) => chip.key ?? chip.label;
+  // ================================== Table Columns =========================
 
   get tableColumns() {
     const columns = [];
     for (const [key, config] of Object.entries(this.columnRegistry)) {
-      if ((config.defaultColumn || config?.checklist) && config.visible())
-        columns.push(key);
+      if ((config.defaultColumn || config?.checklist) && config.visible()) columns.push(key);
     }
     return [...columns, ...this.displayColumns, ...this.appliedCheckList];
   }
@@ -3716,6 +3929,166 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     return this.tableColumns.length;
   }
 
+  columnChange(columns : MatSelectChange){
+    const currentColumns = [...columns.value];
+    const columnsRemoved = this.cachedColumns.filter((c)=> !currentColumns.includes(c));
+    for (const c of columnsRemoved) {
+      if (this.filterMap[c]) delete this.filterMap[c];
+    }
+    this.displayColumns = currentColumns;
+    this.cachedColumns = [...this.displayColumns];
+  }
+
+  // function to get optional columns ( with search )
+  getColumn() {
+    const search = this.columSearch?.trim()?.toLocaleLowerCase() ?? '';
+    const columns = [];
+    for (const [key, config] of Object.entries(this.columnRegistry)) {
+      if (config.defaultColumn || config.type === 'none') continue;
+      if (search.length > 0 && !config.label.toLocaleLowerCase().includes(search)) continue;
+      columns.push({ key: key, label: config.label });
+    }
+    return columns;
+  }
+
+  // function to remove an optional column
+  removeColumnChip(c: string) {
+    if (this.filterMap[c]) delete this.filterMap[c];
+    this.displayColumns = this.displayColumns.filter((column) => column !== c);
+    this.cachedColumns = [...this.displayColumns];
+  }
+
+  // function to remove all optional columns
+  clearAllColumns() {
+    const columns = [...this.displayColumns];
+    for (const c of columns) {
+      if (this.filterMap[c]) delete this.filterMap[c];
+    }
+    this.displayColumns = [];
+    this.cachedColumns = [];
+  }
+
+  // function to get the recent request of a participant
+  getRecentRequestData(req: Array<any>) {
+    if (!req || req.length === 0) return null;
+    let result = req[0];
+    for (let i = 1; i < req.length; i++) {
+      const r = req[i];
+      const oldRequestDate = this.toDate(result['doccreateddate']) ?? null;
+      const currentReqDate = this.toDate(r['doccreateddate']) ?? null;
+      if (currentReqDate && currentReqDate > oldRequestDate) {
+        result = r;
+      }
+    }
+
+    return result;
+  }
+
+  // function to get the value of a column for a participant
+  getColumnValue(column: string, pid: string) {
+    const config = this.columnRegistry[column];
+    if (!config) throw new Error(`Unknown column "${column}"`);
+
+    const meta = this.participantMetadata[pid] ?? {};
+    const req = this.participantRequestMap[pid] ?? [];
+    const eventParticipationDoc = this.getRecentRequestData(req);
+    const requestedDate = this.toDate(eventParticipationDoc?.['doccreateddate']);
+    let value = null;
+
+    if (column === 'name') {
+      value = meta.name;
+    } else if (column === 'requestedDate') {
+      value = requestedDate || null;
+    } else if (column === 'current journey') {
+      const status = (meta['customerstatus'] ?? '').toString().trim().toLowerCase();
+      if (status === 'active') value = meta['activejourney'];
+      else if (status === 'non active') value = meta['lastcompletedjourney'];
+      else value = meta['lastsubscribedjourney'];
+    } else if (column === 'subscriptionend') {
+      value = this.toMillis(meta['subscriptionend']) || null;
+    } else if (column === 'subscriptionstart') {
+      value = this.toMillis(meta['subscriptionstart']) || null;
+    } else if (column === 'paid') {
+      value = meta['pp_totalpaid'];
+    } else if (column === 'totalpurchasevalue') {
+      value = meta['pp_totalpurchasevalue'];
+    } else if (column === 'venuefee') {
+      value = eventParticipationDoc?.['docid'] ? this.getVenueFeeStatus(eventParticipationDoc['docid']) : '';
+    } else if (column === 'up! count') {
+      value = this.getUpCount(pid);
+    } else if (column === 'cpm! count') {
+      value = this.getCpmCount(pid);
+    } else if (this.columnRegistry[column].type === 'relation') {
+      value = this.getProductCountMap(meta[column]);
+    } else if (column === 'emi status') {
+      value = meta['financedata']?.paymentstatus;
+    } else if (column === 'email') {
+      value = meta['email'] ?? '';
+    } else if (column === 'phonenumber') {
+      value = meta['phonenumber'] ?? '';
+    } else if (column === 'scanned') {
+      value = this.eticketLogMap[pid] ? 'scanned' : 'not scanned';
+    } else if (column === 'tickets') {
+      value = Object.keys(meta['customersupport'] ?? {}).length;
+    } else if (config.checklist) {
+      value = this.isClear(this.checkListMap[column], pid, eventParticipationDoc?.['checklist'] ?? []) ? 'clear' : 'not clear';
+    } else if (column === 'status') {
+      if (this.segment === 'eligible') {
+        return 'ready to approve';
+      } else if (this.segment === 'notRequested') {
+        return 'not requested';
+      }
+    } else {
+      value = meta[column]; // customerstatus, financialstatus, atccount, participantmode, paymentplan
+    }
+
+    return value ?? null;
+  }
+
+  // function to get up! product count of a participant
+  getUpCount(pid: string) {
+    const metadata = this.participantMetadata[pid];
+    let count = 0;
+    if (metadata) {
+      const consumedProducts = metadata['consumedproducts'] ?? [];
+      for (const productId of consumedProducts) {
+        if (this.UP_LIVE_PRODUCT_IDS.includes(productId)) {
+          count++;
+        }
+      }
+    }
+    return count;
+  }
+
+  // function to get cpm! product count of a participant
+  getCpmCount(pid: string) {
+    const metadata = this.participantMetadata[pid];
+    let count = 0;
+    if (metadata) {
+      const consumedProducts = metadata['consumedproducts'] ?? [];
+      for (const productId of consumedProducts) {
+        if (this.CPM_PRODUCT_IDS.includes(productId)) {
+          count++;
+        }
+      }
+    }
+    return count;
+  }
+
+  // function to get product id wise count
+  getProductCountMap(productArray: Array<any>) {
+    const productMap = {};
+    if (!Array.isArray(productArray)) return productMap;
+    for (const productId of productArray) {
+      productMap[productId] = productMap[productId] ?? 0;
+      productMap[productId]++;
+    }
+    return productMap;
+  }
+
+  // ================================== Table Filters =========================
+
+  // function to open column filter popup
   openFilterCard(column: string, event: Event) {
     if (this.filterPopup?.column === column) {
       this.closeFilterPopup();
@@ -3734,10 +4107,7 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       for (const row of this.segmentMembers()) {
         const value = this.getColumnValue(column, row);
         if (this.isEmpty(value)) continue;
-        const label =
-          column === 'current journey'
-            ? (this.mapJourney[value] ?? String(value))
-            : String(value);
+        const label = column === 'current journey' ? (this.mapJourney[value] ?? String(value)) : String(value);
         const option = options.get(value) ?? {
           key: value,
           value: label,
@@ -3749,9 +4119,7 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       const availableOptions = [...options.values()];
       filterOption = {
         availableOptions: availableOptions,
-        selectedOption: saved
-          ? [...saved[0].value]
-          : availableOptions.map((option) => option.key),
+        selectedOption: saved ? [...saved[0].value] : availableOptions.map((option) => option.key),
       };
     } else if (config.type === 'text') {
       filterOption = { text: saved?.[0]?.value ?? '' };
@@ -3779,11 +4147,13 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     };
   }
 
+  // function to close column filter popup
   closeFilterPopup() {
     this.filterPopup = null;
     this.filterOrigin = null;
   }
 
+  // function to build filter conditions from the popup
   buildConditions(column: string, filterOption: any) {
     const type = this.columnRegistry[column].type;
     let conditions: Condition[] = [];
@@ -3792,16 +4162,14 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       const selected = filterOption?.selectedOption ?? [];
       const total = filterOption?.availableOptions?.length ?? 0;
       if (selected.length === total) return { conditions: [], error: null };
-      if (selected.length === 0)
-        return { conditions: [], error: 'Select at least one option' };
+      if (selected.length === 0) return { conditions: [], error: 'Select at least one option' };
       conditions = [{ field: column, op: 'in', value: [...selected] }];
     } else if (type === 'text') {
       const text = (filterOption?.text ?? '').trim();
       if (!text) return { conditions: [], error: null };
       conditions = [{ field: column, op: 'contains', value: text }];
     } else if (type === 'number') {
-      if (this.isEmpty(filterOption?.min) && this.isEmpty(filterOption?.max))
-        return { conditions: [], error: null };
+      if (this.isEmpty(filterOption?.min) && this.isEmpty(filterOption?.max)) return { conditions: [], error: null };
       conditions = [
         {
           field: column,
@@ -3810,8 +4178,7 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
         },
       ];
     } else if (type === 'date') {
-      if (this.isEmpty(filterOption?.start) && this.isEmpty(filterOption?.end))
-        return { conditions: [], error: null };
+      if (this.isEmpty(filterOption?.start) && this.isEmpty(filterOption?.end)) return { conditions: [], error: null };
       conditions = [
         {
           field: column,
@@ -3820,9 +4187,7 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
         },
       ];
     } else if (type === 'relation') {
-      const touched = (filterOption as Array<any>).filter(
-        (p) => p?.productid || p?.operator || !this.isEmpty(p?.count),
-      );
+      const touched = (filterOption as Array<any>).filter((p) => p?.productid || p?.operator || !this.isEmpty(p?.count));
       conditions = touched.map((p) => ({
         field: column,
         op: 'count',
@@ -3835,23 +4200,18 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     }
 
     const operators = this.operatorRegistry[type as OperatorType];
-    const hasIncomplete = conditions.some(
-      (condition) => !operators[condition.op].isComplete(condition),
-    );
-    if (hasIncomplete)
-      return { conditions: [], error: 'Please fill all conditions' };
+    const hasIncomplete = conditions.some((condition) => !operators[condition.op].isComplete(condition));
+    if (hasIncomplete) return { conditions: [], error: 'Please fill all conditions' };
 
     return { conditions: conditions, error: null };
   }
 
+  // function to save the column filter
   saveFilterPopup() {
     if (!this.filterPopup) return;
 
     const column = this.filterPopup.column;
-    const { conditions, error } = this.buildConditions(
-      column,
-      this.filterPopup.filterOption,
-    );
+    const { conditions, error } = this.buildConditions(column, this.filterPopup.filterOption);
     if (error) {
       alert(error);
       return;
@@ -3865,45 +4225,37 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
 
     this.pageIndex = 0;
     this.closeFilterPopup();
-    this.refreshMeta();
   }
 
-  // checkColumnType(column){
-
-  // }
-
+  // function to toggle an option in the filter popup
   filterPopupToggleOptions(key) {
     if (this.filterPopup?.filterOption?.selectedOption?.includes(key)) {
-      this.filterPopup.filterOption.selectedOption =
-        this.filterPopup?.filterOption?.selectedOption?.filter(
-          (k) => k !== key,
-        );
+      this.filterPopup.filterOption.selectedOption = this.filterPopup?.filterOption?.selectedOption?.filter((k) => k !== key);
     } else {
       this.filterPopup?.filterOption?.selectedOption?.push(key);
     }
   }
 
+  // function to get filter popup options ( with search )
   getFilterPopOptions() {
     if (this.filterPopup) {
       const search = this.filterPopup?.search?.trim()?.toLowerCase() ?? '';
-      return this.filterPopup?.filterOption?.availableOptions?.filter(
-        (option) => {
-          const value = option?.value?.toLowerCase()?.trim() ?? '';
-          return search.length == 0 || value?.includes(search);
-        },
-      );
+      return this.filterPopup?.filterOption?.availableOptions?.filter((option) => {
+        const value = option?.value?.toLowerCase()?.trim() ?? '';
+        return search.length == 0 || value?.includes(search);
+      });
     }
     return [];
   }
 
+  // function to select all options in the filter popup
   filterPopSelectAll() {
     if (this.filterPopup && this.filterPopup.filterOption) {
-      this.filterPopup.filterOption.selectedOption = (
-        this.filterPopup?.filterOption?.availableOptions ?? []
-      )?.map((option) => option?.key);
+      this.filterPopup.filterOption.selectedOption = (this.filterPopup?.filterOption?.availableOptions ?? [])?.map((option) => option?.key);
     }
   }
 
+  // function to clear the filter popup
   filterPopClearAll() {
     const column = this.filterPopup?.column;
     if (column && this.filterPopup?.filterOption) {
@@ -3917,13 +4269,12 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       } else if (type === 'number') {
         this.filterPopup.filterOption = { min: null, max: null };
       } else if (type === 'relation') {
-        this.filterPopup.filterOption = [
-          { productid: null, operator: null, count: null },
-        ];
+        this.filterPopup.filterOption = [{ productid: null, operator: null, count: null }];
       }
     }
   }
 
+  // function to add a product rule in the filter popup
   addProductFilterPopup() {
     if (this.filterPopup) {
       this.filterPopup?.filterOption?.push({
@@ -3934,80 +4285,42 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     }
   }
 
+  // function to remove a product rule from the filter popup
   removeProductFromPopup(index: number) {
     if (this.filterPopup) {
       (this.filterPopup?.filterOption as Array<any>).splice(index, 1);
     }
   }
 
-  evalCondition(condition: Condition, row: PRow) {
+  // function to evaluate a condition for a participant
+  evalCondition(condition: Condition, pid: string) {
     const column = this.columnRegistry[condition.field];
     if (!column) throw new Error(`Unknown field "${condition.field}"`);
-    const operator =
-      this.operatorRegistry[column.type as OperatorType]?.[condition.op];
-    if (!operator)
-      throw new Error(
-        `Operator "${condition.op}" is not valid for ${column.type}`,
-      );
-    return operator.test(this.getColumnValue(condition.field, row), condition);
+    const operator = this.operatorRegistry[column.type as OperatorType]?.[condition.op];
+    if (!operator) throw new Error(`Operator "${condition.op}" is not valid for ${column.type}`);
+    return operator.test(this.getColumnValue(condition.field, pid), condition);
   }
 
-  filterRows(row: PRow) {
+  // function to check a participant passes all column filters
+  filterRows(pid: string) {
     const filters = Object.values(this.filterMap);
     if (filters.length === 0) return true;
 
     for (const conditions of filters) {
       for (const condition of conditions) {
-        if (!this.evalCondition(condition, row)) return false;
+        if (!this.evalCondition(condition, pid)) return false;
       }
     }
     return true;
   }
 
-  toNumber(value: string): number | null {
-    const n = parseFloat(value);
-    return isNaN(n) ? null : n;
-  }
-
-  // isProductFilterPassed(filter : Array<any> ,columnValue ){
-  //   for (const product of filter) {
-  //     const productId = product?.productId;
-  //     const count = product?.count;
-  //     const productCount = columnValue[productId] ?? 0;
-
-  //     switch (product?.operator) {
-  //       case '>=':
-  //         if ( !(productCount >= count) ) {
-  //           return false
-  //         }
-  //         break;
-
-  //       case '<=':
-  //         if ( !(productCount <= count) ) {
-  //           return false
-  //         }
-  //         break;
-
-  //       default:
-  //         if ( !(productCount == count) ) {
-  //           return false
-  //         }
-  //         break;
-  //     }
-  //   };
-  //   return true;
-  // }
-
+  // function to describe the conditions of a column filter
   describeConditions(column: string, conditions: Condition[]) {
     const type = this.columnRegistry[column].type;
     const format = (d: any) => this.datePipe.transform(d, 'dd/MM/yyyy') ?? '';
 
     if (type === 'enum') {
-      return (conditions[0].value as Array<any>)
-        .map((v) =>
-          column === 'current journey' ? (this.mapJourney[v] ?? v) : v,
-        )
-        .join(' , ');
+      return (conditions[0].value as Array<any>).map((v) => (column === 'current journey' ? (this.mapJourney[v] ?? v) : v)).join(' , ');
     } else if (type === 'text') {
       return `contains "${conditions[0].value}"`;
     } else if (type === 'number') {
@@ -4021,16 +4334,12 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       if (start) return `from ${format(start)}`;
       return `until ${format(end)}`;
     } else if (type === 'relation') {
-      return conditions
-        .map(
-          (c) =>
-            `${this.mapProduct[c.where.productid] ?? c.where.productid} ${this.reverseCompareMap[c.compare.op]} ${c.compare.value}`,
-        )
-        .join(' ; ');
+      return conditions.map((c) => `${this.mapProduct[c.where.productid] ?? c.where.productid} ${this.reverseCompareMap[c.compare.op]} ${c.compare.value}`).join(' ; ');
     }
     return '';
   }
 
+  // function to show filter chips above table
   getFilterChips(): FilterChip[] {
     const chips: FilterChip[] = [];
     const search = this.searchText?.trim().toLocaleLowerCase();
@@ -4054,93 +4363,28 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     return chips;
   }
 
+  // function to remove filter via chips
   removeFilterChip(chip: FilterChip) {
     if (chip.type == 'search') {
       this.searchText = '';
     } else if (chip.type === 'column') {
-      delete this.filterMap[chip.label];
+      delete this.filterMap[chip.key];
     }
     this.pageIndex = 0;
   }
 
+  // function to clear all table filters
   clearAllFilters() {
     this.searchText = '';
     this.filterMap = {};
     this.pageIndex = 0;
   }
 
-  getColumnValue(column: string, row: PRow) {
-    const config = this.columnRegistry[column];
-    if (!config) throw new Error(`Unknown column "${column}"`);
+  // ================================== Table Sorting =========================
 
-    const meta = this.participantMetadata[row?.profileid] ?? {};
-    let value = null;
-
-    if (column === 'name') {
-      value = row.name;
-    } else if (column === 'requestedDate') {
-      value = row.requestedDate || null;
-    } else if (column === 'current journey') {
-      const status = (meta['customerstatus'] ?? '')
-        .toString()
-        .trim()
-        .toLowerCase();
-      if (status === 'active') value = meta['activejourney'];
-      else if (status === 'non active') value = meta['lastcompletedjourney'];
-      else value = meta['lastsubscribedjourney'];
-    } else if (column === 'subscriptionend') {
-      value = this.toMillis(meta['subscriptionend']) || null;
-    } else if (column === 'subscriptionstart') {
-      value = this.toMillis(meta['subscriptionstart']) || null;
-    } else if (column === 'paid') {
-      value = meta['pp_totalpaid'];
-    } else if (column === 'totalpurchasevalue') {
-      value = meta['pp_totalpurchasevalue'];
-    } else if (column === 'venuefee') {
-      value = this.getVenueFeeStatus(row);
-    } else if (column === 'up! count') {
-      value = this.getUpCount(row);
-    } else if (column === 'cpm! count') {
-      value = this.getCpmCount(row);
-    } else if (this.columnRegistry[column].type === 'relation') {
-      value = this.getProductCountMap(meta[column]);
-    } else if (column === 'emi status') {
-      value = meta['financedata']?.paymentstatus;
-    } else if (column === 'email') {
-      value = meta['email'] ?? row.email;
-    } else if (column === 'phonenumber') {
-      value = meta['phonenumber'] ?? row.phone;
-    } else if (column === 'scanned') {
-      value = row['scanned'] ? 'scanned' : 'not scanned';
-    } else if (config.checklist) {
-      value = this.isClear(this.checkListMap[column], row)
-        ? 'clear'
-        : 'not clear';
-    } else {
-      value = meta[column]; // customerstatus, financialstatus, atccount, participantmode, paymentplan
-    }
-
-    return value ?? null;
-  }
-
-  // toggleSort(column : string){
-  //   if (this.sortColumn && this.sortColumn.column === column) {
-  //     if (this.sortColumn.type === 'desc') {
-  //       this.sortColumn = null
-  //     } else {
-  //       this.sortColumn = {...this.sortColumn , type : 'desc'}
-  //     }
-  //   } else {
-  //     this.sortColumn = { column , type : 'asc'}
-  //   }
-  // }
-
+  // function to toggle column sort
   toggleSort(column: string, type: 'asc' | 'desc') {
-    if (
-      this.sortColumn &&
-      this.sortColumn.column === column &&
-      this.sortColumn.type == type
-    ) {
+    if (this.sortColumn && this.sortColumn.column === column && this.sortColumn.type == type) {
       this.sortColumn = null;
     } else {
       this.sortColumn = { column, type: type };
@@ -4149,7 +4393,8 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
 
   isColumnSort() {}
 
-  sortRow(a: PRow, b: PRow): number {
+  // function to compare two participants for the sorted column
+  sortRow(a: string, b: string): number {
     if (!this.sortColumn) return 0;
 
     const column = this.sortColumn.column;
@@ -4193,186 +4438,32 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     return result * direction;
   }
 
-  getUpCount(row: PRow) {
-    const metadata = this.participantMetadata[row.profileid];
-    let count = 0;
-    if (metadata) {
-      const consumedProducts = metadata['consumedproducts'] ?? [];
-      for (const productId of consumedProducts) {
-        if (this.UP_LIVE_PRODUCT_IDS.includes(productId)) {
-          count++;
-        }
-      }
-    }
-    return count;
-  }
+  // ================================== Checklist =========================
 
-  getCpmCount(row: PRow) {
-    const metadata = this.participantMetadata[row.profileid];
-    let count = 0;
-    if (metadata) {
-      const consumedProducts = metadata['consumedproducts'] ?? [];
-      for (const productId of consumedProducts) {
-        if (this.CPM_PRODUCT_IDS.includes(productId)) {
-          count++;
-        }
-      }
-    }
-    return count;
-  }
-
-  getProductCountMap(productArray: Array<any>) {
-    const productMap = {};
-    if (!Array.isArray(productArray)) return productMap;
-    for (const productId of productArray) {
-      productMap[productId] = productMap[productId] ?? 0;
-      productMap[productId]++;
-    }
-    return productMap;
-  }
-
-  // function to convert timestamp to JS Date
-  toDate(value: any): Date | null {
-    if (!value) return null;
-    if (value instanceof Date) return value;
-    if (typeof value?.toDate === 'function') return value.toDate();
-    const date = new Date(value);
-    return isNaN(date.getTime()) ? null : date;
-  }
-
-  // columns
-
-  getColumn() {
-    const search = this.columSearch?.trim()?.toLocaleLowerCase() ?? '';
-    const columns = [];
-    for (const [key, config] of Object.entries(this.columnRegistry)) {
-      if (config.defaultColumn || config.type === 'none') continue;
-      if (
-        search.length > 0 &&
-        !config.label.toLocaleLowerCase().includes(search)
-      )
-        continue;
-      columns.push({ key: key, label: config.label });
-    }
-    return columns;
-  }
-
-  removeColumnChip(c: string) {
-    this.displayColumns = this.displayColumns.filter((column) => column !== c);
-  }
-
-  clearAllColumns() {
-    this.displayColumns = [];
-  }
-
-  // import
-
-  handleImportClick() {
-    const sampleDownload = confirm(
-      'Do you want to download sample Import Excel',
-    );
-    if (sampleDownload) {
-      const data = [
-        { name: 'John Doe', email: 'john@example.com' },
-        { name: 'Jane Smith', email: 'jane@example.com' },
-        { name: 'surya', email: 'surya.thiruvengadam@soexcellence.com' },
-      ];
-
-      const worksheet: XLSX.WorkSheet = XLSX.utils.json_to_sheet(data);
-
-      const workbook: XLSX.WorkBook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Sample');
-
-      XLSX.writeFile(workbook, 'sample_format.xlsx');
-      return;
-    }
-    this.inputFile.nativeElement.click();
-  }
-  onChange(evt: Event) {
-    const target = evt.target as HTMLInputElement;
-    const file = target.files?.[0];
-
-    if (!file) return;
-
-    this.isExcelFile = /\.(xls|xlsx)$/i.test(file.name);
-
-    if (!this.isExcelFile) {
-      this.inputFile.nativeElement.value = '';
-      console.log('Invalid file type. Please upload an Excel file.');
-      return;
-    }
-
-    if (target.files.length > 1) {
-      this.inputFile.nativeElement.value = '';
-      return;
-    }
-
-    const reader = new FileReader();
-
-    reader.onload = (e: ProgressEvent<FileReader>) => {
-      const arrayBuffer = e.target?.result as ArrayBuffer;
-
-      try {
-        const wb: XLSX.WorkBook = XLSX.read(arrayBuffer, {
-          type: 'array',
-          cellDates: true,
-        });
-
-        const wsname: string = wb.SheetNames[0];
-        const ws: XLSX.WorkSheet = wb.Sheets[wsname];
-
-        const data = XLSX.utils.sheet_to_json(ws);
-
-        console.log('Imported List', data.length);
-
-        data
-          // .filter((e: any) => this.emailList.includes(e.email))
-          .forEach((g: any) => {
-            const matched = this.segmentRows.find(
-              (e) => e['email'] === g['email'],
-            );
-            console.log(matched, 'matchd');
-
-            if (matched) {
-              this.selection.toggle(matched);
-            } else {
-              console.log('Unmatched', g['email']);
-            }
-          });
-      } catch (error) {
-        console.error('Error processing file:', error);
-      }
-    };
-
-    this.inputFile.nativeElement.value = '';
-    reader.readAsArrayBuffer(file);
-  }
-
-  isClear(checklist, row: PRow) {
+  // function to check a participant clears a checklist
+  isClear(checklist, pid: string, participantChecklist: Array<string>) {
     if (checklist?.type === 'automated') {
       const groups = checklist?.checklist ?? [];
       return groups.some((group) =>
         group.conditions.every((condition) => {
-          // console.log('evol return : ', condition?.field, this.evalCondition(condition , row))
-          return this.evalCondition(condition, row);
+          return this.evalCondition(condition, pid);
         }),
       );
     } else {
-      return row?.checklist.includes(checklist?.docid);
+      return participantChecklist?.includes(checklist?.docid);
     }
   }
 
+  // function to toggle a checklist column
   toggleChecklist(checkListId) {
-    const storage = JSON.parse(
-      localStorage.getItem(this.EVENT_CHECKLIST) ?? '{}',
-    );
+    const storage = JSON.parse(localStorage.getItem(this.EVENT_CHECKLIST) ?? '{}');
     const eventId = this.eventId?.docid;
     let checklistStorage = storage[this.eventId?.docid] ?? [];
-    console.log('storage', storage);
 
     if (Object.hasOwn(this.columnRegistry, checkListId)) {
       delete this.columnRegistry[checkListId];
       checklistStorage = checklistStorage?.filter((id) => checkListId !== id);
+      if (this.filterMap[checkListId]) delete this.filterMap[checkListId];
     } else {
       this.columnRegistry[checkListId] = {
         label: this.checkListMap[checkListId]?.title,
@@ -4386,30 +4477,34 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       checklistStorage?.push(checkListId);
     }
 
-    localStorage.setItem(
-      this.EVENT_CHECKLIST,
-      JSON.stringify({ [eventId]: checklistStorage }),
-    );
+    localStorage.setItem(this.EVENT_CHECKLIST, JSON.stringify({ [eventId]: checklistStorage }));
   }
 
+  // function to count participants who cleared a checklist
   getClearCountForCheckList(checklist) {
     const conditions = checklist?.checklist;
     let count = 0;
-    for (const row of this.rows) {
-      if (this.isClear(checklist, row)) count++;
+    const plist = new Set([...Object.keys(this.participantRequestMap)]);
+    for (const pid of [...plist]) {
+      const reqData = this.getRecentRequestData(this.participantRequestMap[pid]);
+      if (this.isClear(checklist, pid, reqData?.['checklist'] ?? [])) count++;
     }
     return count;
   }
 
+  // function to count participants who did not clear a checklist
   getNonClearCountForCheckList(checklist) {
     const conditions = checklist?.checklist;
     let count = 0;
-    for (const row of this.rows) {
-      if (!this.isClear(checklist, row)) count++;
+    const plist = new Set([...Object.keys(this.participantRequestMap)]);
+    for (const pid of [...plist]) {
+      const reqData = this.getRecentRequestData(this.participantRequestMap[pid]);
+      if (!this.isClear(checklist, pid, reqData?.['checklist'] ?? [])) count++;
     }
     return count;
   }
 
+  // function to open add checklist popup
   addCheckList() {
     const checklistform = this.form.group({
       title: ['', [Validators.required]],
@@ -4424,14 +4519,13 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     // this.addChecklistConditionGroup();
   }
 
+  // function to open edit checklist popup
   editCheckList(checkListId: string) {
     const checkList = this.checkListMap[checkListId];
     if (!checkList) return;
     const checklistform = this.form.group({
       title: [checkList?.title, [Validators.required]],
-      checklist: this.form.array(
-        this.buildCheckListForEdit(checkList?.checklist ?? []),
-      ),
+      checklist: this.form.array(this.buildCheckListForEdit(checkList?.checklist ?? [])),
       type: 'edit',
       delete: checkList?.delete ?? false,
       eventref: checkList?.eventref,
@@ -4441,6 +4535,7 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     this.dialog.open(this.checklistpopup);
   }
 
+  // function to build checklist form groups for edit
   buildCheckListForEdit(checkList: Array<any>) {
     const list = [];
 
@@ -4453,8 +4548,7 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
         const type = this.columnRegistry[check.field]?.type;
 
         if (type === 'relation') {
-          if (!relations.has(check.field))
-            relations.set(check.field, this.form.array([]));
+          if (!relations.has(check.field)) relations.set(check.field, this.form.array([]));
 
           relations.get(check.field)!.push(
             this.form.group({
@@ -4471,14 +4565,8 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
         switch (type) {
           case 'date':
             value = this.form.group({
-              start: [
-                check?.value?.start ? this.toDate(check.value.start) : null,
-                [Validators.required],
-              ],
-              end: [
-                check?.value?.end ? this.toDate(check.value.end) : null,
-                [Validators.required],
-              ],
+              start: [check?.value?.start ? this.toDate(check.value.start) : null, [Validators.required]],
+              end: [check?.value?.end ? this.toDate(check.value.end) : null, [Validators.required]],
             });
             break;
 
@@ -4490,15 +4578,11 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
             break;
 
           case 'enum':
-            value = this.form.control<string[]>(check?.value ?? [], [
-              Validators.required,
-            ]);
+            value = this.form.control<string[]>(check?.value ?? [], [Validators.required]);
             break;
 
           default:
-            value = this.form.control(check?.value ?? '', [
-              Validators.required,
-            ]);
+            value = this.form.control(check?.value ?? '', [Validators.required]);
         }
 
         conditions.push(
@@ -4534,6 +4618,7 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     return list;
   }
 
+  // function to add a condition group in the checklist form
   addChecklistConditionGroup() {
     const group = this.checkListForm.get('checklist') as FormArray;
     group.push(
@@ -4548,11 +4633,13 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     return this.checkListForm.get('checklist') as FormArray;
   }
 
+  // function to add a condition in a checklist group
   addCheckListCondition(groupIndex: number) {
     const conditiongroup = this.checklistForm.at(groupIndex) as FormGroup;
     (conditiongroup.get('conditions') as FormArray).push(this.getCondition());
   }
 
+  // function to get an empty condition form group
   getCondition() {
     return this.form.group({
       field: [null, [Validators.required]],
@@ -4563,53 +4650,46 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     });
   }
 
+  // function to remove a checklist group
   removeChecklistGroup(groupIndex) {
     this.checklistForm.removeAt(groupIndex);
   }
 
+  // function to remove a condition from a checklist group
   removeChecklistGroupCondition(groupIndex, ConditionIndex) {
     const group = this.checklistForm.at(groupIndex) as FormGroup;
     const cond = group?.get('conditions') as FormArray;
     cond.removeAt(ConditionIndex);
   }
 
+  // function to close checklist popup
   closeChecklistPopup() {
     this.dialog.closeAll();
     // this.checkListForm = null;
   }
 
+  // function to get attribute options for checklist ( with search )
   getOptionsForChecklist(search: string) {
-    const skip = [
-      'participantmode',
-      'emi status',
-      'email',
-      'phonenumber',
-      'paymentplan',
-    ];
+    const skip = ['participantmode', 'emi status', 'email', 'phonenumber', 'paymentplan'];
     const trimedSearch = search?.trim().toLocaleLowerCase();
     const columns = [];
     for (const [key, config] of Object.entries(this.columnRegistry)) {
-      if (config.type === 'none' || !config.showFilter || skip.includes(key))
-        continue;
-      if (
-        trimedSearch.length > 0 &&
-        !config.label.toLocaleLowerCase().includes(search)
-      )
-        continue;
+      if (config.type === 'none' || !config.showFilter || skip.includes(key)) continue;
+      if (trimedSearch.length > 0 && !config.label.toLocaleLowerCase().includes(search)) continue;
       columns.push({ key: key, label: config.label, type: config.type });
     }
     return columns;
   }
 
+  // function to handle attribute change of a checklist condition
   onChangeChecklistAttribute(groupIndex: number, conditionIndex: number) {
-    const conditions = (this.checklistForm.at(groupIndex) as FormGroup).get(
-      'conditions',
-    ) as FormArray;
+    const conditions = (this.checklistForm.at(groupIndex) as FormGroup).get('conditions') as FormArray;
     const field = conditions.at(conditionIndex).get('field')?.value;
 
     conditions.setControl(conditionIndex, this.buildCondition(field));
   }
 
+  // function to build a condition form group for a field
   private buildCondition(field: string): FormGroup {
     const type = this.columnRegistry[field]?.type;
 
@@ -4659,11 +4739,12 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     });
   }
 
+  // function to get the conditions of a checklist group
   getGroupCond(groupIndex) {
-    return (this.checklistForm.at(groupIndex).get('conditions') as FormArray)
-      .controls;
+    return (this.checklistForm.at(groupIndex).get('conditions') as FormArray).controls;
   }
 
+  // function to get available options of a column for checklist
   getAvailableOptionsForColumn(column) {
     if (column === 'current journey') {
       return Object.keys(this.mapJourney).map((jid) => ({
@@ -4676,9 +4757,7 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
         value: val,
       }));
     } else if (column === 'financialstatus') {
-      return ['regular', 'locked', 'defaulted', 'discontinued', 'banned'].map(
-        (val) => ({ key: val, value: val }),
-      );
+      return ['regular', 'locked', 'defaulted', 'discontinued', 'banned'].map((val) => ({ key: val, value: val }));
     } else if (column === 'venuefee') {
       return ['Paid', 'Not paid', 'Exempted'].map((val) => ({
         key: val,
@@ -4693,6 +4772,7 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     return [];
   }
 
+  // function to add a product rule in a checklist condition
   addProductRuleForCheckList(condition: FormGroup) {
     const productArray = condition?.get('value') as FormArray;
     productArray.push(
@@ -4704,11 +4784,13 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     );
   }
 
+  // function to remove a product rule from a checklist condition
   removeProductRuleForCheckList(condition, index) {
     const productArray = condition?.get('value') as FormArray;
     productArray.removeAt(index);
   }
 
+  // function to validate the checklist form
   validateCheckList(): boolean {
     const value = this.checkListForm.value;
 
@@ -4738,15 +4820,7 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
 
           case 'relation':
             if (!v?.length) return false;
-            if (
-              v.some(
-                (r: any) =>
-                  this.isBlank(r.productid) ||
-                  this.isBlank(r.operator) ||
-                  this.isBlank(r.count),
-              )
-            )
-              return false;
+            if (v.some((r: any) => this.isBlank(r.productid) || this.isBlank(r.operator) || this.isBlank(r.count))) return false;
             break;
 
           default:
@@ -4758,14 +4832,12 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     return true;
   }
 
+  // function to check a value is blank
   private isBlank(x: any): boolean {
-    return (
-      x === null || x === undefined || (typeof x === 'string' && !x.trim())
-    );
+    return x === null || x === undefined || (typeof x === 'string' && !x.trim());
   }
 
-  trackByChecklistId = (_: number, checklist: any) => checklist?.title;
-
+  // function to save the checklist
   async saveChecklist() {
     if (!this.validateCheckList()) {
       alert('Fill all the fields');
@@ -4842,21 +4914,16 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       document['created'] = serverTimestamp();
     }
 
-    console.log(document);
-    // try {
-    //   await setDoc(docRef , document , {merge : true});
-    //   await this.loadEventCheckList();
-    //   this.closeChecklistPopup();
-    // } catch (error) {
-    //   console.log(error)
-    // }
+    try {
+      await setDoc(docRef , document , {merge : true});
+      await this.loadEventCheckList();
+      this.closeChecklistPopup();
+    } catch (error) {
+      console.log(error)
+    }
   }
 
-  changeHandler(a: FormGroup) {
-    const val = a.get('value').value;
-    console.log(val);
-  }
-
+  // function to delete a checklist ( soft delete )
   async deleteCheckList(checkListId: string) {
     const checkList = this.checkListMap[checkListId] ?? null;
     if (checkList) {
@@ -4876,42 +4943,30 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     }
   }
 
-  async onManualChecklistChange(
-    row: PRow,
-    checklistId: string,
-    checked: boolean,
-  ) {
-    const isChecked = row.checklist?.includes(checklistId);
-    const docid = row.recentEventParticipationReq['docid'];
+  // function to handle manual checklist change of a row
+  async onManualChecklistChange(pid: string, checklistId: string, checked: boolean) {
+    const reqDoc = this.getRecentRequestData(this.participantRequestMap[pid] ?? []);
+    if(!reqDoc) return
+    const checklist = reqDoc['checklist'] ?? [];
+    const isChecked = checklist?.includes(checklistId);
+    const docid = reqDoc['docid'];
     if (docid) {
       const docref = doc(this.firestore, 'event participation request', docid);
       console.log(docref);
       await setDoc(
         docref,
         {
-          checklist: isChecked
-            ? arrayRemove(checklistId)
-            : arrayUnion(checklistId),
+          checklist: isChecked ? arrayRemove(checklistId) : arrayUnion(checklistId),
         },
         { merge: true },
       );
-
-      if (isChecked) {
-        row.checklist = row.checklist.filter(
-          (checkid) => checkid !== checklistId,
-        );
-      } else {
-        row.checklist.push(checklistId);
-      }
     }
   }
 
+  // function to handle checklist filter click
   onChecklistFilterClick(checkId: string, type: string) {
     if (this.selectedChecklist) {
-      if (
-        this.selectedChecklist?.checklistId === checkId &&
-        this.selectedChecklist?.type === type
-      ) {
+      if (this.selectedChecklist?.checklistId === checkId && this.selectedChecklist?.type === type) {
         this.selectedChecklist = null;
         if (this.columnRegistry[checkId]) {
           delete this.columnRegistry[checkId];
@@ -4928,34 +4983,31 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     }
   }
 
-  filterByCheckList(row: PRow) {
+  // function to filter participants by the selected checklist
+  filterByCheckList(pid: string) {
     if (!this.selectedChecklist) return true;
-    const ispassed = this.getColumnValue(
-      this.selectedChecklist?.checklistId,
-      row,
-    );
+    const ispassed = this.getColumnValue(this.selectedChecklist?.checklistId, pid);
 
     return ispassed === this.selectedChecklist?.type;
   }
 
+  // function to get manual checklist ids
   getManualChecklist() {
-    return Object.keys(this.checkListMap).filter(
-      (id) => this.checkListMap[id]?.type === 'manual',
-    );
+    return Object.keys(this.checkListMap).filter((id) => this.checkListMap[id]?.type === 'manual');
   }
 
-  async blukManualUpdate(checklistId: string, type: 'clear' | 'not clear') {
-    console.log(checklistId);
+  // function to bulk update a manual checklist for selected participants
+  async bulkManualUpdate(checklistId: string, type: 'clear' | 'not clear') {
     if (!checklistId || !this.checkListMap[checklistId]) {
       return;
     }
     const selection = this.selection.selected;
-    const documentsToUpdate = this.selection.selected.map(
-      (row) => row.recentEventParticipationReq['docid'],
-    );
+    const documentsToUpdate = this.selection.selected.map((pid) => {
+      const reqData = this.getRecentRequestData(this.participantRequestMap[pid]);
+      return reqData['docid'];
+    }).filter((data)=>data);
     const data = {
-      checklist:
-        type === 'clear' ? arrayUnion(checklistId) : arrayRemove(checklistId),
+      checklist: type === 'clear' ? arrayUnion(checklistId) : arrayRemove(checklistId),
     };
     let batch = writeBatch(this.firestore);
     const BATCH_LIMIT = 500;
@@ -4964,14 +5016,8 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     try {
       for (const docid of documentsToUpdate) {
         if (!docid) continue;
-        const docRef = doc(
-          this.firestore,
-          'event participation request',
-          docid,
-        );
+        const docRef = doc(this.firestore, 'event participation request', docid);
         batch.set(docRef, data, { merge: true });
-
-        console.log(batch);
 
         operations++;
 
@@ -4986,16 +5032,6 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
         await batch.commit();
       }
 
-      for (const row of selection) {
-        if (type === 'not clear') {
-          row.checklist = row.checklist.filter(
-            (checkid) => checkid !== checklistId,
-          );
-        } else {
-          row.checklist.push(checklistId);
-        }
-      }
-
       this.pageIndex = 0;
       this.defaultSelection();
     } catch (error) {
@@ -5003,20 +5039,116 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     }
   }
 
+  // ================================== Event Editor =========================
+
+  // function to open event editor dialog
   openEventEditor(eventId?) {
-    this.dialog.open(UpdateEventDetailComponent, {
-      disableClose: true,
-      data: {
-        edit: [null, undefined, ''].includes(eventId) ? false : true,
-        eventDocId: [null, undefined, ''].includes(eventId)
-          ? doc(collection(this.firestore, 'event collection')).id
-          : eventId,
-      },
-      panelClass: 'custom-dialog-container',
-      maxHeight: '98vh',
-      maxWidth: '98vw',
-    }).afterClosed().toPromise().then(()=>{
-      
-    })
+    this.dialog
+      .open(UpdateEventDetailComponent, {
+        disableClose: true,
+        data: {
+          edit: [null, undefined, ''].includes(eventId) ? false : true,
+          eventDocId: [null, undefined, ''].includes(eventId) ? doc(collection(this.firestore, 'event collection')).id : eventId,
+        },
+        panelClass: 'custom-dialog-container',
+        maxHeight: '98vh',
+        maxWidth: '98vw',
+      })
+      .afterClosed()
+      .toPromise()
+      .then(() => {
+        // this.fetchSubEvent();
+        this.router.navigateByUrl('/event-participation-confirmation')
+      });
   }
+
+  // ================================== UI Helpers =========================
+
+  get productName() {
+    return this.mapProduct[this.arena?.['productref']?.id] ?? 'Product';
+  }
+
+  // function to get initials of a name
+  initials(name: string): string {
+    return (
+      (name || '?')
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((p) => p[0])
+        .join('')
+        .toUpperCase() || '?'
+    );
+  }
+
+  // function to format month and year
+  formatMonthYear(ms: number): string {
+    return ms
+      ? new Date(ms).toLocaleDateString(undefined, {
+          month: 'short',
+          year: 'numeric',
+        })
+      : '';
+  }
+
+  // Compact money for the table (Indian scale): 5000 -> 5K, 122000 -> 1.2L, 25000000 -> 2.5Cr.
+  shortAmount(v: any): string {
+    const n = +(v || 0);
+    if (!n) return '0';
+    const abs = Math.abs(n);
+    const fmt = (x: number, unit: number) => (x / unit).toFixed(abs % unit === 0 ? 0 : 1).replace(/\.0$/, '');
+    if (abs >= 1e7) return fmt(n, 1e7) + 'Cr';
+    if (abs >= 1e5) return fmt(n, 1e5) + 'L';
+    if (abs >= 1e3) return fmt(n, 1e3) + 'K';
+    return String(n);
+  }
+
+  // function to get finance dot class
+  financeDotClass(f: string): string {
+    const n = (f || '').toLowerCase().replace('fullypaid', 'fully paid').replace(/\s+/g, ' ').trim();
+    if (n === 'regular' || n === 'fully paid') return 'd-ok';
+    if (n === 'defaulted') return 'd-bad';
+    if (n === 'locked') return 'd-org';
+    return '';
+  }
+
+  // function to convert timestamp to millis
+  toMillis(d: any): number {
+    try {
+      if (d?.toMillis) return d.toMillis();
+      if (d?.toDate) return d.toDate().getTime();
+      if (d) return new Date(d).getTime();
+    } catch {}
+    return 0;
+  }         
+
+  toggleJourneyCard() {
+    this.showJourneyCard = !this.showJourneyCard;
+  }
+
+  // function to convert timestamp to JS Date
+  toDate(value: any): Date | null {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+    if (typeof value?.toDate === 'function') return value.toDate();
+    const date = new Date(value);
+    return isNaN(date.getTime()) ? null : date;
+  }
+
+  // function to convert string to number
+  toNumber(value: string): number | null {
+    const n = parseFloat(value);
+    return isNaN(n) ? null : n;
+  }
+
+  // track by functions
+  trackJourneyKey = (_: number, j: JourneyRow) => j.key;
+  trackBreakdown = (_: number, b: { journey: string }) => b.journey;
+  trackParticipant = (_: number, pid: string) => pid;
+  trackByCommunication = (_: number, m: any) => m.docid;
+  readonly trackByIndex = (i: number) => i;
+  trackByTicketNo = (_: number, t: Ticket) => t.ticketno;
+  trackByColumnKey = (_: number, column: any) => column.key;
+  trackChip = (_: number, chip: FilterChip) => chip.key ?? chip.label;
+  trackByChecklistId = (_: number, checklist: any) => checklist?.title;
 }

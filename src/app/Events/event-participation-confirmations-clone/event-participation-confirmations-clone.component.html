@@ -22,7 +22,10 @@
             </mat-form-field>
             <span class="ov-showing" *ngIf="isFiltered">Showing {{ filteredRows.length | number }} of {{ overviewRows.length | number }}</span>
           </div>
-          <button class="btn-create" (click)="openEventEditor(null)">Create Event</button>
+          <div style="display:flex;gap: 10px;">
+            <button class="btn-create" (click)="openEventEditor(null)">Create Event</button>
+            <button class="btn-create" (click)="openCTAConfig()">Configure CTA</button>
+          </div>
         </div>
 
         <div class="ov-error" *ngIf="loadError">
@@ -48,11 +51,53 @@
                 <th class="r">Continuity</th>
                 <th class="r">Not eligible</th>
                 <th class="r">Approved</th>
+                <th class="ev-act" aria-label="Actions"></th>
                 <th class="ov-c-go"></th>
               </tr>
             </thead>
             <tbody>
               <ng-container *ngFor="let event of pagedRows">
+                <!-- <p>{{event?.name}}</p> -->
+                <tr data-testid="epc-overview-row" *ngIf="(event?.subEvents ?? []).length === 0" class="ov-row" role="button" tabindex="0"
+                  [attr.aria-label]="'Open ' + event?.name + ' '"
+                  (click)="openProduct(event)" (keydown)="onRowKey($event, event)"
+                  >
+                  <td>
+                    <div class="ov-evt" [class.child-event]="false">
+                      <span class="ov-av" [style.background]="avatarColorFor(event['docid'])">{{ event?.name[0] ?? ''  }}</span>
+                      <span class="ov-evt-txt">
+                        <span class="ov-name">{{ event?.name }}</span>
+                        <!-- <span class="ov-prod">{{ row.eventName }}</span> -->
+                      </span>
+                    </div>
+                  </td>
+                  <td>
+                    {{ formatRange(event?.start , event?.end) || '—' }}
+                    <!-- <span class="ov-today" *ngIf="row.isToday">Today</span>
+                    <span class="ov-frozen" *ngIf="row.frozen" matTooltip="Numbers frozen at finalize" matTooltipClass="sx-tip"><mat-icon>lock</mat-icon></span> -->
+                  </td>
+                  <td class="r"><span class="ov-mut">…</span></td>
+                  <td class="r"><span class="ov-mut">…</span></td>
+                  <td class="r"><span class="ov-mut">…</span></td>
+                  <td class="r"><span class="ov-mut">…</span></td>
+                  <td class="r"><span class="ov-mut">…</span></td>
+                  <td class="r"><span class="ov-mut">…</span></td>
+                  <td class="r"><span class="ov-mut">…</span></td>
+                  <td class="r"><span class="ov-mut">…</span></td>
+                  <td class="r"><span class="ov-mut">…</span></td>
+                  <!-- <td class="r"><span class="ov-warn" *ngIf="row.error" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span><span class="ov-num" *ngIf="!row.error && row.requested !== null">{{ row.requested | number }}</span><span class="ov-mut" *ngIf="!row.error && row.requested === null">…</span></td>
+                  <td class="r"><span class="ov-warn" *ngIf="row.error" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span><span class="ov-num ov-elig" *ngIf="!row.error && row.eligible !== null">{{ row.eligible | number }}</span><span class="ov-mut" *ngIf="!row.error && row.eligible === null">…</span></td>
+                  <td class="r"><span class="ov-warn" *ngIf="row.error" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span><span class="ov-num ov-elig" *ngIf="!row.error && row.upgrade !== null">{{ row.upgrade | number }}</span><span class="ov-mut" *ngIf="!row.error && row.upgrade === null">…</span></td>
+                  <td class="r"><span class="ov-warn" *ngIf="row.error" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span><span class="ov-num ov-elig" *ngIf="!row.error && row.addon !== null">{{ row.addon | number }}</span><span class="ov-mut" *ngIf="!row.error && row.addon === null">…</span></td>
+                  <td class="r"><span class="ov-warn" *ngIf="row.error" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span><span class="ov-num ov-elig" *ngIf="!row.error && row.continuity !== null">{{ row.continuity | number }}</span><span class="ov-mut" *ngIf="!row.error && row.continuity === null">…</span></td>
+                  <td class="r"><span class="ov-warn" *ngIf="row.error" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span><span class="ov-num ov-ne" *ngIf="!row.error && row.notEligible !== null">{{ row.notEligible | number }}</span><span class="ov-mut" *ngIf="!row.error && row.notEligible === null">…</span></td>
+                  <td class="r"><span class="ov-warn" *ngIf="row.error" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span><span class="ov-num" [ngClass]="row.approved ? 'ov-app' : 'ov-zero'" *ngIf="!row.error && row.approved !== null">{{ row.approved | number }}</span><span class="ov-mut" *ngIf="!row.error && row.approved === null">…</span></td>
+                  <td class="ov-c-go"><mat-icon class="ov-chev">chevron_right</mat-icon></td> -->
+                  <td class="ev-act">
+                    <button type="button" class="ev-edit-btn" title="Edit event" (click)="openEventEditor(event['docid']);$event.stopPropagation()">Edit</button>
+                  </td>
+                </tr>
+
                 <tr data-testid="epc-overview-row" *ngFor="let row of event?.subEvents ?? []" class="ov-row" role="button" tabindex="0"
                   [attr.aria-label]="'Open ' + row.productName + ' ' + row.eventName"
                   (click)="openProduct(event , row)" (keydown)="onRowKey($event, event , row)"
@@ -79,8 +124,12 @@
                   <td class="r"><span class="ov-warn" *ngIf="row.error" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span><span class="ov-num ov-elig" *ngIf="!row.error && row.continuity !== null">{{ row.continuity | number }}</span><span class="ov-mut" *ngIf="!row.error && row.continuity === null">…</span></td>
                   <td class="r"><span class="ov-warn" *ngIf="row.error" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span><span class="ov-num ov-ne" *ngIf="!row.error && row.notEligible !== null">{{ row.notEligible | number }}</span><span class="ov-mut" *ngIf="!row.error && row.notEligible === null">…</span></td>
                   <td class="r"><span class="ov-warn" *ngIf="row.error" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span><span class="ov-num" [ngClass]="row.approved ? 'ov-app' : 'ov-zero'" *ngIf="!row.error && row.approved !== null">{{ row.approved | number }}</span><span class="ov-mut" *ngIf="!row.error && row.approved === null">…</span></td>
+                  <td class="ev-act">
+                    <button type="button" class="ev-edit-btn" title="Edit event" (click)="openEventEditor(event['docid']);$event.stopPropagation()">Edit</button>
+                  </td>
                   <td class="ov-c-go"><mat-icon class="ov-chev">chevron_right</mat-icon></td>
                 </tr>
+
               </ng-container>
               <tr *ngIf="filteredRows.length === 0">
                 <td colspan="8" class="ov-empty">

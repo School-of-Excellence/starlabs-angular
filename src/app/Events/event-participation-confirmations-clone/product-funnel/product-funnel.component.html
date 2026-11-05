@@ -17,9 +17,22 @@
       <div class="fdate">{{ a?.startdate?.toDate() | date:'MMM d' }} – {{ a?.enddate?.toDate() | date:'MMM d, y' }}</div>
     </div>
 
-    <button type="button" class="edit-event-btn" [disabled]="!arena" (click)="openEventEditor(eventId['docid'])">
+    <button type="button" class="edit-event-btn" (click)="openEventEditor(eventId['docid'])" *ngIf="!eventId?.isQueueEvent">
       <mat-icon class="edit-event-icon">edit</mat-icon>
       Edit event
+    </button>
+    <button type="button"
+        class="jtoggle"
+        *ngIf="segmentList.approved.length > 0"
+        [class.on]="showJourneyCard"
+        [attr.aria-pressed]="showJourneyCard"
+        [attr.aria-label]="showJourneyCard ? 'Hide approved by journey' : 'Show approved by journey'"
+        [matTooltip]="showJourneyCard ? 'Hide approved by journey' : 'Show approved by journey'"
+        matTooltipPosition="left"
+        matTooltipClass="sx-tip"
+        (click)="toggleJourneyCard()">
+      <mat-icon class="jtoggle-icon">{{ showJourneyCard ? 'close' : 'timeline' }}</mat-icon>
+      <span class="jtoggle-badge" *ngIf="!showJourneyCard">{{ segmentList.approved.length | number }}</span>
     </button>
   </div>
 
@@ -33,7 +46,7 @@
     <mat-icon class="spin">autorenew</mat-icon> Loading participants...
   </div>
 
-  <ng-container *ngIf="!loading && !loadError">
+  <ng-container *ngIf="!loading && !loadError && arena">
 
     <!-- ============ Cards grid ============ -->
     <div class="sx-bd">
@@ -51,7 +64,7 @@
               <span class="sx-bd-top">
                 <span class="sx-bd-dot"></span>
                 <span class="sx-bd-lab">{{ cardMap[r.key].label }}</span>
-                <span class="sx-bd-num">{{ counts[r.key] | number }}</span>
+                <span class="sx-bd-num">{{ segmentList[r.key].length | number }}</span>
               </span>
             </button>
 
@@ -63,9 +76,9 @@
                   (click)="setCustomerChip('active')" matTooltipClass="sx-tip" matTooltip="Show only active-status participants in the table">
                   Active <b>{{ potentialStatusCount('active') | number }}</b>
                 </button>
-                <button data-testid="pf-potsplit-nonactive" type="button" class="sx-pot-chip non" [class.on]="segment === 'potential' && customerFilter === 'nonactive'"
-                  (click)="setCustomerChip('nonactive')" matTooltipClass="sx-tip" matTooltip="Show only non-active-status participants in the table">
-                  Non-Active <b>{{ potentialStatusCount('nonactive') | number }}</b>
+                <button data-testid="pf-potsplit-nonactive" type="button" class="sx-pot-chip non" [class.on]="segment === 'potential' && customerFilter === 'non active'"
+                  (click)="setCustomerChip('non active')" matTooltipClass="sx-tip" matTooltip="Show only non-active-status participants in the table">
+                  Non-Active <b>{{ potentialStatusCount('non active') | number }}</b>
                 </button>
                 <button data-testid="pf-potsplit-discontinued" type="button" class="sx-pot-chip disc" [class.on]="segment === 'potential' && customerFilter === 'discontinued'"
                   (click)="setCustomerChip('discontinued')" matTooltipClass="sx-tip" matTooltip="Show only discontinued-status participants in the table">
@@ -106,12 +119,126 @@
             <div class="sx-oc-lab">Overall requested</div>
             <div class="sx-oc-hint">requested + approved + unattended + revoked</div>
           </div>
-          <div class="sx-oc-num">{{ overallRequested | number }}</div>
+          <div class="sx-oc-num">{{ segmentList['overallRequested']?.length | number }}</div>
         </button>
       </div>
 
+      <div class="sx-bd-stack">
+        <!-- Checklist card -->
+        <div class="checklist-card">
+  
+          <div class="checklist-head">
+            <span class="checklist-title">
+              <h3 class="checklist-heading">Checklist</h3>
+              <button type="button" class="checklist-add" title="Add checklist item" (click)="addCheckList()">+</button>
+            </span>
+          </div>
+  
+          <div class="checklist-row checklist-labels">
+            <span>Item</span>
+            <span class="checklist-cell">Clear</span>
+            <span class="checklist-cell">Not clear</span>
+          </div>
+  
+          <ng-container *ngFor="let checklist of checkListMap | keyvalue; trackBy: trackByChecklistId">
+            <div class="checklist-row">
+              <div class="checklist-item">
+                <span class="checklist-name">
+                  <span class="checklist-name-text">
+                    <button type="button"
+                            class="checklist-col-btn"
+                            [class.on]="columnRegistry[checklist.key]"
+                            title="Show as a table column"
+                            (click)="toggleChecklist(checklist?.key, checklist?.value)">
+                      <mat-icon class="checklist-icon">
+                        {{ columnRegistry[checklist.key] ? 'check_box' : 'check_box_outline_blank' }}
+                      </mat-icon>
+                    </button>
+                    {{ checklist.value?.title }}
+                  </span>
+  
+                  <div class="checklist-actions">
+                    <button type="button" class="checklist-del" title="Delete checklist" (click)="deleteCheckList(checklist?.key)">
+                      <mat-icon class="checklist-icon">delete</mat-icon>
+                    </button>
+                    <button type="button" class="checklist-edit" title="Edit checklist" (click)="editCheckList(checklist?.key)">
+                      <mat-icon class="checklist-icon">edit</mat-icon>
+                    </button>
+                  </div>
+                </span>
+  
+                <!-- clear / not clear split bar -->
+                <div class="checklist-bar">
+                  <i class="checklist-bar-clear" [style.width.%]="(getClearCountForCheckList(checklist.value) / (getClearCountForCheckList(checklist.value) + getNonClearCountForCheckList(checklist.value) || 1)) * 100"></i>
+                  <i class="checklist-bar-not"   [style.width.%]="(getNonClearCountForCheckList(checklist.value) / (getClearCountForCheckList(checklist.value) + getNonClearCountForCheckList(checklist.value) || 1)) * 100"></i>
+                </div>
+              </div>
+  
+              <button type="button" class="checklist-cell checklist-count checklist-count-clear"
+                      [class.on]="selectedChecklist?.checklistId === checklist?.key && selectedChecklist?.type === 'clear'"
+                      (click)="onChecklistFilterClick(checklist?.key, 'clear')">
+                {{ getClearCountForCheckList(checklist.value) }}
+              </button>
+              <button type="button" class="checklist-cell checklist-count checklist-count-not"
+                      [class.on]="selectedChecklist?.checklistId === checklist?.key && selectedChecklist?.type === 'not clear'"
+                      (click)="onChecklistFilterClick(checklist?.key, 'not clear')">
+                {{ getNonClearCountForCheckList(checklist.value) }}
+              </button>
+            </div>
+          </ng-container>
+        </div>
+        <!--  -->
+      </div>
+      <div class="comm-card">
+
+        <!-- head -->
+        <div class="comm-head">
+          <span class="comm-title">
+            <h3 class="comm-heading">Communication</h3>
+            <!-- <button type="button" class="comm-add" title="New communication" (click)="addCommunication()">+</button> -->
+          </span>
+          <span class="comm-total">{{ communications.length }}</span>
+        </div>
+
+        <!-- channel headers -->
+        <div class="comm-row comm-labels">
+          <span>Message</span>
+          <span class="comm-cell"><span class="comm-ch email">Email</span></span>
+          <span class="comm-cell"><span class="comm-ch whatsapp">WhatsApp</span></span>
+          <span class="comm-cell"><span class="comm-ch app">App</span></span>
+        </div>
+
+        <!-- one row per message -->
+        <div class="comm-wrap">
+          <div class="comm-row" *ngFor="let comm of communications; trackBy: trackByCommunication">
+            <span class="comm-msg">{{ comm.title }}</span>
+
+            <button type="button" class="comm-cell comm-count" [class.zero]="getEmailStats(comm['docid'])?.sent === 0" >
+              <span class="comm-frac">{{ getEmailStats(comm['docid'])?.sent ?? 0}}<small>/{{ getEmailStats(comm['docid'])?.total }}</small></span>
+            </button>
+            <button type="button" class="comm-cell comm-count" [class.zero]="getWatiStats(comm['docid'])?.sent === 0" >
+              <span class="comm-frac">{{ getWatiStats(comm['docid'])?.sent }}<small>/{{ getWatiStats(comm['docid'])?.total }}</small></span>
+            </button>
+            <button type="button" class="comm-cell comm-count" [class.zero]="getAppNotificationStats(comm['docid'])?.sent === 0" >
+              <span class="comm-frac">{{ getAppNotificationStats(comm['docid'])?.sent }}<small>/{{ getAppNotificationStats(comm['docid'])?.total }}</small></span>
+            </button>
+            
+            <!-- <button type="button"
+                    class="comm-cell comm-count"
+                    *ngFor="let ch of communicationChannels"
+                    [class.zero]="m.sent[ch.key] === 0"
+                    [class.on]="selectedCommunication?.key === m.key && selectedCommunication?.channel === ch.key"
+                    (click)="onCommunicationFilterClick(m.key, ch.key)">
+              <span class="comm-frac">{{ m.sent[ch.key] }}<small>/{{ m.total }}</small></span>
+            </button> -->
+          </div>
+        </div>
+
+        <!-- empty state -->
+        <div class="comm-empty" *ngIf="!communications.length">No communications yet</div>
+      </div>
       <!-- Approved by journey × first-timer / repeat -->
-      <div class="sx-bd-stack" *ngIf="counts.approved > 0">
+      <div class="sx-bd-stack" *ngIf="segmentList.approved.length > 0 && showJourneyCard">
         <div class="sx-jcard">
           <div class="sx-jhead">
             <span class="sx-jdot"></span>
@@ -122,10 +249,9 @@
               <mat-icon>{{ groupEditMode ? 'check' : 'workspaces' }}</mat-icon>{{ groupEditMode ? 'Done' : 'Group' }}
             </button>
           </div>
-          <div class="sx-jsub">of {{ counts.approved | number }} approved · journey, split by first-timer vs repeat</div>
+          <div class="sx-jsub">of {{ segmentList.approved.length | number }} approved · journey, split by first-timer vs repeat</div>
           <div class="sx-jload" *ngIf="!splitsReady"><mat-icon class="spin">autorenew</mat-icon> journeys…</div>
 
-          <!-- Group edit mode: tick journeys → name → Group -->
           <ng-container *ngIf="splitsReady && groupEditMode">
             <div class="sx-jedit-hint">Tick journeys, type a group name, then Group. Repeat to build more groups.</div>
             <div class="sx-jgroup-bar">
@@ -149,7 +275,6 @@
             </label>
           </ng-container>
 
-          <!-- Normal mode: click filters the table to the journey (or the union of a group) -->
           <ng-container *ngIf="splitsReady && !groupEditMode">
             <div class="sx-jgrp" *ngFor="let j of displayedJourneys; trackBy: trackJourneyKey">
               <div class="sx-jrowline">
@@ -162,7 +287,6 @@
                   </span>
                   <span class="sx-jnum">{{ j.total | number }}</span>
                 </button>
-                <!-- Participants open in an overlay (mat-menu) so the card stays compact -->
                 <button data-testid="pf-journey-expand" type="button" class="sx-jexp" [matMenuTriggerFor]="jmenu" (click)="$event.stopPropagation()"
                   matTooltipClass="sx-tip" matTooltip="Show participants and their journeys">
                   <mat-icon>group</mat-icon>
@@ -176,7 +300,6 @@
               </mat-menu>
 
               <div class="sx-jfr">
-                <!-- A pill filters the table AND opens the journey-grouped breakdown for that subset -->
                 <button data-testid="pf-journey-first" type="button" class="sx-frpill first" [matMenuTriggerFor]="frFirstMenu"
                   [class.on]="segment === 'approved' && journeyFilter === j.key && frFilter === 'first'"
                   (click)="setJourneyFr(j, 'first')" matTooltipClass="sx-tip" [matTooltip]="'Show first-timers from ' + j.label">First-timer {{ j.first | number }}</button>
@@ -198,7 +321,6 @@
             </div>
           </ng-container>
 
-          <!-- Shared overlay body: participants grouped by journey -->
           <ng-template #frPanelTpl let-j="j" let-fr="fr" let-count="count" let-label="label">
             <div data-testid="pf-journey-menu-stop" class="sx-jmenu" (click)="$event.stopPropagation()">
               <div class="sx-jmenu-head">
@@ -222,74 +344,34 @@
           </ng-template>
         </div>
       </div>
-
-      <!-- Checklist card -->
-      <div class="checklist-card">
-
-        <div class="checklist-head">
-          <span class="checklist-title">
-            <h3 class="checklist-heading">Checklist</h3>
-            <button type="button" class="checklist-add" title="Add checklist item" (click)="addCheckList()">+</button>
-          </span>
-        </div>
-
-        <div class="checklist-row checklist-labels">
-          <span>Item</span>
-          <span class="checklist-cell">Clear</span>
-          <span class="checklist-cell">Not clear</span>
-        </div>
-
-        <ng-container *ngFor="let checklist of checkListMap | keyvalue; trackBy: trackByChecklistId">
-          <div class="checklist-row">
-            <div class="checklist-item">
-              <span class="checklist-name">
-                <span class="checklist-name-text">
-                  <button type="button"
-                          class="checklist-col-btn"
-                          [class.on]="columnRegistry[checklist.key]"
-                          title="Show as a table column"
-                          (click)="toggleChecklist(checklist?.key, checklist?.value)">
-                    <mat-icon class="checklist-icon">
-                      {{ columnRegistry[checklist.key] ? 'check_box' : 'check_box_outline_blank' }}
-                    </mat-icon>
-                  </button>
-                  {{ checklist.value?.title }}
-                </span>
-
-                <div class="checklist-actions">
-                  <button type="button" class="checklist-del" title="Delete checklist" (click)="deleteCheckList(checklist?.key)">
-                    <mat-icon class="checklist-icon">delete</mat-icon>
-                  </button>
-                  <button type="button" class="checklist-edit" title="Edit checklist" (click)="editCheckList(checklist?.key)">
-                    <mat-icon class="checklist-icon">edit</mat-icon>
-                  </button>
-                </div>
-              </span>
-
-              <!-- clear / not clear split bar -->
-              <div class="checklist-bar">
-                <i class="checklist-bar-clear" [style.width.%]="(getClearCountForCheckList(checklist.value) / (getClearCountForCheckList(checklist.value) + getNonClearCountForCheckList(checklist.value) || 1)) * 100"></i>
-                <i class="checklist-bar-not"   [style.width.%]="(getNonClearCountForCheckList(checklist.value) / (getClearCountForCheckList(checklist.value) + getNonClearCountForCheckList(checklist.value) || 1)) * 100"></i>
-              </div>
-            </div>
-
-            <button type="button" class="checklist-cell checklist-count checklist-count-clear"
-                    [class.on]="selectedChecklist?.checklistId === checklist?.key && selectedChecklist?.type === 'clear'"
-                    (click)="onChecklistFilterClick(checklist?.key, 'clear')">
-              {{ getClearCountForCheckList(checklist.value) }}
-            </button>
-            <button type="button" class="checklist-cell checklist-count checklist-count-not"
-                    [class.on]="selectedChecklist?.checklistId === checklist?.key && selectedChecklist?.type === 'not clear'"
-                    (click)="onChecklistFilterClick(checklist?.key, 'not clear')">
-              {{ getNonClearCountForCheckList(checklist.value) }}
-            </button>
-          </div>
-        </ng-container>
-      </div>
     </div>
 
     <!-- ============ Action bar ============ -->
     <div class="sx-bar">
+
+      <mat-form-field appearance="outline" class="sx-search" subscriptSizing="dynamic">
+        <mat-label>Filter</mat-label>
+        <input data-testid="pf-bar-filter" matInput [(ngModel)]="searchText" (ngModelChange)="onSearch()" placeholder="Name or email">
+        <mat-icon matSuffix>search</mat-icon>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="sx-seq" subscriptSizing="dynamic">
+        <mat-label>Add column</mat-label>
+        <mat-select [(ngModel)]="displayColumns" multiple (selectionChange)="columnChange($event)">
+          <mat-option>
+            <ngx-mat-select-search [(ngModel)]="columSearch" name="column search" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let column of getColumn(); trackBy: trackByColumnKey" [value]="column.key">{{ column.label }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <button mat-stroked-button class="sx-ghost" (click)="handleImportClick()" *ngIf="showSelect">Import</button>
+      <input type="file" #inputFile (change)="onChange($event)" style="display: none;">
+
+      <button data-testid="pf-bar-finalize" mat-flat-button class="sx-approve" *ngIf="canFinalize" (click)="finalizeAttendance()"
+        matTooltipClass="sx-tip" matTooltip="Close the event: mark no-show on approved participants who did not attend, and lock the final numbers">
+        <mat-icon>how_to_reg</mat-icon> Finalize attendance<span *ngIf="pendingNoShow.length"> ({{ pendingNoShow.length }})</span>
+      </button>
 
       <ng-container *ngIf="selection.selected.length > 0">
 
@@ -328,11 +410,6 @@
           </button>
         </ng-container>
 
-        <button data-testid="pf-bar-finalize" mat-flat-button class="sx-approve" *ngIf="canFinalize" (click)="finalizeAttendance()"
-          matTooltipClass="sx-tip" matTooltip="Close the event: mark no-show on approved participants who did not attend, and lock the final numbers">
-          <mat-icon>how_to_reg</mat-icon> Finalize attendance<span *ngIf="pendingNoShow.length"> ({{ pendingNoShow.length }})</span>
-        </button>
-
         <button data-testid="pf-bar-send" mat-stroked-button class="sx-ghost" [matMenuTriggerFor]="sendMenu" [disabled]="!segmentRows.length"
           matTooltipClass="sx-tip" matTooltip="Message the participants in this segment">
           <mat-icon>campaign</mat-icon> Send
@@ -346,43 +423,24 @@
         <button data-testid="pf-bar-export" mat-stroked-button class="sx-ghost" (click)="exportList()"><mat-icon>download</mat-icon> Export</button>
 
         <!-- Bulk manual-checklist update -->
-        <div class="bulk">
+        <div class="bulk" *ngIf="selectionMode === 'checklist'">
           <span><b>{{ selection.selected?.length }} Selected</b></span>
           <select class="sel" #selectforbulk>
             <option *ngFor="let key of getManualChecklist()" [value]="key">{{ checkListMap[key]?.title }}</option>
           </select>
-          <button type="button" class="bk c" (click)="blukManualUpdate(selectforbulk.value, 'clear')">✓ Clear</button>
-          <button type="button" class="bk nc" (click)="blukManualUpdate(selectforbulk.value, 'not clear')">✕ Not clear</button>
+          <button type="button" class="bk c" (click)="bulkManualUpdate(selectforbulk.value, 'clear')">✓ Clear</button>
+          <button type="button" class="bk nc" (click)="bulkManualUpdate(selectforbulk.value, 'not clear')">✕ Not clear</button>
           <button type="button" class="bx" title="Unselect all" (click)="selection.clear()">×</button>
         </div>
       </ng-container>
 
       <span class="sx-spacer"></span>
-
-      <mat-form-field appearance="outline" class="sx-search" subscriptSizing="dynamic">
-        <mat-label>Filter</mat-label>
-        <input data-testid="pf-bar-filter" matInput [(ngModel)]="searchText" (ngModelChange)="onSearch()" placeholder="Name or email">
-        <mat-icon matSuffix>search</mat-icon>
-      </mat-form-field>
-
-      <mat-form-field appearance="outline" class="sx-seq" subscriptSizing="dynamic">
-        <mat-label>Add column</mat-label>
-        <mat-select [(ngModel)]="displayColumns" multiple>
-          <mat-option>
-            <ngx-mat-select-search [(ngModel)]="columSearch" name="column search" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
-          </mat-option>
-          <mat-option *ngFor="let column of getColumn(); trackBy: trackByColumnKey" [value]="column.key">{{ column.label }}</mat-option>
-        </mat-select>
-      </mat-form-field>
-
-      <button mat-stroked-button class="sx-ghost" (click)="handleImportClick()" *ngIf="showSelect">Import</button>
-      <input type="file" #inputFile (change)="onChange($event)" style="display: none;">
     </div>
 
     <!-- ============ Applied filters ============ -->
     <div class="result-bar" *ngIf="isFiltered">
       <span class="result-bar-count">
-        Showing <b class="result-bar-num">{{ segmentRows.length | number }}</b> of {{ counts[segment] | number }}
+        Showing <b class="result-bar-num">{{ segmentRows.length | number }}</b> of {{ segmentList[segment].length | number }}
       </span>
 
       <div class="result-bar-chips">
@@ -449,169 +507,181 @@
 
           <tbody>
             <tr *ngFor="let row of pagedRows; trackBy: trackParticipant" [class.picked]="selection.isSelected(row)">
-              <td *ngFor="let column of tableColumns" [ngSwitch]="column" [class.sx-c-check]="column === 'select'">
+              <td *ngFor="let column of tableColumns" [class.sx-c-check]="column === 'select'">
+                <ng-container *ngIf="{ value: getColumnValue(column, row) } as cell">
+                  <ng-container [ngSwitch]="column">
 
-                <mat-checkbox *ngSwitchCase="'select'" data-testid="pf-table-row-select" [checked]="selection.isSelected(row)" [disabled]="!isSelectable(row)"
-                  (change)="toggleRow(row)"
-                  [attr.aria-label]="isSelectable(row) ? ('Select ' + row.name) : ('Cannot select ' + row.name + (row.reason ? ' — ' + row.reason : ''))"></mat-checkbox>
+                    <mat-checkbox *ngSwitchCase="'select'" data-testid="pf-table-row-select" [checked]="selection.isSelected(row)" [disabled]="!isSelectable(row)"
+                      (change)="toggleRow(row)"
+                      [attr.aria-label]="isSelectable(row) ? ('Select ' + getColumnValue('name', row)) : ('Cannot select ' + getColumnValue('name', row) + (row?.reason ? ' — ' + row?.reason : ''))"></mat-checkbox>
 
-                <div *ngSwitchCase="'name'" class="sx-nmcell">
-                  <app-profile-picture class="sx-ph" [profileId]="row.profileid" [name]="row.name" [size]="30"></app-profile-picture>
-                  <div class="sx-nmtext">
-                    <div class="sx-nm">{{ row.name }}</div>
-                    <div class="sx-em">{{ row.email || 'No email' }}</div>
-                  </div>
-                </div>
-
-                <ng-container *ngSwitchCase="'requestedDate'">
-                  <span *ngIf="row.requestedDate">{{ row.requestedDate | date:'medium' }}</span>
-                  <span *ngIf="!row.requestedDate" class="sx-mut">{{ columnRegistry[column].defaultHtml }}</span>
-                </ng-container>
-
-                <ng-container *ngSwitchCase="'current journey'">
-                  <span *ngIf="!row.metaLoaded" class="sx-mut">…</span>
-                  <span *ngIf="row.metaLoaded && row.metaError" class="sx-warn-i" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span>
-                  <span *ngIf="row.metaLoaded && !row.metaError">{{ row.journey || columnRegistry[column].defaultHtml }}</span>
-                </ng-container>
-
-                <ng-container *ngSwitchCase="'subscriptionend'">
-                  <span *ngIf="!row.subLoaded" class="sx-mut">…</span>
-                  <ng-container *ngIf="row.subLoaded">
-                    <span *ngIf="row.subscriptionend">{{ row.subscriptionend | date:'mediumDate' }}</span>
-                    <span *ngIf="!row.subscriptionend" class="sx-mut">{{ columnRegistry[column].defaultHtml }}</span>
-                  </ng-container>
-                </ng-container>
-
-                <ng-container *ngSwitchCase="'customerstatus'">
-                  <span *ngIf="!row.metaLoaded" class="sx-mut">…</span>
-                  <span *ngIf="row.metaLoaded && row.metaError" class="sx-warn-i" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span>
-                  <span *ngIf="row.metaLoaded && !row.metaError" class="sx-cust">{{ row.customerStatus || columnRegistry[column].defaultHtml }}</span>
-                </ng-container>
-
-                <ng-container *ngSwitchCase="'financialstatus'">
-                  <span *ngIf="!row.metaLoaded" class="sx-mut">…</span>
-                  <span *ngIf="row.metaLoaded && row.metaError" class="sx-warn-i" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span>
-                  <span *ngIf="row.metaLoaded && !row.metaError" class="sx-fin">
-                    <span class="dot" [ngClass]="financeDotClass(row.finance)" *ngIf="row.finance"></span>{{ row.finance || columnRegistry[column].defaultHtml }}
-                  </span>
-                </ng-container>
-
-                <ng-container *ngSwitchCase="'paid'">
-                  <span *ngIf="!row.metaLoaded" class="sx-mut">…</span>
-                  <span *ngIf="row.metaLoaded && row.metaError" class="sx-warn-i" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span>
-                  <span *ngIf="row.metaLoaded && !row.metaError" class="sx-paid"
-                    [matTooltip]="(row.purchaseValue || row.paid) ? ((+(row.paid || 0)) | number) + ' / ' + ((+(row.purchaseValue || 0)) | number) + ' paid' : ''" matTooltipClass="sx-tip">
-                    <ng-container *ngIf="row.purchaseValue || row.paid; else dashPaid">
-                      {{ shortAmount(row.paid) }}<span class="tot"> / {{ shortAmount(row.purchaseValue) }}</span>
-                    </ng-container>
-                    <ng-template #dashPaid><span class="sx-mut">{{ columnRegistry[column].defaultHtml }}</span></ng-template>
-                  </span>
-                </ng-container>
-
-                <button *ngSwitchCase="'tickets'" type="button" class="open-ticket-chip-tab" (click)="openTicketDetail(row?.profileid)">
-                  Open Tickets
-                  <b>{{ participantMetadata[row?.profileid]?.customersupporttickets ?? columnRegistry[column].defaultHtml }}</b>
-                </button>
-
-                <ng-container *ngSwitchCase="'queuestage'">
-                  <ng-container *ngIf="arena?.type === 'queue'; else noQueue">
-                    <span *ngIf="!queueStagesLoaded" class="sx-mut">…</span>
-                    <span *ngIf="queueStagesLoaded" class="sx-stage">{{ queueStageByPid.get(row.profileid) || columnRegistry[column].defaultHtml }}</span>
-                  </ng-container>
-                  <ng-template #noQueue><span class="sx-mut">{{ columnRegistry[column].defaultHtml }}</span></ng-template>
-                </ng-container>
-
-                <ng-container *ngSwitchCase="'status'">
-                  <!-- Reason (no product / in queue / addon) -->
-                  <ng-container *ngIf="segment === 'noProduct' || segment === 'inQueue' || segment === 'addon'">
-                    <span class="sx-reason" [class.sx-reason-mut]="segment === 'inQueue'">{{ row.reason }}</span>
-                    <button data-testid="pf-row-assign-product" mat-button class="sx-assign" *ngIf="(segment === 'noProduct' || segment === 'addon') && !row.isOwner" (click)="assignProduct(row)">Assign product</button>
-                  </ng-container>
-
-                  <!-- Attendance (approved / attended / no-show) -->
-                  <ng-container *ngIf="selectionMode === 'attend'">
-                    <span class="sx-att" *ngIf="row.attended">
-                      <mat-icon>check</mat-icon> Attended <span class="sx-mut" *ngIf="row.scanned">· scanned</span>
-                    </span>
-                    <ng-container *ngIf="!row.attended">
-                      <span class="sx-noshow" *ngIf="row.attendanceState === 'no_show'">No-show</span>
-                    </ng-container>
-                    <button data-testid="pf-row-revoke-attend" mat-button class="sx-mark-danger" (click)="markRevoked([row])">Revoke</button>
-                  </ng-container>
-
-                  <!-- Unattended segment -->
-                  <span class="sx-unatt" *ngIf="segment === 'unattended'">
-                    <mat-icon>person_off</mat-icon> Unattended <span class="sx-mut">· product cancelled</span>
-                  </span>
-
-                  <!-- Revoked segment -->
-                  <span class="sx-unatt" *ngIf="segment === 'revoked'">
-                    <mat-icon>block</mat-icon> Revoked
-                    <span class="sx-mut" *ngIf="row.revokedBy">· by {{ row.revokedBy }}</span>
-                    <span class="sx-mut" *ngIf="row.revokedDate">· {{ row.revokedDate | date:'d MMM y, h:mm a' }}</span>
-                    <span class="sx-mut" *ngIf="!row.revokedBy && !row.revokedDate">· product cancelled</span>
-                  </span>
-
-                  <!-- Status (other segments) -->
-                  <span class="sx-mut" *ngIf="segment !== 'noProduct' && segment !== 'addon' && segment !== 'inQueue' && segment !== 'unattended' && segment !== 'revoked' && selectionMode !== 'attend'">
-                    <ng-container *ngIf="segment === 'overallRequested'; else stdStatus">{{ row.isUnattended ? 'unattended' : (row.isRevoked ? 'revoked' : (row.isApproved ? (row.attended ? 'attended' : 'approved') : 'requested')) }}</ng-container>
-                    <ng-template #stdStatus>{{ segment === 'eligible' ? 'ready' : (row.isNotRequested ? 'owns product' : (row.isRequested ? 'requested' : '')) }}</ng-template>
-                  </span>
-
-                  <!-- Revoke: requested -> status-only, approved -> full product-cancel path -->
-                  <button data-testid="pf-row-revoke" mat-button class="sx-mark-danger" *ngIf="selectionMode !== 'attend' && segment !== 'unattended' && segment !== 'revoked' && ((row.isApproved && row.approvedRequestId) || (row.isRequested && !row.isApproved && row.requestData?.docid))"
-                    (click)="revoke(row)">Revoke</button>
-                </ng-container>
-
-                <!-- every other column: venue fee, checklists and all optional columns, chosen by registry type -->
-                <ng-container *ngSwitchDefault>
-                  <ng-container [ngSwitch]="columnRegistry[column].type">
-
-                    <div *ngSwitchCase="'relation'">
-                      <ng-container *ngIf="(getColumnValue(column, row) | keyvalue) as products">
-                        <p class="sx-prod" *ngFor="let product of products">{{ mapProduct[product.key] ?? product.key }} - {{ product.value }}</p>
-                        <span *ngIf="products.length === 0" class="sx-mut">{{ columnRegistry[column].defaultHtml }}</span>
-                      </ng-container>
+                    <div *ngSwitchCase="'name'" class="sx-nmcell">
+                      <app-profile-picture class="sx-ph" [profileId]="row" [name]="cell.value" [size]="30"></app-profile-picture>
+                      <div class="sx-nmtext">
+                        <div class="sx-nm">{{ cell.value }}</div>
+                        <div class="sx-em">{{ getColumnValue('email', row)  || 'No email' }}</div>
+                      </div>
                     </div>
 
-                    <span *ngSwitchCase="'date'">{{ (getColumnValue(column, row) | date:'medium') || columnRegistry[column].defaultHtml }}</span>
+                    <ng-container *ngSwitchCase="'requestedDate'">
+                      <span *ngIf="cell.value">{{ cell.value | date:'medium' }}</span>
+                      <span *ngIf="!cell.value" class="sx-mut">{{ columnRegistry[column].defaultHtml }}</span>
+                    </ng-container>
 
-                    <ng-container *ngSwitchDefault>
+                    <ng-container *ngSwitchCase="'current journey'">
+                      <!-- <span *ngIf="!row.metaLoaded" class="sx-mut">…</span>
+                      <span *ngIf="row.metaLoaded && row.metaError" class="sx-warn-i" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span> -->
+                      <span>{{ mapJourney[cell.value ] || columnRegistry[column].defaultHtml }}</span>
+                    </ng-container>
 
-                      <ng-container *ngIf="columnRegistry[column]?.checklist; else plainValue">
+                    <ng-container *ngSwitchCase="'subscriptionend'">
+                      <span *ngIf="!cell.value" class="sx-mut">…</span>
+                      <ng-container *ngIf="cell.value">
+                        <span *ngIf="cell.value">{{ cell.value | date:'mediumDate' }}</span>
+                        <span *ngIf="!cell.value" class="sx-mut">{{ columnRegistry[column].defaultHtml }}</span>
+                      </ng-container>
+                    </ng-container>
 
-                        <!-- MANUAL: checkbox + status -->
-                        <label class="checklist-cell-manual"
-                               *ngIf="checkListMap[column]?.type === 'manual'; else autoPill"
-                               [class.checklist-cell-clear]="getColumnValue(column, row) === 'clear'"
-                               [class.checklist-cell-not]="getColumnValue(column, row) !== 'clear'"
-                               (click)="$event.stopPropagation()">
-                          <input type="checkbox"
-                                 class="checklist-cell-check"
-                                 [checked]="getColumnValue(column, row) === 'clear'"
-                                 (change)="onManualChecklistChange(row, column, $any($event.target).checked)">
-                          {{ getColumnValue(column, row) === 'clear' ? 'Clear' : 'Not clear' }}
-                        </label>
+                    <ng-container *ngSwitchCase="'customerstatus'">
+                      <!-- <span *ngIf="!row.metaLoaded" class="sx-mut">…</span>
+                      <span *ngIf="row.metaLoaded && row.metaError" class="sx-warn-i" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span> -->
+                      <span class="sx-cust">{{ cell.value || columnRegistry[column].defaultHtml }}</span>
+                    </ng-container>
 
-                        <!-- AUTOMATED: read-only pill -->
-                        <ng-template #autoPill>
-                          <span class="checklist-cell-pill"
-                                title="Calculated automatically"
-                                [class.checklist-cell-clear]="getColumnValue(column, row) === 'clear'"
-                                [class.checklist-cell-not]="getColumnValue(column, row) !== 'clear'">
-                            {{ getColumnValue(column, row) === 'clear' ? 'Clear' : 'Not clear' }}
-                          </span>
-                        </ng-template>
+                    <ng-container *ngSwitchCase="'financialstatus'">
+                      <span *ngIf="!cell.value" class="sx-mut">…</span>
+                      <!-- <span *ngIf="row.metaLoaded && row.metaError" class="sx-warn-i" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span> -->
+                      <span *ngIf="cell.value" class="sx-fin">
+                        <span class="dot" [ngClass]="financeDotClass(cell.value)" *ngIf="cell.value"></span>{{ cell.value || columnRegistry[column].defaultHtml }}
+                      </span>
+                    </ng-container>
+
+                    <ng-container *ngSwitchCase="'paid'">
+                      <ng-container *ngIf="{ paid : getColumnValue('paid' , row) , total : getColumnValue('totalpurchasevalue' , row) } as finance">
+                        <!-- <span *ngIf="!row.metaLoaded" class="sx-mut">…</span>
+                        <span *ngIf="row.metaLoaded && row.metaError" class="sx-warn-i" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span> -->
+                        <span class="sx-paid"
+                          [matTooltip]="(finance.paid || finance.total) ? ((+(finance.paid || 0)) | number) + ' / ' + ((+(finance.total || 0)) | number) + ' paid' : ''" matTooltipClass="sx-tip">
+                          <ng-container *ngIf="finance.paid || finance.total; else dashPaid">
+                            {{ shortAmount(finance.paid) }}<span class="tot"> / {{ shortAmount(finance.total) }}</span>
+                          </ng-container>
+                          <ng-template #dashPaid><span class="sx-mut">{{ columnRegistry[column].defaultHtml }}</span></ng-template>
+                        </span>
+                      </ng-container>
+                    </ng-container>
+
+                    <button *ngSwitchCase="'tickets'" type="button" class="open-ticket-chip-tab" (click)="openTicketDetail(row)">
+                      Open Tickets
+                      <b>{{ cell.value ?? columnRegistry[column].defaultHtml }}</b>
+                    </button>
+
+                    <ng-container *ngSwitchCase="'queuestage'">
+                      <ng-container *ngIf="arena?.type === 'queue'; else noQueue">
+                        <!-- <span *ngIf="!queueStagesLoaded" class="sx-mut">…</span> -->
+                        <span  class="sx-stage">{{ cell.value || columnRegistry[column].defaultHtml }}</span>
+                      </ng-container>
+                      <ng-template #noQueue><span class="sx-mut">{{ columnRegistry[column].defaultHtml }}</span></ng-template>
+                    </ng-container>
+
+                    <ng-container *ngSwitchCase="'status'">
+                      <!-- Reason (no product / in queue / addon) -->
+                      <ng-container *ngIf="segment === 'noProduct' || segment === 'inQueue' || segment === 'addon'">
+                        <span class="sx-reason" [class.sx-reason-mut]="segment === 'inQueue'">{{ cell.value }}</span>
+                        <button data-testid="pf-row-assign-product" mat-button class="sx-assign" *ngIf="(segment === 'noProduct' || segment === 'addon') && !row.isOwner" (click)="assignProduct(row)">Assign product</button>
                       </ng-container>
 
-                      <!-- every other column -->
-                      <ng-template #plainValue>
-                        <span>{{ getColumnValue(column, row) ?? columnRegistry[column].defaultHtml }}</span>
-                      </ng-template>
+                      <!-- Attendance (approved / attended / no-show) -->
+                      <ng-container *ngIf="selectionMode === 'attend'">
+                        <span class="sx-att" *ngIf="isAttended(row)">
+                          <mat-icon>check</mat-icon> Attended <span class="sx-mut" *ngIf="row.scanned">· scanned</span>
+                        </span>
+                        <ng-container *ngIf="!isAttended(row)">
+                          <span class="sx-noshow" *ngIf="row.attendanceState === 'no_show'">No-show</span>
+                        </ng-container>
+                        <button data-testid="pf-row-revoke-attend" mat-button class="sx-mark-danger" (click)="markRevoked([row])">Revoke</button>
+                      </ng-container>
+
+                      <!-- Unattended segment -->
+                      <span class="sx-unatt" *ngIf="segment === 'unattended'">
+                        <mat-icon>person_off</mat-icon> Unattended <span class="sx-mut">· product cancelled</span>
+                      </span>
+
+                      <!-- Revoked segment -->
+                      <ng-container *ngIf="revokedByMap[row]">
+                        <span class="sx-rev" *ngIf="segment === 'revoked'">
+
+                          <span class="sx-rev-head">
+                            <mat-icon class="sx-rev-icon">block</mat-icon>Revoked
+                          </span>
+
+                          <span class="sx-rev-meta">
+                            <span class="sx-rev-by" *ngIf="revokedByMap[row].revoked_by" [title]="revokedByName(row)">by {{ revokedByName(row) }}</span>
+                            <span class="sx-rev-date" *ngIf="revokedByMap[row].revoked_date">{{ toDate(revokedByMap[row]?.revoked_date) | date:'d MMM y, h:mm a' }}</span>
+                            <span *ngIf="!revokedByMap[row].revoked_by && !revokedByMap[row].revoked_date">product cancelled</span>
+                          </span>
+
+                        </span>
+                      </ng-container>
+                      <!-- Status (other segments) -->
+                      <span class="sx-mut" *ngIf="segment !== 'noProduct' && segment !== 'addon' && segment !== 'inQueue' && segment !== 'unattended' && segment !== 'revoked' && selectionMode !== 'attend'">
+                        {{ cell.value }}
+                      </span>
+
+                      <!-- Revoke: requested -> status-only, approved -> full product-cancel path -->
+                      <!-- <button data-testid="pf-row-revoke" mat-button class="sx-mark-danger" *ngIf="selectionMode !== 'attend' && segment !== 'unattended' && segment !== 'revoked' && ((row.isApproved && row.approvedRequestId) || (row.isRequested && !row.isApproved && row.requestData?.docid))"
+                        (click)="revoke(row)">Revoke</button> -->
                     </ng-container>
+
+                    <!-- every other column: venue fee, checklists and all optional columns, chosen by registry type -->
+                    <ng-container *ngSwitchDefault>
+                      <ng-container [ngSwitch]="columnRegistry[column].type">
+
+                        <div *ngSwitchCase="'relation'">
+                          <ng-container *ngIf="(cell.value | keyvalue) as products">
+                            <p class="sx-prod" *ngFor="let product of products">{{ mapProduct[product.key] ?? product.key }} - {{ product.value }}</p>
+                            <span *ngIf="products.length === 0" class="sx-mut">{{ columnRegistry[column].defaultHtml }}</span>
+                          </ng-container>
+                        </div>
+
+                        <span *ngSwitchCase="'date'">{{ (cell.value | date:'medium') || columnRegistry[column].defaultHtml }}</span>
+
+                        <ng-container *ngSwitchDefault>
+                          <ng-container *ngIf="columnRegistry[column]?.checklist; else plainValue">
+
+                            <!-- MANUAL: checkbox + status -->
+                            <label class="checklist-cell-manual"
+                                  *ngIf="checkListMap[column]?.type === 'manual'; else autoPill"
+                                  [class.checklist-cell-clear]="cell.value === 'clear'"
+                                  [class.checklist-cell-not]="cell.value !== 'clear'"
+                                  (click)="$event.stopPropagation()">
+                              <input type="checkbox"
+                                    class="checklist-cell-check"
+                                    [checked]="cell.value === 'clear'"
+                                    (change)="onManualChecklistChange(row, column, $any($event.target).checked)">
+                              {{ cell.value === 'clear' ? 'Clear' : 'Not clear' }}
+                            </label>
+
+                            <!-- AUTOMATED: read-only pill -->
+                            <ng-template #autoPill>
+                              <span class="checklist-cell-pill"
+                                    title="Calculated automatically"
+                                    [class.checklist-cell-clear]="cell.value === 'clear'"
+                                    [class.checklist-cell-not]="cell.value !== 'clear'">
+                                {{ cell.value === 'clear' ? 'Clear' : 'Not clear' }}
+                              </span>
+                            </ng-template>
+                          </ng-container>
+
+                          <!-- every other column -->
+                          <ng-template #plainValue>
+                            <span>{{ cell.value ?? columnRegistry[column].defaultHtml }}</span>
+                          </ng-template>
+                        </ng-container>
+                      </ng-container>
+                    </ng-container>
+
                   </ng-container>
                 </ng-container>
-
               </td>
             </tr>
 
@@ -629,6 +699,9 @@
     </div>
 
   </ng-container>
+  <div *ngIf="subEvents.length === 0 && !loading">
+    There is no arena event for the event
+  </div>
 </div>
 
 <!-- =====================================================================
@@ -709,7 +782,7 @@
   <h2 mat-dialog-title>Approved {{ data.success }} of {{ data.total }}</h2>
   <mat-dialog-content>
     <p>{{ data.failed.length }} could not be approved:</p>
-    <ul class="sx-fail"><li *ngFor="let n of data.failed">{{ n }}</li></ul>
+    <ul class="sx-fail"><li *ngFor="let pid of data.failed">{{ getColumnValue('name', pid) }}</li></ul>
   </mat-dialog-content>
   <mat-dialog-actions align="end">
     <button data-testid="pf-failures-close" mat-button [mat-dialog-close]="false">Close</button>

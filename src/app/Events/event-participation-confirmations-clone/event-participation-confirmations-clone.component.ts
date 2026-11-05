@@ -17,6 +17,7 @@ import { AuthguardService } from '../../authguard.service';
 import { ProductFunnelComponent } from './product-funnel/product-funnel.component';
 import { UpdateEventDetailComponent } from '../event-list/update-event-detail/update-event-detail.component';
 import { MatDialog } from '@angular/material/dialog';
+import { EventCtaConfigComponent } from '../event-list/event-cta-config/event-cta-config.component';
 
 interface OverviewRow {
   arena: any;
@@ -96,7 +97,8 @@ export class EventParticipationConfirmationsCloneComponent {
         this.participantMetadata[profileId] = data;
       })
     });
-    
+
+   this.guard.getProductMap().then((product)=>this.mapProduct = product);
   }
 
   // async loadOverview() {
@@ -199,7 +201,6 @@ export class EventParticipationConfirmationsCloneComponent {
     this.loadingOverview = true;
     this.loadError = false;
     try {
-      this.mapProduct = await this.guard.getProductMap();
 
       const now = new Date();
       now.setHours(0, 0, 0, 0);
@@ -237,23 +238,23 @@ export class EventParticipationConfirmationsCloneComponent {
       const arenaEventMap = {};
       for (let i = 0; i < refs.length; i += 10) {
         const chunk = refs.slice(i, i + 10);
-        const snap = await getDocs(query(
-          collection(this.firestore, 'arena events'), where('eventref', 'in', chunk)));
+        const snap = await getDocs(query(collection(this.firestore, 'arena events'), where('eventref', 'in', chunk)));
         snap.docs.forEach(d => { 
           const a = d.data(); 
-          if (a['delete'] != true) { 
+          // if (a['delete'] != true) { 
             const eventId = a['eventref']?.id;
             arenaEventMap[eventId] = arenaEventMap[eventId] ?? [];
             arenaEventMap[eventId].push(a);
-          }
+          // }
         });
       }
 
       const rows = [];
 
-      for (const [eventId , arenaevents] of Object.entries(arenaEventMap) as any) {
-        const event = mapEvent[eventId] ?? null;
+      for (const [eventId , event] of Object.entries(mapEvent) as any) {
+        // const event = mapEvent[eventId] ?? null;
         const subEvents = [];
+        const arenaevents = arenaEventMap[eventId] ?? [];
 
         for (const arena of arenaevents) {
           const arenaRow = this.buildArenaEvent(arena , mapEvent , todayStart , todayEnd);
@@ -276,7 +277,8 @@ export class EventParticipationConfirmationsCloneComponent {
       }
 
       rows.sort((x, y) => (y.end - x.end) || x.name.localeCompare(y.name));
-      console.log('overview rows : ' , this.overviewRows)
+      // console.log('overview rows : ' , this.overviewRows)
+      this.eventMap = mapEvent;
       this.overviewRows = rows;
       this.loadingOverview = false;
 
@@ -422,7 +424,7 @@ export class EventParticipationConfirmationsCloneComponent {
           // requestedIds.forEach(p => { if (owners.has(p) && !active.has(p)) eligible++; });
           requestedIds.forEach(p => { 
               const participantEligibleBucket = this.participantBucket(p , owners.has(p) , customerStatus , productConsumption , eligibilityJourney , cohortParticipants);
-              console.log(participantEligibleBucket)
+              // console.log(participantEligibleBucket)
               if (participantEligibleBucket === 'eligibile' && !active.has(p)) {
                 eligible++
               } else if(participantEligibleBucket === 'upgrade' && !active.has(p)){
@@ -567,16 +569,17 @@ export class EventParticipationConfirmationsCloneComponent {
   onPage(e: PageEvent) { this.pageIndex = e.pageIndex; this.pageSize = e.pageSize; this.computePageEligibility(); }
   onSearch() { this.pageIndex = 0; this.computePageEligibility(); }
 
-  openProduct(event : any , row : OverviewRow) {
+  openProduct(event : any , row ?: OverviewRow) {
     const key = event['docid'];
     const existing = this.openTabs.findIndex(t => t.key === key);
     if (existing >= 0) { this.selectedIndex = existing + 1; return; }
-    this.openTabs.push({ key, eventName: event.name, eventEnd: new Date(event.end) , event : row?.event , eventStart :  new Date(event?.start) , arenaId : row?.arena?.docid});
+    const eventObject = this.eventMap[key];
+    this.openTabs.push({ key, eventName: event.name, eventEnd: new Date(event.end) , event : eventObject , eventStart :  new Date(event?.start) , arenaId : row?.arena?.docid ?? null});
     this.selectedIndex = this.openTabs.length;
     this.saveTabs();
   }
 
-  onRowKey(e: KeyboardEvent, event : any , row: OverviewRow) {
+  onRowKey(e: KeyboardEvent, event : any , row?: OverviewRow) {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.openProduct(event , row); }
   }
 
@@ -601,8 +604,8 @@ export class EventParticipationConfirmationsCloneComponent {
       if (seen.has(k)) return;
       seen.add(k);
       const event = this.overviewRows.find(r => r.docid === k);
-      const arena = event?.subEvents?.[0];
-      if (event && arena) this.openTabs.push({ key: k, eventName: event.name, eventEnd: new Date(event.end) , event : arena?.event , eventStart :  new Date(event?.start) , arenaId : arena?.arena?.docid });
+      const arena = event?.subEvents?.[0] ?? null;
+      if (event) this.openTabs.push({ key: k, eventName: event.name, eventEnd: new Date(event.end) , event : event , eventStart :  new Date(event?.start) , arenaId : arena?.arena?.docid ?? null });
     });
     this.saveTabs();
   }
@@ -619,8 +622,16 @@ export class EventParticipationConfirmationsCloneComponent {
       panelClass: 'custom-dialog-container',
       maxHeight: '98vh',
       maxWidth: '99vw',
-    }).afterClosed().toPromise().then(()=>{
-      
+    }).afterClosed().toPromise().then((status)=>{
+      this.loadOverview()
     })
+  }
+
+  openCTAConfig(){
+    const diag = this.dialog.open(EventCtaConfigComponent,{
+      maxHeight: "90vh",
+      maxWidth: "90vw",
+      minWidth : "60vw"
+    });
   }
 }

@@ -15,7 +15,7 @@
 *, *::before, *::after { box-sizing: border-box; }
 
 .sx {
-  max-width: 1500px;
+  max-width: 1800px;
   margin: 0 auto;
   padding: 16px 20px 40px;
   color: #1d2330;
@@ -39,6 +39,15 @@
 .sx-mut { color: #8a90a0; }
 .sx-spacer { flex: 1; }
 
+/* revoked cell: label on top, "by … / date" below */
+.sx-rev { display: inline-flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+.sx-rev-head { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; color: #7a2638; }
+.sx-rev-icon { width: 16px; height: 16px; font-size: 16px; line-height: 16px; }
+
+.sx-rev-meta { display: flex; flex-direction: column; font-size: 12px; line-height: 1.3; color: #8a90a0; }
+.sx-rev-by { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sx-rev-date { white-space: nowrap; }
 
 /* ---------- finalized summary ---------- */
 .sx-frozen-card { display: inline-block; margin-bottom: 14px; padding: 14px 18px; }
@@ -98,7 +107,7 @@
 /* =========================================================================
    Cards grid (Potential · Approved · Journey · Checklist)
    ========================================================================= */
-.sx-bd { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; align-items: start; margin-bottom: 16px; }
+.sx-bd { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; align-items: start; margin-bottom: 16px; position: relative; }
 @media (max-width: 1200px) { .sx-bd { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px)  { .sx-bd { grid-template-columns: 1fr; } }
 
@@ -674,3 +683,92 @@
 .ic-sm { width: 18px; height: 18px; font-size: 18px; line-height: 18px; }
 .link { padding: 4px 0; border: 0; background: none; color: #1f5bd8; font: inherit; font-weight: 600; cursor: pointer; }
 .link:hover { text-decoration: underline; }
+
+/* =========================================================================
+   Communication card
+   ========================================================================= */
+.comm-card { padding: 16px 18px; border-radius: 14px; background: #fff; box-shadow: 0 1px 2px rgba(20, 30, 50, .04); }
+
+.comm-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding-left: 12px; border-left: 4px solid #1f5bd8; }
+.comm-title { display: flex; align-items: center; gap: 8px; }
+.comm-heading { margin: 0; font-size: 16px; font-weight: 600; }
+.comm-add { width: 24px; height: 24px; padding: 0; border: 1px solid #eceef2; border-radius: 50%; background: #fff; color: #1f5bd8; font-size: 16px; line-height: 20px; cursor: pointer; }
+.comm-add:hover { background: #eaf1ff; }
+.comm-total { font-size: 24px; font-weight: 600; color: #1f5bd8; }
+
+/* rows: message | email | whatsapp | app */
+.comm-wrap {max-height: 250px; overflow-y: auto;}
+.comm-row { display: grid; grid-template-columns: minmax(0, 1fr) repeat(3, 60px); align-items: center; gap: 6px; padding: 9px 0; border-bottom: 1px solid #eceef2; max-height: 100px; overflow-y: auto;}
+.comm-labels { padding: 4px 0 8px; font-size: 11px; font-weight: 500; color: #8a90a0; }
+.comm-cell { text-align: center; }
+.comm-msg { min-width: 0; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+
+/* channel chips */
+.comm-ch { display: inline-block; padding: 1px 5px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.comm-ch.email    { background: #eaf1ff; color: #1f5bd8; }
+.comm-ch.whatsapp { background: #e8f6ee; color: #22a35a; }
+.comm-ch.app      { background: #efe9fb; color: #7a4fc2; }
+
+/* sent / total */
+.comm-count { padding: 4px 0; border: 0; border-radius: 8px; background: none; font: inherit; cursor: pointer; transition: background .12s, box-shadow .12s; }
+.comm-count:hover { background: #eaf1ff; }
+.comm-count.on { background: #eaf1ff; box-shadow: inset 0 0 0 1.5px #1f5bd8; }
+.comm-count:focus-visible { outline: 2px solid #1f5bd8; outline-offset: 1px; }
+.comm-frac { font-weight: 600; }
+.comm-frac small { font-size: 11px; font-weight: 400; color: #8a90a0; }
+.comm-count.zero .comm-frac { color: #b9bec9; }
+
+.comm-empty { padding: 18px 0 6px; text-align: center; font-size: 13px; color: #8a90a0; }
+
+/* round toggle (right edge of the screen) */
+.jtoggle {
+  /* position: absolute;
+  top: 50%;
+  right: 20px; */
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #eceef2;
+  border-radius: 50%;
+  background: #fff;
+  color: #7a4fc2;
+  box-shadow: 0 4px 14px rgba(20, 30, 50, .16);
+  /* transform: translateY(-50%); */
+  cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s, box-shadow .15s, transform .15s;
+}
+.jtoggle:hover { box-shadow: 0 6px 18px rgba(20, 30, 50, .22); transform: scale(1.06); }
+.jtoggle:focus-visible { outline: 2px solid #1f5bd8; outline-offset: 3px; }
+.jtoggle.on { background: #7a4fc2; border-color: #7a4fc2; color: #fff; }
+
+.jtoggle-icon { width: 24px; height: 24px; font-size: 24px; line-height: 24px; }
+
+/* approved count */
+.jtoggle-badge {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #1f5bd8;
+  color: #fff;
+  font: 600 11px/18px Inter, system-ui, sans-serif;
+  text-align: center;
+}
+
+/* phones: move to the bottom-right corner */
+@media (max-width: 640px) {
+  .jtoggle { top: auto; bottom: 20px; transform: none; }
+  .jtoggle:hover { transform: scale(1.06); }
+}
+
+/* the card eases in when shown */
+.sx-jcard { animation: sx-pop .18s ease-out; }
+@keyframes sx-pop { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .sx-jcard { animation: none; } }
