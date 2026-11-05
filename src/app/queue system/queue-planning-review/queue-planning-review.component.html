@@ -400,6 +400,7 @@
                           <span class="datetime-label" style="color: black;">Appointment:</span>
                           <span class="slot-title-text">{{ getProfileName(appt.hostref?.id) }}</span>
                           <button *ngIf="appt.appointmentref" mat-icon-button matTooltip="Revert Appointment"
+                            data-testid="qpr-revert-appointment"
                             class="revert-btn" style="margin-left: auto;" (click)="revertAppointmentSlot(appt)">
                             <mat-icon>undo</mat-icon>
                           </button>
