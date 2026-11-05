@@ -247,6 +247,8 @@ export const routes: Routes = [
   {path: 'ecosystem', loadComponent: () => import('./Journey Onboarding/eco-system-new/eco-system-new.component').then(m => m.EcoSystemNewComponent), canActivate: [authGuard]},
   {path: 'onboarding-pipeline', loadComponent: () => import('./Journey Onboarding/onboarding-pipeline/onboarding-pipeline.component').then(m => m.OnboardingPipelineComponent), canActivate: [authGuard]},
   {path: 'team-evolution-dashboard', loadComponent: () => import('./Journey Onboarding/team-evolution-dashboard/team-evolution-dashboard.component').then(m => m.TeamEvolutionDashboardComponent), canActivate: [authGuard]},
+  {path: 'delivery-dashboard-new', loadComponent: () => import('./Journey Onboarding/delivery-dashboard-new/delivery-dashboard-new.component').then(m => m.DeliveryDashboardNewComponent)},
+
 
   // Participants Profile Management
   {path: 'participants-analytics', loadComponent: () => import('./Participants Profile Management/participants-analytics/participants-analytics.component').then(m => m.ParticipantsAnalyticsComponent), canActivate: [authGuard]},

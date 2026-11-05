@@ -33,10 +33,11 @@
         </mat-form-field>
         <br>
 
-        <mat-checkbox formControlName="ischangeworkrequired">Is Changework Required</mat-checkbox>
+        <mat-checkbox formControlName="ischangeworkrequired" (change)="onAppointmentCheckboxChange()">Is Changework Required</mat-checkbox>
         <br>
 
-        <mat-checkbox formControlName="groupappointment">Mark as Group Appointment</mat-checkbox>
+        <mat-checkbox formControlName="groupappointment" (change)="onAppointmentCheckboxChange()">Mark as Group Appointment</mat-checkbox>
+        <mat-checkbox formControlName="queueappointment">Mark as Queue Appointment</mat-checkbox>
         <div *ngIf="appointmentform.get('groupappointment').value">
           <mat-form-field class="textField" appearance="outline">
             <mat-label>Maximum Slots</mat-label>
@@ -48,7 +49,7 @@
         </div>
         <div class="btnRow">
           <button data-testid="ud-close-dialog-2" type="button" mat-stroked-button class="cancelbtn" (click)="closeDialog()" [disabled]="loading">Cancel</button>
-          <button data-testid="ud-submit-appointment-3" type="submit" mat-stroked-button class="successbtn" (click)="submitAppointment(appointmentform.value)" [disabled]="loading">Submit</button>
+          <button data-testid="ud-submit-appointment-3" type="submit" mat-stroked-button class="successbtn" (click)="submitAppointment(appointmentform.getRawValue())" [disabled]="loading">Submit</button>
         </div>
       </form>
     </div>
