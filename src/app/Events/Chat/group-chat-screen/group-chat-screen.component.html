@@ -961,9 +961,9 @@
               <span class="grow" *ngIf="isLive(a)">A&amp;H members · {{ memberSearch ? filteredTeam.length + ' of ' + teamMembers.length : teamMembers.length }}</span>
               <span class="grow" *ngIf="!isLive(a)">Team · {{ teamMembers.length + 1 }}</span>
               <!-- Live groups add anyone from the one Add button under Participants. -->
-              <button data-testid="gcs-info-team-add" class="wc-add-btn" *ngIf="!isLive(a) && canManageGroup" (click)="openAddMembers()"><mat-icon>add</mat-icon> Add</button>
+              <button data-testid="gcs-info-team-add" class="wc-add-btn" *ngIf="!isLive(a) && canAddMembers" (click)="openAddMembers()"><mat-icon>add</mat-icon> Add</button>
             </div>
-            <div class="wc-note" *ngIf="isLive(a) && teamMembers.length === 0">
+            <div class="wc-note" *ngIf="isLive(a) && teamMembers.length === 0 && !canAddMembers">
               No A&amp;H member in this group, so nobody can add or remove people.
             </div>
             <!-- One search box filters both lists; it sits here only when Participants has none to show. -->
@@ -1003,7 +1003,7 @@
             <div class="wc-block-title">
               <mat-icon>account_circle</mat-icon>
               <span class="grow">Participants · {{ memberSearch ? filteredParticipants.length + ' of ' + participantMembers.length : participantMembers.length }}</span>
-              <button data-testid="gcs-info-participants-add" class="wc-add-btn" *ngIf="canManageGroup" (click)="openAddMembers()"><mat-icon>add</mat-icon> Add</button>
+              <button data-testid="gcs-info-participants-add" class="wc-add-btn" *ngIf="canAddMembers" (click)="openAddMembers()"><mat-icon>add</mat-icon> Add</button>
             </div>
             <div class="wc-note" *ngIf="participantMembers.length === 0">No participants yet</div>
 

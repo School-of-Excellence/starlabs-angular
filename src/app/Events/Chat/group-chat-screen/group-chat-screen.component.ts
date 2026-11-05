@@ -2119,6 +2119,16 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   get canManageGroup(): boolean { return this.canManageGroupOf(this.active); }
 
   /**
+   * Adding people (QA, Nov 2026): a Chat Admin (`chatxadmin`) can add to ANY group, member or not;
+   * everyone else needs canManageGroup (an A&H member in the group). Archived groups don't change.
+   */
+  get canAddMembers(): boolean {
+    const a = this.active;
+    if (!a || this.isChannel(a) || a.archived) return false;
+    return this.canManageGroup || (this.isLive(a) && this.chatAdmin);
+  }
+
+  /**
    * Announcing is for the A&H team, as in the Flutter app (`chatxadmin` or `ahmember`), and only where
    * they can post at all.
    */
@@ -4819,7 +4829,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   saveAddMembers(): void {
     const active = this.active;
-    if (!active || !this.aPicked.length || !this.canManageGroup) return;
+    if (!active || !this.aPicked.length || !this.canAddMembers) return;
     const n = this.aPicked.length;
     if (this.isLive(active)) {
       updateDoc(active._ref, { members: arrayUnion(...this.aPicked.map(p => p.id)) })
