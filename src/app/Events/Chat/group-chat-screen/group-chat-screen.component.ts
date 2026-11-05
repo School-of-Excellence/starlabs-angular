@@ -1294,8 +1294,8 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   private mapMessageDoc(d: any): ChatMessage {
     const raw: any = d.data();
     const deleted = raw['deleted'] === true;
-    // A deleted message is emptied, with what it said kept in `deleted_content` for the team. Laid back
-    // over the doc for display, exactly as the Flutter app's `_asSent` does.
+    // Deletes leave the message as it was (Nov 2026). Ones deleted before that were emptied with what they
+    // said kept in `deleted_content`: laid back over the doc for display, as the Flutter app's `_asSent` does.
     const data: any = deleted && raw['deleted_content'] && typeof raw['deleted_content'] === 'object'
       ? { ...raw, ...raw['deleted_content'] } : raw;
     const uid = data['sender_uid'];
@@ -1354,11 +1354,12 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     const first = files[0];
     // Through the same classifier as attachments: the app stores `filetype: "jpg"`, `mediatype: "image"`.
     const firstType = first ? this.fileRecordToAttachment(first).type : null;
-    const isMedia = firstType === 'image' || firstType === 'video';
+    // A quote of a deleted message keeps its copy but is marked `deleted`: show neither words nor picture.
+    const gone = raw['deleted'] === true;
+    const isMedia = !gone && (firstType === 'image' || firstType === 'video');
     return {
       senderName: this.nameOfUid(raw['sender_uid']),
-      // The Flutter app empties a quote when its message is deleted and marks it `deleted`.
-      text: raw['deleted'] === true ? 'Deleted message'
+      text: gone ? 'Deleted message'
         : this.plainPreview(this.expandMentions(raw['message'] || '')),
       messageId: raw['messageid'] || undefined,
       senderUid: raw['sender_uid'],
@@ -2024,7 +2025,8 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     const hits: { group: ChatItem; msg: ChatMessage }[] = [];
 
     await Promise.all(groups.map(async g => {
-      const loaded = (g.messages || []).filter(m => this.normalizeForSearch(this.plainPreview(m.text)).includes(q));
+      const loaded = (g.messages || [])
+        .filter(m => !m._deleted && this.normalizeForSearch(this.plainPreview(m.text)).includes(q));
       loaded.forEach(m => hits.push({ group: g, msg: m }));
       if (!this.isLive(g)) return;
 
@@ -2657,6 +2659,8 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   /** Newest first — ISO timestamps sort lexicographically, so no Date parsing needed. */
   get threadAttachments(): (Attachment & { mid: string; at: string; sender: string })[] {
     return (this.active?.messages || [])
+      // A deleted message keeps its files, but they're not shared any more (the team still sees it in the thread).
+      .filter(m => !m._deleted)
       .flatMap(m => {
         const own = this.attachmentsOf(m);
         // A broadcast keeps its files under _broadcast, so surface those in the Docs list too.
@@ -2717,6 +2721,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     const urlRe = /(https?:\/\/[^\s<>"')]+)/g;
 
     for (const m of (this.active?.messages || [])) {
+      if (m._deleted) continue;           // a deleted message keeps its links; they're not shared any more
       const sender = m.from === 'team' ? this.selfName : m.senderName;
       const push = (label: string, href: string) => {
         const key = `${m.id}|${href}`;
@@ -3953,29 +3958,25 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   /**
    * The Flutter app's delete (msgThread.dart `_delete`), so both apps agree on what a deleted message is:
-   *   message → deleted, deleted_at, deleted_by, deleted_content {what it said}, content emptied,
-   *             pinned false, pending [] (nobody is waiting to read it any more)
+   *   message → deleted, deleted_at, deleted_by; message, files, … stay exactly as they were
+   *             (Nov 2026: no more emptying into `deleted_content`); message_search removed so it
+   *             can't be found; pinned false, pending [] (nobody is waiting to read it any more)
    *   group   → pendingcount down for those still waiting; when it was the newest message standing,
    *             last_message / last_sender_uid from the one before, and last_announcement_at removed
-   *   replies → their quote of it emptied and marked deleted
+   *   replies → their quote of it marked deleted (kept, shown as "Deleted message")
    * It disappears for participants; the A&H team still sees it, marked deleted.
    * Not a hard delete any more: that lost the team's copy and left phones with no "deleted" marker.
    */
   private async softDelete(group: ChatItem, msgs: ChatMessage[]): Promise<void> {
     if (!msgs.length) return;
-    const KEPT = ['message', 'files', 'mentions', 'links', 'reply_to', 'attachments', 'voice_seconds', 'voice_wave', 'buttons'];
     const ids = new Set(msgs.map(m => m.id));
     const now = new Date();
     const batch = writeBatch(this.firestore);
     const waiting: { [uid: string]: number } = {};
     msgs.forEach(m => {
       const raw = m._raw || {};
-      const kept: any = {};
-      KEPT.forEach(k => { if (raw[k] != null) kept[k] = raw[k]; });
       batch.update(m._ref, {
-        deleted: true, deleted_at: now, deleted_by: this.currentUid, deleted_content: kept,
-        message: '', files: [], mentions: null, links: null, buttons: [],
-        reply_to: deleteField(), attachments: deleteField(), voice_seconds: deleteField(), voice_wave: deleteField(),
+        deleted: true, deleted_at: now, deleted_by: this.currentUid,
         message_search: deleteField(),
         pinned: false, pending: [],
       });
@@ -4011,15 +4012,15 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       this.notify('Error deleting messages');
       return;
     }
-    // Replies carry a copy of what they quote; for a deleted message that copy is emptied too.
+    // Replies carry a copy of what they quote: kept, and marked so the quote reads "Deleted message".
     for (const id of ids) {
       try {
         const quoting = await getDocs(query(collection(this.supportchat, group.id, 'messages'),
                                             where('reply_to.messageid', '==', id)));
         for (const r of quoting.docs) {
-          await updateDoc(r.ref, { 'reply_to.message': '', 'reply_to.files': [], 'reply_to.deleted': true });
+          await updateDoc(r.ref, { 'reply_to.deleted': true });
         }
-      } catch (e) { console.error('delete: emptying quotes', e); }
+      } catch (e) { console.error('delete: marking quotes', e); }
     }
   }
 

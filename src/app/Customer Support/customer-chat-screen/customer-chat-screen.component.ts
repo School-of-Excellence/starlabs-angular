@@ -6,7 +6,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute } from '@angular/router';
 import { AuthguardService } from '../../authguard.service';
 import { InsertMessageDialogComponent } from '../insert-message-dialog/insert-message-dialog.component';
-import { collection, collectionSnapshots, arrayUnion, arrayRemove, deleteDoc, doc, docSnapshots, Firestore, getDoc, getDocs, orderBy, query, setDoc, updateDoc, where, writeBatch, Timestamp } from '@angular/fire/firestore';
+import { collection, collectionSnapshots, arrayUnion, arrayRemove, doc, docSnapshots, Firestore, getDoc, getDocs, orderBy, query, setDoc, updateDoc, where, writeBatch, Timestamp } from '@angular/fire/firestore';
 import { ref, uploadBytes, getDownloadURL, Storage, deleteObject } from '@angular/fire/storage';
 import { Subject, take, takeUntil } from 'rxjs';
 import { CustomerTicketReviewComponent } from '../customer-ticket-review/customer-ticket-review.component';
@@ -855,12 +855,17 @@ export class CustomerChatScreenComponent {
     document.body.removeChild(selBox);
   }
 
+  // Soft delete (Nov 2026), as in the group chats: the message stays as it was, marked `deleted` with
+  // when and by whom. The participant's app stops showing it; this screen still shows it, marked Deleted.
   delectChat(docid) {
     var agree = confirm(" Are you sure want to delete the chat")
     const clientissueDoc = doc(this.firestore, 'clientissue', this.currentIssueData['id'])
     let chatSubCollection = doc(clientissueDoc, 'messages', docid)
     if (agree) {
-      deleteDoc(chatSubCollection).then(() => {
+      updateDoc(chatSubCollection, {
+        deleted: true, deleted_at: new Date(), deleted_by: this.authservice.uid,
+        pending: [],   // nobody is waiting to read it any more
+      }).then(() => {
         console.log("Chat Deleted Successfully");
         this.openSnackBar("Chat Deleted Successfully", "Ok");
       }).catch((error) => {

@@ -339,13 +339,16 @@
                     <button mat-menu-item [attr.data-testid]="'ccs-msg-copy-' + idx" (click)="copyMessage(chat['originalmessage'])">Copy</button>
                     <button mat-menu-item [attr.data-testid]="'ccs-msg-insert-' + idx" (click)="insertMessage(chat)">Insert Chat</button>
                     <button mat-menu-item
-                      *ngIf="(chat['sender_uid'] == authservice.uid && calculateTimeToDelete(chat['time']) == true)"
+                      *ngIf="(chat['sender_uid'] == authservice.uid && chat['deleted'] !== true && calculateTimeToDelete(chat['time']) == true)"
                       [attr.data-testid]="'ccs-msg-delete-' + idx"
                       (click)="delectChat(chat['messageid'])">Delete</button>
                   </mat-menu>
                 </div>
               </div>
 
+              <!-- Soft deleted: kept as it was, hidden from the participant's app. -->
+              <div *ngIf="chat['deleted'] === true" data-testid="ccs-msg-deleted"
+                style="color: #b3261e; font-size: 12px; font-style: italic; margin: -12px 0 14px;">Deleted — the participant no longer sees this</div>
               <div style="display: flex; flex-direction: row; width: 80%; margin-top: -15px;">
                 <div>
                   <span *ngIf="chat['message'] == '' && chat['files'].length == 0" style="color: grey;">Loading
