@@ -50,6 +50,16 @@
           </td>
         </ng-container>
 
+        <ng-container matColumnDef="forms">
+          <th mat-header-cell *matHeaderCellDef> Forms </th>
+          <td mat-cell *matCellDef="let row">
+            <li data-testid="va-form-name" *ngFor="let form of row.forms; trackBy: trackByFormId">
+              {{mapFormName[form.formid]}}
+            </li>
+            <span data-testid="va-forms-none" *ngIf="!row.forms?.length">None</span>
+          </td>
+        </ng-container>
+
         <ng-container matColumnDef="edit">
           <th mat-header-cell *matHeaderCellDef mat-sort-header> Edit </th>
           <td mat-cell *matCellDef="let row">

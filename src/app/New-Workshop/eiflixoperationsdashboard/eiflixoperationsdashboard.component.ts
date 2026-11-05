@@ -7,8 +7,10 @@ import { FormsModule } from '@angular/forms';
 import { A11yModule } from '@angular/cdk/a11y';
 import {
   Firestore, collection, collectionData, getDoc, getDocs, query, where, orderBy, documentId, Timestamp,
-  doc, setDoc, serverTimestamp
+  doc, setDoc, serverTimestamp, onSnapshot
 } from '@angular/fire/firestore';
+import { WorkshopAccessService } from '../workshop-access/workshop-access.service';
+import { PeopleSendResult, PeopleSendRow, peopleSendPhone } from '../people-send-dialog/people-send-dialog.model';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -17,6 +19,7 @@ import { trigger, transition, style, animate } from '@angular/animations';
 import { Subject, takeUntil } from 'rxjs';
 import * as XLSX from 'xlsx';
 import { EodDialogService } from './eod-dialog/eod-dialog.service';
+import { MatDialog } from '@angular/material/dialog';
 
 /** One bucket of the EiFlix Report: unique PEOPLE, split by cohort. */
 interface CohortCount { existing: number; new: number; total: number; }
@@ -160,6 +163,16 @@ export function journeySupportScheduleOrder(docs: { id: string; data: any }[]): 
     .map(d => d.data);
 }
 
+/**
+ * The Journey sent to Slack (operator 2026-10-28): a new user reads "New user"; anyone else shows
+ * their journey, or "No journey" when they have none (including people in neither directory).
+ */
+export function slackJourneyLabel(r: { usertype?: string; journey?: string }): string {
+  if (r?.usertype === 'New user') return 'New user';
+  const j = (r?.journey || '').trim();
+  return j || 'No journey';
+}
+
 /** The Users section adds 'all' — see `usersRange` for why it is the default. */
 type UsersRangeKey = 'all' | RangeKey;
 
@@ -256,6 +269,8 @@ interface ContentRow {
 export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
   private firestore = inject(Firestore);
   private eodDialog = inject(EodDialogService);
+  private matDialog = inject(MatDialog);
+  private accessService = inject(WorkshopAccessService);
   private destroy$ = new Subject<void>();
 
   @ViewChild('engSection') engSection?: ElementRef<HTMLElement>;
@@ -591,8 +606,11 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
   }
 
   // ==================== EiFlix App Logs (loginlog) ====================
-  /** Range in days: 1 = today (since local midnight), 7, 30. */
-  logRange: 1 | 7 | 30 = 1;
+  /** Range in days: 1 = today (since local midnight), 7, 30 — or 'custom' (From–To, operator 2026-10-23). */
+  logRange: 1 | 7 | 30 | 'custom' = 1;
+  /** The From / To pickers ('yyyy-mm-dd'); the range applies once both are set. */
+  logCustomStart = '';
+  logCustomEnd = '';
   /** How many days the rows currently in logAll actually cover — what the report reuses. */
   private logFetchedDays = 0;
   logLoading = false;
@@ -624,12 +642,42 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
   readonly logPageSizes = [10, 25, 50];
 
   get logPageCount(): number { return Math.max(1, Math.ceil(this.logShown.length / this.logPageSize)); }
-  get logRangeLabel(): string { return this.logRange === 1 ? 'today' : 'last ' + this.logRange + ' days'; }
+  get logRangeLabel(): string {
+    if (this.logRange === 'custom') {
+      const { start, end } = this.logCustomBounds();
+      return 'for ' + this.formatRange(start, end);
+    }
+    return this.logRange === 1 ? 'today' : 'last ' + this.logRange + ' days';
+  }
 
   setLogRange(days: 1 | 7 | 30): void {
-    if (this.logRange === days && this.logAll.length) return;
+    const hadCustom = this.logRange === 'custom' || !!this.logCustomStart || !!this.logCustomEnd;
+    this.logCustomStart = '';
+    this.logCustomEnd = '';
+    if (this.logRange === days && this.logAll.length && !hadCustom) return;
     this.logRange = days;
     this.loadLoginLogs();
+  }
+
+  /** Both pickers set -> switch to the From–To range (mirrors the Users section). */
+  applyLogCustom(): void {
+    if (!this.logCustomStart || !this.logCustomEnd) return;
+    this.logRange = 'custom';
+    this.loadLoginLogs();
+  }
+
+  /** True while exactly one custom date is picked — shows the "pick both" hint. */
+  get logCustomHint(): boolean {
+    return !!this.logCustomStart !== !!this.logCustomEnd;
+  }
+
+  /** From 00:00 on the earlier date to 23:59:59.999 on the later one (picked in either order). */
+  private logCustomBounds(): { start: Date; end: Date } {
+    const a = this.parseDateInput(this.logCustomStart);
+    const b = this.parseDateInput(this.logCustomEnd);
+    const start = new Date(Math.min(a.getTime(), b.getTime())); start.setHours(0, 0, 0, 0);
+    const end = new Date(Math.max(a.getTime(), b.getTime())); end.setHours(23, 59, 59, 999);
+    return { start, end };
   }
 
   /** Local midnight `days - 1` days ago: today = since 00:00 today; 7D = today plus the six days before. */
@@ -650,9 +698,15 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
    * normalisation and the same cohort resolution.
    */
   private async fetchLoginRows(days: number): Promise<LogRow[]> {
+    return this.fetchLoginRowsBetween(this.logRangeStart(days), null);
+  }
+
+  /** The same read bounded on both sides (From–To). Still a single-field range on `date`. */
+  private async fetchLoginRowsBetween(start: Date, end: Date | null): Promise<LogRow[]> {
     const snap = await getDocs(query(
       collection(this.firestore, 'loginlog'),
-      where('date', '>=', Timestamp.fromDate(this.logRangeStart(days))),
+      where('date', '>=', Timestamp.fromDate(start)),
+      ...(end ? [where('date', '<=', Timestamp.fromDate(end))] : []),
       orderBy('date', 'desc'),
     ));
     await Promise.all([this.pmReady, this.nudReady]).catch(() => undefined);
@@ -677,8 +731,16 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
   async loadLoginLogs(): Promise<void> {
     this.logLoading = true; this.logError = false;
     try {
-      const rows = await this.fetchLoginRows(this.logRange);
-      this.logFetchedDays = this.logRange;
+      let rows: LogRow[];
+      if (this.logRange === 'custom') {
+        const { start, end } = this.logCustomBounds();
+        rows = await this.fetchLoginRowsBetween(start, end);
+        // A From–To window is not "the last N days", so the report never borrows these rows.
+        this.logFetchedDays = 0;
+      } else {
+        rows = await this.fetchLoginRows(this.logRange);
+        this.logFetchedDays = this.logRange;
+      }
       this.logAll = rows;
       const names = new Map<string, string>();
       const os = new Set<string>();
@@ -2968,6 +3030,83 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
    * applied) as an .xlsx — base columns always, extras only when that panel
    * actually displays them.
    */
+  /**
+   * Hot Leads Today -> "Send to Slack" (operator 2026-10-21): the shared People Send dialog, handed the
+   * rows the panel is showing now (its search / cohort / journey filter applied). The dialog loads
+   * nothing itself — name, email, phone and journey all come from here.
+   */
+  private sendDialogOpening = false;
+  async openSendToSlack(panel: PanelState): Promise<void> {
+    if (this.sendDialogOpening || !panel.viewRows.length) return;
+    this.sendDialogOpening = true;
+    try {
+      const { PeopleSendDialogComponent } = await import('../people-send-dialog/people-send-dialog.component');
+      // The Slack heading is whatever header the dialog was opened from — here the side panel's own
+      // title and caption (operator 2026-10-28: nothing fixed, the dialog is shared across screens).
+      const heading = panel.title;
+      const subheading = panel.caption;
+      this.matDialog.open(PeopleSendDialogComponent, {
+        width: '980px',
+        maxWidth: '96vw',
+        autoFocus: false,
+        data: {
+          title: 'Send to Slack',
+          subtitle: `${heading} · ${subheading}`,
+          send: (rows: PeopleSendRow[]) => this.sendTouchpointToSlack(rows, heading, subheading),
+          rows: panel.viewRows.map(r => ({
+            name: r.name, email: r.email,
+            countrycode: r.countryCode ?? r.countrycode, phonenumber: r.phonenumber,
+            // Same rule as the panel's tag and its export: moved-to-existing is Existing.
+            usertype: r.unknown ? '' : (r.sourceTag ? 'New user' : 'Existing'),
+            journey: r.journeyTag || '',
+          })),
+        },
+      });
+    } finally {
+      this.sendDialogOpening = false;
+    }
+  }
+
+  /**
+   * Send to Slack (operator 2026-10-28): one `eiflixtouchpoints` document per send. The cloud function
+   * `eiflixtouchpointslack` (cloud-function/components/workshop.js) posts it to the webhook named by
+   * `webhookdoc` in `slack webhookurls` and writes the outcome back onto the same document — the
+   * webhook URL itself never reaches the browser. Waits up to a minute for that outcome.
+   */
+  private async sendTouchpointToSlack(rows: PeopleSendRow[], heading: string, subheading: string): Promise<PeopleSendResult> {
+    const people = rows.map(r => ({
+      name: r.name, email: r.email, phone: peopleSendPhone(r), journey: slackJourneyLabel(r),
+    }));
+    const n = people.length;
+    const who = `${n} ${n === 1 ? 'person' : 'people'}`;
+    const ref = doc(collection(this.firestore, 'eiflixtouchpoints'));
+    const sentby = await this.accessService.currentProfileId().catch(() => null);
+    await setDoc(ref, {
+      docid: ref.id, webhookdoc: 'eiflixhotleads', heading, subheading, people, count: n,
+      sentby: sentby || '', senton: serverTimestamp(), status: 'pending',
+    });
+    return new Promise<PeopleSendResult>(resolve => {
+      let done = false;
+      let unsub: () => void = () => {};
+      const finish = (r: PeopleSendResult) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        unsub();
+        resolve(r);
+      };
+      const timer = setTimeout(() => finish({ ok: true, message: `Queued ${who} for Slack — no confirmation yet.` }), 60_000);
+      unsub = onSnapshot(ref, snap => {
+        const d: any = snap.data() || {};
+        if (d.status === 'sent') finish({ ok: true, message: `Sent ${who} to ${d.channel || 'Slack'}.` });
+        else if (d.status === 'failed') finish({ ok: false, message: `Slack did not take it: ${d.error || 'unknown error'}` });
+      }, err => {
+        console.error('eiflixoperationsdashboard: touchpoint status watch failed', err);
+        finish({ ok: true, message: `Queued ${who} for Slack — no confirmation yet.` });
+      });
+    });
+  }
+
   exportPanel(panel: PanelState): void {
     const worksheetData = this.panelExportRows(panel);
     if (worksheetData.length < 2) return;

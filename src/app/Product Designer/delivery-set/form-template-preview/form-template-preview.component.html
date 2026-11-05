@@ -41,6 +41,14 @@
             </div>
           </div>
         </div>
+        <!-- Follow-up slider answers for a flipping question -->
+        <div *ngIf="field.flipping" class="preview-flipping">
+          <div class="preview-flipping-title">
+            {{field.flipping.title}}
+            <span class="preview-flipping-range" *ngIf="field.flipping.range">({{field.flipping.range}})</span>
+          </div>
+          <div *ngFor="let line of field.flipping.lines" class="preview-array-field-value">{{line}}</div>
+        </div>
       </ng-container>
     </div>
   </div>

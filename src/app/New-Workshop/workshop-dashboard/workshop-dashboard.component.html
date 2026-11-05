@@ -353,7 +353,7 @@
           <!-- Sale Achieved — live workshops only: enrolled people who bought in Watson between the
                registration start and one month after the workshop end (Watson read-only). -->
           <mat-card class="metric-card clickable-metric" data-testid="wdash-sale-card" *ngIf="isLiveWorkshop"
-                    (click)="onMetricClick('saleAchieved')"
+                    (click)="openSaleAchieved()"
                     matTooltip="Enrolled people who bought between registration start and one month after the workshop ended">
             <mat-card-content>
               <div class="metric-content">
@@ -2138,6 +2138,31 @@
           </ng-container> -->
           </div>
         </div>
+        <!-- Sale Achieved: purchase date range inside the window, then the total of the buyers listed. -->
+        <ng-container *ngIf="selectedStatusInfo?.status === 'saleAchieved'">
+          <div class="sale-range" role="group" aria-label="Purchase date range">
+            <label class="sale-range-field">
+              <span>From</span>
+              <input type="date" data-testid="wdash-sale-from" [(ngModel)]="saleFrom" (ngModelChange)="applyFilterSide()"
+                     [ngModelOptions]="{standalone: true}" [min]="saleMin" [max]="saleTo || saleMax"
+                     aria-label="Purchases from">
+            </label>
+            <label class="sale-range-field">
+              <span>To</span>
+              <input type="date" data-testid="wdash-sale-to" [(ngModel)]="saleTo" (ngModelChange)="applyFilterSide()"
+                     [ngModelOptions]="{standalone: true}" [min]="saleFrom || saleMin" [max]="saleMax"
+                     aria-label="Purchases to">
+            </label>
+            <button type="button" class="sale-range-clear" data-testid="wdash-sale-range-clear"
+                    *ngIf="saleFrom || saleTo" (click)="clearSaleRange()" aria-label="Clear the date range">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+          <div class="sale-panel-total">
+            <span class="sale-panel-total-label">Total value</span>
+            <span class="sale-panel-total-amt" data-testid="wdash-sale-panel-total">{{ saleShownTotalLabel }}</span>
+          </div>
+        </ng-container>
         <!-- <mat-card class="participant-card" *ngFor="let participant of filteredParticipants">
           <mat-card-content>
             <a

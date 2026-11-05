@@ -326,8 +326,11 @@
         </section>
 
         <footer class="fb-footer">
-          <button data-testid="ud-delete-form-13" *ngIf="data != null" mat-button type="button" class="fb-delete" (click)="deleteForm()" [disabled]="loading">
+          <button data-testid="ud-delete-form-13" *ngIf="data != null && !data['delete']" mat-button type="button" class="fb-delete" (click)="deleteForm()" [disabled]="loading">
             <mat-icon>delete_outline</mat-icon> Delete form
+          </button>
+          <button data-testid="ud-restore-form-24" *ngIf="data != null && data['delete']" mat-button type="button" (click)="restoreForm()" [disabled]="loading">
+            <mat-icon>restore</mat-icon> Restore form
           </button>
           <span class="fb-flex-spacer"></span>
           <span class="fb-autosave"><span class="fb-autosave-dot"></span>Autosaves when valid</span>
