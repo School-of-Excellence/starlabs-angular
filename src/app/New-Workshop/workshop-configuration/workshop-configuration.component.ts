@@ -110,6 +110,7 @@ interface ChallengeDetail {
   notedescription:string;
   notedescriptionrich:string;
   finalbeforeafter: boolean;
+  allowedit?: boolean;
 }
 
 interface CurriculumItem {
@@ -1964,8 +1965,8 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
       uploadtype:['',],
       zoomlinkchallenge:['',],
       meetdate:['',],
-      finalbeforeafter: [false]
-      
+      finalbeforeafter: [false],
+      allowedit: [false]   // set in the v2 editor only; kept here so a save from this editor doesn't drop it
     });
 
     if (insertIndex >= challengeArray.length) {
@@ -2245,7 +2246,8 @@ private rebuildActivityIds(): void {
           uploadtype:[c.uploadtype || ''],
           zoomlinkchallenge:[c.zoomlinkchallenge || ''],
           meetdate:[this.convertTimestamp(c.meetdate) || ''],
-          finalbeforeafter: [c.finalbeforeafter || false]
+          finalbeforeafter: [c.finalbeforeafter || false],
+          allowedit: [c.allowedit === true]   // v2-only switch: carried through so this editor's save keeps it
         })
       );
     });
