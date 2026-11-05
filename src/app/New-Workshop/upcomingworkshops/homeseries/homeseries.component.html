@@ -81,6 +81,12 @@
             </button>
             <span class="episode-index">{{ i + 1 }}</span>
             <span class="episode-name">{{ episodeTitle(group.get('episodeId')?.value) }}</span>
+            <!-- Edit only: the link needs the saved series id, which a new series does not have yet. -->
+            <button data-testid="hom-copy-link" *ngIf="episodeLink(group.get('episodeId')?.value) as link"
+              mat-icon-button type="button" class="copy-btn" (click)="copyEpisodeLink(link)"
+              matTooltip="Copy link" aria-label="Copy episode link">
+              <mat-icon>content_copy</mat-icon>
+            </button>
             <button data-testid="hom-remove-episode-3" mat-icon-button type="button" class="remove-btn" (click)="removeEpisode(i)"
               matTooltip="Remove episode" aria-label="Remove episode">
               <mat-icon>close</mat-icon>

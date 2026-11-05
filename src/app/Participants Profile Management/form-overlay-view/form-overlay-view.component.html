@@ -48,6 +48,16 @@
                 </ng-container>
                 <ng-template #plainValue>{{ field.value }}</ng-template>
               </div>
+              <div class="question-flipping" *ngIf="field.flipping">
+                <div class="flipping-title">
+                  {{ field.flipping.title }}
+                  <span class="flipping-range" *ngIf="field.flipping.range">({{ field.flipping.range }})</span>
+                </div>
+                <div *ngFor="let line of field.flipping.lines" class="array-sub-item">
+                  <span class="sub-item-label">{{ line.split(':')[0] }}:</span>
+                  <div class="sub-item-answer">{{ line.split(':').slice(1).join(':').trim() }}</div>
+                </div>
+              </div>
               <div class="question-notes" *ngIf="field.fieldnotes">Note: {{ field.fieldnotes }}</div>
             </div>
           </div>

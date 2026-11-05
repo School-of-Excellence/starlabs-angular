@@ -1,4 +1,4 @@
-import { EiflixoperationsdashboardComponent, journeySupportTotal, journeySupportParticipantId, indianNumberWords, watsonPurchaseRows, groupLikeEquality, journeySupportScheduleOrder } from './eiflixoperationsdashboard.component';
+import { EiflixoperationsdashboardComponent, slackJourneyLabel, journeySupportTotal, journeySupportParticipantId, indianNumberWords, watsonPurchaseRows, groupLikeEquality, journeySupportScheduleOrder } from './eiflixoperationsdashboard.component';
 
 /**
  * EiFlix Mobile App Logs — filtering, sorting and paging over rows already loaded from `loginlog`.
@@ -1211,5 +1211,15 @@ describe('EiflixoperationsdashboardComponent — purchases hover card', () => {
       expect(c.planTipRow).withContext('closes after leaving').toBeNull();
       panel.remove();
     } finally { jasmine.clock().uninstall(); }
+  });
+});
+
+/** Send to Slack — the Journey line (operator 2026-10-28). */
+describe('EiflixoperationsdashboardComponent — Send to Slack journey label', () => {
+  it('new user reads "New user"; others show their journey or "No journey"', () => {
+    expect(slackJourneyLabel({ usertype: 'New user', journey: 'B!G' })).withContext('new wins over any journey').toBe('New user');
+    expect(slackJourneyLabel({ usertype: 'Existing', journey: 'B!G Journey' })).toBe('B!G Journey');
+    expect(slackJourneyLabel({ usertype: 'Existing', journey: '  ' })).toBe('No journey');
+    expect(slackJourneyLabel({ usertype: '', journey: '' })).withContext('unknown profile').toBe('No journey');
   });
 });

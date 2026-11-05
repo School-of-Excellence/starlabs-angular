@@ -1,0 +1,317 @@
+<div class="crnd-root">
+  <div class="crnd-header">
+    <div>
+      <h2 class="crnd-title">Randomize participants</h2>
+      <p class="crnd-subtitle" data-testid="crnd-mode-summary">
+        <ng-container *ngIf="withSpecialists === null">Start by choosing how to build the groups.</ng-container>
+        <ng-container *ngIf="withSpecialists !== null">
+          {{withSpecialists ? 'With specialists' : 'Without specialists'}} ·
+          <button data-testid="crnd-change-mode" class="crnd-link-btn" type="button" (click)="changeMode()">Change</button>
+        </ng-container>
+      </p>
+    </div>
+    <button data-testid="crnd-close" class="crnd-icon-btn" type="button" title="Close" (click)="cancel()">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <!-- First screen -->
+  <div class="crnd-choice" *ngIf="withSpecialists === null">
+    <button data-testid="crnd-mode-with" class="crnd-choice-card" type="button" (click)="chooseMode(true)">
+      <mat-icon>groups</mat-icon>
+      <b>With specialists</b>
+      <span>Put specialists in the groups first, then add participants to them.</span>
+    </button>
+    <button data-testid="crnd-mode-without" class="crnd-choice-card" type="button" (click)="chooseMode(false)">
+      <mat-icon>person</mat-icon>
+      <b>Without specialists</b>
+      <span>Only shuffle participants into the groups.</span>
+    </button>
+  </div>
+
+  <div class="crnd-columns" *ngIf="withSpecialists !== null">
+    <div class="crnd-steps">
+      <section class="crnd-step" data-testid="crnd-step" *ngFor="let step of steps; let stepIndex = index">
+
+        <div class="crnd-step-head" data-testid="crnd-step-header">
+          <span class="crnd-step-num" [class.done]="stepDone(step)">
+            <mat-icon *ngIf="stepDone(step)">check</mat-icon><ng-container *ngIf="!stepDone(step)">{{stepIndex + 1}}</ng-container>
+          </span>
+          <h3 class="crnd-step-title">{{stepTitle(step)}}</h3>
+        </div>
+
+        <div class="crnd-step-body" [ngSwitch]="step">
+
+          <!-- Event day -->
+          <ng-container *ngSwitchCase="'event'">
+            <div class="crnd-field">
+              <label class="crnd-field-label">Event</label>
+              <mat-select data-testid="crnd-event-select" class="crnd-select" placeholder="Select event"
+                [value]="selectedEventId" (selectionChange)="onEventChange($event.value)" panelClass="crnd-select-panel">
+                <div class="crnd-panel-search">
+                  <input data-testid="crnd-event-search" type="text" placeholder="Search event" [(ngModel)]="eventSearch"
+                    (keydown)="$event.stopPropagation()" (click)="$event.stopPropagation()" />
+                </div>
+                <mat-option data-testid="crnd-event-option" *ngFor="let event of filteredEvents" [value]="event['ref'].id">
+                  {{event['name']}}
+                </mat-option>
+              </mat-select>
+            </div>
+            <div class="crnd-field">
+              <label class="crnd-field-label">Date</label>
+              <mat-select data-testid="crnd-day-select" class="crnd-select"
+                [placeholder]="selectedEventId ? (attendanceLoading ? 'Loading attendance' : 'Select date') : 'Select event first'"
+                [disabled]="!selectedEventId || attendanceLoading" [value]="selectedDay"
+                (selectionChange)="onDayChange($event.value)" panelClass="crnd-select-panel">
+                <mat-option data-testid="crnd-day-option" *ngFor="let day of dayOptions" [value]="day.key">
+                  {{day.label}} · {{day.count}} checked in
+                </mat-option>
+              </mat-select>
+            </div>
+            <div class="crnd-note-row" *ngIf="attendanceError">
+              <button data-testid="crnd-attendance-retry" class="crnd-ghost-btn" type="button" (click)="retryAttendance()">Try again</button>
+            </div>
+            <p class="crnd-field-hint" data-testid="crnd-attendance-not-used" *ngIf="!eventNeeded">Attendance isn't being used. Change an Attendance filter below to use it.</p>
+            <button data-testid="crnd-skip-attendance" class="crnd-link-btn" type="button" *ngIf="eventNeeded" (click)="skipAttendance()">Continue without attendance</button>
+          </ng-container>
+
+          <!-- Groups -->
+          <ng-container *ngSwitchCase="'groups'">
+            <p class="crnd-step-help">These are the cohorts people will be split into. Existing people in them are replaced.</p>
+            <div class="crnd-list-tools">
+              <input data-testid="crnd-target-search" class="crnd-input" type="text" placeholder="Search cohorts" [(ngModel)]="targetSearch" />
+              <button data-testid="crnd-select-all-targets" class="crnd-ghost-btn" type="button" (click)="selectAllShownTargets()">Select all shown</button>
+            </div>
+            <div class="crnd-list-meta">
+              <span data-testid="crnd-target-count"><b>{{targetCount}}</b> selected</span>
+              <button data-testid="crnd-toggle-selected-groups" class="crnd-link-btn" type="button" *ngIf="targetCount > 0" (click)="showSelectedGroups = !showSelectedGroups">
+                {{showSelectedGroups ? 'Hide' : 'Show'}}
+              </button>
+              <button data-testid="crnd-clear-targets" class="crnd-link-btn" type="button" *ngIf="targetCount > 0" (click)="clearTargets()">Clear</button>
+              <label class="crnd-check-label" *ngIf="marathonName">
+                <input data-testid="crnd-all-marathons" type="checkbox" [(ngModel)]="showAllMarathons" />
+                All marathons
+              </label>
+            </div>
+            <div class="crnd-chips" data-testid="crnd-selected-targets" *ngIf="showSelectedGroups && targetCount > 0">
+              <span class="crnd-chip" data-testid="crnd-target-chip" *ngFor="let cohort of selectedTargets">
+                {{cohort['name']}}
+                <button data-testid="crnd-target-chip-remove" type="button" title="Unselect" (click)="toggleTarget(cohort['docid'])"><mat-icon>close</mat-icon></button>
+              </span>
+            </div>
+            <div class="crnd-list">
+              <label class="crnd-row" data-testid="crnd-target-row" *ngFor="let cohort of filteredTargets">
+                <input data-testid="crnd-target-checkbox" type="checkbox" [checked]="isTargetSelected(cohort['docid'])"
+                  (change)="toggleTarget(cohort['docid'])" />
+                <span class="crnd-row-name">{{cohort['name']}}</span>
+                <span class="crnd-row-meta">{{cohort['cohortCategory'] | titlecase}} · {{cohort['participantidlist']?.length || 0}} people</span>
+              </label>
+              <p class="crnd-empty" data-testid="crnd-target-empty" *ngIf="filteredTargets.length === 0">
+                No matching cohorts. Try All marathons or a different search.
+              </p>
+            </div>
+          </ng-container>
+
+          <!-- Specialists -->
+          <ng-container *ngSwitchCase="'specialists'">
+            <div class="crnd-field">
+              <label class="crnd-field-label">Specialist cohort</label>
+              <mat-select data-testid="crnd-specialist-cohort-select" class="crnd-select" placeholder="Select cohort"
+                [value]="specialistCohortId" (selectionChange)="onSpecialistCohortChange($event.value)" panelClass="crnd-select-panel">
+                <div class="crnd-panel-search">
+                  <input data-testid="crnd-specialist-search" type="text" placeholder="Search cohort" [(ngModel)]="specialistSearch"
+                    (keydown)="$event.stopPropagation()" (click)="$event.stopPropagation()" />
+                  <label data-testid="crnd-specialist-marathons-label" class="crnd-check-label" *ngIf="marathonName" (click)="$event.stopPropagation()">
+                    <input data-testid="crnd-all-marathons-specialists" type="checkbox" [(ngModel)]="showAllMarathons" />
+                    All marathons
+                  </label>
+                </div>
+                <mat-option data-testid="crnd-specialist-option" *ngFor="let cohort of filteredSpecialistCohorts" [value]="cohort['docid']">
+                  {{cohort['name']}} · {{specialistOptionLabel(cohort)}}
+                </mat-option>
+              </mat-select>
+            </div>
+            <div class="crnd-two-fields">
+              <div class="crnd-field">
+                <label class="crnd-field-label" for="crnd-specialists-per-group">How many to add to each group</label>
+                <input id="crnd-specialists-per-group" data-testid="crnd-specialists-per-group-input" class="crnd-input" type="number" min="1" step="1"
+                  placeholder="Enter a number" [(ngModel)]="specialistsPerGroup" (ngModelChange)="recompute()" />
+                <span class="crnd-field-hint" data-testid="crnd-available-count" *ngIf="specialistCohortId && specialistFilterReady">{{specialistAvailableIds.length}} available</span>
+              </div>
+              <div class="crnd-field">
+                <label class="crnd-field-label">Attendance</label>
+                <mat-select data-testid="crnd-specialist-attendance-select" class="crnd-select" [value]="specialistAttendance"
+                  (selectionChange)="onSpecialistAttendanceChange($event.value)" panelClass="crnd-select-panel">
+                  <mat-option data-testid="crnd-specialist-attendance-attended" value="attended">Attended</mat-option>
+                  <mat-option data-testid="crnd-specialist-attendance-not-attended" value="not_attended">Not attended</mat-option>
+                  <mat-option data-testid="crnd-specialist-attendance-all" value="all">All (ignore attendance)</mat-option>
+                </mat-select>
+              </div>
+            </div>
+            <div class="crnd-callout" data-testid="crnd-specialist-split" *ngIf="specialistSplitText">
+              <mat-icon>call_split</mat-icon>
+              <span>{{specialistSplitText}}</span>
+            </div>
+          </ng-container>
+
+          <!-- Participants -->
+          <ng-container *ngSwitchCase="'participants'">
+            <div class="crnd-field">
+              <label class="crnd-field-label">Participants cohort</label>
+              <mat-select data-testid="crnd-source-select" class="crnd-select" placeholder="Select cohort" multiple
+                [value]="sourceCohortIds" (selectionChange)="onSourceChange($event.value)" panelClass="crnd-select-panel">
+                <div class="crnd-panel-search">
+                  <input data-testid="crnd-source-search" type="text" placeholder="Search cohort" [(ngModel)]="sourceSearch"
+                    (keydown)="$event.stopPropagation()" (click)="$event.stopPropagation()" />
+                  <label data-testid="crnd-source-marathons-label" class="crnd-check-label" *ngIf="marathonName" (click)="$event.stopPropagation()">
+                    <input data-testid="crnd-all-marathons-sources" type="checkbox" [(ngModel)]="showAllMarathons" />
+                    All marathons
+                  </label>
+                </div>
+                <mat-option data-testid="crnd-source-option" *ngFor="let cohort of filteredSourceCohorts" [value]="cohort['docid']">
+                  {{cohort['name']}} · {{cohort['participantidlist']?.length || 0}} people<ng-container *ngIf="cohort['status'] === 'nonactive'"> · Inactive</ng-container>
+                </mat-option>
+              </mat-select>
+            </div>
+            <div class="crnd-two-fields">
+              <div class="crnd-field">
+                <label class="crnd-field-label" for="crnd-size">How many to add to each group</label>
+                <input id="crnd-size" data-testid="crnd-size-input" class="crnd-input" type="number" min="1" step="1"
+                  placeholder="Enter a number" [(ngModel)]="size" (ngModelChange)="recompute()" />
+                <span class="crnd-field-hint" data-testid="crnd-match-summary" *ngIf="filterReady && matchedIds.length > 0">
+                  {{eligibleIds.length}} available<ng-container *ngIf="attendance === 'not_attended'"> ({{matchedIds.length}} of {{sourceIds.length}} absent)</ng-container>
+                  <ng-container *ngIf="attendance === 'attended'"> ({{attendedCount}} of {{sourceIds.length}} attended<ng-container *ngIf="includedUnmarkedIds.length > 0"> + {{includedUnmarkedIds.length}} not marked</ng-container>)</ng-container>
+                  ·
+                  <button data-testid="crnd-view-matched" class="crnd-link-btn" type="button" (click)="showMatchedList = !showMatchedList">
+                    {{showMatchedList ? 'Hide names' : 'View names'}}
+                  </button>
+                </span>
+              </div>
+              <div class="crnd-field">
+                <label class="crnd-field-label">Attendance</label>
+                <mat-select data-testid="crnd-attendance-select" class="crnd-select" [value]="attendance"
+                  (selectionChange)="onAttendanceChange($event.value)" panelClass="crnd-select-panel">
+                  <mat-option data-testid="crnd-attendance-attended" value="attended">Attended</mat-option>
+                  <mat-option data-testid="crnd-attendance-not-attended" value="not_attended">Not attended</mat-option>
+                  <mat-option data-testid="crnd-attendance-all" value="all">All (ignore attendance)</mat-option>
+                </mat-select>
+              </div>
+            </div>
+            <ul class="crnd-name-list" data-testid="crnd-name-list" *ngIf="filterReady && matchedIds.length > 0 && showMatchedList">
+              <li *ngFor="let id of eligibleIds">{{profileName(id)}}</li>
+            </ul>
+
+            <!-- People in the cohort with no attendance marked that day -->
+            <div class="crnd-unmarked" data-testid="crnd-unmarked-section" *ngIf="showUnmarkedList">
+              <div class="crnd-unmarked-head">
+                <div>
+                  <h4 class="crnd-unmarked-title" data-testid="crnd-unmarked-count">Attendance not marked ({{unmarkedIds.length}})</h4>
+                  <p class="crnd-unmarked-help">Tick anyone who should be included in the shuffle.</p>
+                </div>
+                <span class="crnd-unmarked-picked" data-testid="crnd-unmarked-picked" *ngIf="includedUnmarkedIds.length > 0">{{includedUnmarkedIds.length}} included</span>
+              </div>
+              <ng-container *ngIf="unmarkedIds.length > 0">
+                <div class="crnd-list-tools">
+                  <input data-testid="crnd-unmarked-search" class="crnd-input" type="text" placeholder="Search by name" [(ngModel)]="unmarkedSearch" />
+                  <button data-testid="crnd-unmarked-select-all" class="crnd-ghost-btn" type="button" (click)="selectAllShownUnmarked()">Select all shown</button>
+                  <button data-testid="crnd-unmarked-clear" class="crnd-ghost-btn" type="button" *ngIf="includedUnmarkedIds.length > 0" (click)="clearUnmarked()">Clear</button>
+                </div>
+                <div class="crnd-list crnd-unmarked-list">
+                  <label class="crnd-row" data-testid="crnd-unmarked-row" *ngFor="let id of filteredUnmarkedIds">
+                    <input data-testid="crnd-unmarked-checkbox" type="checkbox" [checked]="isUnmarkedIncluded(id)" (change)="toggleUnmarked(id)" />
+                    <span class="crnd-row-name">{{profileName(id)}}</span>
+                  </label>
+                  <p class="crnd-empty" data-testid="crnd-unmarked-no-results" *ngIf="filteredUnmarkedIds.length === 0">Nobody matches that name.</p>
+                </div>
+              </ng-container>
+              <p class="crnd-unmarked-help" data-testid="crnd-unmarked-empty" *ngIf="unmarkedIds.length === 0">Everyone in the selected cohort has attendance marked for this day.</p>
+            </div>
+            <div class="crnd-callout" data-testid="crnd-participant-split" *ngIf="participantSplitText">
+              <mat-icon>call_split</mat-icon>
+              <span>
+                {{participantSplitText}}
+                <ng-container *ngIf="specialistOverlapCount > 0">{{specialistOverlapCount}} {{specialistOverlapCount === 1 ? 'person is' : 'people are'}} already placed as specialists.</ng-container>
+              </span>
+            </div>
+          </ng-container>
+
+          <!-- Problems in this step -->
+          <div class="crnd-issue crnd-issue-problem" data-testid="crnd-problem" *ngFor="let issue of stepProblems(step)">
+            <mat-icon>error_outline</mat-icon>
+            <div><b>{{issue.title}}</b><p>{{issue.detail}}</p></div>
+          </div>
+
+          <!-- What is still missing in this step -->
+          <ul class="crnd-todo-list" data-testid="crnd-todo-list" *ngIf="stepTodos(step).length > 0">
+            <li data-testid="crnd-todo" *ngFor="let issue of stepTodos(step)">{{issue.title}}</li>
+          </ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- Summary and preview -->
+    <aside class="crnd-panel" data-testid="crnd-panel">
+      <h3 class="crnd-panel-title">Summary</h3>
+      <div class="crnd-stats">
+        <div class="crnd-stat" data-testid="crnd-stat-groups"><b>{{targetCount}}</b><span>Groups</span></div>
+        <div class="crnd-stat" data-testid="crnd-stat-specialists" *ngIf="withSpecialists"><b>{{pickedSpecialistIds.length}}</b><span>Specialists</span></div>
+        <div class="crnd-stat" data-testid="crnd-stat-participants"><b>{{eligibleIds.length}}</b><span>Participants</span></div>
+      </div>
+      <p class="crnd-step-help crnd-panel-note">Nobody is removed from the specialist or participants cohorts.</p>
+
+      <div class="crnd-preview-empty" data-testid="crnd-preview-empty" *ngIf="plan.length === 0">
+        <mat-icon>visibility</mat-icon>
+        <span>The preview appears here when every step is finished.</span>
+      </div>
+
+      <ng-container *ngIf="plan.length > 0">
+        <div class="crnd-issue crnd-issue-warn" data-testid="crnd-removal-warning" *ngIf="totalRemoved > 0">
+          <mat-icon>warning_amber</mat-icon>
+          <div>
+            <b>{{totalRemoved}} {{totalRemoved === 1 ? 'person' : 'people'}} will be removed from the selected groups</b>
+            <p>They're in those cohorts now but weren't placed there by this shuffle. Open "removed" on a group to see names.</p>
+          </div>
+        </div>
+
+        <div class="crnd-preview-head">
+          <h4 class="crnd-panel-sub">Preview</h4>
+          <button data-testid="crnd-reshuffle" class="crnd-ghost-btn" type="button" (click)="reshuffle()">
+            <mat-icon>shuffle</mat-icon> Reshuffle
+          </button>
+        </div>
+
+        <div class="crnd-card" data-testid="crnd-preview-card" *ngFor="let group of plan">
+          <div class="crnd-card-head">
+            <span class="crnd-card-name">{{group.name}}</span>
+            <span class="crnd-card-count">{{group.participantIds.length + group.specialistIds.length}} people</span>
+          </div>
+          <p class="crnd-card-diff" data-testid="crnd-card-diff">
+            {{group.addedIds.length}} added · {{group.keptIds.length}} stay<ng-container *ngIf="group.removedIds.length > 0"> ·
+              <button data-testid="crnd-view-removed" class="crnd-link-btn crnd-danger-link" type="button" (click)="toggleRemovals(group.name)">
+                {{group.removedIds.length}} removed
+              </button>
+            </ng-container>
+          </p>
+          <ul class="crnd-name-list crnd-removed-list" data-testid="crnd-removed-list" *ngIf="expandedRemovals.has(group.name)">
+            <li *ngFor="let id of group.removedIds">{{profileName(id)}}</li>
+          </ul>
+          <div class="crnd-person crnd-specialist" *ngFor="let id of group.specialistIds">★ {{profileName(id)}}</div>
+          <ng-container *ngFor="let id of group.participantIds; let i = index">
+            <div class="crnd-person" *ngIf="i < 3 || expandedCards.has(group.name)">{{profileName(id)}}</div>
+          </ng-container>
+          <button data-testid="crnd-preview-more" class="crnd-link-btn" type="button" *ngIf="group.participantIds.length > 3" (click)="toggleCard(group.name)">
+            {{expandedCards.has(group.name) ? 'Show less' : 'Show ' + (group.participantIds.length - 3) + ' more'}}
+          </button>
+        </div>
+        <p class="crnd-step-help" *ngIf="withSpecialists">★ = specialist</p>
+      </ng-container>
+    </aside>
+  </div>
+
+  <div class="crnd-footer">
+    <button data-testid="crnd-cancel" class="crnd-ghost-btn" type="button" (click)="cancel()">Close</button>
+    <button data-testid="crnd-confirm" class="crnd-primary-btn" type="button" [disabled]="!canConfirm" (click)="confirm()">
+      Confirm: add {{totalToAdd}}<ng-container *ngIf="totalRemoved > 0">, remove {{totalRemoved}}</ng-container>
+    </button>
+  </div>
+</div>

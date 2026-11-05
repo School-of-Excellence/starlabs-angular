@@ -1,0 +1,382 @@
+<div class="ed2-page">
+  <div class="ed2-progress" *ngIf="refreshing" data-testid="ed2-refreshing" role="progressbar" aria-label="Loading the month"></div>
+
+  <!-- Header: title + month -->
+  <header class="ed2-head">
+    <div class="ed2-head-text">
+      <p class="ed2-eyebrow">Engagement</p>
+      <h1 class="ed2-title">Engagement Dashboard</h1>
+      <p class="ed2-lede">Active and non-active participants, month by month, journey by journey.</p>
+    </div>
+
+    <div class="ed2-month">
+      <button type="button" class="ed2-month-step" data-testid="ed2-month-prev" (click)="shiftMonth(-1)" aria-label="Previous month">
+        <mat-icon>chevron_left</mat-icon>
+      </button>
+      <button type="button" class="ed2-month-label" data-testid="ed2-month-label" (click)="togglePicker()"
+              [attr.aria-expanded]="pickerOpen" aria-haspopup="dialog">
+        <mat-icon class="ed2-month-icon">calendar_month</mat-icon>
+        <span>{{ monthLabel }}</span>
+        <span class="ed2-month-now" *ngIf="isCurrentMonth">This month</span>
+      </button>
+      <button type="button" class="ed2-month-step" data-testid="ed2-month-next" (click)="shiftMonth(1)"
+              [disabled]="isCurrentMonth" aria-label="Next month">
+        <mat-icon>chevron_right</mat-icon>
+      </button>
+
+      <div class="ed2-picker" *ngIf="pickerOpen" data-testid="ed2-month-picker" role="dialog" aria-label="Choose a month">
+        <div class="ed2-picker-head">
+          <button type="button" class="ed2-month-step" data-testid="ed2-year-prev" (click)="pickerYear = pickerYear - 1" aria-label="Previous year">
+            <mat-icon>chevron_left</mat-icon>
+          </button>
+          <span class="ed2-picker-year" data-testid="ed2-year-label">{{ pickerYear }}</span>
+          <button type="button" class="ed2-month-step" data-testid="ed2-year-next" (click)="pickerYear = pickerYear + 1"
+                  [disabled]="!canNextYear" aria-label="Next year">
+            <mat-icon>chevron_right</mat-icon>
+          </button>
+        </div>
+        <div class="ed2-picker-grid">
+          <button type="button" *ngFor="let m of months; let i = index" class="ed2-picker-month" data-testid="ed2-month-option"
+                  [class.is-on]="pickerYear === year && i === month" [disabled]="isFuture(pickerYear, i)"
+                  (click)="pickMonth(i)">{{ m }}</button>
+        </div>
+      </div>
+    </div>
+  </header>
+  <div class="ed2-scrim" *ngIf="pickerOpen" data-testid="ed2-picker-scrim" (click)="pickerOpen = false"></div>
+
+  <!-- Content engagement -->
+  <section class="ed2-section" aria-labelledby="ed2-content-title">
+    <div class="ed2-section-head">
+      <h2 class="ed2-section-title" id="ed2-content-title">Content engagement</h2>
+      <p class="ed2-section-sub">Engaged = watched any content in {{ monthLabel }}.</p>
+      <!-- How Active / Non active is decided for the month on screen. -->
+      <p class="ed2-status-note" data-testid="ed2-status-note" *ngIf="!loading">
+        <mat-icon aria-hidden="true">info_outline</mat-icon>
+        <ng-container *ngIf="!leftOut">Active / non active: status as of today.</ng-container>
+        <ng-container *ngIf="leftOut">
+          Active / non active in {{ monthLabel }}, from each person's subscription dates.
+          <ng-container *ngIf="leftOut.notYet || leftOut.undated">
+            Left out:
+            <span data-testid="ed2-leftout-notyet">{{ leftOut.notYet | number }}</span> not yet customers then,
+            <span data-testid="ed2-leftout-undated">{{ leftOut.undated | number }}</span> without subscription dates.
+          </ng-container>
+        </ng-container>
+      </p>
+    </div>
+    <!-- Filters on their own row with fixed-width controls, so picking one never reflows the layout. -->
+    <div class="ed2-toolbar">
+      <div class="ed2-filters">
+        <!-- From: which values count. Nothing picked = every value. -->
+        <div class="ed2-drop">
+          <button type="button" class="ed2-drop-btn" data-testid="ed2-from-btn" (click)="toggleMenu('from')"
+                  [class.is-set]="filter.from.length > 0" [attr.aria-expanded]="menuOpen === 'from'" aria-haspopup="menu">
+            <mat-icon class="ed2-drop-icon">filter_list</mat-icon>
+            <span class="ed2-drop-cap">From</span>
+            <span class="ed2-drop-summary" data-testid="ed2-from-summary">{{ summary('from') }}</span>
+            <mat-icon class="ed2-caret">expand_more</mat-icon>
+          </button>
+          <div class="ed2-drop-menu" *ngIf="menuOpen === 'from'" data-testid="ed2-from-menu" role="menu" aria-label="Sources">
+            <button type="button" role="menuitemcheckbox" class="ed2-drop-opt" data-testid="ed2-from-all"
+                    [attr.aria-checked]="filter.from.length === 0" (click)="clearDim('from')">
+              <span class="ed2-check" aria-hidden="true"><mat-icon>check</mat-icon></span>All sources
+            </button>
+            <div class="ed2-drop-sep" *ngIf="options.from.length"></div>
+            <button type="button" *ngFor="let o of options.from" role="menuitemcheckbox" class="ed2-drop-opt" data-testid="ed2-from-option"
+                    [attr.aria-checked]="isOn('from', o.key)" (click)="toggleOption('from', o.key)">
+              <span class="ed2-check" aria-hidden="true"><mat-icon>check</mat-icon></span>
+              <span [class.is-muted]="o.key === ''" data-testid="ed2-from-option-label">{{ o.label }}</span>
+            </button>
+            <p class="ed2-drop-empty" *ngIf="!options.from.length" data-testid="ed2-from-empty">No views this month.</p>
+          </div>
+        </div>
+        <!-- Platform: which values count. Nothing picked = every value. -->
+        <div class="ed2-drop">
+          <button type="button" class="ed2-drop-btn" data-testid="ed2-platform-btn" (click)="toggleMenu('platform')"
+                  [class.is-set]="filter.platform.length > 0" [attr.aria-expanded]="menuOpen === 'platform'" aria-haspopup="menu">
+            <mat-icon class="ed2-drop-icon">devices</mat-icon>
+            <span class="ed2-drop-cap">Platform</span>
+            <span class="ed2-drop-summary" data-testid="ed2-platform-summary">{{ summary('platform') }}</span>
+            <mat-icon class="ed2-caret">expand_more</mat-icon>
+          </button>
+          <div class="ed2-drop-menu" *ngIf="menuOpen === 'platform'" data-testid="ed2-platform-menu" role="menu" aria-label="Platforms">
+            <button type="button" role="menuitemcheckbox" class="ed2-drop-opt" data-testid="ed2-platform-all"
+                    [attr.aria-checked]="filter.platform.length === 0" (click)="clearDim('platform')">
+              <span class="ed2-check" aria-hidden="true"><mat-icon>check</mat-icon></span>All platforms
+            </button>
+            <div class="ed2-drop-sep" *ngIf="options.platform.length"></div>
+            <button type="button" *ngFor="let o of options.platform" role="menuitemcheckbox" class="ed2-drop-opt" data-testid="ed2-platform-option"
+                    [attr.aria-checked]="isOn('platform', o.key)" (click)="toggleOption('platform', o.key)">
+              <span class="ed2-check" aria-hidden="true"><mat-icon>check</mat-icon></span>
+              <span data-testid="ed2-platform-option-label">{{ o.label }}</span>
+            </button>
+            <p class="ed2-drop-empty" *ngIf="!options.platform.length" data-testid="ed2-platform-empty">No views this month.</p>
+          </div>
+        </div>
+        <div class="ed2-seg" role="group" aria-label="Customer status">
+        <button type="button" data-testid="ed2-status-all" [class.is-on]="statusFilter === 'all'"
+                [attr.aria-pressed]="statusFilter === 'all'" (click)="setStatus('all')">All</button>
+        <button type="button" data-testid="ed2-status-active" [class.is-on]="statusFilter === 'active'"
+                [attr.aria-pressed]="statusFilter === 'active'" (click)="setStatus('active')">Active</button>
+        <button type="button" data-testid="ed2-status-nonactive" [class.is-on]="statusFilter === 'non active'"
+                [attr.aria-pressed]="statusFilter === 'non active'" (click)="setStatus('non active')">Non active</button>
+        <button type="button" data-testid="ed2-status-free" [class.is-on]="statusFilter === 'free'"
+                [attr.aria-pressed]="statusFilter === 'free'" (click)="setStatus('free')">Free users</button>
+        </div>
+      </div>
+      <!-- Always laid out (hidden when there is nothing to clear) so it never shifts the row. -->
+      <button type="button" class="ed2-clear" [class.is-idle]="!hasFilters" [attr.aria-hidden]="!hasFilters" [disabled]="!hasFilters"
+              data-testid="ed2-clear-filters" (click)="clearAll()">
+        <mat-icon>close</mat-icon>Clear filters
+      </button>
+    </div>
+    <div class="ed2-scrim" *ngIf="menuOpen" data-testid="ed2-menu-scrim" (click)="menuOpen = null"></div>
+
+    <!-- Error -->
+    <div class="ed2-state ed2-state-error" *ngIf="error" data-testid="ed2-error" role="alert">
+      <mat-icon>error_outline</mat-icon>
+      <span>{{ error }}</span>
+      <button type="button" class="ed2-ghost" data-testid="ed2-retry" (click)="retry()">Try again</button>
+    </div>
+
+    <!-- First load -->
+    <ng-container *ngIf="loading && !error">
+      <div class="ed2-kpis" data-testid="ed2-loading" aria-busy="true">
+        <div class="ed2-kpi ed2-skel" *ngFor="let s of [1, 2, 3, 4]"><span></span><span></span><span></span></div>
+      </div>
+      <div class="ed2-card ed2-skel-table">
+        <div class="ed2-skel-line" *ngFor="let s of [1, 2, 3, 4, 5]"></div>
+      </div>
+    </ng-container>
+
+    <ng-container *ngIf="!loading && !error">
+      <!-- KPIs -->
+      <div class="ed2-kpis" [class.is-dim]="refreshing">
+        <button type="button" class="ed2-kpi" data-testid="ed2-kpi-total-card" (click)="openPanel(null, 'all')">
+          <span class="ed2-kpi-label">Participants</span>
+          <span class="ed2-kpi-value" data-testid="ed2-kpi-total">{{ totals.total | number }}</span>
+          <span class="ed2-kpi-foot">
+            <span data-testid="ed2-kpi-active">{{ totals.active.total | number }} active</span>
+            <span class="ed2-dot-sep">·</span>
+            <span data-testid="ed2-kpi-nonactive">{{ totals.nonActive.total | number }} non active</span>
+            <span class="ed2-dot-sep">·</span>
+            <span data-testid="ed2-kpi-free">{{ totals.free.total | number }} free</span>
+          </span>
+        </button>
+        <button type="button" class="ed2-kpi ed2-kpi-good" data-testid="ed2-kpi-engaged-card" (click)="openPanel(null, 'engaged')">
+          <span class="ed2-kpi-label"><i class="ed2-dot ed2-dot-good"></i>Engaged</span>
+          <span class="ed2-kpi-value" data-testid="ed2-kpi-engaged">{{ totals.engaged | number }}</span>
+          <span class="ed2-kpi-foot">{{ share(totals.engaged, totals.total) }}% of participants</span>
+        </button>
+        <button type="button" class="ed2-kpi ed2-kpi-soft" data-testid="ed2-kpi-notengaged-card" (click)="openPanel(null, 'notEngaged')">
+          <span class="ed2-kpi-label"><i class="ed2-dot ed2-dot-soft"></i>Not engaged</span>
+          <span class="ed2-kpi-value" data-testid="ed2-kpi-notengaged">{{ totals.notEngaged | number }}</span>
+          <span class="ed2-kpi-foot">{{ share(totals.notEngaged, totals.total) }}% of participants</span>
+        </button>
+        <div class="ed2-kpi ed2-kpi-rate">
+          <span class="ed2-kpi-label">Engagement rate</span>
+          <span class="ed2-kpi-value"><span data-testid="ed2-kpi-rate">{{ totals.rate }}</span><small>%</small></span>
+          <span class="ed2-meter" aria-hidden="true"><span [style.width.%]="totals.rate"></span></span>
+          <span class="ed2-kpi-foot" *ngIf="statusFilter === 'all'">
+            <span class="ed2-nowrap">Active {{ share(totals.active.engaged, totals.active.total) }}%</span>
+            <span class="ed2-dot-sep">·</span>
+            <span class="ed2-nowrap">Non active {{ share(totals.nonActive.engaged, totals.nonActive.total) }}%</span>
+            <span class="ed2-dot-sep">·</span>
+            <span class="ed2-nowrap">Free {{ share(totals.free.engaged, totals.free.total) }}%</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Journey table -->
+      <div class="ed2-card" [class.is-dim]="refreshing">
+        <div class="ed2-card-head">
+          <h3 class="ed2-card-title">By journey <span class="ed2-count" data-testid="ed2-journey-count">{{ journeys.length }}</span></h3>
+          <div class="ed2-legend" aria-hidden="true">
+            <span><i class="ed2-dot ed2-dot-good"></i>Engaged</span>
+            <span><i class="ed2-dot ed2-dot-soft"></i>Not engaged</span>
+          </div>
+        </div>
+
+        <div class="ed2-empty" *ngIf="!journeys.length" data-testid="ed2-empty">
+          <mat-icon>insights</mat-icon>
+          <p>No participants to show for this status.</p>
+        </div>
+
+        <div class="ed2-table-wrap" *ngIf="journeys.length">
+          <table class="ed2-table">
+            <thead>
+              <tr>
+                <th scope="col" [attr.aria-sort]="ariaSort('name')">
+                  <button type="button" data-testid="ed2-sort-name" (click)="sortBy('name')">Journey <mat-icon>{{ sortIcon('name') }}</mat-icon></button>
+                </th>
+                <th scope="col" class="num" [attr.aria-sort]="ariaSort('total')">
+                  <button type="button" data-testid="ed2-sort-total" (click)="sortBy('total')">Participants <mat-icon>{{ sortIcon('total') }}</mat-icon></button>
+                </th>
+                <th scope="col" class="num" [attr.aria-sort]="ariaSort('engaged')">
+                  <button type="button" data-testid="ed2-sort-engaged" (click)="sortBy('engaged')">Engaged <mat-icon>{{ sortIcon('engaged') }}</mat-icon></button>
+                </th>
+                <th scope="col" class="num" [attr.aria-sort]="ariaSort('notEngaged')">
+                  <button type="button" data-testid="ed2-sort-notengaged" (click)="sortBy('notEngaged')">Not engaged <mat-icon>{{ sortIcon('notEngaged') }}</mat-icon></button>
+                </th>
+                <th scope="col" class="ed2-col-rate" [attr.aria-sort]="ariaSort('rate')">
+                  <button type="button" data-testid="ed2-sort-rate" (click)="sortBy('rate')">Engagement <mat-icon>{{ sortIcon('rate') }}</mat-icon></button>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let r of journeys; trackBy: trackRow" data-testid="ed2-row" [class.is-none]="r.id === noJourney" [class.is-free]="r.id === freeJourney">
+                <td>
+                  <span class="ed2-jname" data-testid="ed2-row-name">{{ r.name }}</span>
+                  <span class="ed2-jmeta" *ngIf="r.id === freeJourney">Signed up, no journey yet</span>
+                  <span class="ed2-jmeta" *ngIf="statusFilter === 'all' && r.id !== freeJourney">{{ r.active.total | number }} active · {{ r.nonActive.total | number }} non active</span>
+                </td>
+                <td class="num">
+                  <button type="button" class="ed2-num" data-testid="ed2-row-total" (click)="openPanel(r.id, 'all')">{{ r.total | number }}</button>
+                </td>
+                <td class="num">
+                  <button type="button" class="ed2-pill ed2-pill-good" data-testid="ed2-row-engaged" (click)="openPanel(r.id, 'engaged')"
+                          [disabled]="!r.engaged">{{ r.engaged | number }}</button>
+                </td>
+                <td class="num">
+                  <button type="button" class="ed2-pill ed2-pill-soft" data-testid="ed2-row-notengaged" (click)="openPanel(r.id, 'notEngaged')"
+                          [disabled]="!r.notEngaged">{{ r.notEngaged | number }}</button>
+                </td>
+                <td class="ed2-col-rate">
+                  <div class="ed2-rate-cell">
+                    <span class="ed2-bar" aria-hidden="true"><span [style.width.%]="r.rate"></span></span>
+                    <span class="ed2-rate" data-testid="ed2-row-rate">{{ r.rate }}%</span>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td>Total</td>
+                <td class="num"><span class="ed2-num">{{ totals.total | number }}</span></td>
+                <td class="num"><span class="ed2-pill ed2-pill-foot">{{ totals.engaged | number }}</span></td>
+                <td class="num"><span class="ed2-pill ed2-pill-foot">{{ totals.notEngaged | number }}</span></td>
+                <td class="ed2-col-rate">
+                  <div class="ed2-rate-cell">
+                    <span class="ed2-bar" aria-hidden="true"><span [style.width.%]="totals.rate"></span></span>
+                    <span class="ed2-rate">{{ totals.rate }}%</span>
+                  </div>
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </ng-container>
+  </section>
+</div>
+
+<!-- People side panel -->
+<div class="ed2-backdrop" *ngIf="panelOpen" data-testid="ed2-panel-backdrop" (click)="closePanel()"></div>
+<aside class="ed2-panel" [class.is-open]="panelOpen" data-testid="ed2-panel" role="dialog" aria-modal="true"
+       [attr.aria-hidden]="!panelOpen" aria-labelledby="ed2-panel-title">
+  <!-- Focus moves into the panel when it opens, stays inside while open, and returns to the opener. -->
+  <div class="ed2-panel-inner" *ngIf="panelOpen" cdkTrapFocus [cdkTrapFocusAutoCapture]="true">
+    <div class="ed2-panel-head">
+      <div class="ed2-panel-titles">
+        <p class="ed2-eyebrow">{{ monthLabel }}<ng-container *ngIf="statusFilter !== 'all'"> · {{ statusLabel(statusFilter) }}</ng-container></p>
+        <h3 class="ed2-panel-title" id="ed2-panel-title" data-testid="ed2-panel-title">{{ panelTitle }}</h3>
+      </div>
+      <button type="button" class="ed2-icon-btn" data-testid="ed2-panel-close" (click)="closePanel()" aria-label="Close" cdkFocusInitial>
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <div class="ed2-seg ed2-seg-full" role="group" aria-label="Show">
+      <button type="button" data-testid="ed2-panel-tab-engaged" [class.is-on]="panelShow === 'engaged'"
+              [attr.aria-pressed]="panelShow === 'engaged'" (click)="setPanelShow('engaged')">Engaged <b>{{ panelEngagedCount | number }}</b></button>
+      <button type="button" data-testid="ed2-panel-tab-notengaged" [class.is-on]="panelShow === 'notEngaged'"
+              [attr.aria-pressed]="panelShow === 'notEngaged'" (click)="setPanelShow('notEngaged')">Not engaged <b>{{ panelNotEngagedCount | number }}</b></button>
+      <button type="button" data-testid="ed2-panel-tab-all" [class.is-on]="panelShow === 'all'"
+              [attr.aria-pressed]="panelShow === 'all'" (click)="setPanelShow('all')">All <b>{{ panelScope.length | number }}</b></button>
+    </div>
+
+    <div class="ed2-panel-tools">
+      <label class="ed2-search">
+        <mat-icon aria-hidden="true">search</mat-icon>
+        <input type="search" data-testid="ed2-panel-search" [(ngModel)]="panelSearch" (ngModelChange)="refreshPanel()"
+               placeholder="Search name, email or phone" autocomplete="off" spellcheck="false" aria-label="Search people">
+      </label>
+      <button type="button" class="ed2-ghost" data-testid="ed2-panel-export" (click)="exportPanel()" [disabled]="!panelList.length">
+        <mat-icon>file_download</mat-icon>Export
+      </button>
+    </div>
+    <!-- Send to the people listed: the workshop dashboard's Communication dialog composers. -->
+    <div class="ed2-send" role="group" aria-label="Send to the people listed">
+      <button type="button" class="ed2-send-btn" data-testid="ed2-send-email" (click)="sendEmail()" [disabled]="!panelWithEmail"
+              title="Email the people listed who have an address" [attr.aria-label]="'Email ' + panelWithEmail + ' people'">
+        <i class="fa-solid fa-envelope" aria-hidden="true"></i><span class="ed2-send-label">Email</span>
+        <span class="ed2-send-n" data-testid="ed2-send-email-n">{{ panelWithEmail | number }}</span>
+      </button>
+      <button type="button" class="ed2-send-btn" data-testid="ed2-send-whatsapp" (click)="sendWhatsapp()" [disabled]="!panelWithPhone"
+              title="WhatsApp the people listed who have a phone number" [attr.aria-label]="'WhatsApp ' + panelWithPhone + ' people'">
+        <i class="fa-brands fa-whatsapp" aria-hidden="true"></i><span class="ed2-send-label">WhatsApp</span>
+        <span class="ed2-send-n" data-testid="ed2-send-whatsapp-n">{{ panelWithPhone | number }}</span>
+      </button>
+      <button type="button" class="ed2-send-btn" data-testid="ed2-send-notification" (click)="sendNotification()" [disabled]="!panelList.length"
+              title="In-app notification to the people listed" [attr.aria-label]="'Notification to ' + panelList.length + ' people'">
+        <mat-icon aria-hidden="true">notifications_active</mat-icon><span class="ed2-send-label">Notification</span>
+        <span class="ed2-send-n" data-testid="ed2-send-notification-n">{{ panelList.length | number }}</span>
+      </button>
+    </div>
+    <p class="ed2-panel-count" data-testid="ed2-panel-count">{{ panelList.length | number }} {{ panelList.length === 1 ? 'person' : 'people' }}</p>
+
+    <div class="ed2-people">
+      <div class="ed2-person" *ngFor="let p of panelList; trackBy: trackPerson" data-testid="ed2-person" [class.is-open]="expanded.has(p.profileid)">
+        <div class="ed2-person-row">
+        <div class="ed2-avatar" aria-hidden="true">{{ (p.name || p.email || '?').charAt(0).toUpperCase() }}</div>
+        <div class="ed2-person-main">
+          <div class="ed2-person-top">
+            <span class="ed2-person-name" data-testid="ed2-person-name">{{ p.name || p.email || 'Unnamed' }}</span>
+            <span class="ed2-status" [ngClass]="statusClass(p.status)" data-testid="ed2-person-status">{{ statusLabel(p.status) }}</span>
+          </div>
+          <span class="ed2-person-sub" *ngIf="p.email">{{ p.email }}</span>
+          <span class="ed2-person-sub" *ngIf="p.phone">{{ p.phone }}</span>
+          <span class="ed2-person-sub" *ngIf="panelJourney === null">{{ journeyLabel(p.journeyId) }}</span>
+        </div>
+        <div class="ed2-person-side" *ngIf="p.engaged; else idle" data-testid="ed2-person-activity">
+          <span class="ed2-watch">{{ duration(p.seconds) }}</span>
+          <span class="ed2-person-sub">{{ p.sessions }} {{ p.sessions === 1 ? 'view' : 'views' }}</span>
+          <span class="ed2-person-sub" *ngIf="p.lastSeen">Last {{ p.lastSeen | date: 'd MMM' }}</span>
+        </div>
+        <ng-template #idle><div class="ed2-person-side"><span class="ed2-idle">No views</span></div></ng-template>
+        <button type="button" class="ed2-expand" *ngIf="p.byFrom.length; else noExpand" data-testid="ed2-person-toggle"
+                (click)="toggleExpand(p.profileid)" [attr.aria-expanded]="expanded.has(p.profileid)"
+                [attr.aria-label]="(expanded.has(p.profileid) ? 'Hide' : 'Show') + ' sources for ' + (p.name || p.email || 'this person')">
+          <mat-icon>expand_more</mat-icon>
+        </button>
+        <ng-template #noExpand><span class="ed2-expand-gap" aria-hidden="true"></span></ng-template>
+        </div>
+        <!-- Watch time by From value and by platform, most watched first. -->
+        <div class="ed2-person-froms" *ngIf="p.byFrom.length && expanded.has(p.profileid)" data-testid="ed2-person-froms">
+          <p class="ed2-break-head">From</p>
+          <div class="ed2-from-row" *ngFor="let f of p.byFrom" data-testid="ed2-person-from">
+            <div class="ed2-from-line">
+              <span class="ed2-from-name" [class.is-muted]="f.key === ''" data-testid="ed2-person-from-name">{{ f.label }}</span>
+              <span class="ed2-from-views">{{ f.sessions }} {{ f.sessions === 1 ? 'view' : 'views' }}</span>
+              <span class="ed2-from-time" data-testid="ed2-person-from-time">{{ duration(f.seconds) }}</span>
+            </div>
+            <span class="ed2-from-bar" aria-hidden="true"><span [style.width.%]="share(f.seconds, p.seconds)"></span></span>
+          </div>
+          <p class="ed2-break-head">Platform</p>
+          <div class="ed2-from-row" *ngFor="let f of p.byPlatform" data-testid="ed2-person-platform">
+            <div class="ed2-from-line">
+              <span class="ed2-from-name" data-testid="ed2-person-platform-name">{{ f.label }}</span>
+              <span class="ed2-from-views">{{ f.sessions }} {{ f.sessions === 1 ? 'view' : 'views' }}</span>
+              <span class="ed2-from-time" data-testid="ed2-person-platform-time">{{ duration(f.seconds) }}</span>
+            </div>
+            <span class="ed2-from-bar" aria-hidden="true"><span [style.width.%]="share(f.seconds, p.seconds)"></span></span>
+          </div>
+        </div>
+      </div>
+      <div class="ed2-empty ed2-empty-panel" *ngIf="!panelList.length" data-testid="ed2-panel-empty">
+        <mat-icon>person_search</mat-icon>
+        <p>{{ panelSearch ? 'Nobody matches this search.' : 'Nobody here this month.' }}</p>
+      </div>
+    </div>
+  </div>
+</aside>

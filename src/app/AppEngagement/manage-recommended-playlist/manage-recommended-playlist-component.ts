@@ -172,7 +172,7 @@ export class ManageRecommendedPlaylistComponent implements OnInit, OnDestroy {
         where('date', '<=', endTimestamp)
       );
       const groupSnap = await getDocs(bufferQuery);
-      this.groupPlaylist = groupSnap.docs.map(d => ({ ...d.data() }));
+      this.groupPlaylist = groupSnap.docs.map(d => ({ ...d.data(), docid: d.id }));
       this.groupDataSource.data = this.groupPlaylist;
       if (this.groupSort) {
         this.groupSort.active = 'date';

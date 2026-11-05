@@ -304,10 +304,12 @@ export class AuthguardService {
     return this.uid
   }
 
-  async getRoles() {
+  // Guards pass the uid from authState: this.uid is only set later by AppComponent's
+  // user() subscription, so on a page refresh it can still be undefined here.
+  async getRoles(uid: string = this.uid) {
     var roles
-    console.log(this.uid, "this uid");
-    const userdataDoc = doc(this.user_dataRef, this.uid)
+    console.log(uid, "this uid");
+    const userdataDoc = doc(this.user_dataRef, uid)
     const rolesQuery = query(this.profile_dataRef, where("user_ref", "==", userdataDoc))
     const profileData = await getDocs(rolesQuery)
     if (profileData.docs.length > 0) {
@@ -348,10 +350,10 @@ export class AuthguardService {
     return { roles: allowedRoles, label, profileid : allowedProfiles };
   }
 
-  async username() {
+  async username(uid: string = this.uid) {
     //not in use 
     let profile = {}
-    const userUid = doc(this.user_dataRef, this.uid)
+    const userUid = doc(this.user_dataRef, uid)
     console.log(userUid, "userUid console");
     const profilequery = query(this.profile_dataRef, where("user_ref", '==', userUid))
     const profileData = await getDocs(profilequery)
