@@ -123,3 +123,27 @@ by recent purchase instead.
   - Exports and reads the CSV. The moved row has the name, email and phone from `new_user_data`. The
     new user and p0 rows have their stored emails, read from Firestore. Nobody exports as "Unknown".
   - Cleans up by id.
+
+### Follow-up 2026-11-02: panel date range + Total value
+- Operator ask: in the Sale Achieved side panel, next to the Amount / Recent purchase sort, add a
+  date range that lists only what was bought in it, plus a total value in the panel.
+- **Range narrows purchases, not just people.** `saleBuyersInRange` (watson-purchases.ts, pure) keeps
+  each buyer's purchases dated From..To and recomputes the per-person total, label and latest date.
+  Buyers left with nothing drop out. Filtering people by "any purchase in range" was rejected because
+  their amounts would still include purchases outside the range, so the totals would not match the
+  dates picked. The row, the hover card, the sort and the CSV export all read the narrowed purchases,
+  so "show those only" holds everywhere.
+- Days are local and whole (From 00:00, To 23:59:59.999), the same convention as `saleWindow`. Either
+  end may be blank (open), and a reversed pair is swapped rather than producing an empty list.
+- The pickers are bounded by the window (min = registration start, max = one month after the workshop
+  end). The card's headline stays the whole-window figure, and only the panel follows the range.
+- **Total value** (`saleBuyersTotal`) sums the buyers listed, after the range and the name search,
+  so it always matches the list under it.
+- The card click resets the range (`openSaleAchieved`). A background reload of the buyers
+  (`loadSaleAchieved` → `onMetricClick`) keeps it, so a live listener re-fire does not undo the pick.
+- Tests:
+  - 3 unit cases in `watson-purchases.spec.ts`.
+  - Hub WDC-16 checks the inputs, their bounds (computed from the seeded W_DASH dates), clear,
+    reset-on-reopen, and ₹0 with no buyers. The emulator build has no Watson, so the narrowing itself
+    is unit-tested only.
+- Hooks: `wdash-sale-from`, `wdash-sale-to`, `wdash-sale-range-clear`, `wdash-sale-panel-total`.

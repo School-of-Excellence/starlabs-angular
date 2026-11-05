@@ -1,4 +1,4 @@
-import { Component, Inject, OnInit } from '@angular/core';
+import { Component, Inject, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, FormArray, Validators } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -12,6 +12,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
+import { Clipboard } from '@angular/cdk/clipboard';
 import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 import {
   Firestore,
@@ -61,6 +62,7 @@ export class HomeseriesComponent implements OnInit {
   episodes: EpisodeOption[] = [];
   episodeSearch = '';
   private episodeTitleMap: Record<string, string> = {};
+  private clipboard = inject(Clipboard);
 
   constructor(
     private fb: FormBuilder,
@@ -143,6 +145,24 @@ export class HomeseriesComponent implements OnInit {
 
   episodeTitle(id: string): string {
     return this.episodeTitleMap[id] || id;
+  }
+
+  /** EiFlix player link for one episode of this series; '' until the series is saved or the row has no episode. */
+  episodeLink(episodeId: string): string {
+    if (!this.isEditMode || !this.docId || !episodeId) return '';
+    return `https://eiflix.com/eiflix/play/${this.docId}/${episodeId}`;
+  }
+
+  async copyEpisodeLink(link: string): Promise<void> {
+    let copied = false;
+    try {
+      await navigator.clipboard.writeText(link);
+      copied = true;
+    } catch {
+      // Older browsers / non-secure origins: fall back to the CDK's textarea copy.
+      copied = this.clipboard.copy(link);
+    }
+    this.snackBar.open(copied ? 'Link copied.' : 'Could not copy the link.', 'Close', { duration: 2000 });
   }
 
   private makeGroup(episodeId: string, title = '', footer = '', headtag = '', subtitle = ''): FormGroup {
