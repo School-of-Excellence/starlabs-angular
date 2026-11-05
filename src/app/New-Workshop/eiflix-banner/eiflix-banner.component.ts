@@ -51,6 +51,8 @@ interface Banner {
   enableapp: boolean;
   /** Show on EiFlix mobile (operator 2026-10-21). Older banners don't have it: read as off. */
   enableeiflixmobile?: boolean;
+  /** What the banner shows: 'video', 'image' or 'both' (operator 2026-11-05). Older banners don't have it. */
+  showtext?: string;
   order?: number;
 }
 
@@ -124,7 +126,8 @@ export class EiflixBannerComponent implements AfterViewInit {
       image: [null, Validators.required],
       imageApp: [null, Validators.required],
       video: [null, Validators.required],
-      buttonname: ['']
+      buttonname: [''],
+      showtext: ['both']
     });
 
     this.loadSeries();
@@ -279,6 +282,7 @@ export class EiflixBannerComponent implements AfterViewInit {
         enableeiflixmobile: formValue.enableeiflixmobile ?? true,
         seriesRefId: formValue.seriesId || '',
         buttonname: formValue.buttonname || '',
+        showtext: formValue.showtext || '',
         externallink: formValue.externallink || '',
         imageUrl: imageUrl || '',
         imageUrlApp: imageUrlApp || '',
@@ -318,7 +322,8 @@ export class EiflixBannerComponent implements AfterViewInit {
       path: 'DeepLink',
       enable: true,
       enableapp:true,
-      enableeiflixmobile: true
+      enableeiflixmobile: true,
+      showtext: 'both'
     });
     this.imagePreview = null;
     this.imagePreviewApp = null;
@@ -340,7 +345,8 @@ export class EiflixBannerComponent implements AfterViewInit {
       enableeiflixmobile: banner.enableeiflixmobile ?? false,
       seriesId: banner.seriesRefId || '',
       externallink: banner.externallink || '',
-      buttonname: banner.buttonname || ''
+      buttonname: banner.buttonname || '',
+      showtext: banner.showtext || ''
     });
 
     this.imagePreview = banner.imageUrl;
