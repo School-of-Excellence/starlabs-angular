@@ -27,6 +27,10 @@ if (emuEnv.useEmulators && emuEnv.emulators) {
   // directly, and an unconnected handle points at the REAL cloud database. ATC is tested against the
   // emulator ONLY — never the development or production database.
   if (e.firestore) connectFirestoreEmulator(getFirestore(app, 'firestore-atc'), e.firestore.host, e.firestore.port);
+  // Named DB `firestore-forms` likewise (formsByClient, delivery forms — ~19 screens read it). Unconnected, the
+  // test build sent every forms read/write to the REAL cloud project (refused there with the dummy key), and
+  // the forms specs were skipped on the emulator as "multi-db unsupported" — which was a misdiagnosis.
+  if (e.firestore) connectFirestoreEmulator(getFirestore(app, 'firestore-forms'), e.firestore.host, e.firestore.port);
   if (e.auth) connectAuthEmulator(getAuth(app), e.auth.url, { disableWarnings: true });
   if (e.storage) connectStorageEmulator(getStorage(app), e.storage.host, e.storage.port);
   console.info('[emulator] Firestore/Auth/Storage connected to local emulator', e);

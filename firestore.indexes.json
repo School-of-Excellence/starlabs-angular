@@ -734,6 +734,34 @@
       ]
     },
     {
+      "collectionGroup": "participantsproduct",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "productref",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "subscriptionstart",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "participantsproduct",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "productref",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "subscriptionend",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "queue_token",
       "queryScope": "COLLECTION",
       "fields": [
@@ -1019,6 +1047,32 @@
         },
         {
           "fieldPath": "created",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "appointments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "bookedby",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "cancelled",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "appointment",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "hosts",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "starttime",
           "order": "DESCENDING"
         }
       ]

@@ -117,3 +117,6 @@
 .toggle-count { display: inline-block; margin-left: 6px; border-radius: 9px; font-size: 11px; font-weight: 700; padding: 1px 7px; }
 .toggle-count.hold { background: #fdecea; color: #b3261e; }
 .toggle-count.ahcrm { background: #e8f0fe; color: #1a56c4; }
+.toggle-count.role { background: #eef3ee; color: #2e6b35; }
+.rolefilter { transition: width 150ms ease; }
+.role-more { margin-left: 4px; font-size: 12px; color: #666; }

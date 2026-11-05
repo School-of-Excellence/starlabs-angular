@@ -527,15 +527,33 @@
 
   <!-- ============ EiFlix App Logs ============ -->
   <section class="eod-section eod-section-gap" data-testid="eif-logs-section">
-    <div class="eod-section-head">
+    <div class="eod-section-head eod-section-head-controls">
       <h2 class="eod-section-title">EiFlix App Logs</h2>
       <span class="eod-section-rule"></span>
-      <div class="eod-seg" role="group" aria-label="Login log period">
-        <button data-testid="eif-logs-range-today" type="button" [class.eod-seg-active]="logRange === 1" [attr.aria-pressed]="logRange === 1" (click)="setLogRange(1)">Today</button>
-        <button data-testid="eif-logs-range-7d" type="button" [class.eod-seg-active]="logRange === 7" [attr.aria-pressed]="logRange === 7" (click)="setLogRange(7)">7D</button>
-        <button data-testid="eif-logs-range-30d" type="button" [class.eod-seg-active]="logRange === 30" [attr.aria-pressed]="logRange === 30" (click)="setLogRange(30)">30D</button>
+      <div class="eod-eng-controls">
+        <div class="eod-seg" role="group" aria-label="Login log period">
+          <button data-testid="eif-logs-range-today" type="button" [class.eod-seg-active]="logRange === 1" [attr.aria-pressed]="logRange === 1" (click)="setLogRange(1)">Today</button>
+          <button data-testid="eif-logs-range-7d" type="button" [class.eod-seg-active]="logRange === 7" [attr.aria-pressed]="logRange === 7" (click)="setLogRange(7)">7D</button>
+          <button data-testid="eif-logs-range-30d" type="button" [class.eod-seg-active]="logRange === 30" [attr.aria-pressed]="logRange === 30" (click)="setLogRange(30)">30D</button>
+        </div>
+        <label class="eod-datefield">
+          <span>From</span>
+          <input data-testid="eif-logs-range-from" type="date" [(ngModel)]="logCustomStart" (change)="applyLogCustom()" [max]="logCustomEnd || todayStr">
+        </label>
+        <label class="eod-datefield">
+          <span>To</span>
+          <input data-testid="eif-logs-range-to" type="date" [(ngModel)]="logCustomEnd" (change)="applyLogCustom()" [min]="logCustomStart" [max]="todayStr">
+        </label>
+        @if (logRange === 'custom' || logCustomStart || logCustomEnd) {
+          <button data-testid="eif-logs-range-clear" type="button" class="eod-clear" (click)="setLogRange(1)">
+            <mat-icon>close</mat-icon>&nbsp;Clear
+          </button>
+        }
       </div>
     </div>
+    @if (logCustomHint) {
+      <span class="eod-date-hint eod-date-hint-head" role="status">Pick both dates to apply the range</span>
+    }
 
     <article class="eod-bigcard eod-logcard" [style.animation-delay.ms]="140">
       <div class="eod-log-tools">
@@ -834,7 +852,7 @@
             </button>
           }
         </div>
-        <div class="eod-ptool-row">
+        <div class="eod-ptool-row" [class.eod-ptool-row-hot]="p.kind === 'hotleads'">
           @if (p.showCohort) {
             <div class="eod-seg eod-pseg" role="group" aria-label="Filter by cohort">
               <button data-testid="eif-set-panel-cohort-28" type="button" [class.eod-seg-active]="p.cohort === 'all'" [attr.aria-pressed]="p.cohort === 'all'" (click)="setPanelCohort(p, 'all')">All</button>
@@ -867,6 +885,16 @@
             aria-label="Export the shown rows as Excel">
             <mat-icon aria-hidden="true">download</mat-icon>Export
           </button>
+          @if (p.kind === 'hotleads') {
+            <button data-testid="eif-send-to-slack"
+              type="button"
+              class="eod-psort-btn eod-pexport eod-pslack"
+              (click)="openSendToSlack(p)"
+              [disabled]="p.loading || p.error || !p.viewRows.length"
+              aria-label="Send the shown hot leads to Slack">
+              <mat-icon aria-hidden="true">send</mat-icon>Send to Slack
+            </button>
+          }
         </div>
         @if (p.journeyOptions.length) {
           <mat-form-field class="eod-pjourney" appearance="outline" subscriptSizing="dynamic">
@@ -923,6 +951,10 @@
               role="button"
               tabindex="0"
               [attr.aria-expanded]="row.expandable ? !!row.expanded : null"
+              (mouseenter)="showPlanTip(row, $any($event.currentTarget))"
+              (mouseleave)="hidePlanTip()"
+              (focus)="showPlanTip(row, $any($event.currentTarget))"
+              (blur)="hidePlanTip()"
               (click)="onRowClick(p, row)"
               (keydown.enter)="onRowClick(p, row)"
               (keydown.space)="$event.preventDefault(); onRowClick(p, row)">
@@ -983,3 +1015,32 @@
   }
 
 </div>
+
+<!-- Purchases hover card for New Users to Paid (operator 2026-10-14): one line per product bought
+     (Watson ParticipantPurchases, read-only). Fixed, above the side panel (z-index 1002 > 1001). -->
+@if (planTipRow) {
+  <div class="eod-plan-tip" data-testid="eif-plan-tip" role="tooltip" [ngStyle]="planTipStyle"
+    (mouseenter)="keepPlanTip()" (mouseleave)="hidePlanTip()">
+    <div class="eod-plan-tip-head">
+      <span class="eod-plan-tip-name">{{ planTipRow.name }}</span>
+      <span class="eod-plan-tip-sub">Purchases · excl. GST</span>
+    </div>
+    <div class="eod-plan-tip-list">
+      @for (s of planTipRow.planPurchases; track $index) {
+        <div class="eod-plan-tip-row">
+          <span class="eod-plan-tip-when">
+            <span class="eod-plan-tip-date">{{ s.dateLabel }}</span>
+            @if (s.product) {
+              <span class="eod-plan-tip-product">{{ s.product }}</span>
+            }
+          </span>
+          <span class="eod-plan-tip-amt">{{ s.amountLabel }}</span>
+        </div>
+      }
+    </div>
+    <div class="eod-plan-tip-foot">
+      <span>Total · {{ planTipRow.planPurchases.length }} {{ planTipRow.planPurchases.length === 1 ? 'product' : 'products' }}</span>
+      <span class="eod-plan-tip-amt">{{ planTipRow.planPurchaseTotalLabel }}</span>
+    </div>
+  </div>
+}

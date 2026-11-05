@@ -37,6 +37,13 @@ import {
   deriveChips,
   emptyFilter,
   filterSignature,
+  filterDiff,
+  pipelineColumns,
+  uniquePipelineNames,
+  productSubscriptionMembers,
+  toProductSubscriptionDocs,
+  productSubscriptionQuery,
+  productSubscriptionKey,
   filterTouched,
   productRuleActive,
   subscriptionFilterError,
@@ -370,6 +377,40 @@ describe('Participant Intelligence', () => {
           unconsumed: [{ productId: 'x', comparison: 'between', count: 2, count2: 3 }],
         });
         expect(ids(applyFilters(people, f))).toEqual(['none']);
+      });
+
+      describe('match all / any', () => {
+        const xy = (consumedMatch: FilterModel['consumedMatch']) =>
+          withFilter({
+            consumed: [
+              { productId: 'x', comparison: 'atLeast', count: 2 },
+              { productId: 'y', comparison: 'atLeast', count: 1 },
+            ],
+            consumedMatch,
+          });
+
+        it('ANDs rules of a kind by default and ORs them with "any"', () => {
+          expect(ids(applyFilters(people, xy('all')))).toEqual(['two']);
+          expect(ids(applyFilters(people, xy('any')))).toEqual(['two', 'none']);
+        });
+
+        it('keeps the two kinds ANDed while one kind is "any"', () => {
+          const f = { ...xy('any'), unconsumed: [{ productId: 'x', comparison: 'atLeast' as const, count: 1 }] };
+          expect(ids(applyFilters(people, f))).toEqual(['none']);
+        });
+
+        it('marks the chips "(any)" and changes the signature only with two active rules', () => {
+          expect(labels(xy('any'))).toEqual(['Consumed (any) Accelerator: at least 2', 'Consumed (any) Mastery: at least 1']);
+          expect(filterSignature(xy('any'))).not.toEqual(filterSignature(xy('all')));
+          const one = (m: FilterModel['consumedMatch']) => ({ ...xy(m), consumed: xy(m).consumed.slice(0, 1) });
+          expect(filterSignature(one('any'))).toEqual(filterSignature(one('all')));
+        });
+
+        it('reads the saved match, defaulting to "all"', () => {
+          expect(mapper.mapSavedFilter({ pifilter: { consumedMatch: 'any' } }).consumedMatch).toBe('any');
+          expect(mapper.mapSavedFilter({ pifilter: { unconsumedMatch: 'bogus' } }).unconsumedMatch).toBe('all');
+          expect(mapper.mapSavedFilter({}).consumedMatch).toBe('all');
+        });
       });
 
       it('chips each rule with the product name in words', () => {
@@ -990,6 +1031,164 @@ describe('Participant Intelligence', () => {
       expect(filterSignature({ ...base, upCount: cond('atLeast', 3) })).not.toBe(filterSignature(base));
       expect(filterSignature({ ...base, exclude: { tier: ['gold'] } })).not.toBe(filterSignature(base));
       expect(filterSignature({ ...base, subscription: { relation: 'anyTime', from: '2026-03-01', to: null } })).not.toBe(filterSignature(base));
+    });
+  });
+  describe('saved-filter update preview', () => {
+    it('splits chips into kept, added and removed', () => {
+      expect(filterDiff(['A', 'B', 'C'], ['B', 'D'])).toEqual({ kept: ['B'], added: ['D'], removed: ['A', 'C'] });
+      expect(filterDiff([], ['A'])).toEqual({ kept: [], added: ['A'], removed: [] });
+      expect(filterDiff(['A'], ['A'])).toEqual({ kept: ['A'], added: [], removed: [] });
+    });
+  });
+
+  describe('pipelines', () => {
+    const p = (profileid: string) => ({ profileid });
+    const cols = [
+      [p('a'), p('b'), p('c')],
+      [p('b'), p('c'), p('d')],
+      [p('c'), p('b')],
+    ];
+    const idsOf = (out: { profileid: string }[][]) => out.map((c) => c.map((x) => x.profileid));
+
+    it('shows everyone in each pipeline by default', () => {
+      expect(idsOf(pipelineColumns(cols, 'all'))).toEqual([['a', 'b', 'c'], ['b', 'c', 'd'], ['c', 'b']]);
+    });
+
+    it('"every" keeps only names in all pipelines, in each pipeline\'s order', () => {
+      expect(idsOf(pipelineColumns(cols, 'every'))).toEqual([['b', 'c'], ['b', 'c'], ['c', 'b']]);
+    });
+
+    it('"notEvery" keeps names missing from at least one pipeline, under the ones they are in', () => {
+      expect(idsOf(pipelineColumns(cols, 'notEvery'))).toEqual([['a'], ['d'], []]);
+    });
+
+    it('counts a name once per pipeline even if listed twice', () => {
+      expect(idsOf(pipelineColumns([[p('a'), p('a')], [p('b')]], 'every'))).toEqual([[], []]);
+    });
+
+    describe('unique names', () => {
+      const n = (profileid: string, name: string) => ({ profileid, name });
+      const asha = n('a', 'Asha'), dass = n('d', 'Dass'), bala = n('b', 'bala');
+
+      it('lists each person once with the pipelines they are in, A–Z ignoring case', () => {
+        const rows = uniquePipelineNames([
+          { name: 'Test 1', people: [dass, asha] },
+          { name: 'Regular', people: [asha, bala] },
+        ]);
+        expect(rows.map((r) => [r.person.profileid, r.pipelines])).toEqual([
+          ['a', ['Test 1', 'Regular']],
+          ['b', ['Regular']],
+          ['d', ['Test 1']],
+        ]);
+      });
+
+      it('gives the "not in every" names once each, from pipelineColumns', () => {
+        const cols = [
+          { name: 'P1', people: [asha, dass] },
+          { name: 'P2', people: [asha, bala] },
+        ];
+        const shown = pipelineColumns(cols.map((c) => c.people), 'notEvery');
+        const rows = uniquePipelineNames(cols.map((c, i) => ({ name: c.name, people: shown[i] })));
+        expect(rows.map((r) => r.person.profileid)).toEqual(['b', 'd']);
+      });
+    });
+  });
+  describe('product subscription (participantsproduct)', () => {
+    const d = (profileid: string, start: string | null, end: string | null) => ({ profileid, start, end });
+    const docs = [
+      d('a', '2026-01-10', '2026-06-30'),
+      d('a', '2026-03-01', '2026-09-30'), // a holds the product twice
+      d('b', '2025-01-01', '2025-12-31'),
+      d('c', null, null),
+    ];
+    const win = (relation: SubscriptionRelation, from: string | null, to: string | null) => ({ relation, from, to });
+    const sorted = (set: Set<string>) => [...set].sort();
+
+    it('dedupes: someone matching on two docs counts once', () => {
+      const m = productSubscriptionMembers(docs, win('startBetween', '2026-01-01', '2026-12-31'));
+      expect(sorted(m)).toEqual(['a']);
+      expect(m.size).toBe(1);
+    });
+
+    it('matches if any one doc fits, and docs without dates never match', () => {
+      expect(sorted(productSubscriptionMembers(docs, win('endBetween', '2026-09-01', '2026-09-30')))).toEqual(['a']);
+      expect(sorted(productSubscriptionMembers(docs, win('anyTime', '2025-06-01', '2026-02-01')))).toEqual(['a', 'b']);
+    });
+
+    it('"Not active in the range" needs every doc inactive in it', () => {
+      // a's second doc is active in July 2026, b's only doc is not
+      expect(sorted(productSubscriptionMembers(docs, win('notActive', '2026-07-01', '2026-07-31')))).toEqual(['b']);
+    });
+
+    it('filters participants by the loaded docs, and nobody before they load', () => {
+      const people = [mk({ profileid: 'a' }), mk({ profileid: 'b' }), mk({ profileid: 'z' })];
+      const ps = { productId: 'x', relation: 'anyTime' as const, from: '2025-06-01', to: '2026-02-01' };
+      const f = withFilter({ productSubscription: ps });
+      expect(ids(applyFilters(people, f, { productSubscriptions: { [productSubscriptionKey(ps)]: docs } }))).toEqual(['a', 'b']);
+      // docs cached for another range of the same product are not used
+      const other = productSubscriptionKey({ ...ps, to: '2026-03-01' });
+      expect(ids(applyFilters(people, f, { productSubscriptions: { [other]: docs } }))).toEqual([]);
+      expect(ids(applyFilters(people, f, {}))).toEqual([]);
+      const noProduct = withFilter({ productSubscription: { productId: null, relation: 'anyTime', from: '2025-06-01', to: null } });
+      expect(ids(applyFilters(people, noProduct, {}))).toEqual(['a', 'b', 'z']);
+    });
+
+    describe('query plan (range in the Firestore query, by local day)', () => {
+      const local = (d: Date | null) => (d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${d.getHours()}:${d.getMinutes()}` : null);
+      const plan = (relation: SubscriptionRelation, from: string | null, to: string | null) => {
+        const q = productSubscriptionQuery({ relation, from, to });
+        return [q.field, local(q.min), local(q.max), !!q.empty];
+      };
+
+      it('narrows start / end options on the date they test, whole days', () => {
+        expect(plan('startBetween', '2026-01-01', '2026-03-31')).toEqual(['subscriptionstart', '2026-01-01 0:0', '2026-03-31 23:59', false]);
+        expect(plan('within', '2026-01-01', null)).toEqual(['subscriptionstart', '2026-01-01 0:0', null, false]);
+        expect(plan('startInEndAfter', null, '2026-03-31')).toEqual(['subscriptionstart', null, '2026-03-31 23:59', false]);
+        expect(plan('endBetween', '2026-01-01', '2026-03-31')).toEqual(['subscriptionend', '2026-01-01 0:0', '2026-03-31 23:59', false]);
+        expect(plan('startBeforeEndIn', '2026-01-01', '2026-03-31')).toEqual(['subscriptionend', '2026-01-01 0:0', '2026-03-31 23:59', false]);
+      });
+
+      it('uses a one-sided bound for the wide options and none for "Not active"', () => {
+        expect(plan('throughout', '2026-01-01', '2026-03-31')).toEqual(['subscriptionstart', null, '2026-01-01 23:59', false]);
+        expect(plan('throughout', null, '2026-03-31')).toEqual([null, null, null, true]);
+        expect(plan('anyTime', '2026-01-01', '2026-03-31')).toEqual(['subscriptionend', '2026-01-01 0:0', null, false]);
+        expect(plan('anyTime', null, '2026-03-31')).toEqual(['subscriptionstart', null, '2026-03-31 23:59', false]);
+        expect(plan('notActive', '2026-01-01', '2026-03-31')).toEqual([null, null, null, false]);
+      });
+
+      it('every doc the bound lets through is still checked exactly', () => {
+        // throughout: the query lets b (start before From) through; the window check drops it (ends before To)
+        const ps = { relation: 'throughout' as const, from: '2026-02-01', to: '2026-05-01' };
+        expect(sorted(productSubscriptionMembers(docs, ps))).toEqual(['a']);
+      });
+
+      it('keys the cache by product, relation and range', () => {
+        const k = productSubscriptionKey({ productId: 'x', relation: 'within', from: '2026-01-01', to: null });
+        expect(k).toBe('x|within|2026-01-01|');
+        expect(k).not.toBe(productSubscriptionKey({ productId: 'x', relation: 'startBetween', from: '2026-01-01', to: null }));
+      });
+    });
+
+    it('drops cancelled / shifted docs (any case) and docs without a profile id', () => {
+      const out = toProductSubscriptionDocs([
+        { profileid: 'a', status: 'ongoing', subscriptionstart: '2026-01-01', subscriptionend: '2026-02-01' },
+        { profileid: 'b', status: 'Cancelled', subscriptionstart: '2026-01-01' },
+        { profileid: 'c', status: 'SHIFTED' },
+        { profileid: 'd', status: null },
+        { status: 'ongoing' },
+      ]);
+      expect(out.map((x) => x.profileid)).toEqual(['a', 'd']);
+      expect(out[0]).toEqual({ profileid: 'a', start: '2026-01-01', end: '2026-02-01' });
+    });
+
+    it('chips, signature and saved-filter mapping', () => {
+      const f = withFilter({ productSubscription: { productId: 'x', relation: 'startBetween', from: '2026-01-01', to: '2026-03-31' } });
+      expect(labels(f).some((l) => l.startsWith('Accelerator · Start between:'))).toBeTrue();
+      expect(filterSignature(f)).not.toBe(filterSignature(emptyFilter()));
+      expect(filterTouched(withFilter({ productSubscription: { productId: 'x', relation: 'startBetween', from: null, to: null } }))).toBeTrue();
+      const saved = mapper.mapSavedFilter({ pifilter: { productSubscription: { productId: 'x', relation: 'within', from: '2026-01-01', to: null } } });
+      expect(saved.productSubscription).toEqual({ productId: 'x', relation: 'within', from: '2026-01-01', to: null });
+      expect(mapper.mapSavedFilter({}).productSubscription).toEqual(emptyFilter().productSubscription);
     });
   });
 });

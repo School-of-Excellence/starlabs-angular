@@ -4,7 +4,7 @@
   <div class="m-3">
     <mat-form-field appearance="outline" class="me-4">
       <mat-label>Filter Client</mat-label>
-      <mat-select [(ngModel)]="selectedProfile" (selectionChange)="selectedSpecialist = null; filterATC()">
+      <mat-select data-testid="rfa-filter-client" [(ngModel)]="selectedProfile" (selectionChange)="selectedSpecialist = null; filterATC()">
         <mat-option>
           <ngx-mat-select-search [(ngModel)]="filterText" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
         </mat-option>
@@ -20,7 +20,7 @@
         <mat-option *ngFor="let option of filterSpecialist()" [value]="option.profileid">{{option.name}}</mat-option>
       </mat-select>
     </mat-form-field>
-    <button *ngIf="selectedProfile != null || selectedSpecialist != null" class="resetbtn" mat-stroked-button (click)="selectedProfile = null; selectedSpecialist = null; filterATC()">Reset</button>
+    <button data-testid="rfa-reset" *ngIf="selectedProfile != null || selectedSpecialist != null" class="resetbtn" mat-stroked-button (click)="selectedProfile = null; selectedSpecialist = null; filterATC()">Reset</button>
   </div>
   <mat-tab-group mat-stretch-tabs mat-align-tabs="center">
 
@@ -79,7 +79,7 @@
 <!-- Reusable template for ATC list -->
 <ng-template #atcListTemplate let-atcList="atcList" let-startIndex="startIndex" let-endIndex="endIndex" let-tabType="tabType">
   <mat-accordion multi>
-    <mat-expansion-panel *ngFor="let atc of atcList.slice(startIndex, endIndex); let i = index" (opened)="openATC(atc)">
+    <mat-expansion-panel data-testid="rfa-panel" [attr.data-atc]="atc.atcid" *ngFor="let atc of atcList.slice(startIndex, endIndex); let i = index" (opened)="openATC(atc)">
       <mat-expansion-panel-header #header collapsedHeight="110%" expandedHeight="115%">
         <mat-panel-title>
           <div class="expansionheader p-2">
@@ -94,21 +94,21 @@
 
             <!-- Flag Comment -->
             <div class="comment-container" *ngIf="tabType != 'validate' && tabType != 'alpha' && (atc['flagcomment'] || []).length != 0">
-              <label><b class="font-italic">Last Comment:</b> {{atc['flagcomment'][atc['flagcomment'].length - 1]['comment']}} <span class="text-secondary"> - By {{mapProfile[atc['flagcomment'][atc['flagcomment'].length - 1]['addedby']]}}</span></label>
+              <label data-testid="rfa-last-comment"><b class="font-italic">Last Comment:</b> {{atc['flagcomment'][atc['flagcomment'].length - 1]['comment']}} <span class="text-secondary"> - By {{mapProfile[atc['flagcomment'][atc['flagcomment'].length - 1]['addedby']]}}</span></label>
             </div>
 
             <div [ngClass]="{'mt-2 mb-2': tabType !== 'validate' && tabType !== 'alpha'}">
               <!-- Different buttons based on tab type -->
               <ng-container *ngIf="tabType === 'validate'">
-                <button class="me-3" mat-stroked-button (click)="$event.stopPropagation(); editATC(atc.atcid, 'validation')">Edit ATC</button>
-                <button class="me-3" mat-stroked-button (click)="$event.stopPropagation(); markATCvalidate(atc.atcid)">Mark ATC as Validated</button>
+                <button data-testid="rfa-edit" class="me-3" mat-stroked-button (click)="$event.stopPropagation(); editATC(atc.atcid, 'validation')">Edit ATC</button>
+                <button data-testid="rfa-validate" class="me-3" mat-stroked-button (click)="$event.stopPropagation(); markATCvalidate(atc.atcid)">Mark ATC as Validated</button>
               </ng-container>
               
               <ng-container *ngIf="tabType !== 'validate'">
-                <button mat-stroked-button (click)="$event.stopPropagation(); editATC(atc.atcid, 'alpha')">Edit ATC</button>
-                <button [ngClass]="atc['flagtype'] == 'flagmandatory' ? 'donebtn' : 'tobebtn'" class="ms-3" mat-stroked-button (click)="$event.stopPropagation(); updateNote(atc, 'flagmandatory')">Mark for Mandatory Consultation</button>
-                <button [ngClass]="atc['flagtype'] == 'flagenhance' ? 'donebtn' : 'tobebtn'" class="ms-3" mat-stroked-button (click)="$event.stopPropagation(); updateNote(atc, 'flagenhance')">Mark for Enhanced Scope Consultation</button>
-                <button [ngClass]="atc['flagtype'] == 'finalreview' ? 'donebtn' : 'tobebtn'" class="ms-3" mat-stroked-button (click)="$event.stopPropagation(); updateNote(atc, 'finalreview')">Approve This ATC as Final</button>
+                <button data-testid="rfa-edit" mat-stroked-button (click)="$event.stopPropagation(); editATC(atc.atcid, 'alpha')">Edit ATC</button>
+                <button data-testid="rfa-flag-mandatory" [ngClass]="atc['flagtype'] == 'flagmandatory' ? 'donebtn' : 'tobebtn'" class="ms-3" mat-stroked-button (click)="$event.stopPropagation(); updateNote(atc, 'flagmandatory')">Mark for Mandatory Consultation</button>
+                <button data-testid="rfa-flag-enhance" [ngClass]="atc['flagtype'] == 'flagenhance' ? 'donebtn' : 'tobebtn'" class="ms-3" mat-stroked-button (click)="$event.stopPropagation(); updateNote(atc, 'flagenhance')">Mark for Enhanced Scope Consultation</button>
+                <button data-testid="rfa-flag-final" [ngClass]="atc['flagtype'] == 'finalreview' ? 'donebtn' : 'tobebtn'" class="ms-3" mat-stroked-button (click)="$event.stopPropagation(); updateNote(atc, 'finalreview')">Approve This ATC as Final</button>
               </ng-container>
             </div>
             
@@ -123,7 +123,7 @@
       </div>
       <div *ngIf="(mapATCtranscription[atc.atcid] || []).length != 0">
         <div class="title text-left mb-0">Adjustment & Procedures</div>
-        <div class="adjbox mt-2" *ngFor="let adj of mapATCtranscription[atc.atcid]; let i = index">
+        <div data-testid="rfa-adj" class="adjbox mt-2" *ngFor="let adj of mapATCtranscription[atc.atcid]; let i = index">
           <label><em *ngIf="tabType !== 'validate'">{{i+1}}) {{adj.adjustment.name}}</em><span *ngIf="tabType === 'validate'">{{i+1}}) {{adj.adjustment.name}}</span></label>
           <!-- Subtext -->
           <div class="text-secondary font-italic mb-2" *ngIf="adj.adjustment['editedby']"> <!--  && !atc['authorid'].includes(adjustmentData['editedby']?.id) -->

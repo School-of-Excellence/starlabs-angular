@@ -455,6 +455,7 @@ scrollLogTop(): void {
       this.mapParticipantList = {};
       for (let i = 0; i < participantlist.length; i++) {
         const participantlistData = participantlist[i];
+        if (participantlistData['isdeleted'] === true) continue; // soft-deleted (isdeleted, set by Participant Intelligence) counts as deleted
         this.participantLists.push(participantlistData);
         this.mapParticipantList[participantlistData['docid']] = participantlistData;
 }
@@ -481,7 +482,8 @@ scrollLogTop(): void {
     try {
       const segmentsRef = collection(this.firestore, 'segments');
       const segmentsSnapshot = await getDocs(query(segmentsRef));
-      this.segments = segmentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // soft-deleted (isdeleted, set by Participant Intelligence) counts as deleted
+      this.segments = segmentsSnapshot.docs.filter(d => d.data()['isdeleted'] !== true).map(doc => ({ id: doc.id, ...doc.data() }));
       this.loading = false;
       
       // Re-check duplicate after loading segments

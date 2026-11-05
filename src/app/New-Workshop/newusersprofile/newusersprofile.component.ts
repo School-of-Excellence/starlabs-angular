@@ -134,6 +134,8 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
 
   // profileId -> name, from authguard.service getParticipantMetaMap().
   private metaMap: Record<string, string> = {};
+  /** new_user_data id -> name. A referrer can be a new user too, not only a participant (operator 2026-11-04). */
+  private nudNames: Record<string, string> = {};
 
   // "Send communication" panel + tag-based selection state.
   showComm = false;
@@ -347,6 +349,13 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
     const ref = collection(this.firestore, 'new_user_data');
     collectionData(ref, { idField: 'id' }).subscribe({
       next: (data: any[]) => {
+        // Names of everyone in new_user_data, from the same read — no extra query.
+        const names: Record<string, string> = {};
+        for (const u of data) {
+          const name = (u?.name ?? '').toString().trim();
+          if (u?.id && name) names[u.id] = name;
+        }
+        this.nudNames = names;
         this.dataSource.data = data
           .sort((a, b) => (this.toDate(b.created)?.getTime() || 0) - (this.toDate(a.created)?.getTime() || 0));
         this.loading = false;
@@ -390,7 +399,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   }
 
   // Picking the option that is already active clears it, so two rows cover
-  // three states and the menu needs no "any" row.
+  // three states and the menu needs no "any" row
   setConvertedFilter(value: ConvertedFilter): void {
     this.convertedFilter = this.convertedFilter === value ? '' : value;
     this.updateDisplayedColumns();
@@ -439,7 +448,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   }
 
   // Midnight (start) or 23:59:59.999 (end) of the picked day; null when the
-  // control is empty or holds a date the adapter could not parse.
+  // control is empty or holds a date the adapter could not parse
   private dayBound(value: Date | null, edge: 'start' | 'end'): number | null {
     if (!(value instanceof Date) || Number.isNaN(value.getTime())) return null;
     return edge === 'start'
@@ -472,8 +481,9 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
     // refferedprofile may be an id string or a DocumentReference.
     const key = typeof rp === 'object' ? (rp.id || '') : rp.toString();
     if (!key) return '';
-    // Map the id to a name; fall back to the id if not found.
-    return this.metaMap[key] || key;
+    // Map the id to a name: participant metadata first, then new_user_data (the referrer may be a new user);
+    // fall back to the id if neither knows it.
+    return this.metaMap[key] || this.nudNames[key] || key;
   }
 
   // Resolve a user's tag ids to their names.
@@ -829,7 +839,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
 
     this.workshopFilterLoading = true;
     this.workshopProfileIds = null; // predicate hides rows while loading
-    // Clear now (not just on completion) so a mid-load export can't read the
+    // Clear now (not just on completion) so a mid-load export can't read the.
     // previous selection's titles.
     this.workshopsByProfile.clear();
     this.refreshFilter();

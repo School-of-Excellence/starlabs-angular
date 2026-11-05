@@ -49,6 +49,22 @@
     color: #3498db;
     margin-bottom: 8px;
   }
+
+  .preview-flipping {
+    margin-top: 8px;
+  }
+
+  .preview-flipping-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: #34495e;
+    margin-bottom: 4px;
+  }
+
+  .preview-flipping-range {
+    font-weight: 400;
+    color: #7f8c8d;
+  }
   
   .preview-field-value {
     font-size: 15px;

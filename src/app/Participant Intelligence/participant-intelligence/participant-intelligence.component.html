@@ -20,6 +20,11 @@
 
       <app-column-config />
 
+      <button data-testid="pi-pipelines" class="tbtn" matTooltip="View saved filters as pipelines" (click)="openPipelines()">
+        <span class="material-symbols-rounded">view_kanban</span>
+        <span class="lbl">Pipelines</span>
+      </button>
+
       <button data-testid="pi-checklists" class="tbtn" [matMenuTriggerFor]="checklistsMenu" matTooltip="Reconciliation checklists">
         <span class="material-symbols-rounded">checklist</span>
         <span class="lbl">Checklists</span>
@@ -94,7 +99,7 @@
   <app-bulk-action-bar (action)="handleBulk($event)" />
 </div>
 
-<mat-menu #exportMenu="matMenu" xPosition="before">
+<mat-menu #exportMenu="matMenu" class="pi-menu" xPosition="before">
   <button data-testid="pi-export-table" mat-menu-item (click)="exportExcel(false)">
     <span class="material-symbols-rounded mi">table_view</span> Export Table
   </button>
@@ -106,7 +111,7 @@
   </button>
 </mat-menu>
 
-<mat-menu #checklistsMenu="matMenu" xPosition="before">
+<mat-menu #checklistsMenu="matMenu" class="pi-menu" xPosition="before">
   <div data-testid="pi-checklists-watson-heading" class="menu-group" (click)="$event.stopPropagation()">Watson status</div>
   @for (c of watsonChecklists; track c.id) {
     <button data-testid="pi-watson-checklist-item" mat-menu-item (click)="openChecklist(c)">

@@ -1,19 +1,20 @@
 <div class="dialog-overlay">
   <div class="dialog-container">
     <div class="dialog-header">
-      <div class="title">{{dailogData["heading"]}}</div>
-      <button class="close-button" (click)="onClose()">×</button>
+      <div data-testid="arn-heading" class="title">{{dailogData["heading"]}}</div>
+      <button data-testid="arn-x" class="close-button" (click)="onClose()">×</button>
     </div>
     <div class="dialog-content">
       <textarea 
+        data-testid="arn-text"
         [(ngModel)]="commentBox" 
         placeholder="Enter your Comment here..."
         rows="5">
       </textarea>
     </div>
     <div class="dialog-footer">
-      <button class="cancel-button" (click)="onClose()">Close</button>
-      <button class="confirm-button" (click)="onConfirm()">Confirm</button>
+      <button data-testid="arn-close" class="cancel-button" (click)="onClose()">Close</button>
+      <button data-testid="arn-confirm" class="confirm-button" (click)="onConfirm()">Confirm</button>
     </div>
   </div>
 </div>

@@ -1,18 +1,22 @@
 <span class="d-flex flex-row justify-content-center mt-2 mb-2">
   <h3>Accelerated Time Compression</h3>
 </span>
-<section *ngIf="profileRoles && profileRoles['mentor'] ? profileRoles['mentor'] || profileRoles['developer'] : false" class="mb-4 ml-4 mr-4">
+<!-- Access is decided by the dashboard route configuration (authGuard) — no hard-coded role check here (2026-10-17). -->
+<section *ngIf="notFound" data-testid="vua-not-found" class="mb-4 ml-4 mr-4">
+  <label>ATC version not found.</label>
+</section>
+<section *ngIf="profileRoles && !notFound" data-testid="vua-root" class="mb-4 ml-4 mr-4">
   <div class="atcdetail" *ngIf="atcdata['atcref']">
-    <label style="float:right;color:black;font-size: 1.25rem;">{{atcdata.status | titlecase}}</label>
+    <label data-testid="vua-status" style="float:right;color:black;font-size: 1.25rem;">{{atcdata.status | titlecase}}</label>
     <br>
     <label class="highlight">Prescribed Author(s):</label>
-    <label><span *ngFor="let item of atcdata['author']"><strong>{{mapProfile[item.id]}},</strong></span></label>
+    <label data-testid="vua-authors"><span *ngFor="let item of atcdata['author']"><strong>{{mapProfile[item.id]}},</strong></span></label>
     <br>
     <label class="highlight">Prescribed Date:</label>
     <label>{{atcdata['prescription_date'].toDate() | date : 'medium'}}</label>
     <br>
     <label class="highlight">Validator(s):</label>
-    <label><span *ngFor="let item of atcdata['validator'] || []"><strong>{{mapProfile[item.id]}},</strong></span></label>
+    <label data-testid="vua-validators"><span *ngFor="let item of atcdata['validator'] || []"><strong>{{mapProfile[item.id]}},</strong></span></label>
   </div>
   <table *ngIf="![null,undefined].includes(atcdata) && ![null,undefined].includes(atcdata['prescription'])" style="width:100%">
     <tr>
@@ -23,7 +27,7 @@
             Procedures
         </th>
     </tr>
-    <tr *ngFor="let prescription of atcdata['prescription'];" style="padding-bottom: 10px;">
+    <tr *ngFor="let prescription of atcdata['prescription']; let i = index" [attr.data-testid]="'vua-adj-' + i" style="padding-bottom: 10px;">
       <td class="adjustmentbox">
           <label [ngClass]="prescription.isdelete ? 'strikeDelete' : null">
             {{prescription.name}}
@@ -36,7 +40,7 @@
       </td>
       <td class="procedurebox">
           <div *ngFor="let procedure of prescription.procedures; let j = index">
-              <label [ngClass]="procedure.isdelete ? 'strikeDelete' : null">- {{mapProcedures[procedure.name['id']]}}</label>
+              <label data-testid="vua-proc-name" [ngClass]="procedure.isdelete ? 'strikeDelete' : null">- {{mapProcedures[procedure.name['id']]}}</label>
               <br>
           </div>
       </td>

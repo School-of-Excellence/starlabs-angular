@@ -394,7 +394,9 @@ export class EitEducationAtcComponent implements OnInit {
   }
 
   onEditATC(atc:any){
-    let collectionname  = atc.atcref.path.indexOf("atc_alpha") === 0 ? "atc_alpha" : "atc_to_validate"
+    // edit-atc's `:type` is 'alpha' | 'validation' (edit-atc.component.ts maps only 'alpha' → atc_alpha) — the
+    // same values View Prescribed ATC sends. 'atc_alpha' used to open alpha ATCs from the wrong collection.
+    let collectionname  = atc.atcref.path.indexOf("atc_alpha") === 0 ? "alpha" : "validation"
     var url = this.router.serializeUrl(this.router.createUrlTree(['/editATC/' + atc.atcid + "/"+ collectionname]));
     console.log("ATC URL : ",url);
      window.open(url, '_blank')
@@ -420,7 +422,10 @@ export class EitEducationAtcComponent implements OnInit {
     loadingref.afterClosed().toPromise().then((result) => {
       let validators = [];
       var resultList = result ?? [];
-      resultList.forEach((e: any) => validators.push(e.profile_ref));
+      // users_roles comes from the DEFAULT database, so profile_ref is a default-database ref; this ATC doc lives
+      // in firestore-atc and the SDK rejects cross-database refs (the save silently failed). Re-create the same
+      // path on the ATC database — as View Prescribed ATC's markATCvalidate does.
+      resultList.forEach((e: any) => validators.push(doc(this.firestoreATC, e.profile_ref.path)));
       if (atc['validator'] != null) {
         validators = [...validators, ...atc['validator']];
       }

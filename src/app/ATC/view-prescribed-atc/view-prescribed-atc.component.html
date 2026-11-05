@@ -2,8 +2,17 @@
   <mat-progress-bar data-testid="vatc-loading" mode="indeterminate"></mat-progress-bar>
 </div>
 
-<div class="mainscreen">
-  <div class="heading">Prescribed ATC</div>
+<div class="mainscreen vp-screen">
+  <!-- Header (prototype): title + subtitle, Export to Excel on the right -->
+  <div class="vp-header">
+    <div>
+      <div class="heading">Prescribed ATC</div>
+      <p class="vp-subtitle">Every prescribed ATC with its adjustments and change work. Filter, open the full ATC, edit or validate it.</p>
+    </div>
+    <button mat-flat-button class="exportbtn" (click)="exportToExcel()" [disabled]="reportATC.length === 0">
+      <mat-icon>download</mat-icon> Export to Excel
+    </button>
+  </div>
 
   <div class="filterbox mat-elevation-z6">
     <div class="filterrow">
@@ -95,9 +104,6 @@
       </span>
       <span class="filtered-by no-filter" *ngIf="getActiveFilters().length === 0">&nbsp;|&nbsp; No filters applied</span>
     </div>
-    <button mat-flat-button class="exportbtn" (click)="exportToExcel()" [disabled]="reportATC.length === 0">
-      <mat-icon>download</mat-icon> Export to Excel
-    </button>
   </div>
 
   <div class="summary-bar">
@@ -150,6 +156,15 @@
         <span class="summary-label">CW Completed</span>
       </div>
     </div>
+
+    <div class="group-divider"></div>
+
+    <div class="summary-group">
+      <div class="summary-item">
+        <span data-testid="vatc-sum-reviews" class="summary-value neutral">{{ reportSummary.totalReviews }}</span>
+        <span class="summary-label">Reviews</span>
+      </div>
+    </div>
   </div>
 
   <div class="mat-elevation-z3">
@@ -159,36 +174,68 @@
           <div class="atc-header-container">
             <!-- ATC Meta Data -->
             <div class="atc-meta">
-              <div class="atcdate">
-                <span class="nonprintable" (click)="onPrint(atc, printSection, $event)">{{(i + 1) + (pageIndex * pageSize)}}. </span>
-                <u>{{atcData['prescription_date']?.toDate() | date:'medium'}}</u>
+              <!-- Title line (prototype): No. · Participant · ATC model · date · status · last edit -->
+              <div class="atc-titleline">
+                <span class="atc-no nonprintable" (click)="onPrint(atc, printSection, $event)">{{(i + 1) + (pageIndex * pageSize)}}.</span>
+                <!-- Participant Name -->
+                <span class="atc-participant">
+                  <span class="hoverprofile" (click)="selectParticipantName(atcData['profileid'])">{{(profileMap[atcData['profileid']] || {})['name']}}</span>
+                  <mat-icon class="view-icon" (click)="openParticipantView(atcData['profileid'], $event)">open_in_new</mat-icon>
+                </span>
+                <!-- Product: model tag (View Mode) — developers / testers can change it -->
+                <span *ngIf="updateProductPath != atc.ref.path" class="atc-tag" [ngClass]="modelTagClass(atcData['product'])">
+                  {{atcData['product'] ? atcData['product'] : 'No Product Mentioned'}}
+                  <button mat-icon-button class="tag-edit-btn" *ngIf="profileRoles['developer'] || profileRoles['tester']" (click)="onSelectProductEdit(atc)" aria-label="Change product">
+                    <mat-icon>edit</mat-icon>
+                  </button>
+                </span>
+                <!-- Product: Edit Mode -->
+                <span *ngIf="updateProductPath == atc.ref.path" class="nonprintable product-edit-inline">
+                  <mat-form-field class="product-select" appearance="outline">
+                    <mat-select [(ngModel)]="newProductValue">
+                      <mat-option *ngFor="let atcmodel of atcModelList" [value]="atcmodel.atcmodel">
+                        {{atcmodel.atcmodel}}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                  <button class="cancelbtn-sm" mat-stroked-button (click)="updateProductPath = null; clearUpdateEdit()">Cancel</button>
+                  <button class="submitbtn-sm" mat-flat-button color="primary" (click)="updateProductValue(atc)">Update</button>
+                </span>
+                <span class="atcdate">{{atcData['prescription_date']?.toDate() | date:'medium'}}</span>
+                <!-- ATC Status (as tags) -->
+                <span class="atc-status nonprintable">
+                  <label data-testid="vatc-status-pending" class="status-tag status-pending" *ngIf="atcData['status'] == 'atc given'">This ATC is yet to validate.</label>
+                  <label data-testid="vatc-status-validated" class="status-tag status-validated" *ngIf="atcData['status'] == 'validated'">This ATC has been validated by Arena Mentor.
+                    <span *ngIf="(atcData['validator'] || []).length != 0">
+                      <!-- OPTIMIZED: Show names in a more efficient way -->
+                      <span class="validator-names">
+                        (<span *ngFor="let author of atcData['validator']; let isLast = last; trackBy: trackByAuthorId">{{(profileMap[author.id] || {})['name']}}<span *ngIf="!isLast">, </span></span>)
+                      </span>
+                    </span>
+                  </label>
+                  <label data-testid="vatc-status-visible" class="status-tag status-visible" *ngIf="!atcData['status'] && atc.ref.parent.id == 'atc_alpha'">This ATC is directly visible to the Participant.</label>
+                </span>
+                <!-- EI Solution: reviews not deleted (prototype) -->
+                <span class="atc-tag tag-model nonprintable" data-testid="vatc-review-count" *ngIf="isEIModel(atcData['product'])">{{ reviewActiveCount(atc) }} reviews</span>
+                <!-- ATC forms (plan 2026-10-28): the model's forms answered on this ATC -->
+                <span class="atc-tag tag-model nonprintable" data-testid="vatc-forms-count" *ngIf="mapFormsCount[atc.id] as count">{{ count.done }} of {{ count.total }} forms submitted</span>
+                <label *ngIf="atcData['lasteditedon']" class="lastedittext nonprintable">
+                  (Last Edit : {{(atcData['lasteditedon'] ? (atcData['lasteditedon']?.toDate() | date:'medium') : '')}})
+                </label>
               </div>
-              <label *ngIf="atcData['lasteditedon']" class="lastedittext nonprintable">
-                (Last Edit : {{(atcData['lasteditedon'] ? (atcData['lasteditedon']?.toDate() | date:'medium') : '')}})
-              </label>
               <!-- ATC Version -->
               <div class="versionbtnarea nonprintable" *ngIf="(mapAtcVersionDoc[atc.ref.path] || []).length != 0">
-                <button class="versionbtn" mat-stroked-button *ngFor="let versionatc of mapAtcVersionDoc[atc.ref.path]; let vIdx = index; trackBy: trackByAtcId" mat-stroked-button type="button" (click)="openVersionAtc(versionatc['atcPath'])">
+                <button data-testid="vatc-version-btn" class="versionbtn" mat-stroked-button *ngFor="let versionatc of mapAtcVersionDoc[atc.ref.path]; let vIdx = index; trackBy: trackByAtcId" mat-stroked-button type="button" (click)="openVersionAtc(versionatc['atcPath'])">
                   Version {{mapAtcVersionDoc[atc.ref.path].length - vIdx}}:
                   &nbsp;
                   {{versionatc['lasteditedon'] ? (versionatc['lasteditedon'].toDate() | date:'medium') : (versionatc['prescription_date']?.toDate() | date:'medium')}}
                 </button>
               </div>
+              <!-- Key–value grid (prototype): activities → names, then the directive -->
               <div class="atcdetail">
-                <!-- Participant Name -->
-                <div>
-                  <label class="info-label">Participant Name:</label>
-                  <label class="info-value">
-                    <span class="hoverprofile" (click)="selectParticipantName(atcData['profileid'])">
-                      {{(profileMap[atcData['profileid']] || {})['name']}}
-                    </span>
-                    <mat-icon class="view-icon" (click)="openParticipantView(atcData['profileid'], $event)">open_in_new</mat-icon>
-                  </label>
-                </div>
-
                 <!-- Author, Observer Name -->
-                <div *ngIf="atcData['bigactivity'] == null">
-                  <div *ngIf="(atcData['author'] || []).length != 0">
+                <ng-container *ngIf="atcData['bigactivity'] == null">
+                  <div class="kv-row" *ngIf="(atcData['author'] || []).length != 0">
                     <label class="info-label">Author(s):</label>
                     <label class="info-value">
                       <span [ngClass]="{'hoverprofile': superRoles}" *ngFor="let author of atcData['author']; let isLast = last; trackBy: trackByAuthorId" (click)="selectAuthorName('profile_data/'+author.id)">
@@ -196,7 +243,7 @@
                       </span>
                     </label>
                   </div>
-                  <div *ngIf="(atcData['observer'] || []).length != 0">
+                  <div class="kv-row" *ngIf="(atcData['observer'] || []).length != 0">
                     <label class="info-label">Observer(s):</label>
                     <label class="info-value">
                       <span [ngClass]="{'hoverprofile': superRoles}" *ngFor="let author of atcData['observer']; let isLast = last; trackBy: trackByAuthorId" (click)="selectAuthorName('profile_data/'+author.id)">
@@ -204,11 +251,11 @@
                       </span>
                     </label>
                   </div>
-                </div>
+                </ng-container>
 
                 <!-- Big Activity Name - OPTIMIZED VERSION -->
-                <div *ngIf="atcData['bigactivity'] != null && getBigActivityEntries(atcData['bigactivity']) as bigActivityEntries">
-                  <div *ngFor="let activity of bigActivityEntries; trackBy: trackByActivityKey">
+                <ng-container *ngIf="atcData['bigactivity'] != null && getBigActivityEntries(atcData['bigactivity']) as bigActivityEntries">
+                  <div class="kv-row" *ngFor="let activity of bigActivityEntries; trackBy: trackByActivityKey">
                     <label class="info-label">{{mapBigActivity[activity.key]}}:</label>
                     <label class="info-value">
                       <span [ngClass]="{'hoverprofile': superRoles}"
@@ -218,60 +265,22 @@
                       </span>
                     </label>
                   </div>
-                </div>
+                </ng-container>
 
-                <!-- Product -->
-                <div>
-                  <label class="info-label">Product:</label>
-
-                  <!-- View Mode -->
-                  <label *ngIf="updateProductPath != atc.ref.path" class="info-value">
-                    {{atcData['product'] ? atcData['product'] : 'No Product Mentioned'}}
-                    <button mat-icon-button>
-                      <mat-icon *ngIf="profileRoles['developer'] || profileRoles['tester']" (click)="onSelectProductEdit(atc)">edit</mat-icon>
-                    </button>
-                  </label>
-
-                  <!-- Edit Mode -->
-                  <span *ngIf="updateProductPath == atc.ref.path" class="nonprintable product-edit-inline">
-                    <mat-form-field class="product-select" appearance="outline">
-                      <mat-select [(ngModel)]="newProductValue">
-                        <mat-option *ngFor="let atcmodel of atcModelList" [value]="atcmodel.atcmodel">
-                          {{atcmodel.atcmodel}}
-                        </mat-option>
-                      </mat-select>
-                    </mat-form-field>
-                    <button class="cancelbtn-sm" mat-stroked-button (click)="updateProductPath = null; clearUpdateEdit()">Cancel</button>
-                    <button class="submitbtn-sm" mat-flat-button color="primary" (click)="updateProductValue(atc)">Update</button>
-                  </span>
-                </div>
-
-                <!-- ATC Directive -->
-                <div>
-                  <label class="info-value"><span class="info-label">ATC Directive:</span>{{atcData['directive']}}</label>
+                <!-- ATC Directive ("Immediate outcome" for WiSH) -->
+                <div class="kv-row">
+                  <label class="info-label">{{ isWiSHModel(atcData['product']) ? 'Immediate outcome:' : 'ATC Directive:' }}</label>
+                  <label class="info-value">{{atcData['directive']}}</label>
                 </div>
               </div>
             </div>
-            <!-- Profile Image -->
+            <!-- Profile Image (initials when there is no photo — prototype) -->
             <div class="profile-image-container nonprintable">
               <div *ngIf="profileMap[atcData['profileid']] && (profileMap[atcData['profileid']]['profile'] || profileMap[atcData['profileid']]['profileimg'])">
                 <img class="profile-image" [src]="profileMap[atcData['profileid']]['profile'] || profileMap[atcData['profileid']]['profileimg']">
               </div>
+              <span class="atc-initials" *ngIf="!(profileMap[atcData['profileid']] && (profileMap[atcData['profileid']]['profile'] || profileMap[atcData['profileid']]['profileimg']))">{{ initialsOf((profileMap[atcData['profileid']] || {})['name']) }}</span>
             </div>
-          </div>
-
-          <!-- ATC Status -->
-          <div class="atc-status nonprintable">
-            <label data-testid="vatc-status-pending" *ngIf="atcData['status'] == 'atc given'">This ATC is yet to validate.</label>
-            <label data-testid="vatc-status-validated" *ngIf="atcData['status'] == 'validated'">This ATC has been validated by Arena Mentor.
-              <span *ngIf="(atcData['validator'] || []).length != 0">
-                <!-- OPTIMIZED: Show names in a more efficient way -->
-                <span class="validator-names">
-                  (<span *ngFor="let author of atcData['validator']; let isLast = last; trackBy: trackByAuthorId">{{(profileMap[author.id] || {})['name']}}<span *ngIf="!isLast">, </span></span>)
-                </span>
-              </span>
-            </label>
-            <label data-testid="vatc-status-visible" *ngIf="!atcData['status'] && atc.ref.parent.id == 'atc_alpha'">This ATC is directly visible to the Participant.</label>
           </div>
 
           <!-- Action Button -->
@@ -294,6 +303,193 @@
               Loading Full ATC...
             </div>
 
+            <!-- Forms (plan 2026-11-01): 1 Delivery activities (participantproductid) · 2 Queue activities (queueid) ·
+                 3 ATC forms (plan 2026-10-28: validated ATCs whose model has forms; rows worked out in buildFormRows) -->
+            <div class="vp-card nonprintable" data-testid="vatc-forms-card" *ngIf="hasFormsCard(atc)">
+              <div class="vp-card-title">Forms</div>
+
+              <div class="forms-part" data-testid="vatc-forms-part-delivery" *ngIf="mapActivityForms[atc.id]?.delivery.length">
+                <div class="forms-part-head">
+                  <span class="forms-part-icon forms-part-delivery"><mat-icon aria-hidden="true">route</mat-icon></span>
+                  <div class="forms-part-text">
+                    <span class="forms-part-title">Delivery activities</span>
+                    <span class="forms-part-sub">Filled in this purchase's delivery sequence</span>
+                  </div>
+                  <span class="forms-part-count" data-testid="vatc-forms-delivery-count">{{ mapActivityForms[atc.id].delivery.length }} {{ mapActivityForms[atc.id].delivery.length == 1 ? 'answer' : 'answers' }}</span>
+                </div>
+                <ng-container *ngFor="let row of mapActivityForms[atc.id].delivery; trackBy: trackByAnswerId">
+                  <ng-container *ngTemplateOutlet="activityRow; context: { $implicit: row }"></ng-container>
+                </ng-container>
+              </div>
+
+              <div class="forms-part" data-testid="vatc-forms-part-queue" *ngIf="mapActivityForms[atc.id]?.queue.length">
+                <div class="forms-part-head">
+                  <span class="forms-part-icon forms-part-queue"><mat-icon aria-hidden="true">groups</mat-icon></span>
+                  <div class="forms-part-text">
+                    <span class="forms-part-title">Queue activities</span>
+                    <span class="forms-part-sub">Filled in the queue{{ atcData['queuename'] ? ' · ' + atcData['queuename'] : '' }}</span>
+                  </div>
+                  <span class="forms-part-count" data-testid="vatc-forms-queue-count">{{ mapActivityForms[atc.id].queue.length }} {{ mapActivityForms[atc.id].queue.length == 1 ? 'answer' : 'answers' }}</span>
+                </div>
+                <ng-container *ngFor="let row of mapActivityForms[atc.id].queue; trackBy: trackByAnswerId">
+                  <ng-container *ngTemplateOutlet="activityRow; context: { $implicit: row }"></ng-container>
+                </ng-container>
+              </div>
+
+              <ng-template #activityRow let-row>
+                <div class="form-row forms-part-row" data-testid="vatc-activity-row">
+                  <div class="form-name">
+                    <span data-testid="vatc-activity-name">{{ row.name }}</span>
+                    <div class="form-line">
+                      <span class="form-status form-status-done"><mat-icon aria-hidden="true">check_circle</mat-icon><span>Submitted</span></span>
+                      <span class="form-note" data-testid="vatc-activity-note">{{ row.note }}</span>
+                    </div>
+                  </div>
+                  <div class="form-actions">
+                    <button data-testid="vatc-activity-view" mat-stroked-button type="button" (click)="viewAtcForm(atc, row)">View answer</button>
+                  </div>
+                </div>
+              </ng-template>
+
+              <div class="forms-part" data-testid="vatc-forms-part-atc" *ngIf="mapFormView[atc.id] || mapFormsLocked[atc.id]">
+                <div class="forms-part-head">
+                  <span class="forms-part-icon forms-part-atc"><mat-icon aria-hidden="true">assignment</mat-icon></span>
+                  <div class="forms-part-text">
+                    <span class="forms-part-title">ATC forms</span>
+                    <span class="forms-part-sub">Forms set on the {{ atcData['product'] }} ATC model</span>
+                  </div>
+                  <span class="forms-part-count forms-summary" data-testid="vatc-forms-summary" *ngIf="mapFormView[atc.id] as formView">{{ formView.summary }}</span>
+                </div>
+                <div class="forms-locked" data-testid="vatc-forms-locked" *ngIf="mapFormsLocked[atc.id]"><mat-icon aria-hidden="true">lock</mat-icon> These open once the ATC is validated.</div>
+              <ng-container *ngIf="mapFormView[atc.id] as formView">
+              <ng-container *ngIf="formView.specialist.length">
+                <div class="forms-group" data-testid="vatc-forms-group-specialist"><mat-icon>how_to_reg</mat-icon> Forms you fill</div>
+                <ng-container *ngFor="let row of formView.specialist; trackBy: trackByRowKey">
+                  <ng-container *ngTemplateOutlet="formRow; context: { $implicit: row }"></ng-container>
+                </ng-container>
+              </ng-container>
+              <ng-container *ngIf="formView.participant.length">
+                <div class="forms-group" data-testid="vatc-forms-group-participant"><mat-icon>smartphone</mat-icon> Forms the participant fills · {{ profileMap[atcData['profileid']]?.name }}</div>
+                <ng-container *ngFor="let row of formView.participant; trackBy: trackByRowKey">
+                  <ng-container *ngTemplateOutlet="formRow; context: { $implicit: row }"></ng-container>
+                </ng-container>
+              </ng-container>
+              <ng-container *ngIf="formView.sponsor.length">
+                <div class="forms-group" data-testid="vatc-forms-group-sponsor"><mat-icon>volunteer_activism</mat-icon> Forms the sponsor fills<span data-testid="vatc-sponsor-name" *ngIf="formView.sponsorName"> · {{ formView.sponsorName }}</span><mat-icon data-testid="vatc-sponsor-locked-icon" class="forms-group-lock" *ngIf="formView.sponsorLocked" aria-label="Sponsor locked">lock</mat-icon></div>
+                <ng-container *ngFor="let row of formView.sponsor; trackBy: trackByRowKey">
+                  <ng-container *ngTemplateOutlet="formRow; context: { $implicit: row }"></ng-container>
+                </ng-container>
+              </ng-container>
+              <ng-template #formRow let-row>
+                <div class="form-row" [class.form-row-off]="row.deleted" data-testid="vatc-form-row">
+                  <div class="form-name">
+                    <span>{{ row.name }}</span>
+                    <div class="form-line">
+                      <span class="form-status" [ngClass]="'form-status-' + row.tone"><mat-icon aria-hidden="true">{{ row.icon }}</mat-icon><span data-testid="vatc-form-status">{{ row.status }}</span></span>
+                      <span class="form-note" data-testid="vatc-form-note">{{ row.note }}</span>
+                    </div>
+                  </div>
+                  <div class="form-actions">
+                    <button *ngIf="row.canView" data-testid="vatc-form-view" mat-stroked-button type="button" (click)="viewAtcForm(atc, row)">View answer</button>
+                    <button *ngIf="row.canEdit" data-testid="vatc-form-edit" mat-stroked-button type="button" (click)="editAtcForm(atc, row)">Edit answer</button>
+                    <button *ngIf="row.canFill" data-testid="vatc-form-fill" mat-flat-button color="primary" type="button" (click)="fillAtcForm(atc, row)">Fill form</button>
+                    <button *ngIf="row.canSend" data-testid="vatc-form-send" mat-stroked-button type="button" (click)="row.filledby == 'sponsor' ? openSponsorSend(atc, row) : sendAtcForm(atc, row)">{{ row.sendLabel }}</button>
+                    <button *ngIf="row.canResend" data-testid="vatc-form-resend" mat-stroked-button type="button" (click)="row.filledby == 'sponsor' ? openSponsorSend(atc, row) : sendAtcForm(atc, row)">Ask to update</button>
+                    <button *ngIf="row.canWithdraw" data-testid="vatc-form-copy" mat-stroked-button type="button" (click)="copyAtcFormLink(row)">Copy link</button>
+                    <button *ngIf="row.canWithdraw" data-testid="vatc-form-revoke" mat-stroked-button type="button" (click)="revokeAtcForm(row)">Withdraw</button>
+                  </div>
+                </div>
+              </ng-template>
+              </ng-container>
+              </div>
+
+              <!-- Send to sponsor (plan 2026-11-02): search while the sponsor isn't locked, the locked name after -->
+              <div class="sponsor-backdrop" *ngIf="sponsorSend?.atc.id == atc.id">
+                <div class="sponsor-dialog" data-testid="vatc-sponsor-dialog" role="dialog" aria-label="Send to sponsor">
+                  <div class="sponsor-title">Send {{ sponsorSend.row.name }}</div>
+                  <label class="sponsor-label" for="vatc-sponsor-search">Sponsor</label>
+                  <ng-container *ngIf="!sponsorSend.locked">
+                    <div class="sponsor-search">
+                      <mat-icon aria-hidden="true">search</mat-icon>
+                      <input id="vatc-sponsor-search" data-testid="vatc-sponsor-search" type="text" placeholder="Search by name" autocomplete="off"
+                        [(ngModel)]="sponsorSend.search" (ngModelChange)="filterSponsors()">
+                    </div>
+                    <div class="sponsor-options" *ngIf="sponsorSend.matches.length">
+                      <button class="sponsor-option" data-testid="vatc-sponsor-option" type="button" *ngFor="let option of sponsorSend.matches; trackBy: trackByProfileId" (click)="pickSponsor(option)">{{ option.name }}</button>
+                    </div>
+                    <div class="sponsor-help">You can change the sponsor until the first sponsor form is sent.</div>
+                  </ng-container>
+                  <ng-container *ngIf="sponsorSend.locked">
+                    <div class="sponsor-locked" data-testid="vatc-sponsor-locked"><mat-icon aria-hidden="true">lock</mat-icon><span>{{ sponsorSend.search }}</span></div>
+                    <div class="sponsor-help">Locked: a form was already sent to {{ sponsorSend.search }}.</div>
+                  </ng-container>
+                  <div class="sponsor-actions">
+                    <button data-testid="vatc-sponsor-cancel" mat-stroked-button type="button" (click)="sponsorSend = null">Cancel</button>
+                    <button data-testid="vatc-sponsor-send" mat-flat-button color="primary" type="button" [disabled]="!sponsorSend.sponsorid" (click)="confirmSponsorSend()">Send to sponsor</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Review log — EI Solution only (plan 2026-10-24): internal notes; add + soft delete for the involved
+                 specialists (author / implementation agent) and mentor / admin / developer roles -->
+            <div class="vp-card review-card nonprintable" data-testid="vatc-review-card" *ngIf="isEIModel(atcData['product'])">
+              <div class="review-head">
+                <div>
+                  <div class="vp-card-title">Review log</div>
+                  <p class="review-note">Internal notes after any appointment. Reviews can't be edited; a deleted review is hidden, not erased.</p>
+                </div>
+                <span class="review-tag">Hidden in the participant app</span>
+              </div>
+              <div class="review-composer">
+                <span class="review-avatar">{{ initialsOf(myReviewerName) }}</span>
+                <div class="review-compose-body">
+                  <textarea data-testid="vatc-review-text" class="review-textarea" rows="3" placeholder="What happened since the last review? Progress, blockers, next focus" [(ngModel)]="reviewDraft[atc.id]" (ngModelChange)="reviewError[atc.id] = null"></textarea>
+                  <div class="review-compose-actions">
+                    <button data-testid="vatc-review-add" mat-flat-button class="review-add-btn" [disabled]="reviewBusy[atc.id]" (click)="addReview(atc)">Add review</button>
+                    <span class="review-saved-as">Saved as {{ myReviewerName }} · today</span>
+                  </div>
+                  <span data-testid="vatc-review-error" class="review-error" *ngIf="reviewError[atc.id]">{{ reviewError[atc.id] }}</span>
+                </div>
+              </div>
+              <p data-testid="vatc-review-empty" class="review-empty" *ngIf="reviewRows(atc).length == 0">No reviews yet. Add the first one after the next appointment.</p>
+              <div class="review-row" data-testid="vatc-review-row" [class.review-deleted]="review.isdelete" *ngFor="let review of reviewRows(atc); trackBy: trackByReviewId">
+                <span class="review-avatar">{{ initialsOf(reviewerName(review.createdby)) }}</span>
+                <div class="review-body">
+                  <div class="review-meta">
+                    <span class="review-name">{{ reviewerName(review.createdby) }}</span>
+                    <span class="review-date">{{ reviewLogDate(review.createdon) | date:'medium' }}</span>
+                    <span class="review-deleted-tag" *ngIf="review.isdelete">Deleted</span>
+                  </div>
+                  <span class="review-text" data-testid="vatc-review-note">{{ review.note }}</span>
+                  <div class="review-confirm" data-testid="vatc-review-confirm" *ngIf="reviewConfirm[atc.id] == review.id">
+                    <span>Delete this review? It's hidden from the log but kept on the ATC.</span>
+                    <button data-testid="vatc-review-cancel" mat-stroked-button (click)="reviewConfirm[atc.id] = null">Cancel</button>
+                    <button data-testid="vatc-review-confirm-delete" mat-flat-button class="review-delete-btn" [disabled]="reviewBusy[atc.id]" (click)="confirmDeleteReview(atc, review)">Delete</button>
+                  </div>
+                </div>
+                <button data-testid="vatc-review-delete" mat-button class="review-delete-link" *ngIf="!review.isdelete && reviewConfirm[atc.id] != review.id" (click)="reviewConfirm[atc.id] = review.id">Delete</button>
+                <button data-testid="vatc-review-undelete" mat-button class="review-delete-link" *ngIf="review.isdelete" [disabled]="reviewBusy[atc.id]" (click)="restoreReview(atc, review)">Undelete</button>
+              </div>
+              <div class="review-show-deleted" *ngIf="reviewDeletedCount(atc) > 0">
+                <mat-checkbox data-testid="vatc-review-show-deleted" [(ngModel)]="reviewShowDeleted[atc.id]">Show deleted ({{ reviewDeletedCount(atc) }})</mat-checkbox>
+              </div>
+            </div>
+
+            <!-- Ask · area of focus (EI Solution) / WiSH outcomes — only when the ATC has them (prototype) -->
+            <div class="template-card" data-testid="vatc-ask-card" *ngIf="templateRows(atc).ask.length != 0">
+              <div class="template-title">Ask · area of focus</div>
+              <div class="template-row" data-testid="vatc-ask-row" *ngFor="let ask of templateRows(atc).ask; let k = index; trackBy: trackByIndex">
+                <span class="template-no">{{ k + 1 }}</span><span class="template-key">{{ askLabel(ask.askedby) }}</span><span>{{ ask.askedfor }}</span>
+              </div>
+            </div>
+            <div class="template-card" data-testid="vatc-outcome-card" *ngIf="templateRows(atc).outcomes.length != 0">
+              <div class="template-title">WiSH outcomes</div>
+              <div class="template-row" data-testid="vatc-outcome-row" *ngFor="let outcome of templateRows(atc).outcomes; let k = index; trackBy: trackByIndex">
+                <span class="template-no">{{ outcomeNumber(k) }}</span><span class="template-key">{{ outcome.outcomearea }}</span><span>{{ outcome.outcomeexpected }}</span>
+              </div>
+            </div>
+
             <!-- Bulk Change Agent: one row per assigned_to activity, each with its own Submit; acts on this ATC's loaded procedures that are not deleted or completed -->
             <div data-testid="vatc-bulk-box" *ngIf="mapATCtranscription[atc.id]['transcription'].length != 0" class="bulk-agent-box nonprintable">
               <div class="bulk-agent-title">Assign Change Agent — all open procedures</div>
@@ -312,6 +508,9 @@
               <label data-testid="vatc-bulk-note" class="bulk-agent-note">{{isBulkReady(atc.id) ? 'Applies to ' + bulkEligibleProcedures(atc.id).length + ' procedures (skips deleted and completed)' : 'Loading procedures…'}}</label>
             </div>
 
+            <!-- Adjustments and procedures (prototype card) -->
+            <div class="vp-card" *ngIf="mapATCtranscription[atc.id]['transcription'].length != 0">
+            <div class="vp-card-title">Adjustments and procedures</div>
             <div *ngFor="let transcription of mapATCtranscription[atc.id]['transcription']; let j = index; trackBy: trackByAdjustmentID" class="transcription-item" [attr.data-testid]="'vatc-adj-' + j">
               <div *ngIf="transcription.adjustment.data() as adjustmentData">
                 <div [ngClass]="{'deleteStyle' : adjustmentData['isdelete'], 'nonprintable': adjustmentData['isdelete']}" class="adjustment-container">
@@ -447,8 +646,11 @@
               </div>
             </div>
 
+            </div>
+
             <!-- ATC Notes -->
             <div class="comment-container nonprintable" *ngIf="![null, undefined].includes(atcData['mentoringid']) || ![null, undefined].includes(atcData['notesid'])">
+              <div class="vp-card-title">Notes</div>
               <div *ngIf="mapATCnotes[atcData['mentoringid']] as mentoringData">
                 <label><b class="font-italic">Mentoring Notes:</b> {{mentoringData["mentoringnote"]}}</label>
               </div>
@@ -490,3 +692,6 @@
     </mat-list>
   </div>
 </div>
+
+<!-- ATC forms: read-only view of a submitted form (the participant forms screen's overlay, reused as is) -->
+<app-form-overlay-view #formOverlay />

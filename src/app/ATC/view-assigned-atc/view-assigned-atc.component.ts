@@ -169,7 +169,8 @@ export class ViewAssignedATCComponent {
   private loadReferenceData(): void {
     // Load user roles
     var roleCollection = collection(this.firestoreDefault, "users_roles")
-    var roleQuery = query(roleCollection, or(where("changeagent", "==", true), where("eis", "==", true), where("ah", "==", true), where("admin", "==", true)))
+    var roleQuery = query(roleCollection, orderBy("name"))
+    // or(where("changeagent", "==", true), where("eis", "==", true), where("ah", "==", true), where("admin", "==", true))
     collectionData(roleQuery).pipe(takeUntil(this.metaSubscription)).subscribe(userRoles => {
       var nameList = [];
       var changeAgent = []

@@ -19,6 +19,8 @@ import { MatInputModule } from '@angular/material/input';
 import { provideNativeDateAdapter } from '@angular/material/core';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatTimepickerModule } from '@angular/material/timepicker';
+import { timeToDate, timeToString } from '../../shared/time-value';
+import { sliderLabel as labelOf, sliderPosition } from '../../shared/slider-value';
 import { AuthguardService } from '../../authguard.service';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
 import { FormOptionComponent } from '../../Product Designer/delivery-set/form-option/form-option.component';
@@ -320,8 +322,14 @@ export class FormAssignmentComponent {
             if(!['label','video','audio'].includes(element['type'])){
               element['formcontrol']=`control${n}`
               n++
-              if(!['array','date'].includes(element['type'])){
+              if(!['array','date','time','slider'].includes(element['type'])){
                 this.deliveryForm.get(element['formcontrol']).patchValue(element['value'] ?? null)
+              }else if(element['type'] == 'slider'){
+                // outside the list (an older 1-based or 1-10 answer) → the nearest option
+                this.deliveryForm.get(element['formcontrol']).patchValue(sliderPosition(element['options'], element['value']))
+              }else if(element['type'] == 'time'){
+                // stored as "HH:mm"; matTimepicker needs a Date
+                this.deliveryForm.get(element['formcontrol']).patchValue(timeToDate(element['value']))
               }else if(element['type'] == 'date'){
                 this.deliveryForm.get(element['formcontrol']).patchValue(element['value'] != undefined && element['value'] != null ? element['value']?.toDate() : null)
               }else if(element['type'] == 'array'){
@@ -440,6 +448,21 @@ export class FormAssignmentComponent {
     return fieldcontrol
   }
 
+
+  // The drag bubble and the summary line show the OPTION, not the index. labelFor is memoised because
+  // mat-slider's displayWith is an @Input: handing it a new closure on every change-detection pass would
+  // re-set the input each cycle.
+  private sliderFormatters = new Map<any, (v: number) => string>();
+  labelFor(options: any): (v: number) => string {
+    if (!this.sliderFormatters.has(options)) {
+      this.sliderFormatters.set(options, (v: number) => labelOf(options, v));
+    }
+    return this.sliderFormatters.get(options);
+  }
+  sliderLabel(options: any, value: any): string {
+    return labelOf(options, value);
+  }
+
   onMultiSelectionChange(event:MatSelectionListChange,formcontrol:string,formobj:any,index:number){
     if(this.submittedClientForm.formarray[index]['flipping'] === true){
       this.submittedClientForm.formarray[index]['flippingquestion']['value'] = this.submittedClientForm.formarray[index]['flippingquestion']['value'] || {}
@@ -548,7 +571,13 @@ export class FormAssignmentComponent {
     for (let i = 0; i < this.submittedClientForm.formarray.length; i++) {
       const element = this.submittedClientForm.formarray[i];
       if (!['label', 'video', 'audio'].includes(element['type'])) {
-        element["value"] = (value[`control${n}`] !== undefined && value[`control${n}`] !== null) 
+        // SUBMIT path. The draft path (_performAutoSave) converts a time the same way; this one is the
+        // one that writes formsByClient, and it used to copy the matTimepicker's Date straight through —
+        // so every submitted answer was a Timestamp while its draft was "HH:mm". Every reader normalises,
+        // which is why nothing looked wrong on screen and only a raw document read caught it.
+        element["value"] = element['type'] === 'time'
+          ? timeToString(value[`control${n}`])
+          : (value[`control${n}`] !== undefined && value[`control${n}`] !== null)
           ? value[`control${n}`] : null;
         n++;
       }
@@ -813,7 +842,10 @@ export class FormAssignmentComponent {
         
         if (!['label', 'video', 'audio'].includes(element['type'])) {
           console.log(value[`control${e}`]);
-          element["value"] = (value[`control${e}`] !== undefined && value[`control${e}`] !== null) 
+          // a time control hands back a Date; "HH:mm" is what goes in the database
+          element["value"] = element['type'] === 'time'
+            ? timeToString(value[`control${e}`])
+            : (value[`control${e}`] !== undefined && value[`control${e}`] !== null)
             ? value[`control${e}`] : null;
           e++;
         }
@@ -895,7 +927,15 @@ export class FormAssignmentComponent {
                 h++;
                 console.log("flipping",element,element['flipping'])
                 // Handle different field types
-                if (!['array', 'date'].includes(element['type'])) {
+                if (element['type'] === 'time') {
+                  // stored as "HH:mm"; matTimepicker needs a Date
+                  this.deliveryForm.get(element['formcontrol'])?.patchValue(timeToDate(element['value']));
+
+                } else if (element['type'] === 'slider') {
+                  // outside the list (an older 1-based or 1-10 answer) → the nearest option
+                  this.deliveryForm.get(element['formcontrol'])?.patchValue(sliderPosition(element['options'], element['value']));
+
+                } else if (!['array', 'date'].includes(element['type'])) {
                   // Regular form controls
                   this.deliveryForm.get(element['formcontrol'])?.patchValue(element['value'] ?? null);
                   if(element['flipping'] === true){

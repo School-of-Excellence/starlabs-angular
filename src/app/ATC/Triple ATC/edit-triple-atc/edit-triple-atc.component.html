@@ -18,8 +18,8 @@
     <label>{{reportATC.date | date}}</label>
     <br>
     <label class="highlight">ATC Directive:</label>
-    <label>{{reportATC.directive == null ? "Directive not provided" : reportATC.directive}}</label>
-    <button class="ms-3" mat-stroked-button (click)="editDirective()">Edit</button>
+    <label data-testid="tre-directive">{{reportATC.directive == null ? "Directive not provided" : reportATC.directive}}</label>
+    <button data-testid="tre-directive-btn" class="ms-3" mat-stroked-button (click)="editDirective()">Edit</button>
 
   </div>
   <div>
@@ -37,14 +37,14 @@
       <div class="mt-2">
         <label class="fw-bold"><u>Perceptual Position {{a+1}}:&nbsp;</u></label><label>{{atc['position']}}</label>
       </div>
-      <div *ngFor="let prescription of atc['atc']; let i = index">
+      <div *ngFor="let prescription of atc['atc']; let i = index" data-testid="tre-adj" [attr.data-pos]="a" [attr.data-adj]="i">
         <div class="flexbox">
           <div class="adjustmentbox">
             <div *ngIf="!prescription.newadjustment">
-              <label [ngClass]="prescription.adjustmentdelete ? 'strikeDelete' : null">{{prescription.adjustmentedit}}</label>
-              <button mat-icon-button class="editbtn" (click)="editAdjustment(a, i); autoSave()"><mat-icon>edit</mat-icon></button>
+              <label data-testid="tre-adj-text" [ngClass]="prescription.adjustmentdelete ? 'strikeDelete' : null">{{prescription.adjustmentedit}}</label>
+              <button data-testid="tre-adj-edit" mat-icon-button class="editbtn" (click)="editAdjustment(a, i); autoSave()"><mat-icon>edit</mat-icon></button>
               <br>
-              <button mat-button [ngClass]="prescription.adjustmentdelete ? 'deletedbtn' : 'todeletebtn'" (click)="onAdjustmentUpdate(a, i); autoSave()">
+              <button data-testid="tre-adj-delete" mat-button [ngClass]="prescription.adjustmentdelete ? 'deletedbtn' : 'todeletebtn'" (click)="onAdjustmentUpdate(a, i); autoSave()">
                 {{prescription.adjustmentdelete ? 'Deleted' : 'Delete Adjustment Completely'}}
               </button>
             </div>
@@ -55,7 +55,7 @@
               </button>
             </div>
             <div class="mt-2" *ngIf="roles['mentor'] && !this.bigActivity()">
-              <mat-checkbox [(ngModel)]="prescription.selected">Pick this Adjustment for Final ATC</mat-checkbox><br>
+              <mat-checkbox data-testid="tre-pick" [(ngModel)]="prescription.selected">Pick this Adjustment for Final ATC</mat-checkbox><br>
               <textarea class="adjustmenttextarea" [(ngModel)]="prescription.comment" placeholder="Write your comment here..."></textarea>
             </div>
           </div>
@@ -63,7 +63,7 @@
             <div class="proceduredata" *ngFor="let procedure of prescription.procedure; let j = index">
               <div *ngIf="!procedure.newprocedure">
                 <label [ngClass]="procedure.proceduredelete ? 'strikeDelete' : null">- {{procedure.name}}</label>
-                <button mat-icon-button (click)="onProcedureUpdated(a, i, j); autoSave()">
+                <button data-testid="tre-proc-toggle" mat-icon-button (click)="onProcedureUpdated(a, i, j); autoSave()">
                   <mat-icon class="deleteicon" *ngIf="procedure.proceduredelete">remove_circle</mat-icon>
                   <mat-icon class="deleteicon" *ngIf="!procedure.proceduredelete">remove_circle_outline</mat-icon>
                 </button>
@@ -221,11 +221,11 @@
   </div> -->
 
   <div *ngIf="!this.bigActivity()" class="submitarea">
-    <button *ngIf="!uploading" mat-stroked-button class="submitbtn" (click)="submit()">{{roles["mentor"] ? "Update Triple ATC and Pick Selected Adjustment for Final ATC" : "Update Triple ATC"}}</button>
+    <button data-testid="tre-submit" *ngIf="!uploading" mat-stroked-button class="submitbtn" (click)="submit()">{{roles["mentor"] ? "Update Triple ATC and Pick Selected Adjustment for Final ATC" : "Update Triple ATC"}}</button>
     <div *ngIf="!uploading && roles['mentor']">
       <br>
       <label>OR</label><br>
-      <button mat-stroked-button class="submitbtn" (click)="pickForFinalATC()">Pick selected Adjustments for Final ATC</button>
+      <button data-testid="tre-pick-final" mat-stroked-button class="submitbtn" (click)="pickForFinalATC()">Pick selected Adjustments for Final ATC</button>
     </div>
     <mat-progress-bar *ngIf="uploading" mode="indeterminate"></mat-progress-bar>
   </div>
@@ -277,7 +277,7 @@
   <div *ngIf="!uploading" class="text-center">
     <button mat-stroked-button class="submitbtn me-3" (click)="finalATCmode = false">Go Back to Triple ATC</button>
     OR
-    <button mat-stroked-button class="submitbtn ms-3" (click)="createFinalATC()">Create Final ATC</button>
+    <button data-testid="tre-create-final" mat-stroked-button class="submitbtn ms-3" (click)="createFinalATC()">Create Final ATC</button>
   </div>
   <mat-progress-bar *ngIf="uploading" mode="indeterminate"></mat-progress-bar>
 </div>

@@ -16,6 +16,7 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { AuthguardService } from '../../authguard.service';
 import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
+import { IconOptionsPipe, ProfileIndex, ProfileOption, ProfileOptionsPipe } from './option-pipes';
 
 @Component({
   selector: 'app-createroutedialog',
@@ -34,7 +35,9 @@ import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/pr
     MatProgressSpinner,
     MatButtonToggleModule,
     NgxMatSelectSearchModule,
-    ProfilePictureComponent
+    ProfilePictureComponent,
+    ProfileOptionsPipe,
+    IconOptionsPipe
   ],
   templateUrl: './createroutedialog.component.html',
   styleUrl: './createroutedialog.component.css'
@@ -58,6 +61,11 @@ export class CreateroutedialogComponent {
   roleList = [];
   profilesList = [];
   profilesMap: any = {}
+  profileIndex: ProfileIndex = { list: [], byId: new Map() };
+  // Full option lists render only once a panel has been opened (see option-pipes.ts)
+  mainIconOpened = false;
+  mainProfilesOpened = false;
+  saving = false;
   // allRoutes: string[] = [];
   allRoutes: Map<string, string> = new Map();
   editingRoutes: string[] = [];
@@ -84,6 +92,7 @@ export class CreateroutedialogComponent {
     })
     this.authguard.getProfileMap().then((map) => {
       this.profilesMap = map.docdata;
+      this.profileIndex = this.buildProfileIndex(map.docdata);
     }).catch(error => console.log(error))
     console.log(this.data, 'consoling route dialog');
     this.data?.fullData?.forEach((doc: any) => {
@@ -149,7 +158,7 @@ export class CreateroutedialogComponent {
 
   }
 
-  children: { label: string; route: string; icon: string; roles: string[]; profileid: []; showInSidenav: boolean, profileSearch: string; }[] = [
+  children: { label: string; route: string; icon: string; roles: string[]; profileid: []; showInSidenav: boolean, profileSearch: string; iconOpened?: boolean; profilesOpened?: boolean; }[] = [
     { label: '', route: '', icon: '', roles: [], profileid: [], showInSidenav: null, profileSearch: '' }
   ];
 
@@ -236,6 +245,7 @@ export class CreateroutedialogComponent {
   }
 
   async save() {
+    if (this.saving) return;
     this.errorMessage = '';
 
     if (!this.isMainValid) {
@@ -336,6 +346,7 @@ export class CreateroutedialogComponent {
 
     console.log('dashboard data', mainRoute)
 
+    this.saving = true;
     try {
       const dashboardCollection = collection(this.firestore, 'dashboard');
 
@@ -349,6 +360,8 @@ export class CreateroutedialogComponent {
       this.dialogRef.close();
     } catch (error) {
       this.errorMessage = 'An error occurred while saving. Please try again.';
+    } finally {
+      this.saving = false;
     }
   }
   close() {
@@ -363,6 +376,27 @@ export class CreateroutedialogComponent {
       .join(', ');
   }
 
+  /** One pass over the cached profile map; avatars use the photo from here instead of one Firestore query each. */
+  private buildProfileIndex(docdata: any): ProfileIndex {
+    const list: ProfileOption[] = Object.keys(docdata || {}).map(id => {
+      const d = docdata[id] || {};
+      const name = d.name || '';
+      const email = d.email || '';
+      let photo = '';
+      if (d.profile && !String(d.profile).includes('profile-image-png-14')) {
+        photo = d.profile;
+      } else if (d.profileimg) {
+        photo = d.profileimg;
+      }
+      return { id, name, email, haystack: `${name} ${email}`.toLowerCase(), photo };
+    });
+    return { list, byId: new Map(list.map(p => [p.id, p])) };
+  }
+
+  trackProfile(_: number, o: { p: ProfileOption }) {
+    return o.p.id;
+  }
+
   getProfileFields(profileId: string, key: string) {
     const profile = this.profilesMap[profileId];
     if (profile && Object.prototype.hasOwnProperty.call(profile, key)) {
@@ -371,21 +405,9 @@ export class CreateroutedialogComponent {
     return '';
   }
 
-  getProfileIds() {
-    return Object.keys(this.profilesMap);
-  }
 
   getInitials(profileId: string): string {
     const name = this.profilesMap[profileId]?.name;
     return name ? name.split(' ').map((n: string) => n[0]).join('').toUpperCase() : '';
-  }
-
-  filterProfilesIds(searchText: string, profileId: string): boolean {
-    const text = (searchText || '').toLowerCase();
-    if (text === '') return true;
-    return (
-      this.getProfileFields(profileId, 'name').toLowerCase().includes(text) ||
-      this.getProfileFields(profileId, 'email').toLowerCase().includes(text)
-    );
   }
 }

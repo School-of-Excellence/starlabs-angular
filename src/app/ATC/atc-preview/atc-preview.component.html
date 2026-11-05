@@ -20,11 +20,11 @@
           <div class="participant-details">
             <div class="info-item">
               <span class="info-label">Name</span>
-              <span class="info-value">{{reportATC.profile_name}}</span>
+              <span data-testid="pva-participant" class="info-value">{{reportATC.profile_name}}</span>
             </div>
             <div class="info-item">
               <span class="info-label">Product</span>
-              <span class="info-value">{{reportATC.product || 'Not specified'}}</span>
+              <span data-testid="pva-product" class="info-value">{{reportATC.product || 'Not specified'}}</span>
             </div>
             <div class="info-item">
               <span class="info-label">Prescribed Date</span>
@@ -39,10 +39,36 @@
     <section class="preview-card" *ngIf="reportATC.directive">
       <div class="card-header">
         <mat-icon class="header-icon">description</mat-icon>
-        <h2 class="card-title">ATC Directive</h2>
+        <h2 class="card-title">{{ isWiSHModel(reportATC.product) ? 'Immediate outcome' : 'ATC Directive' }}</h2>
       </div>
       <div class="card-body">
-        <p class="directive-text">{{reportATC.directive}}</p>
+        <p data-testid="pva-directive" class="directive-text">{{reportATC.directive}}</p>
+      </div>
+    </section>
+
+    <!-- Ask · area of focus (EI Solution) — only when the ATC has asks -->
+    <section class="preview-card" data-testid="pva-ask-card" *ngIf="(reportATC.atcData?.['ask'] || []).length != 0">
+      <div class="card-header">
+        <mat-icon class="header-icon">record_voice_over</mat-icon>
+        <h2 class="card-title">Ask · area of focus</h2>
+      </div>
+      <div class="card-body">
+        <div class="template-row" data-testid="pva-ask-row" *ngFor="let ask of reportATC.atcData['ask']; let k = index">
+          <span class="template-no">{{ k + 1 }}</span><span class="template-key">{{ askLabel(ask.askedby) }}</span><span>{{ ask.askedfor }}</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- WiSH outcomes — only when the ATC has them -->
+    <section class="preview-card" data-testid="pva-outcome-card" *ngIf="(reportATC.atcData?.['outcomes'] || []).length != 0">
+      <div class="card-header">
+        <mat-icon class="header-icon">flag</mat-icon>
+        <h2 class="card-title">WiSH outcomes</h2>
+      </div>
+      <div class="card-body">
+        <div class="template-row" data-testid="pva-outcome-row" *ngFor="let outcome of reportATC.atcData['outcomes']; let k = index">
+          <span class="template-no">{{ outcomeNumber(k) }}</span><span class="template-key">{{ outcome.outcomearea }}</span><span>{{ outcome.outcomeexpected }}</span>
+        </div>
       </div>
     </section>
 
@@ -76,7 +102,7 @@
         <div *ngFor="let prescription of reportATC.transcription; let i = index" class="adjustment-item">
           <div class="adjustment-header" [class.deleted]="prescription.adjustmentdelete">
             <span class="adjustment-number">{{i + 1}}</span>
-            <h3 class="adjustment-title" [class.strikethrough]="prescription.adjustmentdelete">
+            <h3 data-testid="pva-adj-title" class="adjustment-title" [class.strikethrough]="prescription.adjustmentdelete">
               {{prescription.adjustment}}
             </h3>
             <span *ngIf="prescription.adjustmentdelete" class="deleted-badge">Deleted</span>
@@ -99,7 +125,7 @@
               <mat-icon class="procedure-icon">
                 {{procedure.proceduredelete ? 'cancel' : (procedure.completed ? 'check_circle' : 'radio_button_unchecked')}}
               </mat-icon>
-              <span class="procedure-name" [class.strikethrough]="procedure.proceduredelete">{{procedure.name}}</span>
+              <span data-testid="pva-proc-name" class="procedure-name" [class.strikethrough]="procedure.proceduredelete">{{procedure.name}}</span>
               <span *ngIf="procedure.mandatory" class="badge mandatory-badge">Mandatory</span>
               <span *ngIf="procedure.completed" class="badge completed-badge">Completed</span>
             </div>
@@ -159,7 +185,7 @@
     </section>
 
     <!-- Notes Card -->
-    <section class="preview-card" *ngIf="existingNotes && (existingNotes['consultationsummary'] || existingNotes['consultationpoint'] || existingNotes['notes'])">
+    <section data-testid="pva-notes" class="preview-card" *ngIf="existingNotes && (existingNotes['consultationsummary'] || existingNotes['consultationpoint'] || existingNotes['notes'])">
       <div class="card-header">
         <mat-icon class="header-icon">notes</mat-icon>
         <h2 class="card-title">Notes</h2>
@@ -192,6 +218,7 @@
         <mat-form-field appearance="outline" class="notes-field">
           <mat-label>Enter your notes here</mat-label>
           <textarea 
+            data-testid="pva-action-notes"
             matInput 
             [(ngModel)]="actionNotes" 
             rows="5" 
@@ -204,6 +231,7 @@
           <button 
             mat-raised-button 
             class="rework-button" 
+            data-testid="pva-rework"
             (click)="onRework()"
             [disabled]="processing || !actionNotes.trim()">
             <mat-icon>refresh</mat-icon>
@@ -213,6 +241,7 @@
           <button 
             mat-raised-button 
             class="completed-button" 
+            data-testid="pva-activity-completed"
             (click)="onCompletedActivity()"
             [disabled]="processing || !actionNotes.trim()">
             <mat-icon>check_circle</mat-icon>
@@ -222,6 +251,7 @@
           <button 
             mat-raised-button 
             class="completed-button" 
+            data-testid="pva-atc-validated"
             (click)="onCompletedATC()"
             [disabled]="processing || !actionNotes.trim()">
             <mat-icon>check_circle</mat-icon>

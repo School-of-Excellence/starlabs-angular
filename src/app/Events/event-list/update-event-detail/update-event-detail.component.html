@@ -1,4 +1,4 @@
-<div *ngIf="loading" class="loading-container">
+<!-- <div *ngIf="loading" class="loading-container">
     <mat-progress-spinner [diameter]="60" strokeWidth="4" mode="indeterminate"></mat-progress-spinner>
     <span class="loading-text">Fetching Data...</span>
 </div>
@@ -109,7 +109,6 @@
                     <br>
                     <div class="arena-section" formArrayName="products">
                     
-                        <!-- Section Header -->
                         <div class="arena-section-header">
                             <mat-icon class="section-icon">event</mat-icon>
                             <span class="section-title">Manage Arena Events</span>
@@ -118,10 +117,8 @@
                             </button>
                         </div>
                     
-                        <!-- Event Items -->
                         <div class="event-list">
                             <div class="event-card" *ngFor="let control of productsArray.controls; let i = index" [formGroupName]="i">
-                                <!-- Card Header -->
                                 <div class="event-card-header">
                                     <span class="event-index">Event {{ i + 1 }}</span>
                                     <mat-slide-toggle *ngIf="control.value['deliveryref'] != null" data-testid="ued-product-delete-toggle" formControlName="delete" color="warn"
@@ -135,7 +132,6 @@
                                     </button>
                                 </div>
                     
-                                <!-- Basic Info Row -->
                                 <div class="event-card-body">
                                     <div class="field-row">
                                         <mat-form-field class="inputfields" appearance="outline">
@@ -170,7 +166,6 @@
                                         </div>
                                     </div>
                     
-                                    <!-- Image Upload -->
                                     <div class="image-upload-container"
                                         [class.has-image]="productImages[i]?.previewurl != null || productImages[i]?.url != null">
                                         <label class="image-upload-label">
@@ -207,7 +202,6 @@
                                         </div>
                                     </div>
                     
-                                    <!-- Eligibility Section -->
                                     <div class="eligibility-section" formGroupName="eligibility">
                                         <div class="subsection-label">
                                             <mat-icon>filter_alt</mat-icon> Eligibility
@@ -254,7 +248,6 @@
                                                 (change)="onCustomerStatsChange('non active', i, $event.checked)">Non Active</mat-checkbox>
                                         </div>
                     
-                                        <!-- Consumed Products -->
                                         <div class="consumed-products-section">
                                             <div class="subsection-label">
                                                 <mat-icon>shopping_cart</mat-icon> Consumed Products
@@ -308,7 +301,6 @@
                                     </div>
                                 </div>
                     
-                                <!-- Delivery Sequence Preview -->
                                 <div class="delivery-preview" *ngIf="control.value['productref'] != undefined">
                                     <mat-divider></mat-divider>
                                     <div class="delivery-preview-body">
@@ -363,14 +355,6 @@
                         <label>Updating Event...</label>
                     </div>
 
-                    <!-- <label for="fileupload">Event Display Upload :</label>&nbsp;&nbsp;
-                    <input #fileupload type="file" accept="image/png" (change)="uploadImage($event)"
-                        [disabled]="eventimage.previewurl != null || eventimage.url != null">
-                    <div *ngIf="eventimage.previewurl != null || eventimage.url != null" style="display:flex;flex-direction: column;">
-                        <img [src]="eventimage.previewurl || eventimage.url" alt="" height="200" width="310">
-                        <button mat-stroked-button type="button" (click)="onImageRemove()">Remove Image</button>
-                    </div> -->
-
                     <div class="image-upload-container" [class.has-image]="eventimage.previewurl != null || eventimage.url != null">
                         <label class="image-upload-label">
                             <mat-icon>image</mat-icon>
@@ -405,6 +389,603 @@
                     <div class="d-flex justify-content-center">
                         <button class="buttons submtbtn" *ngIf="!loading" mat-stroked-button type="submit" data-testid="ued-save" [disabled]="loading" (click)="saveEventDetail(eventform.getRawValue())">{{(capturedData['edit'] ? "Update" : "Create")}} Event Data</button>
                     </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div> -->
+
+<div *ngIf="loading" class="loading-container">
+    <mat-progress-spinner [diameter]="60" strokeWidth="4" mode="indeterminate"></mat-progress-spinner>
+    <span class="loading-text">Fetching Data...</span>
+</div>
+
+<div class="container">
+    <div *ngIf="!loading">
+
+        <!-- ================= HEADER ================= -->
+        <header class="header">
+            <div class="head-text">
+                <span class="crumb">Events</span>
+                <h1 class="title">{{ (capturedData['edit'] ? "Edit" : "Create") + " Event" }}</h1>
+            </div>
+            <button mat-icon-button class="close-button" data-testid="ued-close" mat-dialog-close aria-label="Close">
+                <mat-icon>close</mat-icon>
+            </button>
+        </header>
+
+        <main class="main-content">
+            <div class="createevent" [formGroup]="eventform">
+                <div class="cgrid">
+
+                    <!-- ================= LEFT : FORM ================= -->
+                    <div class="cmain">
+
+                        <!-- 1 · EVENT DETAILS -->
+                        <section class="csec">
+                            <h2 class="sec-title"><span class="n">1</span>Event details</h2>
+
+                            <div class="g2">
+                                <div class="f" #rName>
+                                    <mat-form-field class="inputfields" appearance="outline">
+                                        <mat-label>Event Name</mat-label>
+                                        <input matInput data-testid="ued-eventname" formControlName="eventname"
+                                            placeholder="e.g. uP! Live Event — Chennai"
+                                            (input)="!capturedData['edit'] ? generateToken() : null">
+                                        <mat-error *ngIf="eventform.get('eventname').hasError('required')">
+                                            Event Name <strong>Required</strong>
+                                        </mat-error>
+                                    </mat-form-field>
+                                </div>
+
+                                <div class="f" #rAtc>
+                                    <mat-form-field class="inputfields" appearance="outline">
+                                        <mat-label>ATC Model</mat-label>
+                                        <mat-select data-testid="ued-atcmodel" formControlName="atcmodel">
+                                            <mat-option *ngFor="let member of atcModelList" [value]="member.atcmodel">{{ member.atcmodel | uppercase }}</mat-option>
+                                        </mat-select>
+                                        <mat-error *ngIf="eventform.get('atcmodel').hasError('required')">
+                                            ATC Model <strong>Required</strong>
+                                        </mat-error>
+                                    </mat-form-field>
+                                </div>
+                            </div>
+
+                            <div class="f" #rDesc>
+                                <mat-form-field class="inputfields" appearance="outline">
+                                    <mat-label>Event Description</mat-label>
+                                    <textarea matInput data-testid="ued-description" cdkTextareaAutosize
+                                        cdkAutosizeMinRows="2" cdkAutosizeMaxRows="4"
+                                        formControlName="description"></textarea>
+                                    <mat-error *ngIf="eventform.get('description').hasError('required')">
+                                        Description <strong>Required</strong>
+                                    </mat-error>
+                                </mat-form-field>
+                            </div>
+
+                            <div class="f">
+                                <mat-form-field class="inputfields" appearance="outline">
+                                    <mat-label>B!G Event Description</mat-label>
+                                    <textarea matInput data-testid="ued-bigdescription" cdkTextareaAutosize
+                                        cdkAutosizeMinRows="2" cdkAutosizeMaxRows="4"
+                                        formControlName="bigdescription"></textarea>
+                                    <mat-error *ngIf="eventform.get('bigdescription').hasError('required')">
+                                        B!G Event Description <strong>Required</strong>
+                                    </mat-error>
+                                </mat-form-field>
+                            </div>
+
+                            <!-- Event display image -->
+                            <div class="image-upload-container"
+                                [class.has-image]="eventimage.previewurl != null || eventimage.url != null"
+                                [class.is-pending]="eventimage.previewurl != null && eventimage.url == null"
+                                [class.is-uploaded]="eventimage.url != null">
+                                <label class="image-upload-label">
+                                    <mat-icon>image</mat-icon>
+                                    Event Display Image
+                                </label>
+
+                                <div class="file-input-wrapper">
+                                    <input #fileupload type="file" accept="image/png, image/jpeg, image/jpg"
+                                        data-testid="ued-event-image-upload" (change)="uploadImage($event)"
+                                        id="eventFileUpload">
+                                    <label for="eventFileUpload" class="file-input-button"
+                                        [class.disabled]="eventimage.previewurl != null || eventimage.url != null">
+                                        <mat-icon>cloud_upload</mat-icon>
+                                        <span>{{ eventimage.url != null ? 'Image Uploaded' : (eventimage.previewurl != null ? 'Image Selected' : 'Choose Image') }}</span>
+                                    </label>
+                                </div>
+
+                                <div *ngIf="eventimage.previewurl != null || eventimage.url != null" class="image-preview-container">
+                                    <div class="image-preview-wrapper event-image-preview" [class.is-pending]="eventimage.url == null">
+                                        <img [src]="eventimage.previewurl || eventimage.url" alt="Event Display Image">
+                                        <div class="upload-overlay" *ngIf="eventimage.url == null">
+                                            <mat-icon>schedule</mat-icon>
+                                            <span>Not uploaded yet</span>
+                                        </div>
+                                        <span class="image-badge" [class.pending]="eventimage.url == null">{{ eventimage.url != null ? 'Uploaded' : 'Preview only' }}</span>
+                                    </div>
+                                    <button mat-stroked-button type="button" class="remove-image-btn"
+                                        data-testid="ued-event-image-remove" (click)="onImageRemove()">
+                                        <mat-icon>delete</mat-icon>
+                                        Remove Image
+                                    </button>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- 2 · WHEN & WHERE -->
+                        <section class="csec">
+                            <h2 class="sec-title"><span class="n">2</span>When &amp; where</h2>
+
+                            <div class="g2">
+                                <div class="f" #rDates>
+                                    <mat-form-field class="inputfields" appearance="outline">
+                                        <mat-label>Event Date</mat-label>
+                                        <mat-date-range-input [rangePicker]="picker">
+                                            <input matStartDate data-testid="ued-startdate" placeholder="Start date"
+                                                (click)="picker.open()" formControlName="startdate">
+                                            <input matEndDate data-testid="ued-enddate" placeholder="End date"
+                                                (click)="picker.open()" formControlName="enddate">
+                                        </mat-date-range-input>
+                                        <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+                                        <mat-date-range-picker touchUi #picker></mat-date-range-picker>
+                                        <mat-error
+                                            *ngIf="eventform.get('startdate').hasError('required') || eventform.get('enddate').hasError('required')">
+                                            Event Date <strong>Required</strong>
+                                        </mat-error>
+                                    </mat-form-field>
+                                </div>
+
+                                <div class="f" #rLastReg>
+                                    <mat-form-field class="inputfields" appearance="outline">
+                                        <mat-label>Last Registration Date</mat-label>
+                                        <input matInput data-testid="ued-lastregdate"
+                                            formControlName="lastregistrationdate" [matDatepicker]="lrd">
+                                        <mat-datepicker-toggle matSuffix [for]="lrd"></mat-datepicker-toggle>
+                                        <mat-datepicker #lrd></mat-datepicker>
+                                        <mat-error *ngIf="eventform.get('lastregistrationdate').hasError('required')">
+                                            Last registration date <strong>Required</strong>
+                                        </mat-error>
+                                    </mat-form-field>
+                                </div>
+                            </div>
+
+                            <div class="g2">
+                                <div class="f" #rVenue>
+                                    <mat-form-field class="inputfields" appearance="outline">
+                                        <mat-label>Event Venue</mat-label>
+                                        <mat-select data-testid="ued-venue" formControlName="venue"
+                                            (selectionChange)="!capturedData['edit'] ? generateToken() : null">
+                                            <mat-option *ngFor="let place of venueList" [value]="place.location">{{ place.location }}</mat-option>
+                                        </mat-select>
+                                        <mat-error *ngIf="eventform.get('venue').hasError('required')">
+                                            Venue <strong>Required</strong>
+                                        </mat-error>
+                                    </mat-form-field>
+                                </div>
+
+                                <div class="f">
+                                    <app-auto-complete-with-chip data-testid="ued-marathon" label="Select Marathon"
+                                        [form]="eventform" controlName="bigmarathonref" [data]="bigMarathonList"
+                                        datatype="arrayofmap" displayname="title" valuetype="ref" valuelabel="ref"
+                                        [multiple]="false">
+                                    </app-auto-complete-with-chip>
+                                </div>
+                            </div>
+
+                            <div class="f" #rAddress>
+                                <mat-form-field class="inputfields" appearance="outline">
+                                    <mat-label>Event Address</mat-label>
+                                    <textarea matInput data-testid="ued-address" cdkTextareaAutosize
+                                        cdkAutosizeMinRows="1" cdkAutosizeMaxRows="4"
+                                        placeholder="Building, street, area"
+                                        formControlName="address"></textarea>
+                                    <mat-error *ngIf="eventform.get('address').hasError('required')">
+                                        Address <strong>Required</strong>
+                                    </mat-error>
+                                </mat-form-field>
+                            </div>
+                        </section>
+
+                        <!-- 3 · HOSTS -->
+                        <section class="csec">
+                            <h2 class="sec-title"><span class="n">3</span>Hosts</h2>
+
+                            <div class="f f-narrow" #rHosts>
+                                <mat-form-field class="inputfields" appearance="outline">
+                                    <mat-label>Hosts</mat-label>
+                                    <mat-select data-testid="ued-hosts" formControlName="hosts" multiple>
+                                        <mat-option *ngFor="let member of ahmemberList" [value]="member.profile">{{ member.name }}</mat-option>
+                                    </mat-select>
+                                    <mat-error *ngIf="eventform.get('hosts').hasError('required')">
+                                        Hosts <strong>Required</strong>
+                                    </mat-error>
+                                </mat-form-field>
+                            </div>
+                        </section>
+
+                        <!-- 4 · PUBLISHING -->
+                        <section class="csec">
+                            <h2 class="sec-title"><span class="n">4</span>Publishing</h2>
+
+                            <div class="g2">
+                                <div class="tgl2">
+                                    <div class="tgl-text">
+                                        <b>Add to calendar</b>
+                                        <span>Shows the event on participant calendars</span>
+                                    </div>
+                                    <mat-slide-toggle formControlName="addtocalendar" data-testid="ued-add-to-calendar"
+                                        aria-label="Add to Calendar"></mat-slide-toggle>
+                                </div>
+
+                                <div class="tgl2">
+                                    <div class="tgl-text">
+                                        <b>Notify participants</b>
+                                        <span>Sends a push notification when you save</span>
+                                    </div>
+                                    <mat-slide-toggle formControlName="notifyparticipants"
+                                        data-testid="ued-notify-participants"
+                                        aria-label="Notify Participants"></mat-slide-toggle>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- 5 · ARENA EVENTS -->
+                        <section class="csec arena-section" formArrayName="products">
+                            <div class="arena-section-header">
+                                <h2 class="sec-title"><span class="n">5</span>Arena events
+                                    <span class="count-pill">{{ productsArray.controls.length }}</span>
+                                </h2>
+                                <button class="add-event-btn" mat-stroked-button type="button"
+                                    data-testid="ued-add-arena-event" (click)="addproductsArray()">
+                                    <mat-icon>add</mat-icon> Add arena event
+                                </button>
+                            </div>
+
+                            <div class="empty-arena" *ngIf="productsArray.controls.length === 0">
+                                No arena events yet. Add one to offer a product inside this event.
+                            </div>
+
+                            <div class="event-list">
+                                <div class="event-card" *ngFor="let control of productsArray.controls; let i = index"
+                                    [formGroupName]="i" [class.is-deleted]="control.value['delete']">
+
+                                    <!-- Card header -->
+                                    <div class="event-card-header">
+                                        <span class="event-index">Arena event {{ i + 1 }}</span>
+                                        <mat-slide-toggle *ngIf="control.value['deliveryref'] != null"
+                                            data-testid="ued-product-delete-toggle" formControlName="delete"
+                                            color="warn" class="delete-toggle">
+                                            {{ control.value['delete'] ? 'Deleted' : 'Active' }}
+                                        </mat-slide-toggle>
+                                        <button *ngIf="control.value['deliveryref'] == null" mat-icon-button
+                                            type="button" class="remove-btn" data-testid="ued-product-remove"
+                                            aria-label="Remove arena event" (click)="removeproductsArray(i)">
+                                            <mat-icon>close</mat-icon>
+                                        </button>
+                                    </div>
+
+                                    <div class="event-card-body">
+
+                                        <!-- Basic info -->
+                                        <div class="g3">
+                                            <mat-form-field class="inputfields" appearance="outline">
+                                                <mat-label>Event Display Name</mat-label>
+                                                <mat-icon matPrefix>label</mat-icon>
+                                                <input matInput data-testid="ued-product-title"
+                                                    formControlName="title" placeholder="Enter event name" />
+                                            </mat-form-field>
+
+                                            <mat-form-field class="inputfields" appearance="outline">
+                                                <mat-label>Eligible Product</mat-label>
+                                                <mat-icon matPrefix>inventory_2</mat-icon>
+                                                <mat-select data-testid="ued-product-ref" [compareWith]="compareFn"
+                                                    formControlName="productref">
+                                                    <mat-option *ngFor="let product of productsList" [value]="product.ref">
+                                                        {{ product.product }}
+                                                    </mat-option>
+                                                </mat-select>
+                                            </mat-form-field>
+
+                                            <mat-form-field class="inputfields" appearance="outline">
+                                                <mat-label>Event Date Range</mat-label>
+                                                <mat-date-range-input [rangePicker]="arenaPicker">
+                                                    <input matStartDate data-testid="ued-product-startdate"
+                                                        (click)="arenaPicker.open()" formControlName="startdate"
+                                                        placeholder="Start" />
+                                                    <input matEndDate data-testid="ued-product-enddate"
+                                                        (click)="arenaPicker.open()" formControlName="enddate"
+                                                        placeholder="End" />
+                                                </mat-date-range-input>
+                                                <mat-datepicker-toggle matSuffix [for]="arenaPicker"></mat-datepicker-toggle>
+                                                <mat-date-range-picker touchUi #arenaPicker></mat-date-range-picker>
+                                            </mat-form-field>
+                                        </div>
+
+                                        <div class="checkbox-group">
+                                            <mat-checkbox formControlName="heroevent" data-testid="ued-product-hero">Hero event</mat-checkbox>
+                                        </div>
+
+                                        <!-- Arena image -->
+                                        <div class="image-upload-container"
+                                            [class.has-image]="productImages[i]?.previewurl != null || productImages[i]?.url != null"
+                                            [class.is-pending]="productImages[i]?.previewurl != null && productImages[i]?.url == null"
+                                            [class.is-uploaded]="productImages[i]?.url != null">
+                                            <label class="image-upload-label">
+                                                <mat-icon>photo_library</mat-icon>
+                                                Arena Event Image
+                                            </label>
+
+                                            <div class="file-input-wrapper">
+                                                <input #productFileUpload type="file" accept="image/png, image/jpeg, image/jpg"
+                                                    data-testid="ued-product-image-upload"
+                                                    (change)="uploadProductImage($event, i)"
+                                                    [id]="'productFileUpload-' + i" />
+                                                <label [for]="'productFileUpload-' + i" class="file-input-button"
+                                                    [class.disabled]="productImages[i]?.previewurl != null || productImages[i]?.url != null">
+                                                    <mat-icon>add_photo_alternate</mat-icon>
+                                                    <span>{{ productImages[i]?.url != null ? 'Image Uploaded' : (productImages[i]?.previewurl != null ? 'Image Selected' : 'Choose Image') }}</span>
+                                                </label>
+                                            </div>
+
+                                            <div *ngIf="productImages[i]?.previewurl != null || productImages[i]?.url != null"
+                                                class="image-preview-container">
+                                                <div class="image-preview-wrapper arena-image-preview" [class.is-pending]="productImages[i]?.url == null">
+                                                    <img [src]="productImages[i]?.previewurl || productImages[i]?.url" alt="Arena Event Image" />
+                                                    <div class="upload-overlay" *ngIf="productImages[i]?.url == null">
+                                                        <mat-icon>schedule</mat-icon>
+                                                        <span>Not uploaded yet</span>
+                                                    </div>
+                                                    <span class="image-badge" [class.pending]="productImages[i]?.url == null">{{ productImages[i]?.url != null ? 'Uploaded' : 'Preview only' }}</span>
+                                                </div>
+                                                <button mat-stroked-button type="button" class="remove-image-btn"
+                                                    data-testid="ued-product-image-remove" (click)="onProductImageRemove(i)">
+                                                    <mat-icon>delete</mat-icon> Remove Image
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <!-- Eligibility -->
+                                        <div class="eligibility-section" formGroupName="eligibility">
+                                            <div class="subsection-label">
+                                                <mat-icon>filter_alt</mat-icon> Eligibility
+                                            </div>
+
+                                            <div class="g2">
+                                                <mat-form-field class="inputfields" appearance="outline">
+                                                    <mat-label>Eligible Journey</mat-label>
+                                                    <mat-select data-testid="ued-product-journey"
+                                                        formControlName="journeyid" multiple>
+                                                        <mat-option>
+                                                            <ngx-mat-select-search data-testid="ued-product-journey-search"
+                                                                [(ngModel)]="filterJourney" name="filterjourney"
+                                                                [placeholderLabel]="'Search'"
+                                                                [noEntriesFoundLabel]="'No matching records found'"
+                                                                ngDefaultControl
+                                                                [ngModelOptions]="{ standalone: true }"></ngx-mat-select-search>
+                                                        </mat-option>
+                                                        <mat-option *ngFor="let journey of onJourneySearch()" [value]="journey.docid">
+                                                            {{ journey.journey }}
+                                                        </mat-option>
+                                                    </mat-select>
+                                                </mat-form-field>
+
+                                                <mat-form-field class="inputfields" appearance="outline">
+                                                    <mat-label>Cohorts</mat-label>
+                                                    <mat-select data-testid="ued-product-cohort"
+                                                        formControlName="cohortid" multiple>
+                                                        <mat-option>
+                                                            <ngx-mat-select-search data-testid="ued-product-cohort-search"
+                                                                [(ngModel)]="filterCohort" name="filtercohort"
+                                                                [placeholderLabel]="'Search'"
+                                                                [noEntriesFoundLabel]="'No matching records found'"
+                                                                ngDefaultControl
+                                                                [ngModelOptions]="{ standalone: true }"></ngx-mat-select-search>
+                                                        </mat-option>
+                                                        <mat-option *ngFor="let cohort of onCohortSearch()" [value]="cohort.docid">
+                                                            {{ cohort.name }}
+                                                        </mat-option>
+                                                    </mat-select>
+                                                </mat-form-field>
+                                            </div>
+
+                                            <div class="customer-status-group">
+                                                <span class="status-label">Customer status</span>
+                                                <mat-checkbox data-testid="ued-product-status-active"
+                                                    [checked]="control.get('eligibility.customerstatus')?.value?.includes('active')"
+                                                    (change)="onCustomerStatsChange('active', i, $event.checked)">Active</mat-checkbox>
+                                                <mat-checkbox data-testid="ued-product-status-nonactive"
+                                                    [checked]="control.get('eligibility.customerstatus')?.value?.includes('non active')"
+                                                    (change)="onCustomerStatsChange('non active', i, $event.checked)">Non Active</mat-checkbox>
+                                            </div>
+
+                                            <!-- Consumed products -->
+                                            <div class="consumed-products-section">
+                                                <div class="subsection-label">
+                                                    <mat-icon>shopping_cart</mat-icon> Consumed products
+                                                </div>
+
+                                                <div formArrayName="productconsumption">
+                                                    <div *ngFor="let product of getProductConsumption(i).controls; let j = index"
+                                                        [formGroupName]="j" class="product-consumption-row">
+                                                        <mat-form-field appearance="outline" class="consumption-field">
+                                                            <mat-label>Product</mat-label>
+                                                            <mat-select data-testid="ued-consumption-product"
+                                                                formControlName="productid">
+                                                                <mat-option *ngFor="let option of productsList" [value]="option.id">
+                                                                    {{ option.product }}
+                                                                </mat-option>
+                                                            </mat-select>
+                                                            <mat-error *ngIf="product.get('productid')?.hasError('required')">Product is required</mat-error>
+                                                        </mat-form-field>
+
+                                                        <mat-form-field appearance="outline" class="consumption-field">
+                                                            <mat-label>Operator</mat-label>
+                                                            <mat-select data-testid="ued-consumption-operator"
+                                                                formControlName="operator">
+                                                                <mat-option value="==">Equal To</mat-option>
+                                                                <mat-option value=">=">Greater Than or Equal to</mat-option>
+                                                                <mat-option value="<=">Less Than or Equal to</mat-option>
+                                                            </mat-select>
+                                                            <mat-error *ngIf="product.get('operator')?.hasError('required')">Comparison is required</mat-error>
+                                                        </mat-form-field>
+
+                                                        <mat-form-field appearance="outline"
+                                                            class="consumption-field consumption-field--short">
+                                                            <mat-label>Min Count</mat-label>
+                                                            <input matInput data-testid="ued-consumption-count"
+                                                                type="number" formControlName="count" min="0" />
+                                                            <mat-error *ngIf="product.get('count')?.hasError('required')">Count is required</mat-error>
+                                                            <mat-error *ngIf="product.get('count')?.hasError('min')">Must be ≥ 0</mat-error>
+                                                        </mat-form-field>
+
+                                                        <button mat-icon-button color="warn" type="button"
+                                                            data-testid="ued-consumption-remove"
+                                                            aria-label="Remove consumed product"
+                                                            (click)="removeProductConsumption(i, j)"
+                                                            class="delete-consumption-btn">
+                                                            <mat-icon>delete</mat-icon>
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <button mat-stroked-button type="button"
+                                                    data-testid="ued-consumption-add"
+                                                    (click)="addProductConsumption(i)" class="add-consumption-btn">
+                                                    <mat-icon>add</mat-icon> Add consumed product
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Delivery sequence preview -->
+                                    <div class="delivery-preview" *ngIf="control.value['productref'] != undefined">
+                                        <mat-divider></mat-divider>
+                                        <div class="delivery-preview-body">
+                                            <div class="subsection-label">
+                                                <mat-icon>route</mat-icon> Delivery sequence
+                                            </div>
+                                            <label class="fw-bold">{{ mapProduct[control.value['productref'].id] }}</label>
+                                            <div *ngIf="mapProductToDeliverySequence[control.value['productref'].id] != undefined; else nosequence">
+                                                <div *ngIf="mapProductToDeliverySequence[control.value['productref'].id][mapProductToDeliverySequence[control.value['productref'].id].length - 1]['deliverysequence'] as sequence; else nosequence">
+                                                    <p *ngIf="sequence.length == 0" class="no-data-text">No Delivery Sequence Found.</p>
+                                                    <ul class="delivery-sequence-list">
+                                                        <li *ngFor="let deliveryitem of sequence">
+                                                            <span *ngIf="deliveryitem['activity'] != undefined">
+                                                                {{
+                                                                deliveryitem['activity'].path.includes('events') ?
+                                                                (mapDeliveryEvents[deliveryitem['activity'].id] ?? '') :
+                                                                deliveryitem['activity'].path.includes('forms') ?
+                                                                (mapDeliveryForms[deliveryitem['activity'].id] ?? '') :
+                                                                deliveryitem['activity'].path.includes('queue') ?
+                                                                (mapDeliveryQueue[deliveryitem['activity'].id] ?? '') :
+                                                                deliveryitem['activity'].path.includes('appointmenttype') ?
+                                                                (mapDeliveryAppointment[deliveryitem['activity'].id] ?? '') :
+                                                                deliveryitem['activity'].path.includes('fieldwork') ?
+                                                                (mapDeliveryFieldwork[deliveryitem['activity'].id] ?? '') :
+                                                                'Unknown'
+                                                                }}
+                                                            </span>
+                                                        </li>
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                            <ng-template #nosequence>
+                                                <p class="no-data-text">No Delivery Sequence Configured.</p>
+                                            </ng-template>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+
+                    <!-- ================= RIGHT : REVIEW (sticky) ================= -->
+                    <aside class="side">
+                        <div class="rev">
+                            <h3>Review</h3>
+
+                            <ng-container *ngIf="{
+                                name: !!eventform.get('eventname')?.value && eventform.get('eventname')?.valid,
+                                atc: !!eventform.get('atcmodel')?.value && eventform.get('atcmodel')?.valid,
+                                desc: !!eventform.get('description')?.value && eventform.get('description')?.valid,
+                                dates: !!eventform.get('startdate')?.value && !!eventform.get('enddate')?.value && eventform.get('startdate')?.valid && eventform.get('enddate')?.valid,
+                                lastreg: !!eventform.get('lastregistrationdate')?.value && eventform.get('lastregistrationdate')?.valid,
+                                venue: !!eventform.get('venue')?.value && eventform.get('venue')?.valid,
+                                address: !!eventform.get('address')?.value && eventform.get('address')?.valid,
+                                hosts: !!eventform.get('hosts')?.value?.length && eventform.get('hosts')?.valid
+                            } as r">
+                                <ng-container *ngIf="{ n: (r.name ? 1 : 0) + (r.atc ? 1 : 0) + (r.desc ? 1 : 0) + (r.dates ? 1 : 0) + (r.lastreg ? 1 : 0) + (r.venue ? 1 : 0) + (r.address ? 1 : 0) + (r.hosts ? 1 : 0) } as d">
+
+                                    <div class="ready">
+                                        <span>{{ d.n }}/8 required</span>
+                                        <div class="bar3"><i [style.width.%]="d.n / 8 * 100"></i></div>
+                                    </div>
+
+                                    <ul class="req">
+                                        <li [class.ok]="r.name" role="button" tabindex="0"
+                                            (click)="!r.name && rName.scrollIntoView({ behavior: 'smooth', block: 'center' })">Event name</li>
+                                        <li [class.ok]="r.atc" role="button" tabindex="0"
+                                            (click)="!r.atc && rAtc.scrollIntoView({ behavior: 'smooth', block: 'center' })">ATC model</li>
+                                        <li [class.ok]="r.desc" role="button" tabindex="0"
+                                            (click)="!r.desc && rDesc.scrollIntoView({ behavior: 'smooth', block: 'center' })">Description</li>
+                                        <li [class.ok]="r.dates" role="button" tabindex="0"
+                                            (click)="!r.dates && rDates.scrollIntoView({ behavior: 'smooth', block: 'center' })">Event dates</li>
+                                        <li [class.ok]="r.lastreg" role="button" tabindex="0"
+                                            (click)="!r.lastreg && rLastReg.scrollIntoView({ behavior: 'smooth', block: 'center' })">Last registration date</li>
+                                        <li [class.ok]="r.venue" role="button" tabindex="0"
+                                            (click)="!r.venue && rVenue.scrollIntoView({ behavior: 'smooth', block: 'center' })">Venue</li>
+                                        <li [class.ok]="r.address" role="button" tabindex="0"
+                                            (click)="!r.address && rAddress.scrollIntoView({ behavior: 'smooth', block: 'center' })">Address</li>
+                                        <li [class.ok]="r.hosts" role="button" tabindex="0"
+                                            (click)="!r.hosts && rHosts.scrollIntoView({ behavior: 'smooth', block: 'center' })">Hosts</li>
+                                    </ul>
+                                </ng-container>
+                            </ng-container>
+
+                            <div class="form-state" [class.bad]="eventform.invalid">
+                                {{ eventform.invalid ? 'Some fields still need attention' : 'All fields are valid' }}
+                            </div>
+
+                            <dl>
+                                <dt>Event</dt>
+                                <dd>{{ eventform.get('eventname')?.value || '—' }}</dd>
+                                <dt>ATC model</dt>
+                                <dd>{{ (eventform.get('atcmodel')?.value | uppercase) || '—' }}</dd>
+                                <dt>Venue</dt>
+                                <dd>{{ eventform.get('venue')?.value || '—' }}</dd>
+                                <dt>Hosts</dt>
+                                <dd>{{ eventform.get('hosts')?.value?.length || 0 }} selected</dd>
+                                <dt>Arena events</dt>
+                                <dd>{{ productsArray.controls.length }}</dd>
+                                <dt>Calendar</dt>
+                                <dd>{{ eventform.get('addtocalendar')?.value ? 'Added' : 'Not added' }}</dd>
+                                <dt>Notify</dt>
+                                <dd>{{ eventform.get('notifyparticipants')?.value ? 'Yes' : 'No' }}</dd>
+                            </dl>
+
+                            <div class="arena-mini" *ngIf="productsArray.controls.length">
+                                <div class="arena-mini-title">Arena events</div>
+                                <div class="arena-mini-row" *ngFor="let c of productsArray.controls; let k = index">
+                                    <span class="arena-mini-name">{{ c.value['title'] || ('Arena event ' + (k + 1)) }}</span>
+                                    <span class="arena-mini-tag" *ngIf="c.value['heroevent']">Hero</span>
+                                    <span class="arena-mini-tag del" *ngIf="c.value['delete']">Deleted</span>
+                                </div>
+                            </div>
+
+                            <div class="pubbox">
+                                <div class="btns">
+                                    <button class="buttons submtbtn" *ngIf="!loading" mat-stroked-button type="submit"
+                                        data-testid="ued-save" [disabled]="loading"
+                                        (click)="saveEventDetail(eventform.getRawValue())">{{ (capturedData['edit'] ? "Update" : "Create") }} Event Data</button>
+                                    <button class="cancel-btn" mat-stroked-button type="button"
+                                        data-testid="ued-cancel" mat-dialog-close>Cancel</button>
+                                </div>
+                            </div>
+                        </div>
+                    </aside>
+
                 </div>
             </div>
         </main>
