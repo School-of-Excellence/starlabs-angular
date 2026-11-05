@@ -329,8 +329,10 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   person: { name: string; doc: Person | null } | null = null;
   lightbox: string | null = null;
   attachError = '';
-  /** True while staged attachments are uploading. */
-  uploadingFiles = false;
+  /** Chats whose files are being sent right now (a send carries on if you switch away mid-way). */
+  private sendingIn = new Set<string>();
+  /** The open chat is sending its files — Send waits, the preview says "Sending…". */
+  get uploadingFiles(): boolean { return !!this.active && this.sendingIn.has(this.active.id); }
   attachMenu = false;
   linkForm: { label: string; url: string } | null = null;
   announceMode = false;
@@ -621,6 +623,13 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   ngOnDestroy(): void {
     this.stashDraft();            // leaving the screen keeps what was typed
+    // Picked files can't be sent once the screen is gone: stop their uploads and delete what landed.
+    this.clearPendingFiles();
+    this.parkedFiles.forEach(files => files.forEach(p => {
+      this.discardUpload(p);
+      if (p.previewUrl) URL.revokeObjectURL(p.previewUrl);
+    }));
+    this.parkedFiles.clear();
     this.media.pauseAll();
     this.discardRecording();          // revokes the preview object URL
     clearInterval(this.recTimer);
@@ -2306,12 +2315,13 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   openItem(c: ChatItem): void {
     if (this.activeIds[this.tab] === c.id) return;   // already open — nothing to stash or reload
     this.stashDraft();
+    this.parkPendingFiles();
     this.editing = null;                             // an edit belongs to the chat being left
     this.activeIds = { ...this.activeIds, [this.tab]: c.id };
     this.restoreDraft(c.id);
+    this.unparkPendingFiles(c.id);
     this.replyTo = null; this.showInfo = false; this.infoMsg = null; this.announceMode = false;
     this.person = null; this.attachError = ''; this.pinnedOpen = false;
-    this.clearPendingFiles();
     this.messagesError = '';
     this.memberSearch = ''; this.editingName = false;
     this.broadcastInfo = null; this.audienceOpen = false;
@@ -2347,9 +2357,11 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   switchTab(t: TabKey): void {
     this.stashDraft();                 // before `tab` moves — activeIds is keyed by it
+    this.parkPendingFiles();
     this.editing = null;
     this.blankComposer();
     this.tab = t;
+    if (this.activeIds[t]) this.unparkPendingFiles(this.activeIds[t]!);
     this.archivedSub = 'groups';
     if (t === 'archived') this.ensureGroupStream('archived');
     this.search = ''; this.catFilter = 'all';
@@ -3316,6 +3328,56 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   pendingFiles: PendingFile[] = [];
 
   /**
+   * QA (Nov 2026): switching chats no longer cancels uploads. Each chat's picked files are parked here
+   * by chat id while another chat is open — their uploads keep running — and come back with the chat,
+   * the way drafts do. They're dropped only when removed, sent, or the screen is left.
+   */
+  private parkedFiles = new Map<string, PendingFile[]>();
+
+  private parkPendingFiles(): void {
+    const id = this.activeIds[this.tab];
+    if (id && this.pendingFiles.length) this.parkedFiles.set(id, this.pendingFiles);
+    this.pendingFiles = [];
+  }
+
+  private unparkPendingFiles(id: string): void {
+    this.pendingFiles = this.parkedFiles.get(id) ?? [];
+    this.parkedFiles.delete(id);
+  }
+
+  /**
+   * What the chat list shows for a chat with parked files: the first photo's thumbnail (or an icon for
+   * the kind) and "Uploading 2 files · 45%", "Photo ready to send" or "… upload failed".
+   */
+  parkedOf(id: string): { thumb?: string; icon: string; label: string; failed: boolean } | null {
+    const files = this.parkedFiles.get(id);
+    if (!files?.length) return null;
+    const busy = files.filter(p => !p.record && !p.error && (p.progress ?? 100) < 100);
+    const failed = files.some(p => !!p.error);
+    const first = files[0];
+    const kind = { image: 'Photo', video: 'Video', voice: 'Audio', file: 'File' }[first.type] || 'File';
+    const what = files.length === 1 ? kind : `${files.length} files`;
+    const pct = busy.length ? Math.round(busy.reduce((n, p) => n + (p.progress ?? 0), 0) / busy.length) : 100;
+    return {
+      thumb: files.find(p => p.type === 'image' && p.previewUrl)?.previewUrl,
+      icon: { video: 'videocam', voice: 'mic' }[first.type as 'video' | 'voice'] || 'attach_file',
+      label: failed ? `${what} — upload failed` : busy.length ? `Uploading ${what} · ${pct}%` : `${what} ready to send`,
+      failed,
+    };
+  }
+
+  /** A chat's files that are parked (not open) or showing (open) — what a send in progress cleans up. */
+  private dropPendingOf(chatId: string, files: PendingFile[], sent: boolean): void {
+    files.forEach(p => {
+      if (!sent) this.discardUpload(p);
+      if (p.previewUrl) URL.revokeObjectURL(p.previewUrl);
+    });
+    if (this.active?.id === chatId) this.pendingFiles = this.pendingFiles.filter(p => !files.includes(p));
+    const parked = (this.parkedFiles.get(chatId) || []).filter(p => !files.includes(p));
+    if (parked.length) this.parkedFiles.set(chatId, parked); else this.parkedFiles.delete(chatId);
+  }
+
+  /**
    * Attaching no longer sends. The file is staged with a preview so the caption can be typed and the
    * attachment reviewed (or removed) first; send() does the upload.
    */
@@ -3399,7 +3461,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     const buttons = this.pendingButtons;
     this.justSent = true;
     this.clearDraft(); this.replyTo = null; this.pendingButtons = [];
-    this.uploadingFiles = true;
+    this.sendingIn.add(active.id);
     try {
       if (this.isLive(active)) {
         // Uploads started when the files were picked; wait for any still running. A file whose upload
@@ -3423,13 +3485,15 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
         src.messages = [...src.messages, msg];
         this.touch(active, text || this.attachmentSummary(attachments), at);
       }
-      this.clearPendingFiles(true);
-      this.scrollToBottomSoon();
+      // The chat may not be the open one any more: take these files off wherever they are now.
+      this.dropPendingOf(active.id, staged, true);
+      if (this.active?.id === active.id) this.scrollToBottomSoon();
     } catch (err: any) {
       console.error('attach', err);
-      this.attachError = err?.message || 'Could not send attachment.';
+      if (this.active?.id === active.id) this.attachError = err?.message || 'Could not send attachment.';
+      else this.notify(`Couldn't send the files to ${active.name}`);
     } finally {
-      this.uploadingFiles = false;
+      this.sendingIn.delete(active.id);
     }
   }
 

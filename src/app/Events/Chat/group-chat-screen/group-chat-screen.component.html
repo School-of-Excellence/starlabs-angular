@@ -83,9 +83,17 @@
             <div class="wc-row-bottom">
               <!-- An unsent draft is the thing you most need to see from the list — it is the whole
                    reason drafts are no longer shared between chats. -->
+              <!-- Files picked in this chat, still uploading (or ready) while another chat is open. -->
+              <span class="wc-row-preview uploading" *ngIf="parkedOf(c.id) as up; else draftOrLast" data-testid="gcs-list-uploading">
+                <img class="wc-row-upthumb" *ngIf="up.thumb" [src]="up.thumb" alt=""/>
+                <mat-icon class="wc-row-upicon" *ngIf="!up.thumb">{{ up.icon }}</mat-icon>
+                <span [class.err]="up.failed">{{ up.label }}</span>
+              </span>
+              <ng-template #draftOrLast>
               <span class="wc-row-preview draft" *ngIf="hasDraft(c.id); else lastMsg">
                 <span class="wc-draft-tag">Draft:</span> {{ draftPreview(c.id) }}
               </span>
+              </ng-template>
               <ng-template #lastMsg>
                 <span class="wc-row-preview">
                   <mat-icon class="wc-row-announce" *ngIf="c.lastIsAnnouncement" aria-label="Announcement">campaign</mat-icon>{{ listPreview(c.lastMessage) || '—' }}
