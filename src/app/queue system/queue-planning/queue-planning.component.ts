@@ -1496,31 +1496,30 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
   // }
 
   async removeDateFromStage(row: PlanningRow, stageName: string, dateIndex: number) {
-    const check = confirm('Are you sure want to remove the slot?');
-    if (!check) {
-      return null;
+    const dateRanges = row.stageData[stageName].dates;
+    const entry = dateRanges[dateIndex];
+
+    const booked = !!(entry['appointmentref'] || entry['bookedby']) || (entry['usedslot'] || 0) > 0 || (entry.participants?.length || 0) > 0;
+
+    if (booked) {
+      alert('This slot is booked. Please cancel the booking first, then delete the slot.');
+      return;
     }
 
-    const dateRanges = row.stageData[stageName].dates;
-    const entryToRemove = dateRanges[dateIndex];
-    if (entryToRemove['docid'] && entryToRemove['slottype'] === 'appointment') {
-      const snap = await getDoc(doc(this.firestore, 'queue availability', entryToRemove['docid']));
-      const slotData = snap.exists() ? snap.data() : null;
-      if (slotData && (slotData['appointmentref'] || slotData['bookedby'])) {
-        alert('This slot is already booked by a participant. Cancel the appointment first.');
-        return;
-      }
-    }
-    if (entryToRemove['docid']) {
-      deleteDoc(doc(this.firestore, 'queue availability', entryToRemove['docid'])).then(() => {
-        dateRanges.splice(dateIndex, 1);
-        this.guard.openSnackBar('Slot removed', 'OK', 600);
-      }).catch(err => {
-        console.log(err);
-        alert('Error removing slot');
-      });
-    } else {
+    if (!confirm('Are you sure want to remove the slot?')) return;
+
+    if (!entry['docid']) {
       dateRanges.splice(dateIndex, 1);
+      return;
+    }
+
+    try {
+      await deleteDoc(doc(this.firestore, 'queue availability', entry['docid']));
+      dateRanges.splice(dateIndex, 1);
+      this.guard.openSnackBar('Slot removed', 'OK', 600);
+    } catch (err) {
+      console.log(err);
+      alert('Error removing slot');
     }
   }
 
