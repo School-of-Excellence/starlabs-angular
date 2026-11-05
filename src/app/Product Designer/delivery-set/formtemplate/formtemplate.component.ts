@@ -2,7 +2,7 @@ import { Component, inject, Input, OnInit, OnDestroy, Output, EventEmitter, View
 import { ConnectivityGuardService, ConnectivityState } from '../../../shared/connectivity-guard.service';
 import { LocalDraftService } from '../../../shared/local-draft.service';
 import { Subscription } from 'rxjs';
-import { doc, Firestore , getDoc,collection , query, where, getDocs,setDoc,deleteDoc,updateDoc,arrayUnion, serverTimestamp, QueryDocumentSnapshot, waitForPendingWrites, getFirestore} from '@angular/fire/firestore';
+import { doc, Firestore , getDoc,collection , query, where, getDocs,setDoc,deleteDoc,updateDoc,arrayUnion, serverTimestamp, QueryDocumentSnapshot, waitForPendingWrites, getFirestore, runTransaction, FieldPath, DocumentReference, DocumentSnapshot} from '@angular/fire/firestore';
 import { ActivatedRoute, Router} from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { FormGroup,FormBuilder, Validators, FormControl, FormArray, ReactiveFormsModule}from'@angular/forms';
@@ -27,6 +27,8 @@ import { provideNativeDateAdapter } from '@angular/material/core';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatTimepickerModule } from '@angular/material/timepicker';
+import { timeToDate, timeToString } from '../../../shared/time-value';
+import { sliderLabel as labelOf, sliderPosition } from '../../../shared/slider-value';
 
 function minArrayLength(min: number): ValidatorFn {
   return (control: AbstractControl): { [key: string]: any } | null => {
@@ -88,9 +90,28 @@ export class FormtemplateComponent {
 
   profileid: any;
   draftDocid:string
+  // video field index → the URL the player uses (+ ngsw-bypass). Kept OUT of submittedClientForm, which is saved to
+  // Firestore (draft + submit): the saved form keeps the plain URL from `delivery forms`. A plain string, like the
+  // audio field: <source [src]> doesn't unwrap a SafeResourceUrl (it rendered "SafeValue must use [property]=binding")
+  // and Firestore rejects the object ("Unsupported field value").
+  videoUrl: { [index: number]: string } = {}
   firestoreDefault = getFirestore()
   private firestoreForms = getFirestore('firestore-forms')
+  private firestoreATC = getFirestore('firestore-atc')
   private auth = inject(AuthguardService)
+  // ATC specialist form (opened from View ATC with ?atcid=): atcid = the ATC version it was opened from,
+  // atcTargetId = the current version the answer is recorded on (resolved at submit)
+  atcid: string | null = null
+  private atcTargetId: string | null = null
+  // ATC participant / sponsor form (?request=): the atc_form_requests doc that authorises this fill, and the
+  // only thing that distinguishes this flow from the specialist's (atcid alone). null for every other flow.
+  atcRequestId: string | null = null
+  atcFormRequest: any = null
+  // THE ANSWER, not a flag derived from it. `async ngOnInit` returns to Angular at its first `await`, so the
+  // lifecycle moves on and ngAfterViewInit used to read `atcRequestInvalid` while the check was still in
+  // flight — it was false, the form rendered, and the refusal arrived after. Both hooks now await this one
+  // promise, so there is nothing to read early. Resolved true when there is no ?request to check.
+  private atcRequestCheck: Promise<boolean> = Promise.resolve(true)
   currentUserId:string
   userProfile:any
   queueData:any
@@ -145,6 +166,8 @@ export class FormtemplateComponent {
 
     console.log('QueryParams', this.route.snapshot.queryParams);
     this.profileid = this.route.snapshot.queryParams['profileid'] || null;
+    this.atcid = this.route.snapshot.queryParams['atcid'] || null;
+    this.atcRequestId = this.route.snapshot.queryParams['request'] || null;
     // this.queueId = this.inlineQueueId ?? this.route.snapshot.queryParams['queueid'] ?? null;
     this.participantAssignmentId = this.route.snapshot.queryParams['participantAssignmentId'] ?? null;
 
@@ -210,6 +233,11 @@ export class FormtemplateComponent {
      // Get queue ID from route params
     this.formpatch = (![null,undefined].includes(this.route.snapshot.queryParams['patchdata']) ||this.route.snapshot.queryParams['viewFilledForm'] === 'true' ||this.route.snapshot.queryParams['viewCompleted'] === 'true' ||![null,undefined].includes(this.participantformtemplateid));
 
+    // ATC participant / sponsor: the request doc decides who may fill this, whether it may still be
+    // filled, and whether it is a new answer or an edit. Nothing here is taken from the URL.
+    this.atcRequestCheck = this.atcRequestId ? this.loadAtcFormRequest() : Promise.resolve(true);
+    if (!(await this.atcRequestCheck)) return;
+
     // Get user ID and roles in constructor
     await this.initializeUserData();
 
@@ -220,7 +248,8 @@ export class FormtemplateComponent {
     await this.getFormsOption();
   }
 
-  ngAfterViewInit(){
+  async ngAfterViewInit(){
+    if (!(await this.atcRequestCheck)) return;
     // console.log(" ngAfterViewInit participantformtemplateid",this.participantformtemplateid);
 
     // console.log(this.formpatch);
@@ -297,8 +326,14 @@ export class FormtemplateComponent {
             if(!['label','video','audio'].includes(element['type'])){
               element['formcontrol']=`control${n}`
               n++
-              if(!['array','date'].includes(element['type'])){
+              if(!['array','date','time','slider'].includes(element['type'])){
                 this.deliveryForm.get(element['formcontrol']).patchValue(element['value'] ?? null)
+              }else if(element['type'] == 'slider'){
+                // outside the list (an older 1-based or 1-10 answer) → the nearest option
+                this.deliveryForm.get(element['formcontrol']).patchValue(sliderPosition(element['options'], element['value']))
+              }else if(element['type'] == 'time'){
+                // stored as "HH:mm"; matTimepicker needs a Date
+                this.deliveryForm.get(element['formcontrol']).patchValue(timeToDate(element['value']))
               }else if(element['type'] == 'date'){
                 this.deliveryForm.get(element['formcontrol']).patchValue(element['value'] != undefined && element['value'] != null ? element['value']?.toDate() : null)
               }else if(element['type'] == 'array'){
@@ -328,15 +363,15 @@ export class FormtemplateComponent {
           this.showcontent = true
         })
       }//patch value if condition
-      this.submittedClientForm['formarray'] = this.submittedClientForm['formarray']?.map((form)=>{
+      this.videoUrl = {}
+      const fields = this.submittedClientForm['formarray'] || []
+      for (let index = 0; index < fields.length; index++) {
+        const form = fields[index]
         if(['video'].includes(form.type)){
-          let url = form.options[0];
-          url += (url.includes('?')?'&':'?') + 'ngsw-bypass';
-          url = this.sanitizer.bypassSecurityTrustResourceUrl(url);
-          form.options = [url]
+          const url = form.options[0];
+          this.videoUrl[index] = url + (url.includes('?')?'&':'?') + 'ngsw-bypass';
         }
-        return form
-      })
+      }
       // console.log('modified : ',this.submittedClientForm)
 
     })
@@ -405,6 +440,21 @@ export class FormtemplateComponent {
       validators.push(maxArrayLength(item.maxcount!));
     }
     return validators;
+  }
+
+
+  // The drag bubble and the summary line show the OPTION, not the index. labelFor is memoised because
+  // mat-slider's displayWith is an @Input: handing it a new closure on every change-detection pass would
+  // re-set the input each cycle.
+  private sliderFormatters = new Map<any, (v: number) => string>();
+  labelFor(options: any): (v: number) => string {
+    if (!this.sliderFormatters.has(options)) {
+      this.sliderFormatters.set(options, (v: number) => labelOf(options, v));
+    }
+    return this.sliderFormatters.get(options);
+  }
+  sliderLabel(options: any, value: any): string {
+    return labelOf(options, value);
   }
 
   buildInitialValue(item:any){
@@ -507,9 +557,124 @@ export class FormtemplateComponent {
 
     previewRef.afterClosed().subscribe(async (data) => {
       if (data) {
+        // ATC form: stop before anything is reset or saved when the ATC no longer exists
+        if (this.atcid && !(await this.resolveAtcForSubmit())) return;
         await this.processFormSubmission(value,data);
       }
     });
+  }
+
+  // Follows upgradedto from the ATC the tab was opened for to its newest version (an edit may have upgraded it
+  // since the tab opened). An upgraded version also carries isdelete:true, so "upgraded" is checked before "deleted".
+  // No version cap (plan 2026-11-02): a version seen twice or an upgradedto that points nowhere is a corrupted chain.
+  private async findCurrentAtc(read: (ref: DocumentReference) => Promise<DocumentSnapshot>): Promise<DocumentReference | 'deleted' | 'corrupted'> {
+    let ref = doc(this.firestoreATC, 'atc_alpha', this.atcid);
+    const seen = new Set<string>();
+    while (true) {
+      seen.add(ref.id);
+      const snap = await read(ref);
+      if (!snap.exists()) return seen.size == 1 ? 'deleted' : 'corrupted';
+      const data = snap.data();
+      if (data['upgradedto'] != null || data['status'] == 'upgraded') {
+        const next = data['upgradedto']?.id;
+        if (!next || seen.has(next)) return 'corrupted';
+        ref = doc(this.firestoreATC, 'atc_alpha', next);
+        continue;
+      }
+      return data['isdelete'] === true ? 'deleted' : ref;
+    }
+  }
+
+  // Checks the ATC still exists before the answer is saved
+  private async resolveAtcForSubmit(): Promise<boolean> {
+    try {
+      const atc = await this.findCurrentAtc(ref => getDoc(ref));
+      if (typeof atc !== 'string') {
+        this.atcTargetId = atc.id;
+        return true;
+      }
+      alert(atc === 'deleted'
+        ? "This ATC was removed, so the form wasn't saved."
+        : "This ATC is corrupted — unable to find the stable version.");
+    } catch (error) {
+      console.error('Error resolving ATC:', error);
+      alert("Couldn't check the ATC. Your answers are kept; try submitting again.");
+    }
+    return false;
+  }
+
+  // Records the answer on the ATC's newest version (formsubmitted.{formid} = answer id) in one transaction, so an edit
+  // landing at the same moment makes Firestore retry on the new version. FieldPath keeps any form id a single map key.
+  private async recordOnAtc(formid: string, answerId: string): Promise<boolean> {
+    try {
+      const request = this.atcFormRequest
+        ? doc(this.firestoreATC, 'atc_form_requests', this.atcFormRequest['requestid']) : null;
+      const recorded = await runTransaction(this.firestoreATC, async transaction => {
+        // a request withdrawn while the form was open must not be recorded (same rule as the app)
+        if (request && !(await transaction.get(request)).exists()) return 'revoked';
+        const atc = await this.findCurrentAtc(ref => transaction.get(ref));
+        if (typeof atc === 'string') return false;
+        transaction.update(atc, new FieldPath('formsubmitted', formid), answerId);
+        if (request) transaction.update(request, { formstatus: 'submitted' });
+        return true;
+      });
+      if (recorded === 'revoked') {
+        alert("Your specialist withdrew this form, so it wasn't recorded.");
+        return false;
+      }
+      if (!recorded) throw new Error('ATC removed before the form was recorded');
+      return true;
+    } catch (error) {
+      console.error('Error recording the form on the ATC:', error);
+      alert("The form was saved but couldn't be linked to the ATC. Tell your admin the form id " + answerId + ".");
+      return false;
+    }
+  }
+
+  // The atc_form_requests doc is the permission slip for a participant / sponsor fill: its profileid must be
+  // the logged-in profile, and only a 'sent' request may still be filled. `answerid` makes it an edit, which
+  // rides the existing patchdata workflow (the copied link carries patchdata when the request has an answer).
+  private async loadAtcFormRequest(): Promise<boolean> {
+    try {
+      const snap = await getDoc(doc(this.firestoreATC, 'atc_form_requests', this.atcRequestId));
+      const myProfileId = (await this.auth.getRoles())?.['profile_ref']?.id ?? null;
+      const refusal = !snap.exists() ? 'This form link is no longer valid.'
+        : snap.data()['profileid'] != myProfileId ? 'This form was sent to someone else.'
+        : snap.data()['formstatus'] != 'sent' ? 'This form has already been submitted.'
+        : null;
+      if (refusal) {
+        alert(refusal);
+        this.router.navigateByUrl("/");
+        return false;
+      }
+      this.atcFormRequest = { requestid: snap.id, ...snap.data() };
+      this.profileid = myProfileId;   // a request form is always filled by the logged-in person
+      return true;
+    } catch (error) {
+      console.error('Error reading the ATC form request:', error);
+      alert("Couldn't open this form. Try the link again.");
+      this.router.navigateByUrl("/");
+      return false;
+    }
+  }
+
+  // Removes the draft once the answer is safely recorded. A request form calls this only after the ATC
+  // transaction has committed, so a withdrawn request leaves the typed answers recoverable.
+  private async disposeDraft() {
+    const draftDocRef = doc(this.firestoreForms, 'temporary_forms', this.draftDocid);
+    await deleteDoc(draftDocRef);
+    this.localDraft.delete(this.draftDocid);
+  }
+
+  // The specialist's tab was opened by View ATC, so it can close itself. A participant / sponsor followed a
+  // pasted link in their own tab, which window.close() cannot close, so they go home instead.
+  private closeAtcFormTab() {
+    if (this.atcFormRequest) {
+      this.router.navigateByUrl("/");
+      return;
+    }
+    window.close();
+    setTimeout(() => this.router.navigateByUrl("/"), 300);
   }
 
    private async processFormSubmission(value: any, data: object) {
@@ -549,14 +714,30 @@ export class FormtemplateComponent {
       this.submittedClientForm['docid'] = this.draftDocid;
       this.submittedClientForm["submittedin"] = "starlabs";
       this.submittedClientForm['formid'] = this.inlineFormId ?? this.patchformid ?? null;
+      if (this.atcTargetId) {
+        this.submittedClientForm['atcid'] = this.atcTargetId;
+        // the request's own tag (participant / sponsor) when the form was opened from a copied link
+        this.submittedClientForm['filledby'] = this.atcFormRequest?.['filledby'] ?? 'specialist';
+      }
 
       console.log(this.submittedClientForm);
 
       // Submit the form
       await this.submitFormData(nextstage,data);
 
+      // ATC form: record the answer on the ATC
+      if (this.atcTargetId && !(await this.recordOnAtc(this.submittedClientForm['formid'], this.submittedClientForm['docid']))) {
+        loadingRef.close();
+        return;
+      }
+
+      // request form: the draft was held back until the ATC + request write committed
+      if (this.atcFormRequest && this.draftDocid) await this.disposeDraft();
+
       loadingRef.close();
-      if (this.queueId) {
+      if (this.atcTargetId) {
+        this.closeAtcFormTab();
+      } else if (this.queueId) {
         this.submittedFormName = this.submittedClientForm['formname'];
         this.submissionComplete = true;
         if (this.isInline) {
@@ -579,7 +760,13 @@ export class FormtemplateComponent {
     for (let i = 0; i < this.submittedClientForm.formarray.length; i++) {
       const element = this.submittedClientForm.formarray[i];
       if (!['label', 'video', 'audio'].includes(element['type'])) {
-        element["value"] = (value[`control${n}`] !== undefined && value[`control${n}`] !== null)
+        // SUBMIT path. The draft path (_performAutoSave) converts a time the same way; this one is the
+        // one that writes formsByClient, and it used to copy the matTimepicker's Date straight through —
+        // so every submitted answer was a Timestamp while its draft was "HH:mm". Every reader normalises,
+        // which is why nothing looked wrong on screen and only a raw document read caught it.
+        element["value"] = element['type'] === 'time'
+          ? timeToString(value[`control${n}`])
+          : (value[`control${n}`] !== undefined && value[`control${n}`] !== null)
           ? value[`control${n}`] : null;
         n++;
       }
@@ -685,11 +872,9 @@ export class FormtemplateComponent {
       });
     }
 
-    // Delete draft
-    if (this.draftDocid) {
-      const draftDocRef = doc(this.firestoreForms, 'temporary_forms', this.draftDocid);
-      await deleteDoc(draftDocRef);
-      this.localDraft.delete(this.draftDocid);
+    // Delete draft — a request form keeps it until the ATC transaction has committed
+    if (this.draftDocid && !this.atcFormRequest) {
+      await this.disposeDraft();
     }
 
 
@@ -766,6 +951,8 @@ export class FormtemplateComponent {
 
     previewRef.afterClosed().subscribe(async (data) => {
       if (data.confirmed) {
+        // ATC answer (Edit from View ATC): stop before anything is saved when the ATC no longer exists
+        if (this.atcid && !(await this.resolveAtcForSubmit())) return;
         const loadingRef = this.dialog.open(LoadingProgressComponent, {
           data: { msg: "Submitting Please Wait ..." },
           disableClose: true
@@ -797,11 +984,20 @@ export class FormtemplateComponent {
           this.submittedClientForm['date'] = new Date();
           this.submittedClientForm['formid'] = this.inlineFormId ?? this.patchformid ?? null;
           this.submittedClientForm["submittedin"] = "starlabs";
+          if (this.atcTargetId) this.submittedClientForm['atcid'] = this.atcTargetId;
 
           console.log(this.submittedClientForm);
 
           // Update the document using merge option
           await setDoc(existingFormDocRef, this.submittedClientForm, { merge: true });
+
+          // ATC answer: keep it recorded on the ATC's newest version, then close the tab View ATC opened
+          if (this.atcTargetId) {
+            const recorded = await this.recordOnAtc(this.submittedClientForm['formid'], originalDocId);
+            loadingRef.close();
+            if (recorded) this.closeAtcFormTab();
+            return;
+          }
 
           // Update big participants assignments status
           if (this.participantAssignmentId) {
@@ -843,7 +1039,10 @@ export class FormtemplateComponent {
       let fieldIndex = 0;
       for (const element of this.submittedClientForm.formarray) {
         if (['label', 'video', 'audio'].includes(element['type'])) continue;
-        element['value'] = value[`control${fieldIndex}`] ?? null;
+        // a time control hands back a Date; "HH:mm" is what goes in the database
+        element['value'] = element['type'] === 'time'
+          ? timeToString(value[`control${fieldIndex}`])
+          : value[`control${fieldIndex}`] ?? null;
         fieldIndex++;
       }
 
@@ -853,8 +1052,13 @@ export class FormtemplateComponent {
       this.submittedClientForm['docid']     = this.draftDocid;
       this.submittedClientForm['formid']    = this.inlineFormId ?? this.patchformid ?? null;
 
+      // The draft doc also carries the ids that scope it (atcid beside the queueid above) and delete:false,
+      // which is what the app's draft query filters on. Kept off submittedClientForm so the ANSWER document
+      // never gains a `delete` field.
+      const draftPayload = { ...this.submittedClientForm, atcid: this.atcid ?? null, delete: false };
+
       //  save locally first 
-      this.localDraft.save(this.draftDocid, this.submittedClientForm, {
+      this.localDraft.save(this.draftDocid, draftPayload, {
         formId:    this.submittedClientForm['formid'],
         profileId: this.profileid,
       });
@@ -867,7 +1071,7 @@ export class FormtemplateComponent {
       // Online — push to Firestore
       try {
         const tempFormDocRef = doc(this.firestoreForms, 'temporary_forms', this.draftDocid);
-        await setDoc(tempFormDocRef, this.submittedClientForm, { merge: true });
+        await setDoc(tempFormDocRef, draftPayload, { merge: true });
 
         if (myEpoch !== this.draftSaveEpoch) return;
 
@@ -920,12 +1124,14 @@ async getFormsOption() {
 
     // Collect Firestore drafts
     const tempFormsRef = collection(this.firestoreForms, 'temporary_forms');
-    const draftQuery = query(
-      tempFormsRef,
+    // An ATC form's draft belongs to that ATC: the same form can be sent on two ATCs. The filter is added
+    // only when there is an atcid, so drafts written before this field existed are still found.
+    const draftFilters = [
       where('formid',    '==', this.patchformid),
-      where('profileid', '==', this.profileid)
-    );
-    const draftSnapshot = await getDocs(draftQuery);
+      where('profileid', '==', this.profileid),
+    ];
+    if (this.atcid) draftFilters.push(where('atcid', '==', this.atcid));
+    const draftSnapshot = await getDocs(query(tempFormsRef, ...draftFilters));
 
     if (!draftSnapshot.empty) {
       const firestoreDrafts = draftSnapshot.docs
@@ -938,11 +1144,16 @@ async getFormsOption() {
       drafts.push(...firestoreDrafts);
     }
 
-    if (drafts.length === 0) return; 
+    // An ATC form's draft belongs to that ATC, so a session with no atcid must not be offered one. The where
+    // query cannot express it (Firestore has no "field missing" filter, and `== null` skips every draft written
+    // before the field existed), so the scoping is applied to the result. `!atcid` catches missing AND null.
+    const scoped = this.atcid ? drafts : drafts.filter(d => !d['atcid']);
+
+    if (scoped.length === 0) return; 
 
     //  Deduplicate by docid 
     const seen = new Set<string>();
-    this.allDrafts = drafts.filter(d => {
+    this.allDrafts = scoped.filter(d => {
       if (seen.has(d['docid'])) return false;
       seen.add(d['docid']);
       return true;
@@ -967,10 +1178,18 @@ async getFormsOption() {
   }
 }
 
-selectDraft(draft: any) {
+// A draft was written under a queue (or an ATC), and its ids are saved on the draft doc but were never read
+// back — so the answer took the id of the draft while keeping the CURRENT session's context. Restoring them
+// here puts the submission back on the queue / ATC the draft belongs to. initializeQueueData has to run again:
+// the token and the stage list were resolved in ngOnInit for the session's queue, and queueref alone would
+// leave the answer referencing one queue while its token and stage came from another.
+async selectDraft(draft: any) {
   this.showDraftDialog = false;
   this.showAllDrafts = false;
   this.draftDocid = draft['docid'];
+  this.atcid = draft['atcid'] ?? null;
+  this.queueId = draft['queueid'] ?? null;
+  if (this.queueId) await this.initializeQueueData();
   this.patchFromDraftData(draft);
 }
 
@@ -1031,7 +1250,13 @@ openDraftsDialog() {
       element['formcontrol'] = `control${index}`;
       index++;
 
-      if (!['array', 'date'].includes(element['type'])) {
+      if (element['type'] === 'time') {
+        // stored as "HH:mm"; matTimepicker needs a Date
+        this.deliveryForm.get(element['formcontrol'])?.patchValue(timeToDate(element['value']));
+      } else if (element['type'] === 'slider') {
+        // outside the list (an older 1-based or 1-10 answer) → the nearest option
+        this.deliveryForm.get(element['formcontrol'])?.patchValue(sliderPosition(element['options'], element['value']));
+      } else if (!['array', 'date'].includes(element['type'])) {
         this.deliveryForm.get(element['formcontrol'])?.patchValue(element['value'] ?? null);
         if (element['flipping'] === true) {
           this.submittedClientForm.formarray[i]['flippingquestion']['value'] =
