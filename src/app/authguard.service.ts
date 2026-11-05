@@ -1082,10 +1082,10 @@ export class AuthguardService {
         alert(err)
       })
 
-      var remainingBookings = await this.getActiveBookings(apptData)
-      var isGroupAppointment = remainingBookings != null
+      const bookings = await this.getSlotBookings(apptData.appointment, slotData)
       for (let i = 0; i < slotData.length; i++) {
         const element = slotData[i];
+        const hasRemainingBookings = bookings.isGroup && bookings.counts[element.id] > 0
         const availabilityDoc = doc(this.availabilityRefs, element.id)
         getDoc(availabilityDoc).then(async availability => {
           if (availability.exists()) {
@@ -1100,26 +1100,19 @@ export class AuthguardService {
                   var slotStart: any = new Date(slotelement.slotstart.toDate())
                   var slotEnd: any = new Date(slotelement.slotend.toDate())
 
-                  if ((slotStart >= selectedSlot.start && slotStart < selectedSlot.end) || (slotEnd > selectedSlot.start && slotEnd < selectedSlot.end) || (selectedSlot.start >= slotStart && selectedSlot.start < slotEnd)) {
+                  const overlaps = (slotStart >= selectedSlot.start && slotStart < selectedSlot.end) || (slotEnd > selectedSlot.start && slotEnd < selectedSlot.end) || (selectedSlot.start >= slotStart && selectedSlot.start < slotEnd)
+                  if (!overlaps) continue
 
-                    if (chosenelement.id == appointmentid) {
-                      if (element.index == k) {
-                        if (this.datepipe.transform(slotStart, "short") == this.datepipe.transform(selectedSlot.start, "short")) {
-                          if (this.datepipe.transform(slotEnd, "short") == this.datepipe.transform(selectedSlot.end, "short")) {
-                            var hasRemainingBookings = isGroupAppointment && remainingBookings[element.id] > 0
-                            slotelement.booked = hasRemainingBookings
-                            if (isGroupAppointment) {
-                              slotelement.available = true
-                            }
-                          }
-                        }
-                      }
-                    }
+                  const sameStart = this.datepipe.transform(slotStart, "short") == this.datepipe.transform(selectedSlot.start, "short")
+                  const sameEnd = this.datepipe.transform(slotEnd, "short") == this.datepipe.transform(selectedSlot.end, "short")
+                  const isCancelledSlot = chosenelement.id == appointmentid && element.index == k && sameStart && sameEnd
+                  const canFreeOverlap = !slotelement.booked && !hasRemainingBookings
 
-                    if (!slotelement.booked) {
-                      slotelement.available = true
-                    }
-
+                  if (isCancelledSlot) {
+                    slotelement.booked = hasRemainingBookings
+                    slotelement.available = true
+                  } else if (canFreeOverlap) {
+                    slotelement.available = true
                   }
                 }
               }
@@ -1151,24 +1144,23 @@ export class AuthguardService {
     }
   }
 
-  async getActiveBookings(apptData){
-    var apptTypeRef = apptData.appointment
-    var apptTypeSnap = await getDoc(apptTypeRef)
-    var isGroupAppointment = apptTypeSnap.data()?.["groupappointment"] == true
-    if(!isGroupAppointment){
-      return null
+  async getSlotBookings(apptTypeRef, slots: { id: string, index: number }[]) {
+    const apptType = (await getDoc(apptTypeRef)).data()
+    const isGroup = apptType?.["groupappointment"] == true
+    const maxBooking = apptType?.["maxbooking"] ?? 1
+    const counts: Record<string, number> = {}
+    if (!isGroup) {
+      return { isGroup, maxBooking, counts }
     }
-    var remainingBookings = {}
-    for (let i = 0; i < apptData.slotdata.length; i++) {
-      const slot = apptData.slotdata[i];
-      var countQuery = query(this.appointmentsRefs,
-        where("slotdata", "array-contains", {id: slot.id, index: slot.index}),
+    for (const slot of slots) {
+      const countQuery = query(this.appointmentsRefs,
+        where("slotdata", "array-contains", { id: slot.id, index: slot.index }),
         where("appointment", "==", apptTypeRef),
         where("cancelled", "==", false))
-      var countSnap = await getCountFromServer(countQuery)
-      remainingBookings[slot.id] = countSnap.data().count
+      const countSnap = await getCountFromServer(countQuery)
+      counts[slot.id] = countSnap.data().count
     }
-    return remainingBookings
+    return { isGroup, maxBooking, counts }
   }
 
   // // Revoke Specialist Availability
