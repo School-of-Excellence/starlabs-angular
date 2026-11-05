@@ -15,6 +15,7 @@ import { ATCDraftService } from '../../shared/atc-draft.service';
 import { parseAtcOutput } from '../../ATC-Ops/atc-ops.types';
 import { resolveProcedurePseudonym } from '../../ATC-Ops/procedure-pseudonyms';
 import { DraftConflictDialogComponent } from '../shared/draft-conflict-dialog.component';
+import { isEISolutionProduct, isWiSHProduct } from '../shared/atc-product';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
 import { AtcOptionComponent } from '../../ATC/atc-option/atc-option.component';
@@ -22,7 +23,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { ErrorStateMatcher } from '@angular/material/core';
 import { AtcAelConfirmComponent } from '../../ATC/atc-ael-confirm/atc-ael-confirm.component';
 import { NetworkStatusService } from '../../network-status.service';
-import { MatFormFieldModule } from '@angular/material/form-field';
+import { MAT_FORM_FIELD_DEFAULT_OPTIONS, MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -64,7 +65,9 @@ const generateId = (firestore: Firestore, collectionName: string) => doc(collect
   ],
 
   templateUrl: './prescribe-atc.component.html',
-  styleUrl: './prescribe-atc.component.css'
+  styleUrl: './prescribe-atc.component.css',
+  // compact fields (prototype spacing): the hint/error line under a field takes space only when an error shows
+  providers: [{ provide: MAT_FORM_FIELD_DEFAULT_OPTIONS, useValue: { subscriptSizing: 'dynamic' } }]
 })
 export class PrescribeATCComponent {
   autoSaveID = null;
@@ -117,7 +120,9 @@ export class PrescribeATCComponent {
   bigActivityMentor = []
   bigActivityAdditional = []
   bigActivityAssignedto = []
-  bulkAssignedSelection = {} // section-level agents per assigned_to activity docid (page-only, not saved to draft)
+  bulkAssignedSelection = {} // section-level agents per assigned_to activity docid (saved to draft)
+  // agents last APPLIED per assigned_to activity docid — new procedures get these when their procedure is chosen
+  bulkAppliedSelection = {}
   bulkAssignedFilter = {} // separate search text per section dropdown
 
   // ATC Data
@@ -202,6 +207,100 @@ export class PrescribeATCComponent {
   tokendata = null
   queueid:string = null
   stagename:string = null
+  // appointments/{id} the specialists were taken from (WiSH / EI Solution); saved on the draft and the ATC
+  appointmentId:string = null
+  // participantsproduct id of the delivery step holding that appointment (plan 2026-11-01); saved on the draft and the ATC
+  participantProductId:string = null
+
+  // Ask · area of focus (EI Solution only): who asked and what they asked for.
+  // Draft keeps every row (ask); the submitted ATC keeps complete rows only: ask [{ askedby, askedfor }].
+  askedByOptions = [
+    { value: "self", label: "Self" },
+    { value: "spouse", label: "Spouse" },
+    { value: "family", label: "Family" },
+    { value: "friends", label: "Friends" },
+    { value: "sponsors", label: "Sponsors" },
+  ]
+  askRows: { askedby: string | null, askedfor: string }[] = []
+
+  get isEISolution(): boolean {
+    return isEISolutionProduct(this.product)
+  }
+
+  // EI Solution always shows at least one (empty) ask row
+  ensureAskRow(){
+    if(this.isEISolution && this.askRows.length == 0) this.askRows.push({ askedby: null, askedfor: "" })
+  }
+
+  addAsk(){
+    this.askRows.push({ askedby: null, askedfor: "" })
+  }
+
+  // removing the last row clears it instead (one row always stays)
+  removeAsk(index: number){
+    this.askRows.splice(index, 1)
+    this.ensureAskRow()
+    this.autoSave()
+  }
+
+  get completeAsks(): { askedby: string, askedfor: string }[] {
+    return this.askRows
+      .filter(row => !!row.askedby && (row.askedfor ?? "").trim().length != 0)
+      .map(row => ({ askedby: row.askedby, askedfor: row.askedfor.trim() }))
+  }
+
+  // null when the asks are ready to submit; otherwise what is missing
+  askError(): string | null {
+    var partial = this.askRows.some(row => !!row.askedby != ((row.askedfor ?? "").trim().length != 0))
+    if(partial) return "Fill both asked by and asked for, or remove the row"
+    if(this.completeAsks.length == 0) return "Add at least one complete ask (asked by and asked for)"
+    return null
+  }
+
+  // WiSH outcomes (WiSH only): one row per outcome area. Draft keeps every row (outcomes); the submitted ATC
+  // keeps complete rows only: outcomes [{ outcomearea, outcomeexpected }]. Empty rows are dropped.
+  outcomeRows: { outcomearea: string, outcomeexpected: string }[] = []
+
+  get isWiSH(): boolean {
+    return isWiSHProduct(this.product)
+  }
+
+  // WiSH opens with five empty outcome rows (as the prototype)
+  ensureOutcomeRows(){
+    if(this.isWiSH && this.outcomeRows.length == 0){
+      for (let i = 0; i < 5; i++) this.outcomeRows.push({ outcomearea: "", outcomeexpected: "" })
+    }
+  }
+
+  addOutcome(){
+    this.outcomeRows.push({ outcomearea: "", outcomeexpected: "" })
+  }
+
+  // removing the last row clears it instead (one row always stays, like Ask)
+  removeOutcome(index: number){
+    this.outcomeRows.splice(index, 1)
+    if(this.isWiSH && this.outcomeRows.length == 0) this.outcomeRows.push({ outcomearea: "", outcomeexpected: "" })
+    this.autoSave()
+  }
+
+  get completeOutcomes(): { outcomearea: string, outcomeexpected: string }[] {
+    return this.outcomeRows
+      .filter(row => (row.outcomearea ?? "").trim().length != 0 && (row.outcomeexpected ?? "").trim().length != 0)
+      .map(row => ({ outcomearea: row.outcomearea.trim(), outcomeexpected: row.outcomeexpected.trim() }))
+  }
+
+  // null when the outcomes are ready to submit; otherwise what is missing
+  outcomeError(): string | null {
+    var partial = this.outcomeRows.some(row => ((row.outcomearea ?? "").trim().length != 0) != ((row.outcomeexpected ?? "").trim().length != 0))
+    if(partial) return "Fill both outcome area and outcomes expected, or clear the row"
+    if(this.completeOutcomes.length == 0) return "Add at least one complete WiSH outcome (outcome area and outcomes expected)"
+    return null
+  }
+
+  // 01, 02 … row numbers for the outcomes table
+  outcomeNumber(index: number): string {
+    return (index + 1 < 10 ? "0" : "") + (index + 1)
+  }
   queryparam
 
   // ATC List
@@ -308,7 +407,7 @@ export class PrescribeATCComponent {
     guardservice.getuid().then(uid=>{
       this.loggedinUser = uid
       console.log(uid)
-      getDocs(query(collection(this.firestoreDefault, "profile_data"),where("user_ref", "==", doc(this.firestoreDefault, 'user_data', uid)))).then(async profileData=>{
+      getDocs(query(collection(this.firestoreDefault, "profile_data"),where("user_ref", "==", doc(this.firestoreDefault, 'user_data', this.loggedinUser)))).then(async profileData=>{
         this.loggedinProfileid = profileData.docs[0].id
         getDoc(doc(this.firestoreDefault, profileData.docs[0].data()['role_ref']['path'])).then(async roleDoc=>{
           var roleData = roleDoc.data()
@@ -416,6 +515,16 @@ export class PrescribeATCComponent {
   pendingAIJson: any = null;
   areasstring: any = null;
   summarystring: any = null;
+
+  // "Areas to explore" / "A&H AI Summary (Beta)" show only when the AI actually gave something (an ATC that did
+  // not come from an AI generation has neither, and an empty AI result would only show blank boxes)
+  get hasAiAreas(): boolean {
+    var areas = this.areasstring
+    return Array.isArray(areas) ? areas.some(e => (e ?? "").toString().trim().length != 0) : (areas ?? "").toString().trim().length != 0
+  }
+  get hasAiSummary(): boolean {
+    return (this.summarystring ?? "").toString().trim().length != 0
+  }
   proceduresLoaded = false;
 
   private extractATCJson(input: string): any | null {
@@ -834,6 +943,137 @@ export class PrescribeATCComponent {
         this.atcdirective = null
       }
     }
+    // EI Solution opens with one empty ask row, WiSH with five empty outcome rows
+    this.ensureAskRow()
+    this.ensureOutcomeRows()
+    // participant + product chosen → WiSH / EI Solution: appointment; any other model: live queue
+    this.runProductCheck()
+  }
+
+  // WiSH and EI Solution take their specialists from the appointment (name match, hardcoded)
+  private isAppointmentModel(product: string): boolean {
+    return isWiSHProduct(product) || isEISolutionProduct(product)
+  }
+
+  // Runs only on the user's own product pick. A product loaded from a draft is patched as it is (no re-check);
+  // a directive assignment never had a queue check and still doesn't.
+  async runProductCheck(){
+    if(!this.participantProfileid || !this.product || this.assignmentInitiated) return
+    if(this.isAppointmentModel(this.product)){
+      if(!this.bigActivity()) await this.prefillFromAppointment()
+    }
+    else{
+      await this.checkLiveQueue()
+    }
+  }
+
+  // WiSH / EI Solution:
+  //  1. AppointmentType-To-Roles where atcrequired == true and atcmodel == product → assigned_appttype_ref
+  //  2. appointments booked by this participant, of those types, hosted by the logged-in specialist, not cancelled,
+  //     started before now → the one closest to now
+  //  3. hostRole "eisroles/<roleId>" → atcrolemap[roleId] (bigactivity ids) → atcproperty: author / observer /
+  //     mentoring / other activity get that role's hosts; assigned_to (change agent) hosts become the "set for all
+  //     procedures" agents of that activity and are applied to every procedure (2026-10-23, operator).
+  // Nothing found → the pickers stay as they are for manual entry.
+  async prefillFromAppointment(){
+    var model = this.product
+    try {
+      var mappingSnap = await getDocs(query(collection(this.firestoreDefault, "AppointmentType-To-Roles"),
+        where("atcrequired", "==", true), where("atcmodel", "==", model)))
+      var roleMapByType = {}
+      var typeRefs = []
+      mappingSnap.docs.forEach(mapping => {
+        var typeRef = mapping.data()["assigned_appttype_ref"]
+        if(typeRef?.id){
+          roleMapByType[typeRef.id] = mapping.data()["atcrolemap"] ?? {}
+          typeRefs.push(typeRef)
+        }
+      })
+      if(typeRefs.length == 0){
+        console.info("[prescribeATC] no appointment type has atcrequired + atcmodel \"" + model + "\"")
+        return
+      }
+
+      // Direct query: this participant, hosted by the logged-in specialist, of those types, not cancelled,
+      // already started — newest first, one doc. `in` takes at most 30 values, so larger type lists are chunked.
+      var now = new Date()
+      var closest = null
+      for (let i = 0; i < typeRefs.length; i += 30) {
+        var apptSnap = await getDocs(query(collection(this.firestoreDefault, "appointments"),
+          where("bookedby", "==", doc(this.firestoreDefault, "profile_data", this.participantProfileid)),
+          where("hosts", "array-contains", doc(this.firestoreDefault, "profile_data", this.loggedinProfileid)),
+          where("appointment", "in", typeRefs.slice(i, i + 30)),
+          where("cancelled", "==", false),
+          where("starttime", "<=", now),
+          orderBy("starttime", "desc"),
+          limit(1)))
+        var latest = apptSnap.docs[0]
+        var start = latest?.data()["starttime"]?.toDate?.() ?? null
+        if(latest && start && (closest == null || start > closest.start)){
+          closest = { id: latest.id, data: latest.data(), typeId: latest.data()["appointment"]?.id, start: start }
+        }
+      }
+      if(closest == null){
+        console.info("[prescribeATC] no past \"" + model + "\" appointment hosted by you for this participant")
+        return
+      }
+      // the product cannot change (it locks), but stay safe if the screen was reset meanwhile
+      if(this.product != model) return
+
+      // the delivery step holding this appointment → the purchase it belongs to (View ATC lists its forms by it)
+      var stepSnap = await getDocs(query(collection(this.firestoreDefault, "deliverables"),
+        where("fileref", "array-contains", doc(this.firestoreDefault, "appointments", closest.id)), limit(1)))
+      var participantProductId = stepSnap.docs[0]?.data()["participantproductid"] ?? null
+
+      var roleMap = roleMapByType[closest.typeId]
+      var toPath = (person) => typeof person == "string" ? (person.includes("/") ? person : "profile_data/" + person) : person?.path
+      var authorFill = {}, observerFill = {}, mentorFill = {}, otherFill = {}, changeAgentFill = {}
+      Object.entries<any>(closest.data["hostRole"] ?? {}).forEach(([roleKey, people]) => {
+        var roleId = roleKey.split("/").pop()
+        var mapped = roleMap[roleId]
+        var activityIds: string[] = Array.isArray(mapped) ? mapped : (typeof mapped == "string" ? [mapped] : [])
+        var paths: string[] = (Array.isArray(people) ? people : []).map(toPath).filter(path => !!path)
+        activityIds.forEach(activityId => {
+          var property = this.bigActivityList.find(e => e["docid"] == activityId)?.["atcproperty"]
+          var target = property == "author" ? authorFill : property == "observer" ? observerFill
+            : property == "mentoring" ? mentorFill : property == "assigned_to" ? changeAgentFill : otherFill
+          target[activityId] = Array.from(new Set([...(target[activityId] ?? []), ...paths]))
+        })
+      })
+
+      // same zone + rebuild steps as the live-queue patch, so the closed mat-selects show the names at once
+      this.ngZone.run(() => {
+        Object.keys(authorFill).forEach(key => this.authorMap[key] = authorFill[key])
+        Object.keys(observerFill).forEach(key => this.observerMap[key] = observerFill[key])
+        Object.keys(mentorFill).forEach(key => this.mentorMap[key] = mentorFill[key])
+        Object.keys(otherFill).forEach(key => {
+          var existing = this.additionalActivityMap.find(e => e.activity == key)
+          if(existing) existing.specialist = otherFill[key]
+          else this.additionalActivityMap.push({ activity: key, specialist: otherFill[key] })
+        })
+        // assigned_to (change agent) activities: the hosts become that activity's "set for all procedures" agents,
+        // applied at once (no confirm — automatic, nothing typed yet): every procedure row now on screen gets them, and a
+        // procedure added later inherits them when its changework is picked (onProcedureSelect). Still editable.
+        Object.keys(changeAgentFill).forEach(key => {
+          this.bulkAssignedSelection[key] = [...changeAgentFill[key]]
+          this.bulkAppliedSelection[key] = [...changeAgentFill[key]]
+          ;(this.transcript ?? []).forEach(adjustment => {
+            (adjustment.procedure ?? []).forEach(procedure => {
+              procedure.assignedMap = procedure.assignedMap ?? {}
+              procedure.assignedMap[key] = [...changeAgentFill[key]]   // own copy per procedure
+            })
+          })
+        })
+        this.appointmentId = closest.id
+        this.participantProductId = participantProductId
+        this.onObserverSelect()
+        this.personnelReady = false
+        setTimeout(() => this.personnelReady = true)
+      })
+      this.autoSave()
+    } catch (error) {
+      console.error("Could not load specialists from the appointment", error)
+    }
   }
 
   onObserverSelect(){
@@ -923,8 +1163,27 @@ export class PrescribeATCComponent {
           procedure.assignedMap[assigned.docid] = [...selected]
         })
       })
+      // remember what was applied: procedures chosen from now on get these agents too (onProcedureSelect)
+      this.bulkAppliedSelection[assigned.docid] = [...selected]
       this.autoSave()
     }
+  }
+
+  // A procedure was chosen on adjustment i, row j: every change-agent activity that was set for all procedures
+  // (Apply) fills this procedure too — only where it has nobody yet, so a manual per-procedure edit is kept.
+  onProcedureSelect(i, j){
+    var procedure = this.transcript?.[i]?.procedure?.[j]
+    procedure.mandatory = this.isWiSH
+    if(procedure?.name){
+      procedure.assignedMap = procedure.assignedMap ?? {}
+      Object.keys(this.bulkAppliedSelection).forEach(activityId => {
+        var applied = this.bulkAppliedSelection[activityId] ?? []
+        if(applied.length != 0 && (procedure.assignedMap[activityId] ?? []).length == 0){
+          procedure.assignedMap[activityId] = [...applied]
+        }
+      })
+    }
+    this.autoSave()
   }
 
   async onProfileSelect(){
@@ -937,7 +1196,12 @@ export class PrescribeATCComponent {
         }
       })
     }
+    // participant first → draft check; the live-queue / appointment check waits for the product (runProductCheck)
+    this.getATCoptions()
+  }
 
+  // The existing live-queue flow (unchanged), now run after the product is chosen for non-WiSH / EI models
+  async checkLiveQueue(){
     // Step 3: does this specialist + participant have an existing live assignment record, in any of the currently ongoing queues
     var ongoingQueueIds = this.ongoingQueues.map(e => e["docid"])
     if(ongoingQueueIds.length != 0){
@@ -975,6 +1239,7 @@ export class PrescribeATCComponent {
             getDoc(doc(this.firestoreDefault, "queue generation", this.queueid)).then(queueDoc =>{
               if(queueDoc.exists()){
                 this.liveassignmentdata['queuename'] = queueDoc.data()["queuename"]
+                this.autoSave() // the draft keeps the queue name for an offline reopen
               }
             })
           }
@@ -1076,6 +1341,9 @@ export class PrescribeATCComponent {
             else{
               this.tokendata = null
             }
+            // The product pick saved the draft before these lookups returned — save again so the draft holds the
+            // queue reference (queueid / stagename / liveassignmentid), the queue's product and its specialists
+            this.autoSave()
           })
 
 
@@ -1095,7 +1363,6 @@ export class PrescribeATCComponent {
         console.log(e)
       })
     }
-    this.getATCoptions()
   }
 
 
@@ -1565,6 +1832,21 @@ export class PrescribeATCComponent {
           aiedited: this.aiedited ?? false,
           aigeneratedsource: this.aigeneratedsource ?? null,
           aigeneratedid: this.aigeneratedid ?? null,
+          // where the specialists came from — reopening patches these back (no re-check), so an ATC drafted
+          // offline still submits with its appointment / queue reference
+          appointmentid: this.appointmentId ?? null,
+          participantproductid: this.participantProductId ?? null,
+          queueid: this.queueid ?? null,
+          stagename: this.stagename ?? null,
+          liveassignmentid: this.liveassignmentid ?? null,
+          queuename: this.liveassignmentdata?.["queuename"] ?? null,
+          // EI Solution asks — every row, half-filled ones too, so nothing typed is lost on reload
+          ask: this.isEISolution ? this.askRows.map(row => ({ askedby: row.askedby ?? null, askedfor: row.askedfor ?? "" })) : [],
+          // WiSH outcomes — every row, half-filled ones too
+          outcomes: this.isWiSH ? this.outcomeRows.map(row => ({ outcomearea: row.outcomearea ?? "", outcomeexpected: row.outcomeexpected ?? "" })) : [],
+          // change-agent "set for all procedures": the picker's selection and what was last applied
+          bulkassigned: this.bulkAssignedSelection ?? {},
+          bulkapplied: this.bulkAppliedSelection ?? {},
         };
 
         // local-first: durable local write (never lost), then push to Firestore inside a rev-checked transaction.
@@ -1636,6 +1918,50 @@ export class PrescribeATCComponent {
     window.open(window.location.origin + window.location.pathname, '_blank');
   }
 
+  // "Ready to submit" panel: a read-only mirror of the checks submit() makes, so the specialist sees what is left.
+  // submit() is still the one that enforces them.
+  get submitChecklist(): { label: string, done: boolean }[] {
+    var transcript = this.transcript ?? []
+    var hasText = (adjustment) => (adjustment?.adjustment ?? "").trim().length != 0
+    var items = [
+      { label: "Choose the participant", done: this.participantProfileid != null },
+      { label: "Choose what the ATC is given for", done: this.product != null },
+      { label: "Prescribed date", done: this.date != null },
+    ]
+    if(!this.bigActivity()){
+      items.push({ label: "Add at least one author", done: Object.keys(this.authorMap ?? {}).some(e => (this.authorMap[e] ?? []).length != 0) })
+    }
+    // same order as the screen: directive, then Ask (EI Solution) / WiSH outcomes
+    items.push({ label: this.isWiSH ? "Write the immediate outcome" : "Write the ATC directive", done: (this.atcdirective ?? "").trim().length != 0 })
+    if(this.isEISolution){
+      items.push({ label: "Add at least one complete ask", done: this.askError() == null })
+    }
+    if(this.isWiSH){
+      items.push({ label: "Add at least one complete WiSH outcome", done: this.outcomeError() == null })
+    }
+    items.push({ label: "Enter the first adjustment and its procedure", done: transcript.length != 0 && (transcript[0].adjustment ?? "").length != 0 && transcript[0].procedure?.[0]?.name != null })
+    items.push({ label: "Awareness and potential years on every adjustment", done: !transcript.some(a => hasText(a) && (a.awareness == null || a.potentialyears == null)) })
+    items.push({ label: "No empty procedure rows", done: !transcript.some(a => hasText(a) && (a.procedure ?? []).some(p => p.name == null)) })
+    items.push({ label: "Consultation points", done: (this.consultationpoint ?? "").trim().length != 0 })
+    items.push({ label: "Case notes", done: (this.casenotes ?? "").trim().length != 0 })
+    var mandatory = transcript.some(a => (a.procedure ?? []).some(p => p.name != null && p.mandatory))
+    if(mandatory && (this.eis || this.admin || this.ah)){
+      items.push({ label: "Changework brief (a procedure is mandatory)", done: (this.audioBlob ?? []).length != 0 })
+    }
+    if(this.mentor && !this.isEISolution && !this.isWiSH){
+      items.push({ label: "Micro ATC directives have an assignee", done: !(this.atcAssignment ?? []).some(d => ((d.directive ?? "").trim().length != 0) != ((d.assignedto ?? []).length != 0)) })
+    }
+    return items
+  }
+
+  get submitChecklistDone(): number {
+    return this.submitChecklist.filter(item => item.done).length
+  }
+
+  trackByLabel(index: number, item: { label: string }){
+    return item.label
+  }
+
   // true when the participant has at least one draft other than the one currently open
   get hasOtherDrafts(): boolean {
     return this.existingDraftIds.some(id => id !== this.autoSaveID);
@@ -1661,10 +1987,44 @@ export class PrescribeATCComponent {
     this.consultationpoint = value['consultationpoint'] ?? null
     this.casenotes = value['notes'] ?? null
     this.mentornotes = value['mentornotes'] ?? null
+    // AI summary + areas the draft was saved with (reopening an AI draft via Continue shows them again)
+    this.summarystring = value['aiatcsummary'] ?? null
+    this.areasstring = value['areastoexplore'] ?? null
     // Carry the "edited from AI generation" provenance through to submit.
     this.aiedited = value['aiedited'] ?? false
     this.aigeneratedsource = value['aigeneratedsource'] ?? null
     this.aigeneratedid = value['aigeneratedid'] ?? null
+    // EI Solution asks as they were typed (an EI draft always shows at least one row)
+    this.askRows = (Array.isArray(value['ask']) ? value['ask'] : [])
+      .map(row => ({ askedby: row?.askedby ?? null, askedfor: row?.askedfor ?? "" }))
+    this.ensureAskRow()
+    // WiSH outcomes as they were typed (a WiSH draft always shows its rows)
+    this.outcomeRows = (Array.isArray(value['outcomes']) ? value['outcomes'] : [])
+      .map(row => ({ outcomearea: row?.outcomearea ?? "", outcomeexpected: row?.outcomeexpected ?? "" }))
+    this.ensureOutcomeRows()
+    // change-agent "set for all procedures" selection and the applied agents new procedures inherit
+    this.bulkAssignedSelection = value['bulkassigned'] ?? {}
+    this.bulkAppliedSelection = value['bulkapplied'] ?? {}
+    // Appointment / queue reference saved with the draft: patched as it is, no re-check
+    this.appointmentId = value['appointmentid'] ?? null
+    this.participantProductId = value['participantproductid'] ?? null
+    this.queueid = value['queueid'] ?? null
+    this.stagename = value['stagename'] ?? null
+    this.liveassignmentid = value['liveassignmentid'] ?? null
+    if (this.liveassignmentid != null) {
+      // queue mode as it was when the draft was saved (submit uses the queue name, live assignment and stage)
+      this.arenamode = true
+      this.liveassignmentdata = { queuename: value['queuename'] ?? null, queueid: this.queueid, stagename: this.stagename }
+      this.validationnotrequired = this.mentor || this.queryparam?.["validation"] == "true"
+    }
+    else if (this.arenamode) {
+      // a draft without a queue session must not inherit queue mode from a previously opened draft
+      // ("Open & Continue Another Draft"); validation goes back to the non-queue default
+      this.arenamode = false
+      this.liveassignmentdata = null
+      this.tokendata = null
+      this.validationnotrequired = !this.bigActivity()
+    }
     for (let i = 0; i < this.transcript.length; i++) {
       this.transcript[i]['awareness'] = this.transcript[i]['awareness'] ?? null
       this.transcript[i]['potentialyears'] = this.transcript[i]['potentialyears'] ?? null
@@ -2170,8 +2530,15 @@ async removeATCImage(index: number) {
     else if(!Object.keys(this.authorMap).some(e => (this.authorMap[e] ?? []).length != 0) && !this.bigActivity()){
       this.focusMissingField('atcfield-author', 'Choose the author names')
     }
+    // same order as the screen: directive, then Ask (EI Solution) / WiSH outcomes
     else if((this.atcdirective ?? "").trim().length == 0){
       this.focusMissingField('atcfield-directive', 'Provide ATC directive')
+    }
+    else if(this.isEISolution && this.askError() != null){
+      this.focusMissingField('atcfield-asks', this.askError())
+    }
+    else if(this.isWiSH && this.outcomeError() != null){
+      this.focusMissingField('atcfield-outcomes', this.outcomeError())
     }
     else if((this.consultationpoint ?? "").trim().length == 0){
       this.focusMissingField('atcfield-consultationpoint', 'Consultation points required')
@@ -2368,6 +2735,18 @@ async removeATCImage(index: number) {
           alphaData["queueid"] = this.queueid
           alphaData["stagename"] = this.stagename
           alphaData["liveassignmentid"] = this.liveassignmentid
+        }
+        if(this.appointmentId != null){
+          alphaData["appointmentid"] = this.appointmentId
+          alphaData["participantproductid"] = this.participantProductId
+        }
+        // EI Solution only: complete asks (other models get no field)
+        if(this.isEISolution){
+          alphaData["ask"] = this.completeAsks
+        }
+        // WiSH only: complete outcome rows (other models get no field)
+        if(this.isWiSH){
+          alphaData["outcomes"] = this.completeOutcomes
         }
         if(aelvalue != false){
           alphaData["aelid"] = aelvalue
@@ -2604,6 +2983,13 @@ async removeATCImage(index: number) {
         behavior : 'smooth'
       })
       this.product = null;
+      this.appointmentId = null;
+      this.participantProductId = null;
+      // the bulk change agents belong to the submitted ATC — the next participant starts clean
+      this.bulkAssignedSelection = {};
+      this.bulkAppliedSelection = {};
+      this.askRows = [];
+      this.outcomeRows = [];
       this.atcdirective = null
       this.filteredProfile = '';
       this.participantProfileid = null;
@@ -2636,6 +3022,9 @@ async removeATCImage(index: number) {
       this.audioBlobURL = [];
       this.autoSaveID = null;  // clear draft context so the name unlocks and a new participant can be selected
       this.aigeneratedEntry = false;
+      // the next ATC in this tab must not show the previous participant's AI summary
+      this.summarystring = null;
+      this.areasstring = null;
       this.existingDraftIds = [];
       this.selectedNoteImages = []
       this.previewNoteImages = []
