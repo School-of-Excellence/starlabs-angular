@@ -766,7 +766,7 @@ export class EventsStageDataComponent {
           if (!pid) return;
           const ms = this.toMillis(x['logdate']);
           const prev = byPid.get(pid);
-          if (!prev || ms >= prev.ms) byPid.set(pid, { ms, currentstage: x['currentstage'] ?? '', selectedstageslot: x['selectedstageslot'] ?? {} });
+          if (!prev || ms >= prev.ms) byPid.set(pid, { ms, currentstage: x['currentstage'] ?? '', selectedstageslot: x['bookedslot'] ?? {} });
         });
         const latestByPid = new Map<string, { ms: number; currentstage: string }>();
         const completedByPid = new Map<string, Record<string, number>>();
