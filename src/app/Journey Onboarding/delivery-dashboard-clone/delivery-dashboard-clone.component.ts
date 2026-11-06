@@ -21,6 +21,7 @@ import { MatNativeDateModule } from '@angular/material/core';
 import { MatInputModule } from '@angular/material/input';
 import { limit } from '@angular/fire/firestore';  // add 'limit' to the existing firestore import
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatTableModule } from '@angular/material/table';
 // Pure business rules — thresholds, bands, date maths, funnel arithmetic and label rules — live in a
 // dependency-free sibling engine so they can be unit-tested without this component's Firestore stack.
 // Extracted 2026-09-10; see delivery-dashboard.engine.ts for what moved and why.
@@ -186,7 +187,8 @@ interface UtilizationRow {
         MatSlideToggleModule,
         ProfilePictureComponent,
         FormOverlayViewComponent,
-        SpecialistAppointmentSlotsComponent   
+        SpecialistAppointmentSlotsComponent,
+        MatTableModule 
     ],
     providers: [DatePipe],
     templateUrl: './delivery-dashboard-clone.component.html',
@@ -282,6 +284,35 @@ export class DeliveryDashboardCloneComponent {
     funnelModalProfiles: { [profileId: string]: any[] } = {};
     notEligible: any = [];
     stageModalOpen = false;
+
+    // weekly report declarations
+    weeklyReportCardId = '';
+    weeklyReportRows: any[] = [];
+    weeklyReportLoading = false;
+
+    weeklyReportParticipants: any[] = [];
+    weeklyStatusFilter = 'all';
+    weeklyInitiatedRange = new FormGroup({
+        start: new FormControl<Date | null>(null),
+        end: new FormControl<Date | null>(null),
+    });
+    weeklyAppointmentRange = new FormGroup({
+        start: new FormControl<Date | null>(null),
+        end: new FormControl<Date | null>(null),
+    });
+    weeklyColumns = [
+        { key: 'sno', label: 'S.NO', perParticipant: true },
+        { key: 'name', label: 'PARTICIPANT NAME', perParticipant: true },
+        { key: 'diagnosticsSpecialist', label: 'DIAGNOSTICS SPECIALIST', perParticipant: true },
+        { key: 'implementationSpecialist', label: 'IMPLEMENTATION SPECIALIST', perParticipant: true },
+        { key: 'initiatedLabel', label: 'INITIATION DATE', perParticipant: true },
+        { key: 'appointmentDate', label: 'APPOINTMENT DATE & TIME', perParticipant: false },
+        { key: 'stage', label: 'STAGE', perParticipant: false },
+        { key: 'status', label: 'STATUS', perParticipant: false },
+    ];
+    weeklyColumnKeys = this.weeklyColumns.map(col => col.key);
+    private readonly weeklyStatusLabels: { [key: string]: string } = { booked: 'Booked', completed: 'Completed' };
+    private eisRoleTypeMap: { [roleId: string]: 'diagnostics' | 'implementation' } = {};
 
     // Hidden products (by name)
     hiddenProductNames: Set<string> = new Set([
@@ -7190,6 +7221,177 @@ export class DeliveryDashboardCloneComponent {
 
         this.populateActionableCohorts(this.currentSelectedLabels); 
         this.cdr.detectChanges();
+    }
+
+    private async loadEisRoles(): Promise<void> {
+        const alreadyLoaded = Object.keys(this.eisRoleTypeMap).length > 0;
+        if (alreadyLoaded) return;
+
+        const snap = await runInInjectionContext(this.injector, () =>
+            getDocs(collection(this.firestore, 'eisroles'))
+        );
+        for (const roleDoc of snap.docs) {
+            const roleName = (roleDoc.data()['role'] || '').toLowerCase();
+            if (roleName.includes('implementation')) this.eisRoleTypeMap[roleDoc.id] = 'implementation';
+            else if (roleName.includes('diagnostics')) this.eisRoleTypeMap[roleDoc.id] = 'diagnostics';
+        }
+    }
+
+    async loadWeeklyReport() {
+        if (!this.weeklyReportCardId) return;
+        this.weeklyReportLoading = true;
+        try {
+            await this.loadEisRoles();
+
+            const productIds = new Set(this.getCardProductIds(this.weeklyReportCardId));
+            const participantProducts = this.allMatchedProductsRaw.filter(item =>
+                productIds.has(item?.productref?.id) && item?.statusdate?.initiated
+            );
+            const docIds = participantProducts.map(item => item.docid);
+            const appointmentsByProduct = await this.fetchAppointments(docIds);
+
+            this.weeklyReportParticipants = participantProducts.map(item => this.weeklyParticipants(item, appointmentsByProduct));
+            this.applyWeeklyFilters();
+        } finally {
+            this.weeklyReportLoading = false;
+        }
+    }
+
+    private async fetchAppointments(docIds: string[]): Promise<Map<string, any[]>> {
+        const requests = [];
+        for (let i = 0; i < docIds.length; i += 30) {
+            const chunk = docIds.slice(i, i + 30);
+            requests.push(runInInjectionContext(this.injector, () =>
+                getDocs(query(
+                    collection(this.firestore, 'appointments'),
+                    where('participantproductid', 'in', chunk),
+                    where('cancelled', '==', false)
+                ))
+            ));
+        }
+        const snaps = await Promise.all(requests);
+        const appointments = snaps.flatMap(snap => snap.docs.map(d => d.data()));
+
+        const appointmentsByProduct = new Map<string, any[]>();
+        for (const appointment of appointments) {
+            const productDocId = appointment['participantproductid'];
+            if (!appointmentsByProduct.has(productDocId)) appointmentsByProduct.set(productDocId, []);
+            appointmentsByProduct.get(productDocId).push(appointment);
+        }
+        return appointmentsByProduct;
+    }
+
+    private weeklyParticipants(item: any, appointmentsByProduct: Map<string, any[]>) {
+        const appointments = (appointmentsByProduct.get(item.docid) || []).sort((a, b) => a['starttime'].toMillis() - b['starttime'].toMillis());
+
+        return {
+            name: this.mapMetaData[item.profileid]?.['name'] || item.profileid,
+            diagnosticsSpecialist: this.getSpecialistNames(appointments, 'diagnostics'),
+            implementationSpecialist: this.getSpecialistNames(appointments, 'implementation'),
+            initiatedDate: this.getDateFromFieldPublic(item.statusdate.initiated),
+            initiatedLabel: this.formatDate(item.statusdate.initiated),
+            appointments: appointments.map(a => this.buildWeeklyAppointment(a)),
+        };
+    }
+
+    private buildWeeklyAppointment(appointment: any) {
+        let statusKey = 'booked';
+        if (appointment['attended']) statusKey = 'completed';
+
+        return {
+            start: appointment['starttime'].toDate(),
+            appointmentDate: this.formatDateTime(appointment['starttime']),
+            stage: this.resolveAppointmentType(appointment) || '-',
+            statusKey,
+            status: this.weeklyStatusLabels[statusKey],
+        };
+    }
+
+    applyWeeklyFilters() {
+        const appointmentFiltersOn = this.isRangeSet(this.weeklyAppointmentRange) || this.weeklyStatusFilter !== 'all';
+        const rows: any[] = [];
+        let sno = 0;
+
+        for (const participant of this.weeklyReportParticipants) {
+            const initiatedMatches = this.isWithinRange(participant.initiatedDate, this.weeklyInitiatedRange);
+            if (!initiatedMatches) continue;
+
+            const appointments = participant.appointments.filter((a: any) => {
+                const inRange = this.isWithinRange(a.start, this.weeklyAppointmentRange);
+                const statusMatches = this.weeklyStatusFilter === 'all' || this.weeklyStatusFilter === a.statusKey;
+                return inRange && statusMatches;
+            });
+            const noMatchingAppointments = appointmentFiltersOn && appointments.length === 0;
+            if (noMatchingAppointments) continue;
+
+            sno++;
+            rows.push(...this.toTableRows(participant, appointments, sno));
+        }
+        this.weeklyReportRows = rows;
+    }
+
+    clearWeeklyFilters() {
+        this.weeklyInitiatedRange.reset();
+        this.weeklyAppointmentRange.reset();
+        this.weeklyStatusFilter = 'all';
+        this.applyWeeklyFilters();
+    }
+
+    exportWeeklyReport() {
+        const rows = this.weeklyReportRows.map(row => ({
+            'S.No': row.sno,
+            'Participant Name': row.name,
+            'Diagnostics Specialist': row.diagnosticsSpecialist,
+            'Implementation Specialist': row.implementationSpecialist,
+            'Initiation Date': row.initiatedLabel,
+            'Appointment Date & Time': row.appointmentDate,
+            'Stage': row.stage,
+            'Status': row.status,
+        }));
+        this.downloadExcel(rows, `${this.getCardName(this.weeklyReportCardId)}_Weekly_Report`);
+    }
+
+    // helper functions
+    private toTableRows(participant: any, appointments: any[], sno: number): any[] {
+        if (appointments.length === 0) {
+            return [{ ...participant, sno, isFirst: true, appointmentDate: '-', stage: '-', status: '-' }];
+        }
+        return appointments.map((appointment, index) => ({
+            ...participant, ...appointment, sno, isFirst: index === 0
+        }));
+    }
+
+    private isRangeSet(range: FormGroup): boolean {
+        const { start, end } = range.value;
+        return !!start && !!end;
+    }
+
+    private isWithinRange(date: Date | null, range: FormGroup): boolean {
+        if (!this.isRangeSet(range)) return true;
+        if (!date) return false;
+
+        const { start, end } = range.value;
+        const endOfDay = new Date(end);
+        endOfDay.setHours(23, 59, 59, 999);
+        return date >= start && date <= endOfDay;
+    }
+
+    private getSpecialistNames(appointments: any[], type: 'diagnostics' | 'implementation'): string {
+        const names = new Set<string>();
+
+        for (const appointment of appointments) {
+            const roles = Object.entries<any[]>(appointment['hostRole'] || {});
+            const hostIdsOf = (roleType: string) => roles
+                .filter(([rolePath]) => this.eisRoleTypeMap[rolePath.split('/').pop()] === roleType)
+                .flatMap(([, hosts]) => hosts.map(host => host.id));
+
+            const implementationIds = hostIdsOf('implementation');
+            const hostIds = type === 'implementation' ? implementationIds : hostIdsOf('diagnostics').filter(id => !implementationIds.includes(id));
+
+            hostIds.forEach(id => names.add(this.mapprofile[id] || id));
+        }
+
+        return Array.from(names).join(', ') || '-';
     }
 
     openParticipant(profileId: string) {

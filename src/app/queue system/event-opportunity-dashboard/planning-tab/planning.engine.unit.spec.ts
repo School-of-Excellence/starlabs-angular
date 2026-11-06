@@ -24,6 +24,15 @@
 //
 // CASES MARKED "DEFECT (pinned)" assert behaviour that is arguably WRONG. They are pinned, not
 // fixed: this was a refactor. Each carries a comment saying why. See the engine header / the report.
+//
+// SLOT FIELD NAME. The seeds below say `bookedslot`, which is what the engine reads. They said
+// `selectedstageslot` until 2026-11-05: 854ad880 renamed the queue-token field in the engine and in
+// five other readers but left the seeds here alone, which turned PLU-04 "counts a confirmed slot
+// whose end is still ahead" and PLU-08 "picks the first configured stage..." red. The five remaining
+// PLU-04 cases kept passing — every one of them asserts an EMPTY result, so a seed the engine can no
+// longer see satisfies them for the wrong reason. Renaming the seed is what makes those five assert
+// anything again. Two readers still live on the old name (queue-planning.component.ts,
+// queue-planning-clone.component.ts), so the field is not yet uniform across the app.
 import {
   ALL_COLS,
   CardDef,
@@ -303,24 +312,24 @@ describe('planning.engine', () => {
     const past = new Date(NOW - 86400000);
 
     it('counts a confirmed slot whose end is still ahead', () => {
-      const tokens = [tok({ selectedstageslot: { 'Stage A': { slotconfirmation: true, enddate: ts(future) } } })];
+      const tokens = [tok({ bookedslot: { 'Stage A': { slotconfirmation: true, enddate: ts(future) } } })];
       expect([...confirmedSlotSetForStage(tokens, 'Stage A', NOW)]).toEqual(['p1']);
     });
 
     it('drops a confirmed slot that has already finished', () => {
-      const tokens = [tok({ selectedstageslot: { 'Stage A': { slotconfirmation: true, enddate: ts(past) } } })];
+      const tokens = [tok({ bookedslot: { 'Stage A': { slotconfirmation: true, enddate: ts(past) } } })];
       expect(confirmedSlotSetForStage(tokens, 'Stage A', NOW).size).toBe(0);
     });
 
     it('drops a slot at exactly now (the comparison is strict >)', () => {
-      const tokens = [tok({ selectedstageslot: { 'Stage A': { slotconfirmation: true, enddate: ts(new Date(NOW)) } } })];
+      const tokens = [tok({ bookedslot: { 'Stage A': { slotconfirmation: true, enddate: ts(new Date(NOW)) } } })];
       expect(confirmedSlotSetForStage(tokens, 'Stage A', NOW).size).toBe(0);
     });
 
     it('ignores an unconfirmed slot and a slot on another stage', () => {
       const tokens = [
-        tok({ profile_id: 'a', selectedstageslot: { 'Stage A': { slotconfirmation: false, enddate: ts(future) } } }),
-        tok({ profile_id: 'b', selectedstageslot: { 'Stage B': { slotconfirmation: true, enddate: ts(future) } } }),
+        tok({ profile_id: 'a', bookedslot: { 'Stage A': { slotconfirmation: false, enddate: ts(future) } } }),
+        tok({ profile_id: 'b', bookedslot: { 'Stage B': { slotconfirmation: true, enddate: ts(future) } } }),
       ];
       expect(confirmedSlotSetForStage(tokens, 'Stage A', NOW).size).toBe(0);
     });
@@ -329,7 +338,7 @@ describe('planning.engine', () => {
       // `if (end && end.getTime() > now)` — a missing or unparseable enddate fails the guard, so the
       // participant confirmed but shows up under "Not Confirmed". The organiser chases them for a
       // confirmation they already gave, and the confirmation-rate row understates reality.
-      const tokens = [tok({ selectedstageslot: { 'Stage A': { slotconfirmation: true } } })];
+      const tokens = [tok({ bookedslot: { 'Stage A': { slotconfirmation: true } } })];
       expect(confirmedSlotSetForStage(tokens, 'Stage A', NOW).size).toBe(0);
     });
 
@@ -694,7 +703,7 @@ describe('planning.engine', () => {
 
     it('picks the first configured stage for which a dated slot exists', () => {
       const tokensFor = (q: string) => q === 'q1'
-        ? [tok({ profile_id: 'p1', selectedstageslot: { 'Stage B': { startdate: ts(new Date(2026, 8, 10, 9, 0)) } } })]
+        ? [tok({ profile_id: 'p1', bookedslot: { 'Stage B': { startdate: ts(new Date(2026, 8, 10, 9, 0)) } } })]
         : [];
       const out = participantSlot('p1', [stage('Stage A'), stage('Stage B')], tokensFor);
       expect(out.startsWith('Sep 10, ')).toBe(true);

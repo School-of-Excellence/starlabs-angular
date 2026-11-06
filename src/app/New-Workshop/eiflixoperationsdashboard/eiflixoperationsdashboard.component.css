@@ -1061,7 +1061,10 @@ section.eod-section:focus { outline: none; }
 }
 .eod-psearch-clear:hover { background: #f2f2ee; color: var(--eod-ink, #17181c); }
 .eod-psearch-clear mat-icon { font-size: 16px; width: 16px; height: 16px; }
-.eod-ptool-row { display: flex; align-items: center; gap: 8px; }
+.eod-ptool-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+/* Hot Leads only: the cohort switch takes its own line so Default, Export and Send to Slack share
+   the next one (three buttons do not fit beside the switch in the 460px panel). */
+.eod-ptool-row.eod-ptool-row-hot .eod-pseg { flex: 1 0 100%; }
 .eod-pseg { flex: 1; }
 .eod-pseg button { flex: 1; padding: 6px 4px; font-size: 11.5px; }
 .eod-psort { position: relative; margin-left: auto; }

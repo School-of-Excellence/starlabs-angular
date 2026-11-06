@@ -1922,3 +1922,28 @@ mat-option[disabled] {
     min-width: auto;
   }
 }
+.slot-type-tag {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 1px 8px;
+  border-radius: 10px;
+  margin-left: 6px;
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+.slot-type-tag.appointment {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+.date-label {
+  white-space: nowrap;
+}
+.edit-slot-btn {
+  position: absolute;
+  right: 9px;
+  bottom: 4px;
+}
+
+.edit-slot-btn .btn-edit {
+  margin-top: 0;
+}

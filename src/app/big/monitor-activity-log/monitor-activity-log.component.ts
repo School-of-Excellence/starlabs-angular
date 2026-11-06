@@ -593,7 +593,7 @@ export class MonitorActivityLogComponent {
     XLSX.utils.book_append_sheet(wb, ws, 'Big Monitor.xlsx');
 
     /* save to file */
-    XLSX.writeFile(wb, 'Events Data');
+    XLSX.writeFile(wb, 'Events Data.xls');
   }
 
 }

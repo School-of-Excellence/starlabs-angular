@@ -284,7 +284,7 @@ export function confirmedSlotSetForStage(queueTokens: any[], stageName: string, 
   (queueTokens || []).forEach(t => {
     const pid = t['profile_id'];
     if (!pid) return;
-    const slot = (t['selectedstageslot'] || {})[stageName];
+    const slot = (t['bookedslot'] || {})[stageName];
     if (!slot || !slot['slotconfirmation']) return;
     // Only count a confirmed slot whose end time is still in the future (upcoming, not past).
     const end = toDate(slot['enddate']);
@@ -638,7 +638,7 @@ export function participantSlot(
 ): string {
   for (const s of stages) {
     const tok = tokensFor(s.queueid).find(t => t['profile_id'] === id);
-    const slot = tok?.['selectedstageslot']?.[s.stagename];
+    const slot = tok?.['bookedslot']?.[s.stagename];
     const label = formatSlot(slot);
     if (label) return label;
   }
