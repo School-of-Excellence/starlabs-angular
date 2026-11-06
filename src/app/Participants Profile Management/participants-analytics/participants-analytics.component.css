@@ -287,3 +287,56 @@ tr:hover .tag-history-btn { opacity: 1; }
 .product-group button[disabled] {
   opacity: 0.3;
 }
+.modal-card.flag-modal {
+  width: 560px;
+  max-width: 92vw;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.flag-body { overflow-y: auto; padding-right: 4px; }
+
+.flag-card {
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  background: #fff;
+  transition: border-color 0.15s, background 0.15s;
+}
+.flag-card.active { border-color: #3f51b5; background: #f6f7fd; }
+
+.flag-section { margin-top: 10px; }
+.flag-section-title { font-size: 12px; font-weight: 600; color: #555; margin-bottom: 6px; }
+.flag-section-title.add { color: #2e7d32; }
+
+.flag-chips { display: flex; flex-wrap: wrap; gap: 6px; max-height: 96px; overflow-y: auto; }
+
+.flag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  padding: 3px 4px 3px 10px;
+  border-radius: 14px;
+  background: #eceff1;
+  color: #37474f;
+}
+.flag-chip.add { padding: 3px 10px; background: #e8f5e9; color: #2e7d32; }
+
+.flag-chip-x {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+  border-radius: 50%;
+  font-size: 11px;
+  color: #78909c;
+  padding: 0;
+}
+.flag-chip-x:hover { background: #ffcdd2; color: #c62828; }
+
+.flag-hint { font-size: 12px; color: #666; margin: 4px 0 12px; }
