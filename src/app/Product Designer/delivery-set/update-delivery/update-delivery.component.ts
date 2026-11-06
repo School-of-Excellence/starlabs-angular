@@ -113,6 +113,7 @@ export class UpdateDeliveryComponent {
         duration: [, {validators: [Validators.required], updateOn:"change"}],
         ischangeworkrequired: [false, {validators: [], updateOn:"change"}],
         groupappointment: [false, {validators: [], updateOn:"change"}],
+        queueappointment: [false, {validators: [], updateOn:"change"}],  
         maxbooking: [1, {validators: [], updateOn:"change"}],
         docid: [, {}]
       })
@@ -160,9 +161,11 @@ export class UpdateDeliveryComponent {
           duration: dialogdata.duration,
           ischangeworkrequired: dialogdata.ischangeworkrequired ?? false,
           groupappointment: dialogdata.groupappointment ?? false,
+          queueappointment: dialogdata.queueappointment ?? false,   
           maxbooking: dialogdata.maxbooking ?? null,
           docid: dialogdata.docid
         })
+        this.onAppointmentCheckboxChange()   
       }
       else if(this.selectedType == "Form"){
         const formCollectionDoc = doc(collection(this.firestore,"delivery forms"),dialogdata.docid)
@@ -364,11 +367,12 @@ export class UpdateDeliveryComponent {
       this.loading = true
       var docid = value.docid ?? doc(collection(this.firestore,"appointmenttype")).id
       const docRef = doc(this.firestore,"appointmenttype",docid)
-      setDoc(docRef,{
+       setDoc(docRef,{
         appointmenttype: value.appointmentname,
         duration: value.duration,
         ischangeworkrequired: value.ischangeworkrequired,
         groupappointment: value.groupappointment,
+        queueappointment: value.queueappointment,
         maxbooking: value.groupappointment ? value.maxbooking : null,
         id: docid
       },{merge:true}).then(()=>{
@@ -413,6 +417,17 @@ export class UpdateDeliveryComponent {
         alert(err)
       })
     }
+  }
+
+  onAppointmentCheckboxChange(){
+    const group  = this.appointmentform.get('groupappointment')
+    const change = this.appointmentform.get('ischangeworkrequired')
+    const opts   = { emitEvent: false }
+
+    if(group.value && change.value){ change.setValue(false, opts) }
+
+    group.value  ? change.disable(opts) : change.enable(opts)
+    change.value ? group.disable(opts)  : group.enable(opts)
   }
 
   submitQueue(value){
