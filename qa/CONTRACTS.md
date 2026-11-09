@@ -17,3 +17,5 @@ One line per live contract (gate section 1.1).
 > http://localhost:4200/journey-coach-health against the starlabs-test Firebase project,
 > in a logged-in Chrome session, with the reconciliations recorded in each contract's
 > Evidence block — not merely that it compiles or that the node checks pass.
+
+| jc-onboarding-usability (p1: decouple) | /onboarding-pipeline | qa/checks/jc-onboarding-decouple.mjs | 2026-11-09 PASS (8/8; 6 FAIL on revert; live intake funnel renders on starlabs-test) |

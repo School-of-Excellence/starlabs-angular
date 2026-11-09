@@ -112,6 +112,9 @@ export class OnboardingPipelineComponent implements OnInit {
   // Access gate state
   loading: boolean = true;
   accessDenied: boolean = false;
+  // Fatal (non-salescrm) init failure — only this hides the whole screen. Salescrm
+  // config/access denials keep the intake funnel visible and show a notice instead.
+  fatalError: boolean = false;
   accessError: string = '';
   accessReason: 'config' | 'email' | 'notfound' | 'unknown' | '' = '';
   accessDebug: { email?: string; queriedEmails?: string[]; raw?: string } = {};
@@ -227,6 +230,10 @@ export class OnboardingPipelineComponent implements OnInit {
   ) {}
 
   async ngOnInit() {
+    // Intake funnel (journey-coach sources) reads the MAIN starlabs Firestore and is
+    // independent of salescrm — load it unconditionally so the screen is usable even
+    // when salescrm is unconfigured or access is denied.
+    this.loadSourceBuckets();
     try {
       // 1. Verify salescrm Firebase config is actually filled in.
       const salescrmCfg: any = (environment as any)?.['salescrm'];
@@ -259,6 +266,7 @@ export class OnboardingPipelineComponent implements OnInit {
     } catch (err: any) {
       console.error('[onboarding-pipeline] init error:', err);
       this.accessDenied = true;
+      this.fatalError = true;
       this.accessReason = 'unknown';
       this.accessError = 'Could not connect to salescrm. ' + (err?.message || '') + ' (See console for full details.)';
       this.accessDebug.raw = (err && (err.message || err.toString())) || 'unknown';

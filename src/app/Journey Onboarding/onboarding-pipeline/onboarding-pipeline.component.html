@@ -7,7 +7,7 @@
   </div>
 
   <!-- ═══════════════ ACCESS DENIED ═══════════════ -->
-  <div class="op-state op-state--denied" *ngIf="!loading && accessDenied">
+  <div class="op-state op-state--denied" *ngIf="!loading && fatalError">
     <div class="op-denied-card">
       <div class="op-denied-icon" [class.op-denied-icon--warn]="accessReason === 'config'">
         <svg *ngIf="accessReason === 'config'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -51,7 +51,7 @@
   </div>
 
   <!-- ═══════════════ PIPELINE LISTING ═══════════════ -->
-  <ng-container *ngIf="!loading && !accessDenied && !selectedPipeline">
+  <ng-container *ngIf="!loading && !fatalError && !selectedPipeline">
     <div class="op-header">
       <div class="op-header-main">
         <span class="op-eyebrow">
@@ -59,9 +59,12 @@
           Journey · Onboarding pipelines
         </span>
         <h1 class="op-title">Onboarding Pipeline</h1>
-        <p class="op-sub">
+        <p class="op-sub" *ngIf="!accessDenied">
           Pipelines tagged <strong>Journey Experience</strong> and shared with
           <strong>{{ salescrmUserName }}</strong>.
+        </p>
+        <p class="op-sub" *ngIf="accessDenied">
+          Coach onboarding intake &mdash; purchase &rarr; mandate &rarr; onboarding. Salescrm pipelines are not connected.
         </p>
       </div>
     </div>
@@ -284,7 +287,22 @@
     </div>
 
     <!-- ─── PIPELINES SECTION ─── -->
-    <section class="op-pipelines">
+    <!-- Salescrm unavailable → inline notice here instead of blocking the whole screen; the intake funnel above stays usable. -->
+    <section class="op-pipelines op-pipelines--notice" *ngIf="accessDenied">
+      <div class="op-pipelines-head"><div class="op-pipelines-meta"><h2 class="op-pipelines-title">Pipelines</h2></div></div>
+      <div class="op-denied-card op-denied-card--inline">
+        <h3 class="op-denied-title">
+          <ng-container [ngSwitch]="accessReason">
+            <ng-container *ngSwitchCase="'config'">Salescrm not configured</ng-container>
+            <ng-container *ngSwitchCase="'email'">No session email</ng-container>
+            <ng-container *ngSwitchCase="'notfound'">Not in salescrm</ng-container>
+            <ng-container *ngSwitchDefault>Pipelines unavailable</ng-container>
+          </ng-container>
+        </h3>
+        <p class="op-denied-desc">{{ accessError }}</p>
+      </div>
+    </section>
+    <section class="op-pipelines" *ngIf="!accessDenied">
       <div class="op-pipelines-head">
         <div class="op-pipelines-meta">
           <span class="op-pipelines-eyebrow"
