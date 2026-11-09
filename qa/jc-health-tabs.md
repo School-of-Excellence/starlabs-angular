@@ -7,7 +7,7 @@ URL: http://localhost:4300/journey-coach-health
 ## Scope
 Journey Coach Health becomes the single journey-coach screen with four top-level tabs:
 1. Overall Summary (placeholder — content to be defined)
-2. Onboarding (scaffold — Gross/Assured sales + Onboarding by product + intake pipeline next)
+2. Onboarding (built — see qa/jc-health-onboarding-tab.md)
 3. Ev. Preparation (placeholder — content to be defined)
 4. Journey Planning = the existing coach-health screen, unchanged (default tab)
 

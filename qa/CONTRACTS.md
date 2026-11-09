@@ -21,3 +21,5 @@ One line per live contract (gate section 1.1).
 | jc-onboarding-usability (p1: decouple) | /onboarding-pipeline | qa/checks/jc-onboarding-decouple.mjs | 2026-11-09 PASS (8/8; 6 FAIL on revert; live intake funnel renders on starlabs-test) |
 
 | jc-health-tabs | /journey-coach-health | qa/checks/jc-health-tabs.mjs | 2026-11-09 PASS (9/9; 8 FAIL on revert; live tab switching) |
+
+| jc-health-onboarding-tab | /journey-coach-health (Onboarding tab) | qa/checks/jc-health-onboarding-tab.mjs | 2026-11-09 PASS (12/12; 9 FAIL on revert; live: filter + Gross/Assured + by-product + pipeline below; To onboard 7 == 6+1) |

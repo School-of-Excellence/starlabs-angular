@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, ViewChild, TemplateRef, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectorRef, Component, Input, ViewChild, TemplateRef, ChangeDetectionStrategy } from '@angular/core';
 import { and, collection, collectionData, Firestore, or, query, where, getDocs, getCountFromServer, doc, updateDoc, setDoc, getDoc, limit, writeBatch } from '@angular/fire/firestore';
 import { orderBy, Timestamp } from 'firebase/firestore';
 import { takeUntil, Subject, Subscription, take, combineLatest } from 'rxjs';
@@ -650,6 +650,11 @@ export class JourneycoachDashboardComponent {
   askAHDialogProfiles: any[] = [];
   askAHSourceFilter: 'all' | 'askAH' | 'loveLetter' = 'all';
   askAHResolvedFilter: 'all' | 'resolved' | 'unresolved' = 'all';
+
+  /** When true (embedded in Journey Coach Health -> Onboarding tab), render only the date filter,
+   *  Gross/Assured sales and Onboarding-by-product (plus their tables and dialogs, so every
+   *  drill-down still works). Default false: the standalone dashboard is unchanged. */
+  @Input() embedOnboarding = false;
 
   constructor(
     public firestore: Firestore,
@@ -4093,6 +4098,11 @@ export class JourneycoachDashboardComponent {
 
   // Function to navigate screen to onboarding pipeline
   navigateToOnboardingPipeline() {
+    // Embedded in the coach-health Onboarding tab, the pipeline is rendered right below: scroll to it.
+    if (this.embedOnboarding) {
+      document.getElementById('jx-onboarding-pipeline')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
     window.open('/onboarding-pipeline', '_blank');
   }
 

@@ -1098,11 +1098,13 @@
   </ng-container>
   <!-- ═══ end Journey Planning tab ═══ -->
 
-  <!-- ─── Onboarding tab (scaffold; sales + onboarding-by-product + intake pipeline next) ─── -->
-  <section class="jx-tab-panel" *ngIf="experienceTab === 'onboarding'" data-testid="jx-panel-onboarding">
-    <div class="jx-placeholder">
-      <h2>Onboarding</h2>
-      <p>Gross &amp; Assured sales, Onboarding by product, and the intake pipeline will appear here.</p>
+  <!-- ─── Onboarding tab: Gross & Assured sales + Onboarding by product (Journey Experience dashboard,
+       embedded in onboarding mode — its tables and dialogs come along so every drill-down works),
+       with the intake pipeline directly below the by-product table. ─── -->
+  <section class="jx-tab-panel jx-onboarding" *ngIf="experienceTab === 'onboarding'" data-testid="jx-panel-onboarding">
+    <app-journeycoach-dashboard [embedOnboarding]="true" data-testid="jx-onboarding-sales"></app-journeycoach-dashboard>
+    <div id="jx-onboarding-pipeline" class="jx-onboarding-pipeline" data-testid="jx-onboarding-pipeline">
+      <app-onboarding-pipeline></app-onboarding-pipeline>
     </div>
   </section>
 

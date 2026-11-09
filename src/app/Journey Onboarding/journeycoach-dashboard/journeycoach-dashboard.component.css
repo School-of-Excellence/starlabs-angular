@@ -2498,3 +2498,16 @@ mat-dialog-actions,
 .jcd-root.jcd-dark .jcd-pg-num,
 .jcd-root.jcd-dark .jcd-pg-size { background: var(--soft) !important; color: var(--ink) !important; border-color: var(--line) !important; }
 .jcd-root.jcd-dark .jcd-pg-num.active { background: var(--accent) !important; color: #fff !important; border-color: var(--accent) !important; }
+
+/* ─── Embedded in Journey Coach Health -> Onboarding tab ([embedOnboarding]="true") ───
+   Standalone dashboard is unaffected: every rule is scoped to .jcd-embed. */
+.jcd-root.jcd-embed { min-height: auto; background: transparent; }
+.jcd-root.jcd-embed .top { position: static; -webkit-backdrop-filter: none; backdrop-filter: none; border: 1px solid var(--line); border-radius: 14px; }
+.jcd-root.jcd-embed .content { padding: 14px 0 18px; }
+.jcd-root.jcd-embed .content > .card.span4 { grid-column: span 6; }
+.jcd-root.jcd-embed .content > .card.span8 { grid-column: span 12; }
+.jcd-root.jcd-embed .loading-overlay { position: relative; inset: auto; min-height: 220px; z-index: auto; border-radius: 14px; }
+@media (max-width: 1200px) {
+  .jcd-root.jcd-embed .content > .card.span4,
+  .jcd-root.jcd-embed .content > .card.span8 { grid-column: span 12; }
+}
