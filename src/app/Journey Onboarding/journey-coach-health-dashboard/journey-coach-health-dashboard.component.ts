@@ -232,6 +232,12 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   readonly COVERAGE_TARGET = 0.9;  // contact at least this share of the base each period
 
   view: DashboardView = 'summary';
+
+  // Journey Experience top-level tabs. 'planning' = the existing coach-health screen
+  // (Summary / Participants / Coaches), kept unchanged; the others are new sibling tabs
+  // so a coach has one screen for onboarding, evolution prep and journey planning.
+  experienceTab: 'overall' | 'onboarding' | 'evprep' | 'planning' = 'planning';
+  setExperienceTab(t: 'overall' | 'onboarding' | 'evprep' | 'planning'): void { this.experienceTab = t; }
   // Dark/light theming (operator-approved): follows prefers-color-scheme by default; the header toggle
   // overrides and persists to localStorage. Applied via [attr.data-theme] on .jchd-wrap.
   theme: 'dark' | 'light' | null = null;

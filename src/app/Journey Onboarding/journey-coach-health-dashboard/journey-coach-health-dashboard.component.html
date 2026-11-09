@@ -1,5 +1,15 @@
 <div class="jchd-wrap" [ngClass]="'jchd-view-' + view" [attr.data-theme]="theme">
 
+  <!-- ─── Journey Experience top-level tabs ─── -->
+  <nav class="jx-tabbar" role="tablist" aria-label="Journey experience" data-testid="jx-tabbar">
+    <button type="button" class="jx-tab" role="tab" [class.on]="experienceTab==='overall'" [attr.aria-selected]="experienceTab==='overall'" (click)="setExperienceTab('overall')" data-testid="jx-tab-overall"><span class="jx-tab-step">1</span><span class="jx-tab-label">Overall Summary</span></button>
+    <button type="button" class="jx-tab" role="tab" [class.on]="experienceTab==='onboarding'" [attr.aria-selected]="experienceTab==='onboarding'" (click)="setExperienceTab('onboarding')" data-testid="jx-tab-onboarding"><span class="jx-tab-step">2</span><span class="jx-tab-label">Onboarding</span></button>
+    <button type="button" class="jx-tab" role="tab" [class.on]="experienceTab==='evprep'" [attr.aria-selected]="experienceTab==='evprep'" (click)="setExperienceTab('evprep')" data-testid="jx-tab-evprep"><span class="jx-tab-step">3</span><span class="jx-tab-label">Ev. Preparation</span></button>
+    <button type="button" class="jx-tab" role="tab" [class.on]="experienceTab==='planning'" [attr.aria-selected]="experienceTab==='planning'" (click)="setExperienceTab('planning')" data-testid="jx-tab-planning"><span class="jx-tab-step">4</span><span class="jx-tab-label">Journey Planning</span></button>
+  </nav>
+
+  <!-- ═══ Journey Planning tab = the existing coach-health screen (unchanged) ═══ -->
+  <ng-container *ngIf="experienceTab === 'planning'">
   <header class="jchd-header">
     <div class="header-left">
       <div class="jchd-eyebrow">Coach overview</div>
@@ -1085,4 +1095,30 @@
       </div>
     </div>
   </div>
+  </ng-container>
+  <!-- ═══ end Journey Planning tab ═══ -->
+
+  <!-- ─── Onboarding tab (scaffold; sales + onboarding-by-product + intake pipeline next) ─── -->
+  <section class="jx-tab-panel" *ngIf="experienceTab === 'onboarding'" data-testid="jx-panel-onboarding">
+    <div class="jx-placeholder">
+      <h2>Onboarding</h2>
+      <p>Gross &amp; Assured sales, Onboarding by product, and the intake pipeline will appear here.</p>
+    </div>
+  </section>
+
+  <!-- ─── Ev. Preparation tab (placeholder — content to be defined) ─── -->
+  <section class="jx-tab-panel" *ngIf="experienceTab === 'evprep'" data-testid="jx-panel-evprep">
+    <div class="jx-placeholder">
+      <h2>Ev. Preparation</h2>
+      <p>Evolution preparation — to be defined.</p>
+    </div>
+  </section>
+
+  <!-- ─── Overall Summary tab (placeholder — content to be defined) ─── -->
+  <section class="jx-tab-panel" *ngIf="experienceTab === 'overall'" data-testid="jx-panel-overall">
+    <div class="jx-placeholder">
+      <h2>Overall Summary</h2>
+      <p>Cross-area summary — to be defined.</p>
+    </div>
+  </section>
 </div>
