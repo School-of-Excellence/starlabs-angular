@@ -17,3 +17,5 @@ One line per live contract (gate section 1.1).
 > http://localhost:4200/journey-coach-health against the starlabs-test Firebase project,
 > in a logged-in Chrome session, with the reconciliations recorded in each contract's
 > Evidence block — not merely that it compiles or that the node checks pass.
+
+| jc-health-finance-collapse | /journey-coach-health | qa/checks/jc-health-finance-collapse.mjs | 2026-11-09 PASS (patched 10/10; 8 FAIL on revert; live light+dark + drill) |
