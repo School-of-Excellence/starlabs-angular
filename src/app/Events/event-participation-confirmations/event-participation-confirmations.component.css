@@ -185,3 +185,28 @@
 .ev-edit-btn:hover { background: #eaf1ff; border-color: #cfdcf7; color: #1f5bd8; }
 .ev-edit-btn:focus-visible { outline: 2px solid #1f5bd8; outline-offset: 2px; }
 .ev-edit-btn:disabled { background: #f3f4f6; color: #b5bac4; cursor: default; }
+
+.ov-deleted { cursor: default; }
+.ov-deleted:hover td { background: transparent; }
+
+/* grey out every cell except the one with the Edit button */
+.ov-deleted td:not(.ev-act) { opacity: .5; filter: grayscale(1); }
+
+.ov-deleted .ov-name { text-decoration: line-through; text-decoration-color: #b9bec9; }
+.ov-deleted .ov-chev { visibility: hidden; }
+
+/* queue event: purple bar on the left edge + "Queue" tag after the name */
+.ov-queue td:first-child { box-shadow: inset 3px 0 0 #7a4fc2; }
+
+.ov-queue .ov-name::after {
+  content: 'Queue';
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #efe9fb;
+  color: #7a4fc2;
+  font-size: 10px;
+  font-weight: 600;
+  vertical-align: 2px;
+}

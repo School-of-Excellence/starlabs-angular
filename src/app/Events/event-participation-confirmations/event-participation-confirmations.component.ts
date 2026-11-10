@@ -180,7 +180,15 @@ export class EventParticipationConfirmationsComponent {
         rows.push(eventRow)
       }
 
-      rows.sort((x, y) => (y.end - x.end) || x.name.localeCompare(y.name));
+      rows.sort((x, y) =>{
+        if (this.mode == 'upcoming') {
+          return x?.start - y?.start
+        } else if (this.mode === 'past') {
+          return y?.end - x?.end
+        } else {
+          return x.name.localeCompare(y.name)
+        }
+      });
       // console.log('overview rows : ' , this.overviewRows)
       this.eventMap = mapEvent;
       this.overviewRows = rows;

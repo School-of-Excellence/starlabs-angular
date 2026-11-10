@@ -85,9 +85,11 @@
                 </tr>
 
                 <tr data-testid="epc-overview-row" *ngFor="let row of event?.subEvents ?? []" class="ov-row" role="button" tabindex="0"
+                  [class.ov-deleted]="row?.arena?.delete"
+                  [attr.aria-disabled]="row?.arena?.delete"
+                  [class.ov-queue]="event?.isQueueEvent"
                   [attr.aria-label]="'Open ' + row.productName + ' ' + row.eventName"
-                  (click)="openProduct(event , row)" (keydown)="onRowKey($event, event , row)"
-                  >
+                  (click)="!row?.arena?.delete && openProduct(event , row)" (keydown)="onRowKey($event, event , row)">
                   <td>
                     <div class="ov-evt" [class.child-event]="!row?.arena?.heroevent && !event?.isQueueEvent">
                       <span class="ov-av" [style.background]="row.avatarColor">{{ row.initial }}</span>
