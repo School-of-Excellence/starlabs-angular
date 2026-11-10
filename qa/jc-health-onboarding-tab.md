@@ -56,4 +56,5 @@ role gate on the Onboarding tab. Revisit only if the coach-health audience widen
 - Command: node qa/checks/jc-health-onboarding-tab.mjs
 - Fail if reverted: yes
 - Last run (2026-11-09): PATCHED 12/12 PASS; REVERTED 9 FAIL; RESTORED PASS. jc-health-tabs + jc-onboarding-decouple still PASS.
+- Prod build (2026-11-10): `npx ng build --configuration production` on jc-health-tabs -> EXIT 0 (pre-existing CommonJS / bootstrap-selector warnings only; no budget errors).
 - Live (starlabs-test, :4300, 2026-11-09): PASS — tab renders filter, Gross/Assured, by-product (To onboard 7; uP! 4, FTM 3) and the pipeline below; Pipeline link scrolls to the pipeline in-page; no console errors; standalone dashboard shows all 14 cards.
