@@ -32,11 +32,11 @@ item 4 is the EXISTING onboarding-pipeline component. Nothing is duplicated.
   (live 2026-11-09: 7 == 6 + 1).
 - Embed CSS is scoped to .jcd-embed; the full-screen fixed loader becomes local; the sticky toolbar is static.
 
-## Access scope — operator decision required
+## Access scope — DECIDED (operator, 2026-11-10): coaches see it
 /JourneycoachDashboard-new is protected by its own route-config roles; the component does not enforce them.
-Embedding it here means everyone who can open /journey-coach-health now sees org-wide Gross/Assured sales.
-Intended if journey coaches should see sales; otherwise gate the Onboarding tab (or the sales cards) on the
-same roles as the Journey Experience dashboard before shipping.
+Embedding it here means everyone who can open /journey-coach-health sees org-wide Gross/Assured sales.
+Operator decision: this is intended — journey coaches do onboarding and should see these figures. No extra
+role gate on the Onboarding tab. Revisit only if the coach-health audience widens beyond journey coaches.
 
 ## Known limitations (follow-ups)
 - Numbers are org-wide (as in the Journey Experience dashboard); they do not follow coach-health's Viewing coach selector.
