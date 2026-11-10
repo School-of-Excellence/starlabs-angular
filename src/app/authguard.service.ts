@@ -3,7 +3,7 @@ import { AngularFireAuth } from '@angular/fire/compat/auth';
 import { Auth, signOut, user } from '@angular/fire/auth';
 import { BehaviorSubject, Observable, Subject } from 'rxjs';
 import { map } from 'rxjs/operators';
-import { Firestore, collection, query, where, orderBy, getDocs, doc, getDoc, setDoc, updateDoc, writeBatch, CollectionReference, DocumentReference, serverTimestamp, addDoc, limit, onSnapshot, Timestamp, FieldValue} from '@angular/fire/firestore';
+import { Firestore, collection, query, where, orderBy, getDocs, doc, getDoc, setDoc, updateDoc, writeBatch, CollectionReference, DocumentReference, serverTimestamp, addDoc, limit, onSnapshot, Timestamp, FieldValue, getCountFromServer} from '@angular/fire/firestore';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -1045,7 +1045,7 @@ export class AuthguardService {
     }
   }
 
-  cancelAppointment(apptData) {
+  async cancelAppointment(apptData) {
     var id: string = apptData.bookingid
     var slotData: Array<any> = apptData.slotdata
     var appointmentid: string = apptData.appointment.id
@@ -1075,15 +1075,17 @@ export class AuthguardService {
 
       const appointmentRef = doc(this.appointmentsRefs, id)
 
-      updateDoc(appointmentRef, {
+      await updateDoc(appointmentRef, {
         cancelled: true,
         cancelledon: new Date()
       }).catch(err => {
         alert(err)
       })
 
+      const bookings = await this.getSlotBookings(apptData.appointment, slotData)
       for (let i = 0; i < slotData.length; i++) {
         const element = slotData[i];
+        const hasRemainingBookings = bookings.isGroup && bookings.counts[element.id] > 0
         const availabilityDoc = doc(this.availabilityRefs, element.id)
         getDoc(availabilityDoc).then(async availability => {
           if (availability.exists()) {
@@ -1098,22 +1100,19 @@ export class AuthguardService {
                   var slotStart: any = new Date(slotelement.slotstart.toDate())
                   var slotEnd: any = new Date(slotelement.slotend.toDate())
 
-                  if ((slotStart >= selectedSlot.start && slotStart < selectedSlot.end) || (slotEnd > selectedSlot.start && slotEnd < selectedSlot.end) || (selectedSlot.start >= slotStart && selectedSlot.start < slotEnd)) {
+                  const overlaps = (slotStart >= selectedSlot.start && slotStart < selectedSlot.end) || (slotEnd > selectedSlot.start && slotEnd < selectedSlot.end) || (selectedSlot.start >= slotStart && selectedSlot.start < slotEnd)
+                  if (!overlaps) continue
 
-                    if (chosenelement.id == appointmentid) {
-                      if (element.index == k) {
-                        if (this.datepipe.transform(slotStart, "short") == this.datepipe.transform(selectedSlot.start, "short")) {
-                          if (this.datepipe.transform(slotEnd, "short") == this.datepipe.transform(selectedSlot.end, "short")) {
-                            slotelement.booked = false
-                          }
-                        }
-                      }
-                    }
+                  const sameStart = this.datepipe.transform(slotStart, "short") == this.datepipe.transform(selectedSlot.start, "short")
+                  const sameEnd = this.datepipe.transform(slotEnd, "short") == this.datepipe.transform(selectedSlot.end, "short")
+                  const isCancelledSlot = chosenelement.id == appointmentid && element.index == k && sameStart && sameEnd
+                  const canFreeOverlap = !slotelement.booked && !hasRemainingBookings
 
-                    if (!slotelement.booked) {
-                      slotelement.available = true
-                    }
-
+                  if (isCancelledSlot) {
+                    slotelement.booked = hasRemainingBookings
+                    slotelement.available = true
+                  } else if (canFreeOverlap) {
+                    slotelement.available = true
                   }
                 }
               }
@@ -1143,6 +1142,25 @@ export class AuthguardService {
     } else {
       if (apptData.isRescheduling != undefined) { apptData.isRescheduling = false }
     }
+  }
+
+  async getSlotBookings(apptTypeRef, slots: { id: string, index: number }[]) {
+    const apptType = (await getDoc(apptTypeRef)).data()
+    const isGroup = apptType?.["groupappointment"] == true
+    const maxBooking = apptType?.["maxbooking"] ?? 1
+    const counts: Record<string, number> = {}
+    if (!isGroup) {
+      return { isGroup, maxBooking, counts }
+    }
+    for (const slot of slots) {
+      const countQuery = query(this.appointmentsRefs,
+        where("slotdata", "array-contains", { id: slot.id, index: slot.index }),
+        where("appointment", "==", apptTypeRef),
+        where("cancelled", "==", false))
+      const countSnap = await getCountFromServer(countQuery)
+      counts[slot.id] = countSnap.data().count
+    }
+    return { isGroup, maxBooking, counts }
   }
 
   // // Revoke Specialist Availability

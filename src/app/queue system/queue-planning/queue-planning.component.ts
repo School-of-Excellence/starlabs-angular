@@ -167,6 +167,8 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
   // For editing date entry
   editingRow: PlanningRow = null;
   editingStageName: string = null;
+  // The slot dialog currently open; its afterClosed reset only runs while it is still current.
+  private activeDateDialogRef: any = null;
   editingDateIndex: number = null;
   editingDateEntry: any = {
     title: null,
@@ -639,7 +641,7 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
       }
 
       if (shouldHaveConfirmed) {
-        const stageSlots = token.selectedstageslot || {};
+        const stageSlots = this.tokenStageSlots(token);
         const selectedSlot = stageSlots[stageName];
 
         // FIXED: Check if participant has selected ANY slot for this stage
@@ -954,11 +956,12 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
         var stageSlot = {}
         for (let i = 0; i < tokens.length; i++) {
           const tokenData = tokens[i];
-          if(tokenData["selectedstageslot"]){
-            Object.keys(tokenData["selectedstageslot"]).forEach(stage =>{
-              var slotData = tokenData["selectedstageslot"][stage]
-              slotData["startdate"] = slotData["startdate"].toDate()
-              slotData["enddate"] = slotData["enddate"].toDate()
+          const tokenSlots = this.tokenStageSlots(tokenData);
+          if(Object.keys(tokenSlots).length){
+            Object.keys(tokenSlots).forEach(stage =>{
+              var slotData = tokenSlots[stage]
+              slotData["startdate"] = slotData["startdate"]?.toDate ? slotData["startdate"].toDate() : slotData["startdate"]
+              slotData["enddate"] = slotData["enddate"]?.toDate ? slotData["enddate"].toDate() : slotData["enddate"]
               stageSlot[stage] = stageSlot[stage] ?? []
               stageSlot[stage].push({
                 ...slotData,
@@ -1377,6 +1380,12 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
     return matchingParticipants;
   }
 
+  /** A token's booked slot per stage. queue-planning-review writes bookings to `bookedslot`
+   *  (renamed from `selectedstageslot` in 854ad880); older tokens may still carry the old field. */
+  private tokenStageSlots(token: any): Record<string, any> {
+    return token?.['bookedslot'] ?? token?.['selectedstageslot'] ?? {};
+  }
+
   getParticipantsForSlot(variationid: string, segmentid: string, stagename: string, startdate: Date, enddate: Date): any[] {
     const toTime = (d: any): number | null => {
       if (!d) return null;
@@ -1395,7 +1404,7 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
     for (const token of this.queueTokenList || []) {
       if (token.variationid !== variationid) continue;
 
-      const stageSlots = token.selectedstageslot || {};
+      const stageSlots = this.tokenStageSlots(token);
       const slot = stageSlots[stagename];
 
       if (
@@ -2258,8 +2267,12 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
       maxHeight: '90vh',
       disableClose: false
     });
+    this.activeDateDialogRef = dialogRef;
 
     dialogRef.afterClosed().subscribe(() => {
+      // A late close of an earlier dialog must not wipe the state of one opened since.
+      if (this.activeDateDialogRef !== dialogRef) return;
+      this.activeDateDialogRef = null;
       this.searchSegmentForMulti = '';
       this.slotDialogMode = 'single';
       this.editingSlotType = null;
@@ -2356,7 +2369,12 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
       maxWidth: '95vw'
     });
 
+    this.activeDateDialogRef = dialogRef;
+
     dialogRef.afterClosed().subscribe(() => {
+      // A late close of an earlier dialog must not wipe the state of one opened since.
+      if (this.activeDateDialogRef !== dialogRef) return;
+      this.activeDateDialogRef = null;
       this.editingRow = null;
       this.editingStageName = null;
       this.editingDateIndex = null;
@@ -2397,8 +2415,12 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
     const dialogRef = this.dialog.open(this.dateEditDialog, {
       maxWidth: '95vw'
     });
+    this.activeDateDialogRef = dialogRef;
 
     dialogRef.afterClosed().subscribe(() => {
+      // A late close of an earlier dialog must not wipe the state of one opened since.
+      if (this.activeDateDialogRef !== dialogRef) return;
+      this.activeDateDialogRef = null;
       this.editingRow = null;
       this.editingStageName = null;
       this.editingDateIndex = null;
@@ -2758,7 +2780,7 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
 
     this.queueTokenList.forEach(token => {
       if (token.variationid === variationId) {
-        const stageSlots = token.selectedstageslot || {};
+        const stageSlots = this.tokenStageSlots(token);
         
         // Check if any stage has this segment selected
         Object.keys(stageSlots).forEach(stageName => {
@@ -2829,7 +2851,12 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
     this.appointmentGroups = [];
     this.selectedAppointmentSlots = [];
 
-    const appointmentTypeRef = this.stageProperty[stageName]['actionresource'];
+    const appointmentTypeRef = this.stageProperty?.[stageName]?.['actionresource'];
+    if (!appointmentTypeRef) {
+      // No appointment type for this stage (or no stage at all) — nothing to load, never leave the spinner on.
+      this.loadingAppointmentSlots = false;
+      return;
+    }
     const now = new Date();
     const from = new Date(this.appointmentDateStart); from.setHours(0, 0, 0, 0);
     const to = new Date(this.appointmentDateEnd || this.appointmentDateStart); to.setHours(23, 59, 59, 999);
