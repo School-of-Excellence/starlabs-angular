@@ -55,3 +55,38 @@ Literal `data-testid` strings only — no `${interpolation}` (gate section 1.1 /
 | jcd-pipe-journey-all | Journey selector: All | jc-onboarding-pipeline |
 | jcd-pipe-journey-opt | Journey selector: one journey | jc-onboarding-pipeline |
 | jcd-name-contact | Mobile + email under the name (embed To-be-onboarded tables) | jc-onboarding-pipeline |
+
+## journey-coach-health-dashboard — Overall Summary tab
+| testid | element | contract |
+|---|---|---|
+| ov-date-month-mode | Date mode: Month | jc-overall-summary |
+| ov-date-range-mode | Date mode: Range | jc-overall-summary |
+| ov-date-prev | Previous month | jc-overall-summary |
+| ov-date-month | Month input | jc-overall-summary |
+| ov-date-next | Next month | jc-overall-summary |
+| ov-date-start | Range start | jc-overall-summary |
+| ov-date-end | Range end | jc-overall-summary |
+| ov-date-label | Active date range label | jc-overall-summary |
+| ov-viewing-select | Viewing as | jc-overall-summary |
+| ov-sales | Sales by Journey card | jc-overall-summary |
+| ov-sales-row | Sales by Journey row | jc-overall-summary |
+| ov-sales-total | Sales by Journey total Overall | jc-overall-summary |
+| ov-onboarding | Onboarding status card | jc-overall-summary |
+| ov-ob-tobe | To be onboarded | jc-overall-summary |
+| ov-ob-le7 | <= 7 days | jc-overall-summary |
+| ov-ob-gt7 | 7+ days | jc-overall-summary |
+| ov-ob-onboarded | Onboarded | jc-overall-summary |
+| ov-ob-avg | Avg days from ASV to Onboarding | jc-overall-summary |
+| ov-schedule | Scheduled & completed card | jc-overall-summary |
+| ov-jc-today | JC scheduled today | jc-overall-summary |
+| ov-jc-week | JC next 7 days | jc-overall-summary |
+| ov-jc-done | JC completed in range | jc-overall-summary |
+| ov-obs-today | Onboarding scheduled today | jc-overall-summary |
+| ov-obs-week | Onboarding next 7 days | jc-overall-summary |
+| ov-obs-done | Onboarding completed in range | jc-overall-summary |
+| ov-se | Ready for SE card | jc-overall-summary |
+| ov-se-pending | Ready for SE pending note | jc-overall-summary |
+| ov-health | Participant health card | jc-overall-summary |
+| ov-health-total | Active Ecosystem participant total | jc-overall-summary |
+| ov-ah | Ask A&H & Love Letter card | jc-overall-summary |
+| ov-ah-needsattention-combined | A&H Needs Attention combined | jc-overall-summary |
