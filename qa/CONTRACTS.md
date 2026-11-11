@@ -29,3 +29,4 @@ One line per live contract (gate section 1.1).
 | jc-onboarding-pipeline | /journey-coach-health (Onboarding tab) | qa/checks/jc-onboarding-pipeline.mjs | 2026-11-11 PASS (14/14; 13 FAIL on revert; live Apr 2026: 5/1/2/0, tile==list, disjoint, journey selector changes counts) |
 
 | jc-onboarding-board | /journey-coach-health (Onboarding tab) | qa/checks/jc-onboarding-board.mjs | 2026-11-11 PASS (13/13; 13 FAIL on revert; live: columns == tiles, blocks + dialogs verified, no writes) |
+| jc-overall-summary | /journey-coach-health (Overall Summary tab) | qa/checks/jc-overall-summary.mjs | 2026-11-11 PASS (19/19; 17 FAIL on revert; live Apr 2026 All: sales 14 = drill 14, JC done 22, OB done 6, onboarding 7/0/7/0 == Onboarding tab, A&H 5 == Planning) |

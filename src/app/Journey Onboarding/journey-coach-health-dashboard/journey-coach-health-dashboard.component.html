@@ -1078,7 +1078,10 @@
 
   </ng-container>
 
-  <!-- ===== A&H drill overlay (native; themed by the .jchd-wrap design tokens, dark included) ===== -->
+  </ng-container>
+  <!-- ═══ end Journey Planning tab ═══ -->
+
+  <!-- ===== A&H drill overlay — shared by Journey Planning and Overall Summary (native; themed by the .jchd-wrap design tokens, dark included) ===== -->
   <div class="ahd-backdrop" *ngIf="ahDrill() as drill" (click)="closeAhDrill()">
     <div class="ahd-panel" data-testid="ahd-overlay" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
       <div class="ahd-head">
@@ -1095,13 +1098,13 @@
       </div>
     </div>
   </div>
-  </ng-container>
-  <!-- ═══ end Journey Planning tab ═══ -->
 
   <!-- ─── Onboarding tab: Gross & Assured sales + Onboarding by product (Journey Experience dashboard,
        embedded in onboarding mode — its tables and dialogs come along so every drill-down works),
        with the intake pipeline directly below the by-product table. ─── -->
-  <section class="jx-tab-panel jx-onboarding" *ngIf="experienceTab === 'onboarding'" data-testid="jx-panel-onboarding">
+  <!-- Mounted the first time Overall or Onboarding opens, then kept alive (hidden off its tab) so the
+       Overall Summary reads the SAME instance — one load, one date range (operator 2026-11-11, option B). -->
+  <section class="jx-tab-panel jx-onboarding" *ngIf="jcdMounted" [class.jx-offstage]="experienceTab !== 'onboarding'" data-testid="jx-panel-onboarding">
     <!-- Sales counts, Onboarding by product, the 4-stage pipeline and the drill-down table all live in the
          embedded Journey Experience dashboard. The 5-bucket intake funnel (app-onboarding-pipeline) was replaced
          on this tab by operator decision 2026-11-11; /onboarding-pipeline is unchanged. -->
@@ -1116,11 +1119,220 @@
     </div>
   </section>
 
-  <!-- ─── Overall Summary tab (placeholder — content to be defined) ─── -->
-  <section class="jx-tab-panel" *ngIf="experienceTab === 'overall'" data-testid="jx-panel-overall">
-    <div class="jx-placeholder">
-      <h2>Overall Summary</h2>
-      <p>Cross-area summary — to be defined.</p>
+  <!-- ─── Overall Summary tab (operator spec 2026-11-11) ───
+       1-2 read the shared Onboarding dashboard (org-wide, its date range); 3, 5, 6 read this screen's data
+       scoped by Viewing as; 4 waits for the Ev. Preparation tab. Drills use the native overlay above. -->
+  <section class="jx-tab-panel jx-overall" *ngIf="experienceTab === 'overall'" data-testid="jx-panel-overall">
+
+    <div class="ov-bar">
+      <div class="ov-seg" role="group" aria-label="Date mode">
+        <button type="button" [class.on]="ovPickerMode() === 'month'" (click)="ovSetMonth(ovMonth())" data-testid="ov-date-month-mode">Month</button>
+        <button type="button" [class.on]="ovPickerMode() === 'range'" (click)="ovSetRange('start', ovIsoDate(ovRange()?.start))" data-testid="ov-date-range-mode">Range</button>
+      </div>
+      <span class="ov-pill" *ngIf="ovPickerMode() === 'month'">
+        <button type="button" class="ov-ico" (click)="ovStepMonth(-1)" aria-label="Previous month" data-testid="ov-date-prev"><mat-icon>chevron_left</mat-icon></button>
+        <input type="month" class="ov-in" [ngModel]="ovMonth()" (ngModelChange)="ovSetMonth($event)" aria-label="Month" data-testid="ov-date-month">
+        <button type="button" class="ov-ico" (click)="ovStepMonth(1)" aria-label="Next month" data-testid="ov-date-next"><mat-icon>chevron_right</mat-icon></button>
+      </span>
+      <span class="ov-pill" *ngIf="ovPickerMode() === 'range'">
+        <input type="date" class="ov-in" [ngModel]="ovIsoDate(ovRange()?.start)" (ngModelChange)="ovSetRange('start', $event)" aria-label="Start date" data-testid="ov-date-start">
+        <span class="ov-dash">–</span>
+        <input type="date" class="ov-in" [ngModel]="ovIsoDate(ovRange()?.end)" (ngModelChange)="ovSetRange('end', $event)" aria-label="End date" data-testid="ov-date-end">
+      </span>
+      <span class="ov-range" *ngIf="ovRange() as r" data-testid="ov-date-label">{{ r.start | date:'d MMM y' }} – {{ r.end | date:'d MMM y' }}</span>
+      <label class="ov-pill ov-viewing">
+        <span class="ov-vk">Viewing as</span>
+        <select data-testid="ov-viewing-select" [ngModel]="selectedCoachId" (ngModelChange)="onCoachChange($event)" aria-label="Viewing as">
+          <option [value]="ALL">All participants</option>
+          <option *ngFor="let c of coaches" [value]="c.id">{{ c.name }}</option>
+          <option [value]="UNASSIGNED">Unassigned · no coach ({{ unassignedCount }})</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="ov-grid">
+
+      <!-- 1. Sales by Journey (Gross; Overall = New + Upgrades + Add-ons) -->
+      <section class="ios2-card ov-card ov-s7" data-testid="ov-sales">
+        <div class="ios2-head">
+          <span class="ios2-app ap-blue"><mat-icon>point_of_sale</mat-icon></span>
+          <span class="ios2-title">Sales by Journey</span>
+          <span class="ov-scope">Org-wide · Gross</span>
+        </div>
+        <p class="ios2-empty" *ngIf="ovLoading()">Loading…</p>
+        <div class="ah-table" *ngIf="!ovLoading()">
+          <table>
+            <thead><tr><th class="ah-flag">Journey</th><th>New</th><th>Upgrades</th><th>Add-ons</th><th>Overall</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let r of ovSales().rows" data-testid="ov-sales-row">
+                <td class="ah-flag">{{ r.name }}</td>
+                <td><button type="button" class="ah-num" (click)="ovSalesDrill(r.id, 'new', r.name + ' · New')">{{ r.newN }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovSalesDrill(r.id, 'upgrade', r.name + ' · Upgrades')">{{ r.upN }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovSalesDrill(r.id, 'addon', r.name + ' · Add-ons')">{{ r.addN }}</button></td>
+                <td><button type="button" class="ah-num ov-strong" (click)="ovSalesDrill(r.id, 'all', r.name + ' · Overall')">{{ r.total }}</button></td>
+              </tr>
+              <tr *ngIf="!ovSales().rows.length"><td class="ah-flag ov-muted" colspan="5">No approved sales in this range.</td></tr>
+              <tr class="ah-total" *ngIf="ovSales() as s">
+                <td class="ah-flag">Total</td>
+                <td><button type="button" class="ah-num" (click)="ovSalesDrill(null, 'new', 'All journeys · New')">{{ s.tot.newN }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovSalesDrill(null, 'upgrade', 'All journeys · Upgrades')">{{ s.tot.upN }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovSalesDrill(null, 'addon', 'All journeys · Add-ons')">{{ s.tot.addN }}</button></td>
+                <td><button type="button" class="ah-num" data-testid="ov-sales-total" (click)="ovSalesDrill(null, 'all', 'All journeys · Overall')">{{ s.tot.total }}</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="ov-foot">Approved Gross sales, the same New / Upgrades / Add-ons split as the Gross Sales card. Pending sales are not counted.</p>
+      </section>
+
+      <!-- 2. Onboarding status -->
+      <section class="ios2-card ov-card ov-s5" data-testid="ov-onboarding">
+        <div class="ios2-head">
+          <span class="ios2-app ap-green"><mat-icon>how_to_reg</mat-icon></span>
+          <span class="ios2-title">Onboarding status</span>
+          <span class="ov-scope">Org-wide</span>
+        </div>
+        <div class="ov-tiles ov-t4">
+          <button type="button" class="jcp-tile ov-hero" (click)="ovOpenOnboardingTable('toBeOnboarded')" data-testid="ov-ob-tobe"><span class="jcp-num">{{ ovObCount('all') }}</span><span class="jcp-label">To be onboarded</span></button>
+          <button type="button" class="jcp-tile" (click)="ovOpenOnboardingTable('less7Days')" data-testid="ov-ob-le7"><span class="jcp-num">{{ ovObCount('last7DaysnotOnboarded') }}</span><span class="jcp-label">≤ 7 days</span></button>
+          <button type="button" class="jcp-tile ov-warn" (click)="ovOpenOnboardingTable('more7Days')" data-testid="ov-ob-gt7"><span class="jcp-num">{{ ovObCount('last15daysnotOnboarded') }}</span><span class="jcp-label">7+ days</span></button>
+          <button type="button" class="jcp-tile ov-good" (click)="ovOpenOnboardingTable('onboarded')" data-testid="ov-ob-onboarded"><span class="jcp-num">{{ ovObCount('onboarded') }}</span><span class="jcp-label">Onboarded</span></button>
+        </div>
+        <div class="ov-avg" data-testid="ov-ob-avg"><span>Avg days from ASV to Onboarding</span><b>{{ ovObAvg() }}</b></div>
+        <p class="ov-foot">The Onboarding tab's numbers. Onboarded and the average follow the date range; the open buckets cover every open onboarding.</p>
+      </section>
+
+      <!-- 3. Scheduled & completed — Journey Coaching and Onboarding kept separate -->
+      <section class="ios2-card ov-card ov-s12" data-testid="ov-schedule">
+        <div class="ios2-head">
+          <span class="ios2-app ap-indigo"><mat-icon>event_available</mat-icon></span>
+          <span class="ios2-title">Scheduled &amp; completed</span>
+          <span class="fb-hint" *ngIf="!ovSched().ready">loading…</span>
+          <span class="ov-scope ov-scope-coach">Viewing as</span>
+        </div>
+        <div class="ov-srow" *ngIf="ovSched() as k">
+          <span><span class="jcs-tag jcs-tag-jc">Journey Coaching</span></span>
+          <div class="ov-tiles ov-t3">
+            <button type="button" class="jcp-tile" (click)="ovSchedDrill(false, 'today', 'Journey Coaching · scheduled today')" data-testid="ov-jc-today"><span class="jcp-num">{{ k.jcToday }}</span><span class="jcp-label">Scheduled today</span></button>
+            <button type="button" class="jcp-tile" (click)="ovSchedDrill(false, 'week', 'Journey Coaching · next 7 days')" data-testid="ov-jc-week"><span class="jcp-num">{{ k.jcWeek }}</span><span class="jcp-label">Next 7 days</span></button>
+            <button type="button" class="jcp-tile ov-good" (click)="ovSchedDrill(false, 'done', 'Journey Coaching · completed')" data-testid="ov-jc-done"><span class="jcp-num">{{ k.jcDone }}</span><span class="jcp-label">Completed · in range</span></button>
+          </div>
+        </div>
+        <div class="ov-srow" *ngIf="ovSched() as k">
+          <span><span class="jcs-tag jcs-tag-ob">Onboarding</span></span>
+          <div class="ov-tiles ov-t3">
+            <button type="button" class="jcp-tile" (click)="ovSchedDrill(true, 'today', 'Onboarding · scheduled today')" data-testid="ov-obs-today"><span class="jcp-num">{{ k.obToday }}</span><span class="jcp-label">Scheduled today</span></button>
+            <button type="button" class="jcp-tile" (click)="ovSchedDrill(true, 'week', 'Onboarding · next 7 days')" data-testid="ov-obs-week"><span class="jcp-num">{{ k.obWeek }}</span><span class="jcp-label">Next 7 days</span></button>
+            <button type="button" class="jcp-tile ov-good" (click)="ovSchedDrill(true, 'done', 'Onboarding · completed')" data-testid="ov-obs-done"><span class="jcp-num">{{ k.obDone }}</span><span class="jcp-label">Completed · in range</span></button>
+          </div>
+        </div>
+        <p class="ov-foot">Today and Next 7 days match Journey Planning's Schedule card. Completed = attended sessions in the date range.</p>
+      </section>
+
+      <!-- 4. Ready for SE (Scope Enhancement) — data comes from the Ev. Preparation tab -->
+      <section class="ios2-card ov-card ov-s6" data-testid="ov-se">
+        <div class="ios2-head">
+          <span class="ios2-app ap-orange"><mat-icon>trending_up</mat-icon></span>
+          <span class="ios2-title">Ready for SE</span>
+          <span class="ov-scope">Scope Enhancement</span>
+        </div>
+        <div class="ov-pending" data-testid="ov-se-pending">Pending: this fills in once the Ev. Preparation tab records the month SE is planned for each participant.</div>
+        <div class="ah-table ov-ghost">
+          <table>
+            <thead><tr><th class="ah-flag">SE month</th><th>New</th><th>Existing</th></tr></thead>
+            <tbody>
+              <tr class="ah-total"><td class="ah-flag">Overall</td><td>–</td><td>–</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 5. Participant health (Coach-set health, Active participants on Ecosystem products) -->
+      <section class="ios2-card ov-card ov-s6 health-card" data-testid="ov-health" *ngIf="ovHealth() as hd">
+        <div class="ios2-head">
+          <span class="ios2-app ap-pink"><mat-icon>favorite</mat-icon></span>
+          <span class="ios2-title">Participant health</span>
+          <span class="ov-scope ov-scope-coach">Viewing as</span>
+        </div>
+        <p class="ov-sub">Active participants on Ecosystem products · <b data-testid="ov-health-total">{{ hd.total }}</b></p>
+        <div class="health-bar" *ngIf="hd.total > 0" aria-hidden="true">
+          <span class="hb-segment state-happy" [style.width.%]="healthPct(hd.happy, hd.total)"></span>
+          <span class="hb-segment state-neutral" [style.width.%]="healthPct(hd.neutral, hd.total)"></span>
+          <span class="hb-segment state-unhappy" [style.width.%]="healthPct(hd.unhappy, hd.total)"></span>
+          <span class="hb-segment state-at-risk" [style.width.%]="healthPct(hd.atRisk, hd.total)"></span>
+          <span class="hb-segment state-critical" [style.width.%]="healthPct(hd.critical, hd.total)"></span>
+          <span class="hb-segment state-not-assessed" [style.width.%]="healthPct(hd.notAssessed, hd.total)"></span>
+        </div>
+        <div class="ov-legend">
+          <button type="button" (click)="ovHealthDrill('HAPPY', 'Participant health · Happy')"><span><i class="hl-dot state-happy"></i>Happy</span><b>{{ hd.happy }}</b></button>
+          <button type="button" (click)="ovHealthDrill('NEUTRAL', 'Participant health · Neutral')"><span><i class="hl-dot state-neutral"></i>Neutral</span><b>{{ hd.neutral }}</b></button>
+          <button type="button" (click)="ovHealthDrill('UNHAPPY', 'Participant health · Unhappy')"><span><i class="hl-dot state-unhappy"></i>Unhappy</span><b>{{ hd.unhappy }}</b></button>
+          <button type="button" (click)="ovHealthDrill('AT_RISK', 'Participant health · At-risk')"><span><i class="hl-dot state-at-risk"></i>At-risk</span><b>{{ hd.atRisk }}</b></button>
+          <button type="button" (click)="ovHealthDrill('CRITICAL', 'Participant health · Critical')"><span><i class="hl-dot state-critical"></i>Critical</span><b>{{ hd.critical }}</b></button>
+          <button type="button" (click)="ovHealthDrill(null, 'Participant health · Not assessed')"><span><i class="hl-dot state-not-assessed"></i>Not assessed</span><b>{{ hd.notAssessed }}</b></button>
+        </div>
+      </section>
+
+      <!-- 6. Ask A&H & Love Letter (the Journey Planning table, scoped by Viewing as) -->
+      <section class="ios2-card ov-card ov-s12 jchd-ah-card" data-testid="ov-ah" *ngIf="ovAh() as s">
+        <div class="ios2-head">
+          <span class="ios2-app ap-pink"><mat-icon>mail</mat-icon></span>
+          <span class="ios2-title">Ask A&amp;H &amp; Love Letter</span>
+          <span class="ah-src">
+            <button type="button" class="ah-src-pill ah-src-ask" (click)="ovAhDrill('ask', 'all', false, 'Ask AH · all')">Ask AH · {{ s.askAH.total }}</button>
+            <button type="button" class="ah-src-pill ah-src-love" (click)="ovAhDrill('love', 'all', false, 'Love Letter · all')">Love Letter · {{ s.loveLetter.total }}</button>
+          </span>
+          <span class="ov-scope ov-scope-coach">Viewing as · last 180 days</span>
+        </div>
+        <div class="ah-table">
+          <table>
+            <thead><tr><th class="ah-flag">Flag</th><th>Ask AH</th><th>Love Letter</th><th>Combined</th><th class="ah-res">Resolved</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="ah-flag"><span class="ah-dot ah-happy"></span>Happy</td>
+                <td><button type="button" class="ah-num" (click)="ovAhDrill('ask', 'liked', false, 'Ask AH · Happy')">{{ s.askAH.liked }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovAhDrill('love', 'liked', false, 'Love Letter · Happy')">{{ s.loveLetter.liked }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovAhDrill('both', 'liked', false, 'Happy · combined')">{{ s.liked }}</button></td>
+                <td class="ah-res"><button type="button" class="ah-num" (click)="ovAhDrill('both', 'liked', true, 'Happy · resolved')">{{ s.resolvedLiked }}</button></td>
+              </tr>
+              <tr>
+                <td class="ah-flag"><span class="ah-dot ah-attn"></span>Needs Attention</td>
+                <td><button type="button" class="ah-num" (click)="ovAhDrill('ask', 'tagged', false, 'Ask AH · Needs Attention')">{{ s.askAH.tagged }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovAhDrill('love', 'tagged', false, 'Love Letter · Needs Attention')">{{ s.loveLetter.tagged }}</button></td>
+                <td><button type="button" class="ah-num" data-testid="ov-ah-needsattention-combined" (click)="ovAhDrill('both', 'tagged', false, 'Needs Attention · combined')">{{ s.tagged }}</button></td>
+                <td class="ah-res"><button type="button" class="ah-num" (click)="ovAhDrill('both', 'tagged', true, 'Needs Attention · resolved')">{{ s.resolvedTagged }}</button></td>
+              </tr>
+              <tr>
+                <td class="ah-flag"><span class="ah-dot ah-opp"></span>Opportunity</td>
+                <td><button type="button" class="ah-num" (click)="ovAhDrill('ask', 'opportunity', false, 'Ask AH · Opportunity')">{{ s.askAH.opportunity }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovAhDrill('love', 'opportunity', false, 'Love Letter · Opportunity')">{{ s.loveLetter.opportunity }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovAhDrill('both', 'opportunity', false, 'Opportunity · combined')">{{ s.opportunity }}</button></td>
+                <td class="ah-res"><button type="button" class="ah-num" (click)="ovAhDrill('both', 'opportunity', true, 'Opportunity · resolved')">{{ s.resolvedOpportunity }}</button></td>
+              </tr>
+              <tr>
+                <td class="ah-flag"><span class="ah-dot ah-crit"></span>Critical</td>
+                <td><button type="button" class="ah-num" (click)="ovAhDrill('ask', 'critical', false, 'Ask AH · Critical')">{{ s.askAH.critical }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovAhDrill('love', 'critical', false, 'Love Letter · Critical')">{{ s.loveLetter.critical }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovAhDrill('both', 'critical', false, 'Critical · combined')">{{ s.critical }}</button></td>
+                <td class="ah-res"><button type="button" class="ah-num" (click)="ovAhDrill('both', 'critical', true, 'Critical · resolved')">{{ s.resolvedCritical }}</button></td>
+              </tr>
+              <tr class="ah-total">
+                <td class="ah-flag">Total Flagged</td>
+                <td>{{ s.askAH.liked + s.askAH.tagged + s.askAH.opportunity + s.askAH.critical }}</td>
+                <td>{{ s.loveLetter.liked + s.loveLetter.tagged + s.loveLetter.opportunity + s.loveLetter.critical }}</td>
+                <td>{{ s.liked + s.tagged + s.opportunity + s.critical }}</td>
+                <td class="ah-res">{{ s.resolvedTotal }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="ah-cards">
+          <button type="button" class="ah-mini ah-mini-unflagged" (click)="ovAhDrill('both', 'unflagged', false, 'Unflagged')"><span class="ah-mini-k">Unflagged</span><span class="ah-mini-n">{{ s.unflagged }}</span></button>
+          <button type="button" class="ah-mini ah-mini-positive" (click)="ovAhDrill('both', 'liked', false, 'Positive flags')"><span class="ah-mini-k">Positive flags</span><span class="ah-mini-n">{{ s.liked }}</span></button>
+          <button type="button" class="ah-mini ah-mini-critattn" (click)="ovAhDrill('both', 'critattn', false, 'Critical + Attention')"><span class="ah-mini-k">Critical + Attn</span><span class="ah-mini-n">{{ s.critical + s.tagged }}</span></button>
+        </div>
+      </section>
+
     </div>
   </section>
 </div>

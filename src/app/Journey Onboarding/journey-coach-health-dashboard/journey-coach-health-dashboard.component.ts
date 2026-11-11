@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild, ElementRef, HostListener, signal, computed } from '@angular/core';
+import { Component, OnInit, ViewChild, ElementRef, HostListener, signal, computed, ChangeDetectorRef } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -130,6 +130,8 @@ type CoachMetric = 'caseload' | 'active' | 'needToday' | 'goingQuiet' | 'flagged
 /** One completed JC: an `appointments` doc with journeycoach == true AND attended == true.
  *  `coachId` is the first entry of the doc's `hosts[]` — the coach who ran the session. */
 interface JcDoneEvent { profileid: string; coachId: string | null; ms: number; onboarding?: boolean; }
+/** Overall Summary · Sales by Journey row (counts of the dashboard's Gross New / Upgrade / Add-on sets). */
+interface OvSalesRow { id: string; name: string; newN: number; upN: number; addN: number; total: number; }
 
 /** Product-type classification, derived from the `journey` collection's `type` field
  *  (and the special-cased FTO journey for gifts) — the same signal the sales dashboards use. */
@@ -239,7 +241,236 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   // (Summary / Participants / Coaches), kept unchanged; the others are new sibling tabs
   // so a coach has one screen for onboarding, evolution prep and journey planning.
   experienceTab: 'overall' | 'onboarding' | 'evprep' | 'planning' = 'planning';
-  setExperienceTab(t: 'overall' | 'onboarding' | 'evprep' | 'planning'): void { this.experienceTab = t; }
+  setExperienceTab(t: 'overall' | 'onboarding' | 'evprep' | 'planning'): void {
+    this.experienceTab = t;
+    // ONE shared Onboarding dashboard instance (operator 2026-11-11, option B): mounted the first time
+    // Overall or Onboarding opens, then kept alive (hidden off its tab) so both tabs read the same load.
+    if (t === 'overall' || t === 'onboarding') this.jcdMounted = true;
+  }
+
+  // ═══ Overall Summary tab (operator spec 2026-11-11) ═══════════════════════════════════════════
+  //  1 Sales by Journey + 2 Onboarding status read the shared embedded journeycoach-dashboard (org-wide,
+  //  its date range). 3 Scheduled/completed, 5 Participant health, 6 A&H read this component's data,
+  //  scoped by Viewing as (selectedCoachId). 4 Ready for SE is pending the Ev. Preparation tab.
+  jcdMounted = false;
+  /** The shared Onboarding dashboard, published via a signal on the next microtask so the Overall
+   *  template never sees the ViewChild flip mid-check. */
+  jcdRef = signal<JourneycoachDashboardComponent | null>(null);
+  @ViewChild(JourneycoachDashboardComponent) set jcdChild(c: JourneycoachDashboardComponent | undefined) {
+    queueMicrotask(() => this.jcdRef.set(c ?? null));
+  }
+  /** The embedded dashboard is OnPush: anything we change on it from here must mark ITS view for check
+   *  (its own injected ChangeDetectorRef; a query-read ref at the host resolves to this view instead). */
+  private markJcd(j: JourneycoachDashboardComponent): void {
+    (j as unknown as { cdr?: ChangeDetectorRef }).cdr?.markForCheck();
+  }
+
+  /** Overall's date range = the shared dashboard's range (one setting for Overall + Onboarding). */
+  ovRange(): { start: Date; end: Date } | null {
+    const j = this.jcdRef();
+    if (!j?.startDate || !j?.endDate) return null;
+    const s = new Date(j.startDate), e = new Date(j.endDate);
+    if (isNaN(s.getTime()) || isNaN(e.getTime())) return null;
+    return { start: this.startOfDay(s), end: this.endOfDay(e) };
+  }
+  ovMonth(): string { return this.jcdRef()?.monthyear ?? ''; }
+  ovPickerMode(): string { return this.jcdRef()?.pickerMode ?? 'month'; }
+  /** Date controls drive the shared dashboard's own month/range methods, then re-render it. */
+  ovStepMonth(dir: -1 | 1): void {
+    const j = this.jcdRef(); if (!j) return;
+    j.pickerMode = 'month';
+    if (dir < 0) j.backwardMonth(); else j.forwardMonth();
+    this.markJcd(j);
+  }
+  ovSetMonth(ym: string): void {
+    const j = this.jcdRef(); if (!j || !/^\d{4}-\d{2}$/.test(ym)) return;
+    j.pickerMode = 'month';
+    j.monthyear = ym;
+    j.updateDate();
+    this.markJcd(j);
+  }
+  ovSetRange(which: 'start' | 'end', v: string): void {
+    const j = this.jcdRef(); if (!j || !v) return;
+    const d = new Date(v + 'T00:00:00');
+    if (isNaN(d.getTime())) return;
+    j.pickerMode = 'range';
+    if (which === 'start') j.startDate = d; else j.endDate = d;
+    const s = new Date(j.startDate), e = new Date(j.endDate);
+    if (!isNaN(s.getTime()) && !isNaN(e.getTime()) && s <= e) j.fetchData();
+    this.markJcd(j);
+  }
+  ovIsoDate(d: Date | undefined): string {
+    if (!d) return '';
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+  ovLoading(): boolean { const j = this.jcdRef(); return !j || !!j.isLoading; }
+
+  // ── 1. Sales by Journey: the dashboard's Gross New / Upgrade / Add-on sets, grouped by journey ──
+  private ovSalesMemo: { k: any[]; v: { rows: OvSalesRow[]; tot: OvSalesRow } } | null = null;
+  ovSales(): { rows: OvSalesRow[]; tot: OvSalesRow } {
+    const j = this.jcdRef();
+    const n: any[] = j?.originalData?.['grossnewsale']?.data ?? [];
+    const u: any[] = j?.originalData?.['grossupgradesale']?.data ?? [];
+    const a: any[] = j?.originalData?.['grossaddonsale']?.data ?? [];
+    const names = j?.mapjourneyname ?? {};
+    const key = [n, u, a, names, Object.keys(names).length];
+    if (this.ovSalesMemo && this.ovSalesMemo.k.every((x, i) => x === key[i])) return this.ovSalesMemo.v;
+    const by = new Map<string, OvSalesRow>();
+    const row = (id: string): OvSalesRow => {
+      let r = by.get(id);
+      if (!r) { r = { id, name: id === 'unassigned' ? 'Unassigned' : (names[id] || id), newN: 0, upN: 0, addN: 0, total: 0 }; by.set(id, r); }
+      return r;
+    };
+    const jid = (s: any): string => (typeof s?.['journey'] === 'string' && s['journey']) ? s['journey'] : 'unassigned';
+    n.forEach(s => { row(jid(s)).newN++; });
+    u.forEach(s => { row(jid(s)).upN++; });
+    a.forEach(s => { row(jid(s)).addN++; });
+    const rows = [...by.values()];
+    rows.forEach(r => r.total = r.newN + r.upN + r.addN);
+    rows.sort((x, y) => y.total - x.total || x.name.localeCompare(y.name));
+    const tot: OvSalesRow = { id: '', name: 'Total', newN: n.length, upN: u.length, addN: a.length, total: n.length + u.length + a.length };
+    this.ovSalesMemo = { k: key, v: { rows, tot } };
+    return this.ovSalesMemo.v;
+  }
+  /** Drill a Sales-by-Journey cell: the exact sales behind it (list length == cell), native overlay. */
+  ovSalesDrill(journeyId: string | null, kind: 'new' | 'upgrade' | 'addon' | 'all', title: string): void {
+    const j = this.jcdRef(); if (!j) return;
+    const sets: Record<string, string> = { new: 'grossnewsale', upgrade: 'grossupgradesale', addon: 'grossaddonsale' };
+    const keys = kind === 'all' ? Object.values(sets) : [sets[kind]];
+    const jid = (s: any): string => (typeof s?.['journey'] === 'string' && s['journey']) ? s['journey'] : 'unassigned';
+    const rows: any[] = keys.flatMap(k => j.originalData?.[k]?.data ?? []).filter(s => journeyId == null || jid(s) === journeyId);
+    this.openOvDrill(title, rows.map(s => {
+      const pid = typeof s?.['profileid'] === 'string' ? s['profileid'] : '';
+      const d = this.toDate(s?.['purchasedate']);
+      return { profileid: pid, name: (pid && this.nameOf(pid)) || s?.['name'] || 'Unknown participant', created: d?.getTime() ?? 0 };
+    }));
+  }
+
+  // ── 2. Onboarding status: the dashboard's own sets; a tile opens its real table on the Onboarding tab ──
+  ovObCount(key: string): number { return this.jcdRef()?.originalData?.[key]?.count ?? 0; }
+  ovObAvg(): string {
+    const j = this.jcdRef();
+    return j && j.avgAssuredList?.length > 0 ? j.avgAssured.toFixed(2) : 'N/A';
+  }
+  ovOpenOnboardingTable(box: 'toBeOnboarded' | 'less7Days' | 'more7Days' | 'onboarded'): void {
+    const j = this.jcdRef(); if (!j) return;
+    this.setExperienceTab('onboarding');
+    // onBoxClick toggles: only open when that table is not already the open one.
+    const open = j.showTable && j.currentTableConfig?.title === j.tableConfigs?.[box]?.title;
+    if (!open) j.onBoxClick(box);
+    this.markJcd(j);
+  }
+
+  // ── 3. Scheduled & completed (Journey Coaching and Onboarding kept separate) ──
+  /** Booked sessions for one schedule, same predicates as the Planning Schedule card (schedCounts). */
+  private ovPending(onboarding: boolean, bucket: 'today' | 'week'): JcDoneEvent[] {
+    const now = Date.now();
+    const endToday = this.endOfDay(new Date()).getTime();
+    const week7 = endToday + 7 * 86400000;
+    const inScope = new Set(this.rosterIds());
+    return this.jcPendingEvents().filter(e => (e.onboarding === true) === onboarding && inScope.has(e.profileid)
+      && e.ms >= now && (bucket === 'today' ? e.ms <= endToday : (e.ms > endToday && e.ms <= week7)));
+  }
+  /** Attended sessions in the Overall date range (JC = jcDoneEvents, Onboarding = obDoneEvents). */
+  private ovDone(onboarding: boolean): JcDoneEvent[] {
+    const r = this.ovRange(); if (!r) return [];
+    const now = Date.now();
+    const from = r.start.getTime(), to = Math.min(r.end.getTime(), now);
+    const inScope = new Set(this.rosterIds());
+    return (onboarding ? this.obDoneEvents() : this.jcDoneEvents())
+      .filter(e => inScope.has(e.profileid) && e.ms >= from && e.ms <= to);
+  }
+  ovSched(): { jcToday: number; jcWeek: number; jcDone: number; obToday: number; obWeek: number; obDone: number; ready: boolean } {
+    return {
+      jcToday: this.ovPending(false, 'today').length, jcWeek: this.ovPending(false, 'week').length, jcDone: this.ovDone(false).length,
+      obToday: this.ovPending(true, 'today').length, obWeek: this.ovPending(true, 'week').length, obDone: this.ovDone(true).length,
+      ready: this.contactDataLoaded(),
+    };
+  }
+  ovSchedDrill(onboarding: boolean, what: 'today' | 'week' | 'done', title: string): void {
+    const ev = what === 'done' ? this.ovDone(onboarding) : this.ovPending(onboarding, what);
+    this.openOvDrill(title, ev.map(e => ({ profileid: e.profileid, name: this.nameOf(e.profileid), created: e.ms })),
+      what === 'done' ? 'desc' : 'asc');
+  }
+
+  // ── 5. Participant health: Active participants on Ecosystem products, by coach-set health state ──
+  private ovHealthPeople(): { profileid: string; state: string | null; date: Date | null }[] {
+    const out: { profileid: string; state: string | null; date: Date | null }[] = [];
+    if (this.pagedMode && this.fullIndexBuilt) {
+      for (const l of this.fullIndex) {
+        if (!this.liteInScope(l) || l.productType !== 'ecosystem' || this.lifecycleOf(l.customerstatus) !== 'active') continue;
+        const h = this.freshHealth(this.coachHealthByProfile[l.profileid]);
+        out.push({ profileid: l.profileid, state: h?.state ?? null, date: h?.date ?? null });
+      }
+    } else {
+      for (const r of this.allRows()) {
+        if (r.productType !== 'ecosystem' || this.lifecycleOf(r.customerstatus) !== 'active') continue;
+        out.push({ profileid: r.profileid, state: r.coachHealthState?.state ?? null, date: r.coachHealthState?.date ?? null });
+      }
+    }
+    return out;
+  }
+  ovHealth(): { happy: number; neutral: number; unhappy: number; atRisk: number; critical: number; notAssessed: number; total: number } {
+    const d = { happy: 0, neutral: 0, unhappy: 0, atRisk: 0, critical: 0, notAssessed: 0, total: 0 };
+    for (const p of this.ovHealthPeople()) {
+      d.total++;
+      switch (p.state) {
+        case 'HAPPY': d.happy++; break;
+        case 'NEUTRAL': d.neutral++; break;
+        case 'UNHAPPY': d.unhappy++; break;
+        case 'AT_RISK': d.atRisk++; break;
+        case 'CRITICAL': d.critical++; break;
+        default: d.notAssessed++; break;
+      }
+    }
+    return d;
+  }
+  ovHealthDrill(state: 'HAPPY' | 'NEUTRAL' | 'UNHAPPY' | 'AT_RISK' | 'CRITICAL' | null, title: string): void {
+    const known = ['HAPPY', 'NEUTRAL', 'UNHAPPY', 'AT_RISK', 'CRITICAL'];
+    const people = this.ovHealthPeople().filter(p => state ? p.state === state : !known.includes(p.state ?? ''));
+    this.openOvDrill(title, people.map(p => ({ profileid: p.profileid, name: this.nameOf(p.profileid), created: p.date?.getTime() ?? 0 })));
+  }
+
+  // ── 6. A&H Love Letters: the Planning table's documents, scoped by Viewing as ──
+  /** Viewing-as scope for A&H. All = every document (identical to the Planning table). */
+  private ovAhScope(): Set<string> | undefined {
+    return this.selectedCoachId === this.ALL ? undefined : new Set(this.rosterIds());
+  }
+  ovAh(): AHSummary | null {
+    if (!this.ahSummary()) return null;
+    const scope = this.ovAhScope();
+    const docs = scope ? this.ahDocs.filter(d => scope.has(d.profileid)) : this.ahDocs;
+    const count = (ds: typeof docs): AHFlagCounts => ({
+      total: ds.length,
+      tagged: ds.filter(d => d.tagged).length, opportunity: ds.filter(d => d.opportunity).length,
+      liked: ds.filter(d => d.liked).length, critical: ds.filter(d => d.critical).length,
+      resolved: ds.filter(d => d.resolved).length,
+    });
+    return {
+      askAH: count(docs.filter(d => d.coll === 'ask')),
+      loveLetter: count(docs.filter(d => d.coll === 'love')),
+      liked: docs.filter(d => d.liked).length, tagged: docs.filter(d => d.tagged).length,
+      opportunity: docs.filter(d => d.opportunity).length, critical: docs.filter(d => d.critical).length,
+      unflagged: docs.filter(d => !d.tagged && !d.opportunity && !d.liked && !d.critical).length,
+      resolvedTotal: docs.filter(d => d.resolved).length,
+      resolvedLiked: docs.filter(d => d.liked && d.resolved).length,
+      resolvedTagged: docs.filter(d => d.tagged && d.resolved).length,
+      resolvedOpportunity: docs.filter(d => d.opportunity && d.resolved).length,
+      resolvedCritical: docs.filter(d => d.critical && d.resolved).length,
+    };
+  }
+  ovAhDrill(coll: 'ask' | 'love' | 'both',
+    flag: 'all' | 'liked' | 'tagged' | 'opportunity' | 'critical' | 'unflagged' | 'critattn',
+    resolvedOnly: boolean, title: string): void {
+    this.openAhDrill(coll, flag, resolvedOnly, title, this.ovAhScope());
+  }
+
+  /** Overall drills reuse the native A&H drill overlay (no new dialog component). */
+  private openOvDrill(title: string, entries: AhDrillEntry[], order: 'asc' | 'desc' = 'desc'): void {
+    if (!entries.length) return;
+    const sorted = entries.slice().sort((a, b) => order === 'asc' ? a.created - b.created : b.created - a.created);
+    this.ahDrill.set({ title, entries: sorted });
+  }
   // Dark/light theming (operator-approved): follows prefers-color-scheme by default; the header toggle
   // overrides and persists to localStorage. Applied via [attr.data-theme] on .jchd-wrap.
   theme: 'dark' | 'light' | null = null;
@@ -1136,6 +1367,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     const map: Record<string, number> = {};
     const events: JcDoneEvent[] = [];
     const pending: JcDoneEvent[] = [];
+    const obDone: JcDoneEvent[] = [];
     await this.loadOnboardingApptTypes();
     try {
       // ONE read of every journey-coach appointment (the `attended` filter used to be in the
@@ -1173,7 +1405,12 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         // in the JC-done list. Mirrors the journeycoach-dashboard rule ([null,undefined].includes(onboarding)).
         // Pending/overdue above is intentionally left untouched — the JC-vs-Onboarding schedule split
         // (doc item 1) is handled there separately.
-        if (data['onboarding'] === true) return;
+        if (data['onboarding'] === true) {
+          // Overall Summary: an attended onboarding call = a completed onboarding. Exactly the docs the
+          // JC-done rule drops here, so JC completed and Onboarding completed stay disjoint.
+          obDone.push({ profileid: pid, coachId: host, ms: dt.getTime(), onboarding: true });
+          return;
+        }
         map[pid] = Math.max(map[pid] ?? 0, dt.getTime());
         // Keep each event as well — this query IS "JC done" (a journey-coach appointment that was
         // attended), and the JC pipeline metrics need the individual occurrences, not just the
@@ -1190,6 +1427,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.contactEventByProfile = map;
     this.jcDoneEvents.set(events);
     this.jcPendingEvents.set(pending);
+    this.obDoneEvents.set(obDone);
   }
 
   // ---- JC pipeline metrics (doc item 8): JC Done Today / Last Week / Last Month ----
@@ -1198,6 +1436,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   private jcDoneEvents = signal<JcDoneEvent[]>([]);
   /** Booked, not cancelled, not yet marked attended. Future = pending, past = overdue. */
   private jcPendingEvents = signal<JcDoneEvent[]>([]);
+  /** Attended ONBOARDING calls (onboarding === true) — the Overall Summary's Onboarding completed. */
+  private obDoneEvents = signal<JcDoneEvent[]>([]);
 
   /** Which count tile is active per schedule column; 'all' = show every booked session (default).
    *  Clicking a Today / Next-7 / Overdue tile filters that column's list to the bucket (toggle off). */
@@ -1472,11 +1712,12 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   openAhDrill(
     coll: 'ask' | 'love' | 'both',
     flag: 'all' | 'liked' | 'tagged' | 'opportunity' | 'critical' | 'unflagged' | 'critattn',
-    resolvedOnly: boolean, title: string,
+    resolvedOnly: boolean, title: string, scope?: Set<string>,
   ): void {
     const flagged = (d: { liked: boolean; tagged: boolean; opportunity: boolean; critical: boolean }) =>
       d.liked || d.tagged || d.opportunity || d.critical;
     const docs = this.ahDocs.filter(d => {
+      if (scope && !scope.has(d.profileid)) return false;   // Overall Summary: Viewing-as scope
       if (coll !== 'both' && d.coll !== coll) return false;
       if (resolvedOnly && !d.resolved) return false;
       switch (flag) {
