@@ -1,6 +1,8 @@
-<div class="head"><b>STARLABS</b><span class="small">Delivery Dashboard · Business/Career Accelerator</span></div>
-
 <div class="wrap">
+
+  <!-- ========== LOAD STATE ========== -->
+  <div class="banner accent" *ngIf="loading">Loading delivery data…</div>
+  <div class="banner error" *ngIf="loadError">{{ loadError }}</div>
 
   <!-- ========== PAGE HEADER ========== -->
   <header class="page-head">
@@ -39,7 +41,8 @@
           <span class="bar2"><span style="width:100%;background:#8b87ff"></span></span>
           <b>{{ ongoingParticipant() }}</b>
         </button>
-        <button class="prow" *ngFor="let p of visibleOngoing()">
+        <button class="prow" *ngFor="let p of visibleOngoing()" (click)="setProdByName(p.name)"
+                [class.sel]="curP() && normName(curP().name) === normName(p.name)">
           <span class="small">{{ p.name }}</span>
           <span class="bar2"><span [style.width.%]="p.count / maxOngoing() * 100"></span></span>
           <b>{{ p.count }}</b>
@@ -63,13 +66,9 @@
         <div class="l">Stuck</div><div class="v red">{{ k.stuck }}</div>
         <div class="s">no progress in 14+ days{{ curP() ? ' (sample)' : '' }}</div>
       </button>
-      <button class="kpi clickable" (click)="openPanel('await')">
-        <div class="l">Awaiting initiation</div><div class="v amber">{{ k.awaiting }}</div>
-        <div class="s">not paid yet{{ curP() ? ' (sample)' : '' }}</div>
-      </button>
-      <button class="kpi clickable" (click)="openPanel('nc')">
-        <div class="l">Initiated, not consuming</div><div class="v amber">{{ k.notC }}</div>
-        <div class="s">started, no usage yet{{ curP() ? ' (sample)' : '' }}</div>
+      <button class="kpi clickable" (click)="openLive('nc')">
+        <div class="l">Delivery not started</div><div class="v amber">{{ k.notC }}</div>
+        <div class="s">in diagnostics, no appointment scheduled</div>
       </button>
       <button class="kpi clickable" (click)="openLive('avg')">
         <div class="l">Average days to complete</div>
@@ -123,10 +122,10 @@
   <!-- ========================================================= -->
   <ng-container *ngIf="activeTab === 'pipeline'">
 
-    <!-- Product pipeline table -->
-    <section class="section" id="sec-pipeline">
-      <h2>Product pipeline</h2>
-      <p class="sub">Eligibility, journey and bonuses by product. Click a product to filter the screen.</p>
+    <!-- ========== JOURNEY FUNNEL (replaces the old product pipeline table) ========== -->
+    <section class="section" id="sec-funnel">
+      <h2>Journey funnel</h2>
+      <p class="sub">Click any number to see the participants behind it.</p>
       <div class="filterbar flush">
         <label class="field">Event
           <select><option value="bca">{{ EVENT }}</option></select>
@@ -137,107 +136,138 @@
         <table class="fit-t">
           <thead>
             <tr>
-              <th>Total</th><th>Product</th><th>Eligible</th><th>Ineligible</th><th>Purchased</th><th>Purchased %</th>
+              <th>Total</th><th>Product</th><th>Eligible</th><th>Ineligible</th>
+              <th>Purchased</th><th>Purchased %</th>
               <th>Yet to start</th><th>Ongoing</th><th>Done</th><th>Done %</th>
-              <th style="min-width:160px">Stage mix
+              <th class="mixcol">
+                Stage mix
                 <div class="legend">
                   <span><i style="background:#9aa3b5"></i>Yet to start</span>
-                  <span><i style="background:#6b7388"></i>Started</span>
                   <span><i style="background:#f59e0b"></i>Ongoing</span>
                   <span><i style="background:#4f46e5"></i>Done</span>
                 </div>
               </th>
-              <th>Init→start · Start→done</th><th>Bonus given</th><th>Subscription ended</th>
+              <th>Init→Start · Start→Done</th>
+              <th>Bonus given</th>
+              <th>Subscription ended</th>
             </tr>
           </thead>
+
           <tbody>
-            <tr class="click" *ngFor="let p of visibleProducts(); trackBy: trackById" [class.sel]="S.prod === p.id" (click)="setProd(p.id)">
-              <td><b>{{ p.total }}</b></td>
-              <td><span class="dot-sw" [style.background]="p.color"></span><b>{{ p.short }}</b></td>
-              <td>{{ p.eligible }}</td>
-              <td>{{ p.ineligible }}</td>
-              <td>{{ p.purch }}</td>
-              <td>{{ pct(p.purch, p.eligible) }}%</td>
-              <td>{{ p.funnel[0] }}</td>
-              <td>{{ p.funnel[3] }}</td>
-              <td>{{ p.funnel[4] }}</td>
-              <td>{{ pct(p.funnel[4], stageTotal(p)) }}%</td>
-              <td>
-                <div class="mix">
-                  <div class="seg" *ngFor="let m of stageMix(p)" [title]="m.name + ': ' + m.count" [style.flex]="m.count + ' 1 0'">
-                    <span class="c">{{ m.count }}</span>
-                    <span class="b" [style.background]="m.color"></span>
-                  </div>
-                  <span class="muted small" *ngIf="stageMix(p).length === 0">no records</span>
-                </div>
-              </td>
-              <td>
-                <div class="small">Init→start: <span class="warn">0d · missing</span></div>
-                <div class="small">Start→done:
-                  <span *ngIf="p.avgDone === '0d'" class="warn">0d · missing</span>
-                  <span *ngIf="p.avgDone === 'none'" class="muted">no completions</span>
-                  <ng-container *ngIf="p.avgDone !== '0d' && p.avgDone !== 'none'">{{ p.avgDone }}</ng-container>
-                </div>
-              </td>
-              <td><b>{{ p.bonus }}</b></td>
-              <td>{{ p.ended }}</td>
+            <ng-container *ngFor="let r of funnelVisible()">
+              <ng-container *ngTemplateOutlet="frow; context: { $implicit: r }"></ng-container>
+            </ng-container>
+
+            <tr class="click hidden-toggle" *ngIf="funnelHidden().length > 0" (click)="funnelShowHidden = !funnelShowHidden">
+              <td colspan="14">{{ funnelShowHidden ? '▾' : '▸' }} Hidden products ({{ funnelHidden().length }})</td>
             </tr>
-            <tr *ngIf="visibleProducts().length === 0"><td colspan="14" class="muted">No products to show.</td></tr>
+            <ng-container *ngIf="funnelShowHidden">
+              <ng-container *ngFor="let r of funnelHidden()">
+                <ng-container *ngTemplateOutlet="frow; context: { $implicit: r }"></ng-container>
+              </ng-container>
+            </ng-container>
+
+            <tr *ngIf="funnelRows.length === 0"><td colspan="14" class="muted">No products to show.</td></tr>
           </tbody>
+
           <tfoot>
             <tr>
-              <td>{{ sumKey('total') }}</td>
-              <td>Total · {{ visibleProducts().length }} products</td>
-              <td>{{ sumKey('eligible') }}</td>
-              <td>{{ sumKey('ineligible') }}</td>
-              <td>{{ sumKey('purch') }}</td>
-              <td>{{ pct(sumKey('purch'), sumKey('eligible')) }}%</td>
-              <td>{{ sumFunnel(0) }}</td>
-              <td>{{ sumFunnel(3) }}</td>
-              <td>{{ sumFunnel(4) }}</td>
-              <td>{{ pct(sumFunnel(4), sumStageTotal()) }}%</td>
+              <td><button class="num" (click)="openFunnel(null, 'total')">{{ funnelSum('total') }}</button></td>
+              <td>Total · {{ funnelShown().length }} products</td>
+              <td><button class="num" (click)="openFunnel(null, 'eligible')">{{ funnelSum('eligible') }}</button></td>
+              <td><button class="num" (click)="openFunnel(null, 'notEligible')">{{ funnelSum('notEligible') }}</button></td>
+              <td><button class="num" (click)="openFunnel(null, 'purchased')">{{ funnelSum('purchased') }}</button></td>
+              <td>{{ funnelSumPct('purchased') }}%</td>
+              <td><button class="num" (click)="openFunnel(null, 'yetToStart')">{{ funnelSum('yetToStart') }}</button></td>
+              <td><button class="num" (click)="openFunnel(null, 'ongoing')">{{ funnelSum('ongoing') }}</button></td>
+              <td><button class="num" (click)="openFunnel(null, 'done')">{{ funnelSum('done') }}</button></td>
+              <td>{{ funnelSumPct('done') }}%</td>
               <td></td><td></td>
-              <td>{{ sumKey('bonus') }}</td>
-              <td>{{ sumKey('ended') }}</td>
+              <td><button class="num" (click)="openFunnel(null, 'bonus')">{{ funnelSum('bonus') }}</button></td>
+              <td><button class="num" (click)="openFunnel(null, 'subEnded')">{{ funnelSum('subEnded') }}</button></td>
             </tr>
           </tfoot>
         </table>
+
+        <!-- one product row, used for visible and hidden products -->
+        <ng-template #frow let-r>
+          <tr [class.muted-row]="r.hidden">
+            <td><button class="num" (click)="openFunnel([r.group], 'total', r.group)"><b>{{ r.total }}</b></button></td>
+            <td><span class="pdot" [style.background]="funnelColor(r.group)"></span><b>{{ r.group }}</b></td>
+            <td><button class="num" (click)="openFunnel([r.group], 'eligible', r.group)">{{ r.eligible }}</button></td>
+            <td><button class="num" (click)="openFunnel([r.group], 'notEligible', r.group)">{{ r.notEligible }}</button></td>
+            <td><button class="num" (click)="openFunnel([r.group], 'purchased', r.group)">{{ r.purchased }}</button></td>
+            <td>{{ r.purchasedPct }}%</td>
+            <td><button class="num" (click)="openFunnel([r.group], 'yetToStart', r.group)">{{ r.yetToStart }}</button></td>
+            <td><button class="num" (click)="openFunnel([r.group], 'ongoing', r.group)">{{ r.ongoing }}</button></td>
+            <td><button class="num" (click)="openFunnel([r.group], 'done', r.group)">{{ r.done }}</button></td>
+            <td>{{ r.donePct }}%</td>
+
+            <td class="mixcol">
+              <div class="mix" *ngIf="mixSegments(r).length; else nomix">
+                <div class="segwrap" *ngFor="let s of mixSegments(r)" [style.flex-grow]="s.value" [title]="s.label + ': ' + s.value">
+                  <span class="segn">{{ s.value }}</span>
+                  <div class="segbar" [style.background]="s.color"></div>
+                </div>
+              </div>
+              <ng-template #nomix><span class="muted">—</span></ng-template>
+            </td>
+
+            <td class="avgcol">
+              <div>Init→start:
+                <ng-container *ngTemplateOutlet="avgv; context: { v: r.avgInitToStart, none: 'no data' }"></ng-container>
+              </div>
+              <div>Start→done:
+                <ng-container *ngTemplateOutlet="avgv; context: { v: r.avgStartToDone, none: 'no completions' }"></ng-container>
+              </div>
+            </td>
+
+            <td><button class="num" (click)="openFunnel([r.group], 'bonus', r.group)"><b>{{ r.bonus }}</b></button></td>
+            <td><button class="num" (click)="openFunnel([r.group], 'subEnded', r.group)">{{ r.subEnded }}</button></td>
+          </tr>
+        </ng-template>
+
+        <ng-template #avgv let-v="v" let-none="none">
+          <span *ngIf="v === null" class="muted">{{ none }}</span>
+          <span *ngIf="v === 0" class="warn">0d · missing</span>
+          <span *ngIf="v !== null && v > 0">{{ v }}d</span>
+        </ng-template>
       </div>
-      <p class="note">Total is the participant count per product. Stage mix: grey = yet to start, dark grey = started, amber = ongoing, purple = done. Bonus given counts participants who received the product as a bonus.</p>
+      <p class="note">Total is the participant count per product. Stage mix: grey = yet to start, amber = ongoing, indigo = done. Init→Start is the average days from initiated to ongoing, and Start→Done is the average days from ongoing to completed. Bonus given counts participants who received the product as a bonus. Subscription ended counts participants whose subscription end date has passed.</p>    
     </section>
 
     <!-- Stages board -->
     <section class="section" id="sec-stages">
       <h2>Stages</h2>
-      <p class="sub">
-        {{ PB[S.stageProd]?.name }}.
-        {{ captured ? 'Counts from the system.' : 'Stage counts for this product are not captured yet, so the counts shown are from the sample.' }}
-      </p>
+      <p class="sub">{{ overallTab ? overallTab.label + ' · stages come from the product delivery sequence.' : 'Click a product to load its stages.' }}</p>
       <div class="toolbar">
-        <button *ngFor="let t of STAGE_TABS" [class.on]="S.stageProd === t[0]" (click)="S.stageProd = t[0]">{{ t[1] }}</button>
+        <button *ngFor="let t of OVERALL_TABS" [class.on]="overallTab === t" (click)="openOverallTab(t)">{{ t.label }}</button>
       </div>
-      <div class="scroll">
-        <div class="stage-grid">
-          <div class="stage-col" *ngFor="let c of stageCols()" [style.border-top-color]="c.color">
-            <div class="top"><b>{{ c.name }}</b><span class="badge solid" [style.background]="c.color">{{ c.badge }}</span></div>
+      <div class="banner accent" *ngIf="overallLoading">Loading stages…</div>
+
+      <div class="scroll" *ngIf="overallTab">
+        <div class="stage-grid" [style.grid-template-columns]="'repeat(' + overallBoard.length + ', 260px)'">
+          <div class="stage-col" *ngFor="let c of overallBoard; let i = index" [style.border-top-color]="STAGE_COLORS[i % STAGE_COLORS.length]">
+            <div class="top"><b>{{ c.name }}</b><span class="badge solid" [style.background]="STAGE_COLORS[i % STAGE_COLORS.length]">{{ c.items.length }}</span></div>
 
             <ng-container *ngIf="!c.first">
               <div class="stage-2">
-                <div class="box"><b class="green-t">{{ c.completed }}</b><div class="small muted">completed</div></div>
-                <div class="box"><b>{{ c.cancelled }}</b><div class="small muted">cancelled</div></div>
+              <div class="box" (click)="openStageDialog(c, 'completed')"><b class="green-t">{{ c.completed }}</b><div class="small muted">completed</div></div>
+              <div class="box" (click)="openStageDialog(c, 'cancelled')"><b>{{ c.cancelled }}</b><div class="small muted">cancelled</div></div>
               </div>
               <div class="stage-3">
-                <div class="box"><b>{{ c.all }}</b><div class="small muted">all</div></div>
-                <div class="box"><b>{{ c.sched }}</b><div class="small muted">scheduled</div></div>
-                <div class="box"><b>{{ c.wait }}</b><div class="small muted">waiting</div></div>
+                <div class="box" (click)="toggleAll(c)"><b>{{ c.all }}</b><div class="small muted">all</div></div>
+                <div class="box"><b>{{ c.scheduled }}</b><div class="small muted">scheduled</div></div>
+                <div class="box"><b>{{ c.waiting }}</b><div class="small muted">waiting</div></div>
               </div>
             </ng-container>
 
-            <div class="mini-card" *ngFor="let p of c.items; trackBy: trackById">
-              <b>{{ p.name }}</b>
-              <div class="small muted">{{ p.id }} · {{ p.owner }}</div>
-              <div class="st"><span class="badge" [ngClass]="STATUS_CLS[p.status]">{{ STATUS[p.status] }}</span></div>
-              <div class="small muted st">{{ p.days }} days in stage<ng-container *ngIf="p.diagSpec"> · {{ p.diagSpec }}</ng-container></div>
+              <div class="mini-card" *ngFor="let card of visibleItems(c); trackBy: trackByRow">
+              <b>{{ card.row.name }}</b>
+              <div class="small muted">{{ card.row.profileid }}</div>
+              <div class="st"><span class="badge" [ngClass]="CARD_CLS[card.state]">{{ card.state | titlecase }}</span></div>
+              <div class="small muted st" *ngIf="c.first && overallTab.months">Tentative start: {{ fd(card.row.tentativeStart) }}</div>
+              <button *ngIf="c.canBook && superRole" (click)="openOnboardingDialog(card.row)">Book onboarding</button>
             </div>
             <div class="small muted empty-col" *ngIf="c.items.length === 0">No data yet</div>
           </div>
@@ -255,7 +285,7 @@
 
     <div class="filterbar">
       <label class="field">Search
-        <input type="search" class="w-190" placeholder="Name or ID" [(ngModel)]="S.q">
+        <input type="search" class="w-190" placeholder="Name" [(ngModel)]="S.q">
       </label>
       <label class="field">Product
         <select [(ngModel)]="S.prod">
@@ -265,14 +295,19 @@
       </label>
       <label class="field">Status
         <select [(ngModel)]="S.status">
-          <option value="all">All statuses</option>
-          <option *ngFor="let s of STATUS_LIST" [value]="s.value">{{ s.label }}</option>
+          <option value="all">All</option>
+          <option *ngFor="let b of BOTTLENECKS" [value]="b.value">{{ b.label }}</option>
         </select>
       </label>
       <label class="field">Event
         <select [(ngModel)]="S.event">
           <option value="all">All events</option>
           <option value="bca">{{ EVENT }}</option>
+        </select>
+      </label>
+      <label class="field">Date by
+        <select [(ngModel)]="S.dateField">
+          <option *ngFor="let d of DATE_FIELDS" [value]="d.value">{{ d.label }}</option>
         </select>
       </label>
       <label class="field">Initiated date
@@ -287,17 +322,13 @@
         <label class="field">From<input type="date" [(ngModel)]="S.rFrom"></label>
         <label class="field">To<input type="date" [(ngModel)]="S.rTo"></label>
       </ng-container>
-      <label class="field">Customer
-        <select [(ngModel)]="S.cust"><option value="all">All</option><option value="Active">Active</option><option value="Ended">Ended</option></select>
-      </label>
-      <label class="field">Financial
-        <select [(ngModel)]="S.fin"><option value="all">All</option><option value="Paid">Paid</option><option value="Pending">Pending</option></select>
-      </label>
+      <select [(ngModel)]="S.cust"><option value="all">All</option><option value="active">Active</option><option value="inactive">Non-active</option></select>
+      <select [(ngModel)]="S.fin">
+        <option value="all">All</option>
+        <option *ngFor="let f of FINANCE_LIST" [value]="f">{{ f | titlecase }}</option>
+      </select>
       <label class="field">Parallel product
-        <select [(ngModel)]="S.par">
-          <option value="all">All</option>
-          <option *ngFor="let p of ACTIVE" [value]="p.short">{{ p.short }}</option>
-        </select>
+        <select [(ngModel)]="S.par"><option value="all">All</option><option value="yes">Has parallel product</option><option value="no">No parallel product</option></select>
       </label>
       <label class="field">Tag
         <select [(ngModel)]="S.tagF">
@@ -467,40 +498,11 @@
         </ng-template>
       </ng-container>
 
-      <!-- ===== Awaiting initiation ===== -->
-      <div class="card scroll" *ngSwitchCase="'await'">
-        <div class="toolbar flush">
-          <button (click)="backToParticipants()">Back to participants</button>
-          <span class="small muted ml-auto">{{ panelRows('awaiting-payment').length }} awaiting initiation in scope (sample)</span>
-        </div>
-        <table>
-          <thead><tr><th>Priority</th><th>Name</th><th>Mobile</th><th>Journey</th><th>Parallel product</th><th>Onboarded</th><th>Days waiting</th><th>Payment status</th><th>Last payment</th><th>Subscription start</th><th>Subscription end</th><th>Bottleneck</th></tr></thead>
-          <tbody>
-            <tr *ngFor="let p of panelRows('awaiting-payment')">
-              <td><span class="badge" [ngClass]="prio(p.days)[1]">{{ prio(p.days)[0] }}</span></td>
-              <td><b>{{ p.name }}</b><div class="small muted">{{ p.id }}</div></td>
-              <td class="small muted">Not in sample</td>
-              <td>{{ STAGES[0] }}</td>
-              <td>{{ p.parallel }}</td>
-              <td class="muted">—</td>
-              <td><span class="badge b-red">{{ p.days }} days</span></td>
-              <td><span class="badge b-amber">Pending</span></td>
-              <td class="muted">—</td>
-              <td class="muted">—</td>
-              <td>{{ fmt(addDays(p.subEnd)) }}</td>
-              <td class="small">Payment not confirmed</td>
-            </tr>
-            <tr *ngIf="panelRows('awaiting-payment').length === 0"><td colspan="12" class="muted">No participants awaiting initiation in scope.</td></tr>
-          </tbody>
-        </table>
-      </div>
-
       <!-- ===== Ready to start ===== -->
       <div class="card scroll" *ngSwitchCase="'rdy'">
         <div class="toolbar flush">
           <button (click)="backToParticipants()">All {{ countAllInScope }}</button>
-          <button (click)="openPanel('await')">Awaiting Initiation <b style="margin-left:4px">{{ countStatus('awaiting-payment') }}</b></button>
-          <button (click)="openPanel('nc')">Initiated – Not Consuming <b style="margin-left:4px">{{ countStatus('not-consuming') }}</b></button>
+          <button (click)="openPanel('nc')">Delivery Not Started <b style="margin-left:4px">{{ countStatus('not-consuming') }}</b></button>
           <button (click)="openPanel('stuck')">Stuck Cases <b style="margin-left:4px">{{ countStatus('stuck') }}</b></button>
         </div>
         <div class="banner grad">
@@ -533,7 +535,7 @@
       <div class="card scroll" *ngSwitchCase="'nc'">
         <div class="toolbar flush">
           <button (click)="backToParticipants()">Back to participants</button>
-          <span class="small muted ml-auto">{{ panelRows('not-consuming').length }} initiated, not consuming in scope (sample)</span>
+          <span class="small muted ml-auto">{{ panelRows('not-consuming').length }} Delivery not started</span>
         </div>
         <table>
           <thead><tr><th>Status</th><th>Name</th><th>Journey</th><th>Parallel product</th><th>Product</th><th>Mobile</th><th>Initiated date</th><th>Days waiting</th><th>Subscription start</th><th>Subscription end</th><th>Notes</th><th></th></tr></thead>
@@ -630,29 +632,35 @@
           <button (click)="backToParticipants()">Back to participants</button>
           <span class="small muted ml-auto">{{ liveRows.length }} participants</span>
         </div>
-        <table mat-table [dataSource]="liveRows" class="w-full">
-          <ng-container matColumnDef="name">
-            <th mat-header-cell *matHeaderCellDef>Name</th>
-            <td mat-cell *matCellDef="let r">{{ r.name }}</td>
-          </ng-container>
-          <ng-container matColumnDef="email">
-            <th mat-header-cell *matHeaderCellDef>Email</th>
-            <td mat-cell *matCellDef="let r">{{ r.email }}</td>
-          </ng-container>
-          <ng-container matColumnDef="product">
-            <th mat-header-cell *matHeaderCellDef>Product</th>
-            <td mat-cell *matCellDef="let r">{{ r.product }}</td>
-          </ng-container>
-          <ng-container matColumnDef="startDate">
-            <th mat-header-cell *matHeaderCellDef>Ongoing date</th>
-            <td mat-cell *matCellDef="let r">{{ r.startDate ? fmt(r.startDate) : '—' }}</td>
-          </ng-container>
-          <ng-container matColumnDef="days">
-            <th mat-header-cell *matHeaderCellDef>Days</th>
-            <td mat-cell *matCellDef="let r">{{ r.days }}</td>
-          </ng-container>
-          <tr mat-header-row *matHeaderRowDef="liveColumns"></tr>
-          <tr mat-row *matRowDef="let r; columns: liveColumns"></tr>
+        <table>
+          <thead>
+            <tr><th *ngFor="let c of liveColDefs()">{{ c.label }}</th></tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let r of liveRows">
+              <td *ngFor="let c of liveColDefs()">
+                <ng-container [ngSwitch]="c.key">
+                  <ng-container *ngSwitchCase="'name'"><b>{{ r.name }}</b><div class="small muted">{{ r.profileid }}</div></ng-container>
+                  <ng-container *ngSwitchCase="'priority'">
+                    <span class="badge" [ngClass]="prio(r.days)[1]">{{ prio(r.days)[0] }}</span>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'paymentStatus'">
+                    <span class="badge" [ngClass]="paymentBadge(r)[1]">{{ paymentBadge(r)[0] }}</span>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'daysWaiting'">
+                    <span class="badge b-red">{{ r.days }} days</span>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'daysStuck'">
+                    <span class="badge" [ngClass]="prio(r.days)[1]">{{ r.days }} days</span>
+                  </ng-container>
+                  <ng-container *ngSwitchDefault>{{ liveCell(r, c.key) }}</ng-container>
+                </ng-container>
+              </td>
+            </tr>
+            <tr *ngIf="liveRows.length === 0">
+              <td [attr.colspan]="liveColumns.length" class="muted">No participants match.</td>
+            </tr>
+          </tbody>
         </table>
       </div>
 
@@ -785,4 +793,85 @@
   </div>
 </div>
 
+<!-- ========== FUNNEL POPUP ========== -->
+<div class="scrim center" *ngIf="funnelPopup as pop" (click)="closeFunnel()">
+  <div class="modal" (click)="$event.stopPropagation()">
+    <div class="panel-head">
+      <div>
+        <b style="font-size:17px">{{ pop.title }} · {{ FUNNEL_LABEL[pop.metric] }}</b>
+        <div class="small muted">{{ funnelPopupList.length }} participants</div>
+      </div>
+      <div class="toolbar nomargin">
+        <input type="search" class="w-190" placeholder="Name, email or mobile"
+               [(ngModel)]="funnelQ" (ngModelChange)="refreshFunnelPopup()">
+        <button (click)="exportFunnelPopup()">Export</button>
+        <button (click)="closeFunnel()">Close</button>
+      </div>
+    </div>
+
+    <div class="scroll stage-modal-body">
+            <table>
+        <thead>
+          <tr>
+            <th>#</th><th>Participant</th><th>Product</th>
+            <th>Initiated</th><th>Ongoing</th><th>Completed</th><th>Product Cycle</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let r of funnelPopupList; let i = index">
+            <td>{{ i + 1 }}</td>
+            <td>{{ r.name }}</td>
+            <td>{{ r.group }}</td>
+            <td>{{ fd(r.initiatedDate) }}</td>
+            <td>{{ fd(r.ongoingDate) }}</td>
+            <td>{{ fd(r.completedDate) }}</td>
+            <td>{{ productCycle(r) }}</td>
+          </tr>
+          <tr *ngIf="funnelPopupList.length === 0">
+            <td colspan="7" class="muted">No participants match.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<!-- stages dialog box -->
+<div class="stage-scrim" *ngIf="stageDialog as dlg" (click)="closeStageDialog()">
+  <div class="stage-modal" (click)="$event.stopPropagation()">
+    <div class="panel-head">
+      <div>
+        <b style="font-size:17px">{{ dlg.title }} · {{ dlg.kind | titlecase }}</b>
+        <div class="small muted">{{ dlg.rows.length }} appointments</div>
+      </div>
+      <button (click)="closeStageDialog()">Close</button>
+    </div>
+
+    <div class="scroll modal-body">
+      <table>
+        <thead>
+          <tr><th>Participant</th><th>{{ dlg.dateLabel }}</th><th>Specialist</th><th></th></tr>
+        </thead>
+        <tbody>
+          <ng-container *ngFor="let r of dlg.rows">
+            <tr>
+              <td>{{ r.name }}</td>
+              <td>{{ fd(r.date) }}</td>
+              <td>{{ specialistOf(r.appt) }}</td>
+              <td><button (click)="r.open = !r.open">{{ r.open ? '▾' : '▸' }}</button></td>
+            </tr>
+            <tr *ngIf="r.open">
+              <td colspan="4">
+                <div class="small muted" *ngIf="r.previous.length === 0">No previous completed appointments.</div>
+                <div class="small" *ngFor="let p of r.previous">{{ p.stageName }} · {{ fd(p.appt.end) }} · {{ specialistOf(p.appt) }}</div>
+              </td>
+            </tr>
+          </ng-container>
+          <tr *ngIf="dlg.rows.length === 0">
+            <td colspan="4" class="muted">No appointments.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
 <div class="toast" [class.show]="toastShow">{{ toastMsg }}</div>
