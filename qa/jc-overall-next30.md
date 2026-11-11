@@ -41,3 +41,4 @@ rosterIds() (Viewing as). No new query.
 - Fail if reverted: yes (7 of 9 FAIL against HEAD~ sources)
 - Last run: PASS 9/9
 - Live 2026-11-11 (localhost:4303, starlabs-test): starlabs-test has 0 future JC sessions, so all tiles 0 == drill 0; with 4 in-memory sessions (+3d, +12d, +40d JC; +20d onboarding; nothing written) JC Next 7 = 1 == drill 1, JC Next 30 = 2 == drill 2 (+40d excluded), Onboarding Next 30 = 1 == drill 1 (disjoint).
+- Not verified live: Next 30 days with real future bookings (starlabs-test has none; checked with in-memory sessions only); light mode (checked in dark only).
