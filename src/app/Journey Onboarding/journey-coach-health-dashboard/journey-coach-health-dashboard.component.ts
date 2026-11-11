@@ -36,7 +36,6 @@ import { SetHealthStateDialogComponent, SetHealthStateResult } from './set-healt
 import { ParticipantSlideoverComponent, SlideoverData, SlideoverActivityItem, SlideoverLogPayload } from './participant-slideover.component';
 import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 import { JourneycoachDashboardComponent } from '../journeycoach-dashboard/journeycoach-dashboard.component';
-import { OnboardingPipelineComponent } from '../onboarding-pipeline/onboarding-pipeline.component';
 import {
   CoachHealthState, ActivityType, COACH_HEALTH_OPTIONS,
   coachHealthLabel, coachHealthStateClass, normalizeCoachHealth,
@@ -198,7 +197,7 @@ interface ScoreboardRow {
   standalone: true,
   imports: [
     CommonModule, FormsModule, RouterLink, ProfilePictureComponent,
-    JourneycoachDashboardComponent, OnboardingPipelineComponent,
+    JourneycoachDashboardComponent,
     MatTableModule, MatPaginatorModule, MatSortModule,
     MatFormFieldModule, MatInputModule, MatSelectModule,
     MatChipsModule, MatIconModule, MatButtonModule, MatMenuModule,

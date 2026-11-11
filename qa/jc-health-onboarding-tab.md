@@ -10,10 +10,11 @@ The Onboarding tab of Journey Coach Health shows, top to bottom:
 2. Gross Sales and Assured Sales cards (side by side).
 3. Onboarding · by product: To onboard / <=7 days / 7+ days / Not assured, Onboarded this month,
    OB calls / JC calls / Avg OB days / Avg purch days, the per-product table, Schedule and Pipeline.
-4. The onboarding intake pipeline (Sources funnel) directly below the by-product table.
+4. (2026-11-11) The 4-stage onboarding pipeline card, then the table opened from any count — see jc-onboarding-pipeline.
+   The former intake funnel (onboarding-pipeline component) was removed from this tab by operator decision.
 
-Items 1-3 are the EXISTING journeycoach-dashboard component embedded with [embedOnboarding]="true";
-item 4 is the EXISTING onboarding-pipeline component. Nothing is duplicated.
+All items are the EXISTING journeycoach-dashboard component embedded with [embedOnboarding]="true".
+Nothing is duplicated.
 
 ## User moves
 1. Open the URL, click Onboarding (testid: jx-tab-onboarding).

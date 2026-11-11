@@ -46,3 +46,12 @@ Literal `data-testid` strings only — no `${interpolation}` (gate section 1.1 /
 |---|---|---|
 | jcd-embed-gross-count | Gross Sales count (embed only) | jc-onboarding-count-only |
 | jcd-embed-assured-count | Assured Sales count (embed only) | jc-onboarding-count-only |
+| jcd-pipe | Onboarding pipeline card (embed only) | jc-onboarding-pipeline |
+| jcd-pipe-notassured | Pipeline stage: Not Assured count | jc-onboarding-pipeline |
+| jcd-pipe-ready | Pipeline stage: Ready for Onboarding count | jc-onboarding-pipeline |
+| jcd-pipe-scheduled | Pipeline stage: Scheduled for Onboarding count | jc-onboarding-pipeline |
+| jcd-pipe-onboarded | Pipeline stage: Onboarded count | jc-onboarding-pipeline |
+| jcd-pipe-journey | Pipeline Journey selector | jc-onboarding-pipeline |
+| jcd-pipe-journey-all | Journey selector: All | jc-onboarding-pipeline |
+| jcd-pipe-journey-opt | Journey selector: one journey | jc-onboarding-pipeline |
+| jcd-name-contact | Mobile + email under the name (embed To-be-onboarded tables) | jc-onboarding-pipeline |

@@ -324,6 +324,12 @@ export class JourneycoachDashboardComponent {
     last15daysnotOnboarded: { count: 0, data: [] },
     onboarded: { count: 0, data: [] },
 
+    // Onboarding-tab pipeline (embed only) — 4 disjoint stages, see recomputePipeline()
+    pipeNotAssured: { count: 0, data: [] },
+    pipeReady: { count: 0, data: [] },
+    pipeScheduled: { count: 0, data: [] },
+    pipeOnboarded: { count: 0, data: [] },
+
     // Product Initiation 
     alljourneynotstarted: { count: 0, data: [] },
     lessthan30daysjourneynotstarted: { count: 0, data: [] },
@@ -812,6 +818,82 @@ export class JourneycoachDashboardComponent {
     (this.originalData['last15daysnotOnboarded']?.data || []).forEach((r: any) => { const m = ensure(nameOf(r)); m.plus7++; m.toOnboard++; });
     (this.originalData['notassured']?.data || []).forEach((r: any) => { const m = ensure(nameOf(r)); m.notAssured++; });
     this.onboardingProducts = Object.values(map).sort((a: any, b: any) => b.toOnboard - a.toOnboard);
+    this.recomputePipeline();
+  }
+
+  // ─── Onboarding tab (embedOnboarding only; operator 2026-11-11) ───
+  // Pipeline: 4 disjoint stages from the same participantjourneyproduct sets the by-product card uses,
+  // scoped by this dashboard's date filter — stages 1-3 by purchase date, Onboarded by onboarded date
+  // (= the existing 'onboarded' set). Not Assured = no payment plan; Ready = payment plan, no onboarding
+  // call booked; Scheduled = call booked, not onboarded; Onboarded = marked onboarded.
+  pipelineJourney: string = 'all';
+  pipelineJourneys: { id: string; name: string }[] = [];
+
+  recomputePipeline() {
+    if (!this.embedOnboarding) return;
+    const ist = (330 * 60 * 1000);
+    const start = new Date(this.startDate); start.setHours(0, 0, 0, 0); start.setTime(start.getTime() + ist);
+    const end = new Date(this.endDate); end.setHours(23, 59, 59, 999); end.setTime(end.getTime() + ist);
+    const inRange = (r: any) => { const d = r?.['purchasedate']?.toDate?.(); return !!d && d >= start && d <= end; };
+    const jid = (r: any) => r?.['journeyref']?.id || 'unassigned';
+
+    // Needs-a-call first: no call booked, then call time passed (ready to mark onboarded), then upcoming.
+    this.sortNeedsSchedulingFirst(this.originalData['all'].data);
+    this.sortNeedsSchedulingFirst(this.originalData['last7DaysnotOnboarded'].data);
+    this.sortNeedsSchedulingFirst(this.originalData['last15daysnotOnboarded'].data);
+
+    const notAssured = (this.originalData['notassured'].data || []).filter(inRange);
+    const open = (this.originalData['all'].data || []).filter(inRange);
+    const ready = open.filter((r: any) => !r['onboardingscheduled']);
+    const scheduled = open.filter((r: any) => !!r['onboardingscheduled']);
+    const onboarded = this.originalData['onboarded'].data || [];
+
+    const names = new Map<string, string>();
+    [...notAssured, ...open, ...onboarded].forEach((r: any) => {
+      const id = jid(r);
+      names.set(id, id === 'unassigned' ? 'Unassigned' : (this.mapjourneyname?.[id] || id));
+    });
+    this.pipelineJourneys = [...names].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+    if (this.pipelineJourney !== 'all' && !names.has(this.pipelineJourney)) this.pipelineJourney = 'all';
+
+    const pick = (rows: any[]) => rows.filter((r: any) => this.pipelineJourney === 'all' || jid(r) === this.pipelineJourney);
+    const put = (key: string, rows: any[]) => { const d = pick(rows); this.originalData[key] = { count: d.length, data: d }; };
+    put('pipeNotAssured', notAssured);
+    put('pipeReady', ready);
+    put('pipeScheduled', scheduled);
+    put('pipeOnboarded', onboarded);
+    this.updateTableDataIfOpen(this.tableType);
+  }
+
+  setPipelineJourney(id: string) {
+    this.pipelineJourney = id;
+    this.recomputePipeline();
+  }
+
+  private sortNeedsSchedulingFirst(rows: any[]) {
+    if (!Array.isArray(rows)) return;
+    const now = new Date();
+    const rank = (r: any) => {
+      const d = r?.['onboardingscheduled']?.toDate?.();
+      return !d ? 0 : (d <= now ? 1 : 2);
+    };
+    rows.sort((a, b) => rank(a) - rank(b));
+  }
+
+  // Embed-only display order for the To-be-onboarded table: actions together (Schedule, Action, Journey Plan);
+  // Mobile/EMail shown under the name. currentTableConfig.columns is untouched, so export keeps every column.
+  assuredColumnsEmbed: any[] = [];
+  get displayColumns(): any[] {
+    const cols = this.currentTableConfig?.columns || [];
+    return (this.embedOnboarding && cols === this.assuredColumns && this.assuredColumnsEmbed.length) ? this.assuredColumnsEmbed : cols;
+  }
+  get showNameContact(): boolean {
+    return this.embedOnboarding && this.currentTableConfig?.columns === this.assuredColumns;
+  }
+  delayClass(row: any): string {
+    const n = Number(row?.['delayeddays']);
+    if (!isFinite(n)) return '';
+    return n <= 7 ? 'jcd-wait-ok' : (n <= 30 ? 'jcd-wait-mid' : 'jcd-wait-bad');
   }
 
   openOnboardingProduct(_p: any) { this.onBoxClick('toBeOnboarded'); }
@@ -1246,6 +1328,10 @@ export class JourneycoachDashboardComponent {
       { key: 'generalnotes', header: 'Notes', width: '25%', type: 'text', substringStart: 0, substringEnd: 50 },
       { key: 'addnotes', header: '+', width: '25%', type: 'text', substringStart: 0, substringEnd: 50 },
     ]
+    {
+      const order = ['Name', 'Journey', 'Purchase Date', 'ENACH Date', 'Delayed Days', 'Sales Person', 'Schedule', 'Action', 'Journey Plan', 'Schedule For', 'Payment Plan', 'Sale Notes', 'Notes', '+'];
+      this.assuredColumnsEmbed = order.map(h => this.assuredColumns.find((c: any) => c.header === h)).filter(Boolean);
+    }
 
     this.onboardedColumns = [
       { key: 'profileid', header: 'Name', width: '12%', type: 'mapped', mapData: this.mapMetaData, mapValue: 'name' },
@@ -1495,6 +1581,34 @@ export class JourneycoachDashboardComponent {
         data: [],
         dataKey: 'notassured',
         filters: ['search', 'purchasedate', 'journey']
+      },
+      pipeNotAssured: {
+        title: 'Pipeline · Not Assured',
+        columns: this.notAssuredColumns,
+        data: [],
+        dataKey: 'pipeNotAssured',
+        filters: ['search', 'purchasedate', 'journey']
+      },
+      pipeReady: {
+        title: 'Pipeline · Ready for Onboarding',
+        columns: this.assuredColumns,
+        data: [],
+        dataKey: 'pipeReady',
+        filters: ['search', 'purchasedate', 'journey', 'journeycoach']
+      },
+      pipeScheduled: {
+        title: 'Pipeline · Scheduled for Onboarding',
+        columns: this.assuredColumns,
+        data: [],
+        dataKey: 'pipeScheduled',
+        filters: ['search', 'purchasedate', 'journey', 'journeycoach']
+      },
+      pipeOnboarded: {
+        title: 'Pipeline · Onboarded',
+        columns: this.onboardedColumns,
+        data: [],
+        dataKey: 'pipeOnboarded',
+        filters: ['search', 'purchasedate', 'journey', 'journeycoach']
       },
       toBeOnboarded: {
         title: 'To Be Onboared - Total',
@@ -2588,6 +2702,7 @@ export class JourneycoachDashboardComponent {
 
               this.originalData['onboarded'].data = tempArray4;
               this.originalData['onboarded'].count = tempArray4.length;
+              this.recomputePipeline();
 
               this.originalData['lessthan30daysjourneynotstarted'].data = tempArray5;
               this.originalData['lessthan30daysjourneynotstarted'].count = tempArray5.length;
@@ -4098,9 +4213,9 @@ export class JourneycoachDashboardComponent {
 
   // Function to navigate screen to onboarding pipeline
   navigateToOnboardingPipeline() {
-    // Embedded in the coach-health Onboarding tab, the pipeline is rendered right below: scroll to it.
+    // Embedded in the coach-health Onboarding tab, the pipeline card is on this page: scroll to it.
     if (this.embedOnboarding) {
-      document.getElementById('jx-onboarding-pipeline')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.getElementById('jcd-onb-pipeline')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
     }
     window.open('/onboarding-pipeline', '_blank');

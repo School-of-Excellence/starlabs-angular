@@ -44,21 +44,23 @@ check('OT6', 'Onboarding by product card (tiles + product table) is NOT gated',
   () => row2.includes('Onboarding · by product') && row2.includes('onboardingProducts') && !/\*ngIf="!embedOnboarding"/.test(row2));
 check('OT7', 'table section + dialogs are not gated, so every drill-down still works',
   () => /<div class="jcd-table-section" \*ngIf="showTable"/.test(jhtml) && !/jcd-table-section[^>]*embedOnboarding/.test(jhtml));
-check('OT8', 'Pipeline link scrolls to the pipeline when embedded, opens the page when standalone',
-  () => /if \(this\.embedOnboarding\) \{\s*document\.getElementById\('jx-onboarding-pipeline'\)/.test(jts)
+check('OT8', 'Pipeline link scrolls to the in-page pipeline card when embedded, opens the page when standalone',
+  () => /if \(this\.embedOnboarding\) \{\s*document\.getElementById\('jcd-onb-pipeline'\)/.test(jts)
      && /window\.open\('\/onboarding-pipeline', '_blank'\)/.test(jts));
 check('OT9', 'embed CSS is scoped and the fixed full-screen loader becomes local',
   () => /\.jcd-root\.jcd-embed \.loading-overlay \{ position: relative;/.test(jcss)
      && /\.jcd-root\.jcd-embed \.top \{ position: static;/.test(jcss));
 
 // --- coach-health: Onboarding tab composition ---
-check('OT10', 'coach-health imports both embedded components',
-  () => /JourneycoachDashboardComponent, OnboardingPipelineComponent,/.test(hts));
+// 2026-11-11: the 5-bucket intake funnel was replaced on this tab by the 4-stage pipeline (jc-onboarding-pipeline).
+check('OT10', 'coach-health embeds the Journey Experience dashboard and no longer the intake funnel',
+  () => /JourneycoachDashboardComponent,/.test(hts) && !/OnboardingPipelineComponent/.test(hts));
 const panel = hhtml.slice(hhtml.indexOf('data-testid="jx-panel-onboarding"'));
 const iSales = panel.indexOf('<app-journeycoach-dashboard [embedOnboarding]="true"');
 const iPipe = panel.indexOf('id="jx-onboarding-pipeline"');
 check('OT11', 'Onboarding tab embeds the sales/onboarding sections', () => iSales >= 0);
-check('OT12', 'intake pipeline is BELOW the by-product table', () => iSales >= 0 && iPipe > iSales && panel.includes('<app-onboarding-pipeline>'));
+check('OT12', 'old intake funnel is gone from the tab (standalone /onboarding-pipeline untouched)',
+  () => iSales >= 0 && iPipe < 0 && !panel.slice(0, panel.indexOf('</section>')).includes('<app-onboarding-pipeline>'));
 
 console.log(failed ? `\n${failed} FAIL` : '\nALL PASS');
 process.exit(failed ? 1 : 0);

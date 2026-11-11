@@ -1102,10 +1102,10 @@
        embedded in onboarding mode — its tables and dialogs come along so every drill-down works),
        with the intake pipeline directly below the by-product table. ─── -->
   <section class="jx-tab-panel jx-onboarding" *ngIf="experienceTab === 'onboarding'" data-testid="jx-panel-onboarding">
+    <!-- Sales counts, Onboarding by product, the 4-stage pipeline and the drill-down table all live in the
+         embedded Journey Experience dashboard. The 5-bucket intake funnel (app-onboarding-pipeline) was replaced
+         on this tab by operator decision 2026-11-11; /onboarding-pipeline is unchanged. -->
     <app-journeycoach-dashboard [embedOnboarding]="true" data-testid="jx-onboarding-sales"></app-journeycoach-dashboard>
-    <div id="jx-onboarding-pipeline" class="jx-onboarding-pipeline" data-testid="jx-onboarding-pipeline">
-      <app-onboarding-pipeline></app-onboarding-pipeline>
-    </div>
   </section>
 
   <!-- ─── Ev. Preparation tab (placeholder — content to be defined) ─── -->

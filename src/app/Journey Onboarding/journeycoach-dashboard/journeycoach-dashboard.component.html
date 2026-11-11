@@ -129,6 +129,25 @@
     <div data-testid="jcd-div-onb-product" class="prow" *ngFor="let p of onboardingProducts" (click)="openOnboardingProduct(p)"><span class="pn">{{p.product}}</span><span class="cell dan">{{p.toOnboard}}</span><span class="cell mut">{{p.within7}}</span><span class="cell warn">{{p.plus7}}</span><span class="cell mut">{{p.notAssured}}</span></div>
   </div>
 </div>
+<!-- ONBOARDING PIPELINE — embed only (Journey Coach Health -> Onboarding tab, operator 2026-11-11).
+     4 disjoint stages; each count opens its table below (same table section, dialogs and actions). -->
+<div class="card span8 jcd-pipe" id="jcd-onb-pipeline" data-testid="jcd-pipe" *ngIf="embedOnboarding">
+  <div class="ch"><span class="ct">Onboarding pipeline</span>
+    <div class="seg sm jcd-pipe-journeys" data-testid="jcd-pipe-journey">
+      <button type="button" data-testid="jcd-pipe-journey-all" [class.on]="pipelineJourney === 'all'" (click)="setPipelineJourney('all')">All</button>
+      <button type="button" data-testid="jcd-pipe-journey-opt" *ngFor="let j of pipelineJourneys" [class.on]="pipelineJourney === j.id" (click)="setPipelineJourney(j.id)">{{ j.name }}</button>
+    </div>
+  </div>
+  <div class="cbody">
+    <div class="jcd-pstrip">
+      <div data-testid="jcd-pipe-notassured" class="orc st1" [class.on]="showTable && tableType === 'pipeNotAssured'" (click)="onBoxClick('pipeNotAssured')"><div class="k">Not Assured</div><div class="s">Gross sales · no payment plan</div><div class="v">{{ originalData['pipeNotAssured'].count }}</div></div>
+      <div data-testid="jcd-pipe-ready" class="orc st2" [class.on]="showTable && tableType === 'pipeReady'" (click)="onBoxClick('pipeReady')"><div class="k">Ready for Onboarding</div><div class="s">Assured sales · no call booked</div><div class="v">{{ originalData['pipeReady'].count }}</div></div>
+      <div data-testid="jcd-pipe-scheduled" class="orc st3" [class.on]="showTable && tableType === 'pipeScheduled'" (click)="onBoxClick('pipeScheduled')"><div class="k">Scheduled for Onboarding</div><div class="s">Call booked · not onboarded</div><div class="v">{{ originalData['pipeScheduled'].count }}</div></div>
+      <div data-testid="jcd-pipe-onboarded" class="orc st4" [class.on]="showTable && tableType === 'pipeOnboarded'" (click)="onBoxClick('pipeOnboarded')"><div class="k">Onboarded</div><div class="s">Marked onboarded</div><div class="v">{{ originalData['pipeOnboarded'].count }}</div></div>
+    </div>
+    <div class="sub2">Date filter: purchase date for the first three stages, onboarded date for Onboarded · each participant sits in one stage · click a count to open its table</div>
+  </div>
+</div>
 <ng-container *ngIf="!embedOnboarding"><!-- rail + rows 3-4: hidden when embedded -->
 <div class="rail a">
   <div class="card" style="max-height:none">
@@ -518,7 +537,7 @@
         <thead>
           <tr>
             <th class="jcd-th jcd-th-sno">S.No</th>
-            <th data-testid="jcd-th-145" class="jcd-th" *ngFor="let column of currentTableConfig?.columns"
+            <th data-testid="jcd-th-145" class="jcd-th" *ngFor="let column of displayColumns"
               [style.width]="column.width"
               [class.jcd-th-sort]="isSortable(column)"
               (click)="isSortable(column) && sortTable(column.key)">
@@ -532,7 +551,7 @@
             [ngClass]="highlightRow(row)"
             [class.jcd-tr-even]="i % 2 === 0">
             <td class="jcd-td jcd-td-sno">{{ (currentPage-1)*itemsPerPage+i+1 }}</td>
-            <td class="jcd-td" *ngFor="let column of currentTableConfig?.columns"
+            <td class="jcd-td" *ngFor="let column of displayColumns"
               [class.jcd-td-highlight]="shouldHighlightCell(column.key)">
 
               <!-- Default text cell -->
@@ -553,6 +572,7 @@
                 </app-profile-picture>
 
                 <span class="jcd-name-link">{{ formatCellValue(row, column) }}</span>
+                <small class="jcd-name-contact" data-testid="jcd-name-contact" *ngIf="showNameContact">{{ mapMetaData[row['profileid']]?.['phonenumber'] }} · {{ mapMetaData[row['profileid']]?.['email'] }}</small>
 
               </span>
 
@@ -611,7 +631,7 @@
               <span *ngIf="column.key === 'waitingperiod'">{{ formatCellValue(row, column) }} days</span>
 
               <!-- Delayed days -->
-              <span *ngIf="column.key === 'delayeddays'">{{ formatCellValue(row, column) }} days</span>
+              <span *ngIf="column.key === 'delayeddays'" [ngClass]="embedOnboarding ? delayClass(row) : ''">{{ formatCellValue(row, column) }} days</span>
 
               <!-- Subscription end -->
               <span *ngIf="column.key === 'subscriptionend'">

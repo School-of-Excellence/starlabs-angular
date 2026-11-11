@@ -2508,6 +2508,30 @@ mat-dialog-actions,
 .jcd-root.jcd-embed .content > .card.span8 { grid-column: span 12; }
 .jcd-root.jcd-embed .loading-overlay { position: relative; inset: auto; min-height: 220px; z-index: auto; border-radius: 14px; }
 .jcd-root.jcd-embed .jcd-embed-count { font-size: 34px; padding: 6px 0 2px; }
+.jcd-root.jcd-embed .jcd-pipe .ch { flex-wrap: wrap; }
+.jcd-root.jcd-embed .jcd-pipe-journeys { flex-wrap: wrap; }
+.jcd-root.jcd-embed .jcd-pstrip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.jcd-root.jcd-embed .jcd-pstrip .orc { outline: 2px solid transparent; outline-offset: -2px; }
+.jcd-root.jcd-embed .jcd-pstrip .orc .s { font-size: 10.5px; color: var(--mut); margin-top: 2px; }
+.jcd-root.jcd-embed .jcd-pstrip .orc .v { font-size: 28px; }
+.jcd-root.jcd-embed .jcd-pstrip .st1 { background: var(--red-soft); }
+.jcd-root.jcd-embed .jcd-pstrip .st1 .k, .jcd-root.jcd-embed .jcd-pstrip .st1 .v { color: var(--red); }
+.jcd-root.jcd-embed .jcd-pstrip .st2 { background: var(--accent-soft); }
+.jcd-root.jcd-embed .jcd-pstrip .st2 .k, .jcd-root.jcd-embed .jcd-pstrip .st2 .v { color: var(--accent); }
+.jcd-root.jcd-embed .jcd-pstrip .st3 { background: var(--indigo-soft); }
+.jcd-root.jcd-embed .jcd-pstrip .st3 .k, .jcd-root.jcd-embed .jcd-pstrip .st3 .v { color: var(--indigo); }
+.jcd-root.jcd-embed .jcd-pstrip .st4 { background: var(--green-soft); }
+.jcd-root.jcd-embed .jcd-pstrip .st4 .k, .jcd-root.jcd-embed .jcd-pstrip .st4 .v { color: var(--green); }
+.jcd-root.jcd-embed .jcd-pstrip .st1.on { outline-color: var(--red); }
+.jcd-root.jcd-embed .jcd-pstrip .st2.on { outline-color: var(--accent); }
+.jcd-root.jcd-embed .jcd-pstrip .st3.on { outline-color: var(--indigo); }
+.jcd-root.jcd-embed .jcd-pstrip .st4.on { outline-color: var(--green); }
+.jcd-root.jcd-embed .jcd-name-contact { display: block; font-size: 11px; color: var(--mut); font-weight: 500; }
+.jcd-root.jcd-embed .jcd-wait-ok, .jcd-root.jcd-embed .jcd-wait-mid, .jcd-root.jcd-embed .jcd-wait-bad { font-weight: 700; font-size: 11px; padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
+.jcd-root.jcd-embed .jcd-wait-ok { background: var(--green-soft); color: var(--green); }
+.jcd-root.jcd-embed .jcd-wait-mid { background: var(--amber-soft); color: var(--amber); }
+.jcd-root.jcd-embed .jcd-wait-bad { background: var(--red-soft); color: var(--red); }
+@media (max-width: 760px) { .jcd-root.jcd-embed .jcd-pstrip { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 1200px) {
   .jcd-root.jcd-embed .content > .card.span4,
   .jcd-root.jcd-embed .content > .card.span8 { grid-column: span 12; }
