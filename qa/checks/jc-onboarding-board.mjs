@@ -27,9 +27,9 @@ try {
 const COLS = [['notassured', 'pipe-col-na', 'pipeNotAssured'], ['ready', 'pipe-col-ready', 'pipeReady'],
               ['scheduled', 'pipe-col-sched', 'pipeScheduled'], ['onboarded', 'pipe-col-ob', 'pipeOnboarded']];
 
-check('KB1', 'board sits inside the embed-only pipeline card, below the count tiles',
-  () => { const p = html.indexOf('data-testid="jcd-pipe"'); const t = html.indexOf('data-testid="jcd-pipe-onboarded"'); const b = html.indexOf('data-testid="jcd-pipe-board"');
-          return p > 0 && t > p && b > t && /class="jcd-kboard" cdkDropListGroup data-testid="jcd-pipe-board"/.test(html); });
+check('KB1', 'board sits inside the embed-only pipeline card; stage counts are its column headers (no tile row above it)',
+  () => { const p = html.indexOf('data-testid="jcd-pipe"'); const b = html.indexOf('data-testid="jcd-pipe-board"'); const t = html.indexOf('data-testid="jcd-pipe-notassured"');
+          return p > 0 && b > p && t > b && /class="jcd-kboard" cdkDropListGroup data-testid="jcd-pipe-board"/.test(html); });
 check('KB2', 'four columns, each a drop list bound to the same set its count tile shows (column == tile)',
   () => COLS.every(([t, id, k]) => new RegExp(`cdkDropList id="${id}" \\[cdkDropListData\\]="originalData\\['${k}'\\]\\.data" \\(cdkDropListDropped\\)="onPipelineDrop\\(\\$event\\)" data-testid="jcd-pipe-col-${t}"`).test(html)
         && html.includes(`*ngFor="let row of originalData['${k}'].data; trackBy: pipeTrack" cdkDrag [cdkDragData]="row"`)));

@@ -36,3 +36,4 @@ One line per live contract (gate section 1.1).
 | jc-overall-plan-grid | /journey-coach-health (Overall Summary · Planned journey) | qa/checks/jc-overall-plan-grid.mjs | 2026-11-11 PASS (12/12; 12 FAIL on revert) |
 | jc-health-followups | /journey-coach-health (Planning: row chip, slide-over, Schedule card) | qa/checks/jc-health-followups.mjs | 2026-11-11 PASS (13/13; 12 FAIL on revert) |
 | jc-health-na-finance-trend | /journey-coach-health (Planning: NA rule, Participants tiles, daily trend) | qa/checks/jc-health-na-finance-trend.mjs | 2026-11-11 PASS (18/18; 17 FAIL on revert) |
+| jc-onboarding-pending-tiles | /journey-coach-health (Onboarding tab) | qa/checks/jc-onboarding-pending-tiles.mjs | 2026-11-11 PASS (10/10; revert: 9 FAIL + pipeline PL2/PL14 + board KB1 FAIL; live Apr 2026: chip 16 == table 16 == footer 16, columns 5/1/2/0 == tables) |
