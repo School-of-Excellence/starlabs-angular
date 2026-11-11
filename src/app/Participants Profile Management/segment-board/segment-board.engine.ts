@@ -29,9 +29,11 @@ export interface SegmentBoardStore {
   loadAllHistory(limit: number): Promise<any[]>;            // every segment's history (collection group), newest first
   loadParticipants(): Promise<any[]>;                      // participant metadata docs, already mapped (segment-board.facts.ts)
   loadLists(): Promise<{ segmentid: string; profilelist: string[]; lastupdated: Date | null }[]>;   // segmentboardlist
-  saveLists(lists: { segmentid: string; segmentname: string; profilelist: string[] }[]): Promise<void>;
+  // history (optional) is written in the same batch: Import & move's members-added / members-removed entries
+  saveLists(lists: { segmentid: string; segmentname: string; profilelist: string[] }[], history?: HistoryEntry[]): Promise<void>;
   // journeys from `journey`, products from `products` (ids + names); countDefaults = products counted as uP! / CPM events
   readTable(file: File): Promise<string[][]>;               // rows x cells of an uploaded CSV / Excel file
+  writeTable(fileName: string, rows: string[][]): Promise<void>;   // download rows as an .xlsx file (Import & move template)
   // the B!G Cohorts dialogs (app notification, email, WhatsApp, recommended playlist) for these profile ids;
   // resolves with a short line for the activity log, or null when the dialog was closed without sending
   communicate(channel: 'app' | 'email' | 'whatsapp', profileIds: string[]): Promise<string | null>;
@@ -48,8 +50,9 @@ export interface OrderUpdate { id: string; displayIndex: number; sequence?: numb
 // a change to one segment; only the fields that changed, as { from, to } in the config doc's own shapes
 export interface HistoryEntry {
   segmentid: string; segmentname: string;
-  action: 'create' | 'edit' | 'archive' | 'unarchive' | 'reorder' | 'migrate';
+  action: 'create' | 'edit' | 'archive' | 'unarchive' | 'reorder' | 'migrate' | 'members-added' | 'members-removed';
   changedfields: string[]; changes: Record<string, { from: unknown; to: unknown }>; summary: string;
+  source?: { source: string; matchedBy: string; movedto?: string };   // Import & move: file name (or "pasted list") and match key
 }
 export interface MigrationRow {
   oldId: string; newId: string | null;          // newId null = keeps its id (only the who fields change)
@@ -460,6 +463,8 @@ const IC={
   edit:ico('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>'),
   chev:ico('<path d="m6 9 6 6 6-6"/>'),
   refresh:ico('<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>'),
+  download:ico('<path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 15v4a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-4"/>'),
+  upload:ico('<path d="M12 15V4"/><path d="m7 9 5-5 5 5"/><path d="M5 15v4a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-4"/>'),
   plus:ico('<path d="M12 5v14M5 12h14"/>'),
   archive:ico('<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/>'),
   activity:ico('<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>'),
@@ -661,6 +666,7 @@ function renderMain(){
         ${set.type==='master'?`<button class="btn quiet" data-act="history" title="Change history">${IC.history}<span>Change history</span></button>`:''}
         <button class="btn quiet" data-testid="sgb-show-archived" data-act="show-archived" aria-pressed="${S.showArchived}" title="Archived segments">${IC.archive}<span>${S.showArchived?'Back to segments':`Archived (${fmt(ARCHIVED.length)})`}</span></button>
       </div>
+      ${set.type==='master'?`<button class="btn" data-testid="sgb-import-move" data-act="import-move" ${!edit||S.arranging||!imvTargets().length?'disabled':''} title="${imvTargets().length?'Import a list of participants and move them into a manual segment, after a review':'Create an active manual segment first'}">${IC.upload}<span>Import &amp; move</span></button>`:''}
       <button class="btn ${S.refreshing&&S.refreshing.size>1?'is-busy':''}" data-testid="sgb-refresh-all" data-act="refresh-all" ${!edit||S.arranging||S.refreshing||!set._auto.length?'disabled':''} title="Rebuild every active automated list from its conditions">${IC.refresh}<span>${S.refreshing&&S.refreshing.size>1?'Refreshing…':'Refresh all lists'}</span></button>
       <button class="btn primary" data-testid="sgb-new-seg" data-act="new-seg" ${!edit||S.arranging?'disabled':''}>${IC.plus}<span>New segment</span></button>
     </div></header>
@@ -1052,18 +1058,19 @@ function openCompare(){
   CMP={segId:d.id,by:'email',table:null,fileName:'',col:0,header:true,paste:'',result:null,tab:'matched',busy:false};
   renderCmp(); $('#cmpDlg').showModal();
 }
-function cmpDetect(){   // pick the column that looks like email / name; row 1 is a header if it has a label-like cell
-  const T=CMP.table; if(!T||!T.length) return;
-  const first=T[0], want=CMP.by==='email'?/e-?mail/i:/name/i;
+// both take the dialog state ({by, table, header, col, paste}): Import & compare (CMP) and Import & move (IMV) share them
+function cmpDetect(st=CMP){   // pick the column that looks like email / name; row 1 is a header if it has a label-like cell
+  const T=st.table; if(!T||!T.length) return;
+  const first=T[0], want=st.by==='email'?/e-?mail/i:/name/i;
   let col=first.findIndex(c=>want.test(c));
-  CMP.header=first.some(c=>/e-?mail|name|profile|phone|id/i.test(c)&&!c.includes('@'));
-  if(col<0&&CMP.by==='email'){ const probe=T.slice(0,20); const w=Math.max(...T.map(r=>r.length)); for(let i=0;i<w&&col<0;i++) if(probe.some(r=>String(r[i]||'').includes('@'))) col=i; }
-  CMP.col=Math.max(0,col);
+  st.header=first.some(c=>/e-?mail|name|profile|phone|id/i.test(c)&&!c.includes('@'));
+  if(col<0&&st.by==='email'){ const probe=T.slice(0,20); const w=Math.max(...T.map(r=>r.length)); for(let i=0;i<w&&col<0;i++) if(probe.some(r=>String(r[i]||'').includes('@'))) col=i; }
+  st.col=Math.max(0,col);
 }
-function cmpValues(){   // pasted lines win over the file; blanks dropped
-  if(CMP.paste.trim()) return CMP.paste.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
-  if(!CMP.table) return [];
-  return CMP.table.slice(CMP.header?1:0).map(r=>String(r[CMP.col]??'').trim()).filter(Boolean);
+function cmpValues(st=CMP){   // pasted lines win over the file; blanks dropped
+  if(st.paste.trim()) return st.paste.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+  if(!st.table) return [];
+  return st.table.slice(st.header?1:0).map(r=>String(r[st.col]??'').trim()).filter(Boolean);
 }
 function cmpCurrentRows(){   // the View all list, without the search box
   const set=curSet(), d=S.drawer, dq=S.dq; S.dq=''; const rows=drawerRows(set,d); S.dq=dq; return rows;
@@ -1120,6 +1127,122 @@ function cmpExport(all){
   downloadCsv(`${s.name} compare ${all?'all':CMP_TABS.find(x=>x[0]===CMP.tab)[1]}`,CMP_HEAD,lines);
   toast(`Exported ${plural(lines.length,'row')}.`);
 }
+// ---------- import & move: an uploaded / pasted list → one manual segment, after a review list (operator 2026-11-11) ----------
+// Board level. Each imported value is matched against participant metadata; the review shows where each person is now.
+// Ticked by default: people in an automated segment. Unticked (a tick moves them too): people in another manual segment
+// or in no segment. Already in the target / not found / repeated / a name shared by several people: shown, not movable.
+let IMV=null;
+const IMV_STATUS={
+  auto:['In an automated segment','auto'], manual:['In another manual segment','manual'], none:['Not in a segment',''],
+  there:['Already there',''], moved:['Moved','ok'], notfound:['Not found','bad'], dup:['Repeated in the list','warn'], multi:['Name shared by several people','warn'],
+};
+const IMV_TABS=[['tick','Will move','Ticked'],['untick','Not ticked','Movable, left out'],['there','Already there','In the target now'],['nomatch','Not matched','Not found · repeated · shared name']];
+const imvTargets=()=>master.displayOrder.map(id=>master._by.get(id)).filter(x=>x&&x.mode==='manual'&&x.status!=='inactive');
+function openImportMove(){
+  if(!canEdit(master)||!imvTargets().length) return;
+  IMV={by:'email',table:null,fileName:'',col:0,header:true,paste:'',busy:false,target:'',rows:null,tick:new Set(),tab:'tick',q:'',saving:false,moved:null,source:''};
+  renderImv(); $('#imvDlg').showModal();
+}
+// one row per imported value; statuses follow the current lists, so a re-build after a move shows "Already there"
+function imvBuild(){
+  const by=IMV.by, t=master._by.get(IMV.target), tIds=LISTS.get(IMV.target)?.ids||new Set(), mm=MEM[master.id];
+  const elig=t&&(t.eligibility||(t.journeys||[]).length)?segElig(t):null;
+  const everyone=new Map(); for(const p of P){ const k=cmpKey(by,by==='email'?p.email:p.name); if(!k) continue; if(!everyone.has(k)) everyone.set(k,[]); everyone.get(k).push(p); }
+  const seen=new Set(), rows=[];
+  for(const v of cmpValues(IMV)){
+    const k=cmpKey(by,v); if(!k) continue;
+    if(seen.has(k)){ rows.push({value:v,status:'dup'}); continue; } seen.add(k);
+    const found=everyone.get(k)||[];
+    if(!found.length){ rows.push({value:v,status:'notfound'}); continue; }
+    if(found.length>1){ rows.push({value:v,status:'multi',p:found[0],n:found.length}); continue; }
+    const p=found[0], m=mm.get(p.pid), segs=m?.segs||[];
+    const status=tIds.has(p.pid)?'there':master._pinned.has(p.pid)?'manual':segs.length?'auto':'none';
+    rows.push({value:v,status,p,segs,elig:!elig||matches(elig,p.f)});
+  }
+  return rows;
+}
+function imvReview(){
+  IMV.rows=imvBuild(); IMV.tick=new Set(IMV.rows.filter(r=>r.status==='auto').map(r=>r.p.pid));
+  IMV.tab=IMV.tick.size?'tick':'untick'; IMV.q=''; IMV.moved=null;
+}
+const imvMovable=r=>['auto','manual','none'].includes(r.status);
+function imvGroup(r){ if(IMV.moved?.has(r.p?.pid)) return 'moved'; if(imvMovable(r)) return IMV.tick.has(r.p.pid)?'tick':'untick'; return r.status==='there'?'there':'nomatch'; }
+function imvView(){
+  const q=IMV.q.trim().toLowerCase();
+  return IMV.rows.filter(r=>{ if(imvGroup(r)!==IMV.tab) return false;
+    return !q||[r.value,r.p?.name,r.p?.email].some(x=>String(x||'').toLowerCase().includes(q)); });
+}
+const imvSegText=r=>r.status==='notfound'||r.status==='dup'?'':r.status==='multi'?`${fmt(r.n)} people`:(r.segs||[]).length?r.segs.map(id=>segName(master,id)).join(', '):'—';
+function imvRowHtml(r){
+  const pid=r.p?.pid, g=imvGroup(r), [label,cls]=IMV_STATUS[g==='moved'?'moved':r.status], can=!IMV.moved&&imvMovable(r);
+  return `<tr data-testid="sgb-imv-row" data-imv-status="${g==='moved'?'moved':r.status}">
+    <td class="imv-c">${can?`<input type="checkbox" data-testid="sgb-imv-tick" data-imvpid="${esc(pid)}" ${IMV.tick.has(pid)?'checked':''} aria-label="Move ${esc(r.p.name)}">`:''}</td>
+    <td>${r.p&&r.status!=='multi'?`<div class="pn">${esc(r.p.name)}</div><div class="subtle small">${esc(r.p.email||'—')}</div>`:`<div class="pn">${esc(r.value)}</div>`}</td>
+    <td>${esc(r.p&&r.status!=='multi'?r.p.journey||'':'')}</td>
+    <td>${esc(imvSegText(r))}</td>
+    <td><span class="chip ${cls}">${esc(label)}</span>${r.p&&r.elig===false&&g!=='moved'?' <span class="chip warn" title="Doesn’t meet the target segment’s eligibility conditions">Not eligible</span>':''}</td></tr>`;
+}
+function renderImv(){
+  const t=master._by.get(IMV.target);
+  let body='', foot='', sub='Upload or paste a list, pick a manual segment, then check who will move';
+  if(!IMV.rows){
+    const vals=cmpValues(IMV), T=IMV.table, w=T?Math.max(0,...T.map(r=>r.length)):0;
+    body=`<label class="f" for="imvTarget">Move into <span class="req">manual segment</span></label>
+      <select id="imvTarget" data-testid="sgb-imv-target"><option value="">Choose a manual segment…</option>${imvTargets().map(x=>`<option value="${esc(x.id)}" ${x.id===IMV.target?'selected':''}>${esc(x.name)} (${fmt(LISTS.get(x.id)?.ids.size||0)})</option>`).join('')}</select>
+      <label class="f">Match by</label><div class="seg-toggle" role="radiogroup" aria-label="Match by">${[['email','Email'],['name','Name']].map(([v,l])=>`<label><input type="radio" name="imvBy" value="${v}" ${IMV.by===v?'checked':''}>${l}</label>`).join('')}</div>
+      <p class="subtle small" style="margin:6px 0 0">${IMV.by==='email'?'Emails are matched ignoring case and spaces.':'Names are matched ignoring case and extra spaces. A name shared by several people is not moved.'}</p>
+      <div class="imv-up"><label class="f" for="imvFile">Upload a list <span class="opt">CSV or Excel</span></label><button class="btn tertiary" data-testid="sgb-imv-template" data-act="imv-template" title="An empty Excel file with Name and Email headers">${IC.download}<span>Download template</span></button></div>
+      <input id="imvFile" data-testid="sgb-imv-file" type="file" accept=".csv,.txt,.xlsx,.xls">
+      ${T?`<div class="cmp-col"><label class="f" for="imvCol">Column in ${esc(IMV.fileName)}</label><select id="imvCol">${Array.from({length:w},(_,i)=>`<option value="${i}" ${i===IMV.col?'selected':''}>${esc(IMV.header&&T[0][i]?T[0][i]:'Column '+String.fromCharCode(65+i%26))}</option>`).join('')}</select>
+        <label class="f" style="font-weight:400"><input type="checkbox" id="imvHead" ${IMV.header?'checked':''}> First row is a header</label></div>`:''}
+      <label class="f" for="imvPaste">…or paste ${IMV.by==='email'?'emails':'names'}, one per line <span class="opt">used instead of the file</span></label>
+      <textarea id="imvPaste" data-testid="sgb-imv-paste" rows="4" placeholder="${IMV.by==='email'?'someone@example.com':'Full name'}">${esc(IMV.paste)}</textarea>
+      <div class="info" id="imvInfo">${imvInfoText(vals)}</div>`;
+    foot=`<span class="err" id="imvErr"></span><button class="btn" data-dlg="cancel">Cancel</button><button class="btn primary" id="imvGo" data-testid="sgb-imv-review" ${vals.length&&IMV.target&&!IMV.busy?'':'disabled'}>Review list</button>`;
+  } else {
+    sub=`Into <b>${esc(t?.name||IMV.target)}</b> · ${plural(IMV.rows.length,'imported value')}${IMV.source?` from ${esc(IMV.source)}`:''}`;
+    const n={tick:0,untick:0,there:0,nomatch:0,moved:0}; for(const r of IMV.rows) n[imvGroup(r)]++;
+    const tabs=IMV.moved?[['moved','Moved','Now in the segment'],...IMV_TABS.slice(1)]:IMV_TABS;
+    const view=imvView(), shown=view.slice(0,300), movable=view.filter(r=>imvMovable(r)&&!IMV.moved);
+    const allOn=movable.length&&movable.every(r=>IMV.tick.has(r.p.pid));
+    body=`${IMV.moved?`<div class="info ok" data-testid="sgb-imv-done">Moved ${plural(IMV.moved.size,'participant')} to <b>${esc(t?.name||'')}</b>.${IMV.autos?` ${plural(IMV.autos,'automated list')} updated.`:''} Recorded in the segment’s history.</div>`:''}
+      <div class="cmp-tiles imv-tiles">${tabs.map(([k,l,s])=>`<button class="cmp-tile imv-${k}" data-testid="sgb-imv-tile" data-imvtab="${k}" aria-pressed="${IMV.tab===k}"><b>${fmt(n[k])}</b><span>${l}</span><small>${s}</small></button>`).join('')}</div>
+      <div class="dq-row" style="margin:10px 0 6px"><input id="imvQ" data-testid="sgb-imv-search" type="search" placeholder="Search this list" value="${esc(IMV.q)}" aria-label="Search the review list"></div>
+      ${view.length?`<div class="tbl-wrap imv-wrap"><table class="pt imv-t"><thead><tr><th class="imv-c">${movable.length?`<input type="checkbox" data-testid="sgb-imv-tick-all" id="imvAll" ${allOn?'checked':''} aria-label="Tick everyone in this view">`:''}</th><th>Participant</th><th>Journey</th><th>Now in</th><th>Status</th></tr></thead>
+        <tbody>${shown.map(imvRowHtml).join('')}</tbody></table></div>${view.length>shown.length?`<p class="subtle small">Showing 300 of ${fmt(view.length)}. Search, or export for the full list.</p>`:''}`
+        :'<p class="subtle" style="padding:12px 0">Nobody in this group.</p>'}`;
+    foot=IMV.moved
+      ?`<button class="btn" data-act="imv-back" style="margin-right:auto">← Import another list</button><button class="btn" data-testid="sgb-imv-export" data-act="imv-export">Export CSV</button><button class="btn primary" data-dlg="cancel">Done</button>`
+      :`<button class="btn" data-act="imv-back" style="margin-right:auto">← Change list</button><span class="err" id="imvErr"></span><button class="btn" data-testid="sgb-imv-export" data-act="imv-export">Export CSV</button><button class="btn primary" id="imvMove" data-testid="sgb-imv-move" ${IMV.tick.size&&!IMV.saving?'':'disabled'}>${IMV.saving?'Moving…':`Move ${plural(IMV.tick.size,'participant')}`}</button>`;
+  }
+  $('#imvDlg .dlg').innerHTML=`<div class="dlg-h"><h2 id="imvTitle">Import &amp; move to a manual segment</h2><p class="subtle">${sub}</p></div>
+    <div class="dlg-b">${body}</div><div class="dlg-f">${foot}</div>`;
+}
+function imvInfoText(vals){
+  return !vals.length?'Upload a file or paste a list.':!IMV.target?`${plural(vals.length,'value')} read. Choose the manual segment to move them into.`
+    :`${plural(vals.length,'value')} to match against ${plural(P.length,'participant')}. Nothing moves until you confirm on the next step.`;
+}
+function imvRefreshInput(){ const v=cmpValues(IMV), go=$('#imvGo'), info=$('#imvInfo'); if(go) go.disabled=!(v.length&&IMV.target&&!IMV.busy); if(info) info.textContent=imvInfoText(v); }
+const IMV_HEAD=['Imported value','Profile ID','Name','Email','Journey','Now in','Status','Eligible for target','Ticked'];
+function imvExport(){
+  const t=master._by.get(IMV.target);
+  const lines=IMV.rows.map(r=>{const g=imvGroup(r), one=r.p&&r.status!=='multi';
+    return [r.value,one?r.p.pid:'',one?r.p.name:'',one?r.p.email:'',one?r.p.journey||'':'',imvSegText(r),IMV_STATUS[g==='moved'?'moved':r.status][0],one?(r.elig?'Yes':'No'):'',imvMovable(r)?(IMV.tick.has(r.p.pid)?'Yes':'No'):''];});
+  downloadCsv(`${t?.name||'segment'} import ${IMV.moved?'moved':'review'}`,IMV_HEAD,lines);
+  toast(`Exported ${plural(lines.length,'row')}.`);
+}
+async function imvMove(){
+  const t=master._by.get(IMV.target), pids=IMV.rows.filter(r=>imvMovable(r)&&IMV.tick.has(r.p.pid)).map(r=>r.p.pid);
+  if(!t||!pids.length) return;
+  IMV.saving=true; renderImv();
+  const err={textContent:''};
+  const r=await placeInManual(t.id,pids,null,err,{source:IMV.source||'pasted list',matchedBy:IMV.by});
+  IMV.saving=false;
+  if(!r){ renderImv(); const e=$('#imvErr'); if(e) e.textContent=`Nothing was moved. ${err.textContent}`; return; }
+  AUDIT.unshift({at:Date.now(),by:who(),type:'RULE_CHANGE',text:`${t.name}: ${plural(pids.length,'participant')} imported from ${IMV.source||'a pasted list'}`});
+  IMV.moved=new Set(pids); IMV.autos=r.autos; IMV.rows=imvBuild(); IMV.tab='moved';
+  render(); renderImv(); toast(`Moved ${plural(pids.length,'participant')} to ${t.name}.`);
+}
 // uP! / CPM column: counted with the products picked in this segment's own uP! / CPM attended conditions
 // (the operator configures those per condition); no such condition, or not a segment list → "—"
 function countProducts(set,d){
@@ -1158,8 +1281,8 @@ function conditionsHtml(set,s,compact){
     ${!compact&&edit?`<button class="btn" data-act="edit-seg" data-seg="${s.id}">Edit segment</button>`:''}
     ${compact?'':`<pre class="dev-note block">${esc(JSON.stringify({journeys:js.ids,rule:s.rule},null,2))}</pre>`}`;
 }
-const H_ACTION={create:'Created',edit:'Edited',archive:'Archived',unarchive:'Unarchived',reorder:'Moved',migrate:'New id',rename:'Renamed',delete:'Deleted','segment-added':'Segment added','segment-removed':'Segment removed'};
-const H_FIELD={id:'Segment id',groupid:'Group',segments:'Segments',deleted:'Deleted',name:'Name',description:'Description',status:'Status',journeys:'Journey',rule:'Conditions',eligibility:'Eligibility',position:'Board position',sequence:'Sequence',archived:'Archived'};
+const H_ACTION={create:'Created',edit:'Edited',archive:'Archived',unarchive:'Unarchived',reorder:'Moved',migrate:'New id',rename:'Renamed',delete:'Deleted','segment-added':'Segment added','segment-removed':'Segment removed','members-added':'Participants added','members-removed':'Participants removed'};
+const H_FIELD={id:'Segment id',groupid:'Group',segments:'Segments',deleted:'Deleted',name:'Name',description:'Description',status:'Status',journeys:'Journey',rule:'Conditions',eligibility:'Eligibility',position:'Board position',sequence:'Sequence',archived:'Archived',members:'Participants'};
 function hVal(f,v){
   if(v===null||v===undefined||v===''||(Array.isArray(v)&&!v.length)) return '<span class="subtle">—</span>';
   if(f==='rule'||f==='eligibility'){ const r=Array.isArray(v)?{all:v}:v; try{ const ex=expand(r); return `<ul class="h-rules">${(ex.all||ex.any).map(n=>`<li>${esc(describe(n))}</li>`).join('')}</ul>${ex.any?'<span class="subtle small">any of these</span>':''}`; }catch(e){ return `<code>${esc(JSON.stringify(v))}</code>`; } }
@@ -1169,6 +1292,8 @@ function hVal(f,v){
   if(f==='segments'&&typeof v==='object') return esc([...(v.added||[]).map(id=>'+ '+segName(curSet(),id)),...(v.removed||[]).map(id=>'− '+segName(curSet(),id))].join(', ')||'—');
   if(f==='deleted') return v?'Yes':'No';
   if(f==='archived') return v?'Yes':'No';
+  if(f==='members'&&Array.isArray(v)){ const names=v.slice(0,25).map(id=>PI.get(id)?.name||id);
+    return `<b>${plural(v.length,'participant')}</b><div class="subtle small">${esc(names.join(', '))}${v.length>25?` and ${fmt(v.length-25)} more`:''}</div>`; }
   return esc(String(v));
 }
 function historyListHtml(state,showSeg){
@@ -1596,16 +1721,22 @@ async function syncAutoLists(){
   const now=new Date(); for(const l of changed) LISTS.set(l.segmentid,{ids:new Set(l.profilelist),lastupdated:now});
   computeSet(master); return changed.length;
 }
-// place people in one manual segment: out of every other manual segment, then automated lists follow
-async function placeInManual(targetId,pids,btn,errEl){
-  const set=curSet(), add=new Set(pids), writes=[];
+// place people in one manual segment: out of every other manual segment, then automated lists follow.
+// record = {source, matchedBy} (Import & move) also writes members-added / members-removed history in the same batch
+async function placeInManual(targetId,pids,btn,errEl,record){
+  const set=curSet(), add=new Set(pids), writes=[], history=[];
   for(const s of set.segments) if(s.mode==='manual'){
-    const cur=[...(LISTS.get(s.id)?.ids||[])];
-    const next=s.id===targetId?[...cur,...pids.filter(id=>!cur.includes(id))]:cur.filter(id=>!add.has(id));
+    const cur=[...(LISTS.get(s.id)?.ids||[])], had=new Set(cur);
+    const next=s.id===targetId?[...cur,...pids.filter(id=>!had.has(id))]:cur.filter(id=>!add.has(id));
     if(s.id===targetId||next.length!==cur.length) writes.push({segmentid:s.id,segmentname:s.name,profilelist:next});
+    if(!record) continue;
+    if(s.id===targetId){ const added=pids.filter(id=>!had.has(id));
+      if(added.length) history.push({...hEntry(s,'members-added',{members:{from:null,to:added}},`Imported ${plural(added.length,'participant')} from ${record.source} (matched by ${record.matchedBy})`),source:record});
+    } else { const removed=cur.filter(id=>add.has(id));
+      if(removed.length) history.push({...hEntry(s,'members-removed',{members:{from:removed,to:null}},`${plural(removed.length,'participant')} moved to ${set._by.get(targetId)?.name||targetId} by an import from ${record.source}`),source:{...record,movedto:targetId}}); }
   }
   const label=btn?.textContent; if(btn){btn.disabled=true; btn.textContent='Saving…';}
-  try{ await store.saveLists(writes); }
+  try{ await store.saveLists(writes,history); if(history.length) forgetHistory(history.map(h=>h.segmentid)); }
   catch(e){ if(btn){btn.disabled=false; btn.textContent=label;} const m=`Couldn’t save to segmentboardlist: ${e?.message||e}`; if(errEl) errEl.textContent=m; else toast(m); return null; }
   const now=new Date(); for(const l of writes) LISTS.set(l.segmentid,{ids:new Set(l.profilelist),lastupdated:now});
   const moved=writes.filter(w=>w.segmentid!==targetId).length;
@@ -2002,6 +2133,15 @@ listen(root,'click',e=>{
       else if(t.closest('[data-act="cmp-export-all"]')) cmpExport(true);
       return;
     }
+    if(dlg.id==='imvDlg'&&IMV){
+      if(t.closest('#imvGo')){ imvReview(); renderImv(); }
+      else if(t.closest('#imvMove')) imvMove();
+      else if(t.closest('[data-imvtab]')){ IMV.tab=t.closest('[data-imvtab]').dataset.imvtab; renderImv(); }
+      else if(t.closest('[data-act="imv-back"]')){ IMV.rows=null; IMV.moved=null; renderImv(); }
+      else if(t.closest('[data-act="imv-export"]')) imvExport();
+      else if(t.closest('[data-act="imv-template"]')) store.writeTable('import-participants-template.xlsx',[['Name','Email']]).catch(e=>toast(`Couldn’t make the template: ${e?.message||e}`));
+      return;
+    }
     if(dlg.id==='grpDlg'&&GRP){ const b=t.closest('[data-grp]'); if(b) grpAction(b.dataset.grp,b.dataset.gid); return; }
     if(dlg.id==='segDlg'&&t.closest('[data-b="grp-add"]')){
       addGroup($('#sGroupNew').value).then(g=>{ B.groupid=g.id; const box=$('#sGroupNewBox'); renderSegDlg(); $('#sErr').textContent=''; })
@@ -2068,6 +2208,7 @@ listen(root,'click',e=>{
     else if(act==='unarchive') unarchiveSeg(a.dataset.seg);
     else if(act==='move-manual') openManualMove();
     else if(act==='compare') openCompare();
+    else if(act==='import-move') openImportMove();
     else if(act==='refresh-list') refreshLists([a.dataset.seg]);
     else if(act==='refresh-all') refreshLists(set._auto.map(x=>x.id));
     else if(act==='more'){S.limit+=150;renderDrawer();}
@@ -2129,6 +2270,18 @@ listen(document,'keydown',e=>{
 listen(root,'change',e=>{
   const t=e.target;
   if(t.name==='mmTgt'&&MM){ MM.target=t.value; const g=$('#mmGo'); if(g) g.disabled=false; return; }
+  if(IMV&&t.closest&&t.closest('#imvDlg')){
+    if(t.id==='imvTarget'){ IMV.target=t.value; imvRefreshInput(); }
+    else if(t.name==='imvBy'){ IMV.by=t.value; cmpDetect(IMV); renderImv(); }
+    else if(t.id==='imvCol'){ IMV.col=+t.value; renderImv(); }
+    else if(t.id==='imvHead'){ IMV.header=t.checked; renderImv(); }
+    else if(t.id==='imvFile'&&t.files&&t.files[0]){ const f=t.files[0]; IMV.busy=true; imvRefreshInput();
+      store.readTable(f).then(T=>{ IMV.table=T; IMV.fileName=f.name; IMV.source=IMV.paste.trim()?'pasted list':f.name; IMV.busy=false; cmpDetect(IMV); renderImv(); if(!cmpValues(IMV).length) $('#imvErr').textContent='No values found in that file.'; })
+        .catch(err=>{ IMV.busy=false; renderImv(); $('#imvErr').textContent=`Couldn’t read ${f.name}: ${err?.message||err}`; }); }
+    else if(t.dataset.imvpid){ t.checked?IMV.tick.add(t.dataset.imvpid):IMV.tick.delete(t.dataset.imvpid); renderImv(); }
+    else if(t.id==='imvAll'){ for(const r of imvView()) if(imvMovable(r)) t.checked?IMV.tick.add(r.p.pid):IMV.tick.delete(r.p.pid); renderImv(); }
+    return;
+  }
   if(CMP&&t.closest&&t.closest('#cmpDlg')){
     if(t.name==='cmpBy'){ CMP.by=t.value; cmpDetect(); renderCmp(); }
     else if(t.id==='cmpCol'){ CMP.col=+t.value; renderCmp(); }
@@ -2189,6 +2342,8 @@ listen(root,'change',e=>{
 });
 listen(root,'input',e=>{
   const t=e.target;
+  if(t.id==='imvPaste'&&IMV){ IMV.paste=t.value; IMV.source=t.value.trim()?'pasted list':IMV.fileName; imvRefreshInput(); return; }
+  if(t.id==='imvQ'&&IMV){ IMV.q=t.value; const pos=t.selectionStart; renderImv(); const n=$('#imvQ'); if(n){ n.focus(); n.setSelectionRange(pos,pos); } return; }
   if(t.id==='cmpPaste'&&CMP){ CMP.paste=t.value; const v=cmpValues(), go=$('#cmpGo'), info=$('#cmpInfo');
     if(go) go.disabled=!v.length; if(info) info.textContent=v.length?`${plural(v.length,'value')} to compare against the ${plural(cmpCurrentRows().length,'participant')} in View all.`:'Upload a file or paste a list to compare.'; return; }
   if(t.id==='q'){

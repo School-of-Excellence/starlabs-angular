@@ -856,3 +856,57 @@ ng build ok; hook-diff aligned (82). SGB-07 drives the panel (count, Not grouped
 - `event collection` (all events, for the Live events filter), which could move on demand the same way.
 
 **Revert:** put `store.loadQueueTokens()` back in `load()`'s `Promise.all`, with the QTOK fill, and remove `ensureTokens`.
+
+## 2026-11-11 · Import & move: list → manual segment, with a review list
+
+**Plan:** `specs/plans/2026-11-11-segment-import-move.md` (approved). **Operator decisions:**
+- board level;
+- people not in an automated segment are shown unticked;
+- every import move is recorded in history;
+- a Name/Email Excel template is available from the dialog.
+
+**What changed:**
+- **Header button "Import & move"** (`sgb-import-move`):
+  - Master board only; admins.
+  - Disabled when there's no active manual segment.
+- **Step 1 (`#imvDlg`):**
+  - Pick the target manual segment.
+  - Match by email (default) or by name.
+  - Upload a CSV/XLSX file or paste a list.
+  - **Download template** gives `import-participants-template.xlsx`: one sheet with the headers Name and Email, written by `store.writeTable` with the xlsx package the app already ships.
+- **Step 2, the review list:**
+  - **Tiles:** Will move · Not ticked · Already there · Not matched.
+  - **Table:** name, email, journey, current segment(s) and status, with search, tick-all for the view, and Export CSV.
+  - **Default ticks:** only people in an automated segment. People in another manual segment, or in no segment, are shown unticked; ticking them moves them too.
+  - **"Not eligible" flag:** shown when the person fails the target's journey or eligibility conditions. It's a warning only, the same as the board's existing eligibility warning.
+  - **Not movable:** already in the target, not found, repeated in the list, or a name shared by several people.
+- **Move:**
+  - Runs `placeInManual(target, pids, …, record)`, so the dialog uses the same path as every manual move: the target list grows, other manual lists drop those people, and the automated lists resync.
+  - With `record`, `store.saveLists(lists, history)` writes `members-added` on the target and `members-removed` on each manual segment people left. Both go in the same batch as the list docs; history rides in the last batch.
+  - Each entry carries `changes.members {from, to}` (profile ids), `source {source: file name or "pasted list", matchedBy}`, and `updatedby` / `updatedat`.
+- **History view:** labels the new actions "Participants added" / "Participants removed", and the from → to detail shows a count plus up to 25 names.
+- `cmpDetect` / `cmpValues` now take the dialog state, so Import & compare and Import & move share them.
+
+**Why this way:**
+- **Reuse `placeInManual`:** a second write path for manual membership would drift from the first. Taking people out of their old manual segment, and resyncing the automated lists, is the rule for every manual move.
+- **Default ticks are conservative:** someone in another manual segment was placed there by a person, so pulling them out needs a deliberate tick.
+- **A shared name never moves:** a name match is ambiguous, and moving one of the people would be a guess.
+- **Ordinary drag / "Move to…" moves still write no history:** only imports were asked for. Recording those too is a small follow-up through the same `record` parameter.
+
+**Verified on the harness** (hand-worked world: 10 people, 2 automated segments, 2 manual segments):
+- **Paste of 8 values:** 3 ticked (Alpha, plus Dev and Hari flagged Not eligible), 2 unticked (Esha in IB, Gopal in no segment), 1 already there (Farah), 2 not matched (an unknown email and a repeat).
+- **Ticking Esha:** the button reads "Move 4".
+- **Writes:**
+  - IA = p6, p1, p4, p5, p10; IB = [];
+  - BIG active = p2, p3; uP! all = p8, p9;
+  - history: IA `members-added` [p1, p4, p5, p10], and IB `members-removed` [p5] with `movedto`.
+- **Re-import:** 0/1/5/2, and Move is disabled. Search keeps focus.
+- **Template:** a call with `[['Name','Email']]`.
+- **History drawer:** lists both entries with names.
+- **Checks:** ng build ok; hook-diff aligned (97 hooks); hub SGB-08 and ADDR4 added (listed, not run).
+
+**Revert:**
+- Remove the header button, the IMV section in the engine, `#imvDlg`, and the "Import & move" CSS block.
+- Drop `writeTable` and the `history` parameter of `saveLists` (store and component).
+- Remove the `record` parameter from `placeInManual`, and the two H_ACTION entries and the `members` H_FIELD.
+- `cmpDetect` / `cmpValues` can keep their state parameter; it defaults to CMP.
