@@ -27,3 +27,5 @@ One line per live contract (gate section 1.1).
 | jc-onboarding-count-only | /journey-coach-health (Onboarding tab) | qa/checks/jc-onboarding-count-only.mjs | 2026-11-11 PASS (7/7; 6 FAIL on revert; live: Gross 2 == table 2, Assured 0; standalone 14/14 details) |
 
 | jc-onboarding-pipeline | /journey-coach-health (Onboarding tab) | qa/checks/jc-onboarding-pipeline.mjs | 2026-11-11 PASS (14/14; 13 FAIL on revert; live Apr 2026: 5/1/2/0, tile==list, disjoint, journey selector changes counts) |
+
+| jc-onboarding-board | /journey-coach-health (Onboarding tab) | qa/checks/jc-onboarding-board.mjs | 2026-11-11 PASS (13/13; 13 FAIL on revert; live: columns == tiles, blocks + dialogs verified, no writes) |

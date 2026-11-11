@@ -146,8 +146,70 @@
       <div data-testid="jcd-pipe-onboarded" class="orc st4" [class.on]="showTable && tableType === 'pipeOnboarded'" (click)="onBoxClick('pipeOnboarded')"><div class="k">Onboarded</div><div class="s">Marked onboarded</div><div class="v">{{ originalData['pipeOnboarded'].count }}</div></div>
     </div>
     <div class="sub2">Date filter: purchase date for the first three stages, onboarded date for Onboarded · each participant sits in one stage · click a count to open its table</div>
+
+    <!-- Card board: drag a card forward to open the existing Schedule / Mark Onboarded flow -->
+    <div class="jcd-kboard" cdkDropListGroup data-testid="jcd-pipe-board">
+      <div class="jcd-kcol k-na">
+        <div class="jcd-kcol-head"><span class="jcd-kcol-title">Not Assured</span><span class="jcd-kcount">{{ originalData['pipeNotAssured'].count }}</span></div>
+        <div class="jcd-kcol-body" cdkDropList id="pipe-col-na" [cdkDropListData]="originalData['pipeNotAssured'].data" (cdkDropListDropped)="onPipelineDrop($event)" data-testid="jcd-pipe-col-notassured">
+          <div class="jcd-kdrag" *ngFor="let row of originalData['pipeNotAssured'].data; trackBy: pipeTrack" cdkDrag [cdkDragData]="row" cdkDragPreviewContainer="parent"><ng-container *ngTemplateOutlet="pipeCard; context: { $implicit: row, stage: 'na' }"></ng-container></div>
+          <div class="jcd-kempty" *ngIf="!originalData['pipeNotAssured'].count">No participants in this stage.</div>
+        </div>
+      </div>
+      <div class="jcd-kcol k-ready">
+        <div class="jcd-kcol-head"><span class="jcd-kcol-title">Ready for Onboarding</span><span class="jcd-kcount">{{ originalData['pipeReady'].count }}</span></div>
+        <div class="jcd-kcol-body" cdkDropList id="pipe-col-ready" [cdkDropListData]="originalData['pipeReady'].data" (cdkDropListDropped)="onPipelineDrop($event)" data-testid="jcd-pipe-col-ready">
+          <div class="jcd-kdrag" *ngFor="let row of originalData['pipeReady'].data; trackBy: pipeTrack" cdkDrag [cdkDragData]="row" cdkDragPreviewContainer="parent"><ng-container *ngTemplateOutlet="pipeCard; context: { $implicit: row, stage: 'ready' }"></ng-container></div>
+          <div class="jcd-kempty" *ngIf="!originalData['pipeReady'].count">No participants in this stage.</div>
+        </div>
+      </div>
+      <div class="jcd-kcol k-sched">
+        <div class="jcd-kcol-head"><span class="jcd-kcol-title">Scheduled for Onboarding</span><span class="jcd-kcount">{{ originalData['pipeScheduled'].count }}</span></div>
+        <div class="jcd-kcol-body" cdkDropList id="pipe-col-sched" [cdkDropListData]="originalData['pipeScheduled'].data" (cdkDropListDropped)="onPipelineDrop($event)" data-testid="jcd-pipe-col-scheduled">
+          <div class="jcd-kdrag" *ngFor="let row of originalData['pipeScheduled'].data; trackBy: pipeTrack" cdkDrag [cdkDragData]="row" cdkDragPreviewContainer="parent"><ng-container *ngTemplateOutlet="pipeCard; context: { $implicit: row, stage: 'sched' }"></ng-container></div>
+          <div class="jcd-kempty" *ngIf="!originalData['pipeScheduled'].count">No participants in this stage.</div>
+        </div>
+      </div>
+      <div class="jcd-kcol k-ob">
+        <div class="jcd-kcol-head"><span class="jcd-kcol-title">Onboarded</span><span class="jcd-kcount">{{ originalData['pipeOnboarded'].count }}</span></div>
+        <div class="jcd-kcol-body" cdkDropList id="pipe-col-ob" [cdkDropListData]="originalData['pipeOnboarded'].data" (cdkDropListDropped)="onPipelineDrop($event)" data-testid="jcd-pipe-col-onboarded">
+          <div class="jcd-kdrag" *ngFor="let row of originalData['pipeOnboarded'].data; trackBy: pipeTrack" cdkDrag [cdkDragData]="row" [cdkDragDisabled]="true"><ng-container *ngTemplateOutlet="pipeCard; context: { $implicit: row, stage: 'ob' }"></ng-container></div>
+          <div class="jcd-kempty" *ngIf="!originalData['pipeOnboarded'].count">No participants in this stage.</div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
+
+<ng-template #pipeCard let-row let-stage="stage">
+  <div class="jcd-kcard" data-testid="jcd-pipe-card">
+    <div class="jcd-kcard-head">
+      <app-profile-picture [profileId]="row['profileid']" [name]="mapMetaData[row['profileid']]?.['name']" [size]="28"></app-profile-picture>
+      <div class="jcd-kwho">
+        <span class="jcd-name-link" (click)="navigatetoprofile(row['profileid'])">{{ mapMetaData[row['profileid']]?.['name'] }}</span>
+        <small>{{ mapMetaData[row['profileid']]?.['email'] }}</small>
+      </div>
+      <span class="jcd-kbadge">{{ mapjourneyname[row['journeyref']?.id] || 'Unassigned' }}</span>
+    </div>
+    <div class="jcd-kchips">
+      <span class="jcd-kchip" *ngIf="stage === 'na' || stage === 'ready'">Purchased {{ row['purchasedate']?.toDate() | date:'mediumDate' }} · {{ daysSince(row['purchasedate']) }}d ago</span>
+      <span class="jcd-kchip" *ngIf="stage === 'sched'" [class.dan]="isPast(row['onboardingscheduled'])">Call {{ row['onboardingscheduled']?.toDate() | date:'mediumDate' }}{{ isPast(row['onboardingscheduled']) ? ' · passed' : '' }}</span>
+      <span class="jcd-kchip ok" *ngIf="stage === 'ob'">Onboarded {{ row['onboardedtime']?.toDate() | date:'mediumDate' }}</span>
+    </div>
+    <div class="jcd-kacts">
+      <button type="button" data-testid="jcd-pipe-card-schedule" class="jcd-sched-btn" *ngIf="stage === 'ready' || stage === 'sched'"
+        [style.background]="stage === 'sched' ? '#dc2626' : (row['onreschedule'] ? '#dc2626' : '#2563eb')"
+        (click)="openSchedule(row, 'onboarding')">{{ stage === 'sched' || row['onreschedule'] ? 'Re-schedule' : 'Schedule' }}</button>
+      <button type="button" data-testid="jcd-pipe-card-onboard" class="jcd-action-btn" *ngIf="stage === 'sched'"
+        [class.jcd-action-btn--active]="!checkMarkOnboarding(row)" [disabled]="checkMarkOnboarding(row)"
+        (click)="markOnboarded(row)">Mark Onboarded</button>
+      <button type="button" data-testid="jcd-pipe-card-plan" class="jcd-outline-btn" *ngIf="stage !== 'na'" (click)="navigatejourneyplan(row)">Journey Plan</button>
+      <button type="button" data-testid="jcd-pipe-card-notes" class="jcd-icon-btn" (click)="row['generalnotes']?.length ? viewNotes(row, 'generalnotes') : addNotes(row)" [title]="row['generalnotes']?.length ? 'View notes' : 'Add note'">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      </button>
+    </div>
+  </div>
+</ng-template>
 <ng-container *ngIf="!embedOnboarding"><!-- rail + rows 3-4: hidden when embedded -->
 <div class="rail a">
   <div class="card" style="max-height:none">

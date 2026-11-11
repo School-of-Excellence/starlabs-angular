@@ -55,3 +55,13 @@ Literal `data-testid` strings only — no `${interpolation}` (gate section 1.1 /
 | jcd-pipe-journey-all | Journey selector: All | jc-onboarding-pipeline |
 | jcd-pipe-journey-opt | Journey selector: one journey | jc-onboarding-pipeline |
 | jcd-name-contact | Mobile + email under the name (embed To-be-onboarded tables) | jc-onboarding-pipeline |
+| jcd-pipe-board | Pipeline card board (embed only) | jc-onboarding-board |
+| jcd-pipe-col-notassured | Board column: Not Assured | jc-onboarding-board |
+| jcd-pipe-col-ready | Board column: Ready for Onboarding | jc-onboarding-board |
+| jcd-pipe-col-scheduled | Board column: Scheduled for Onboarding | jc-onboarding-board |
+| jcd-pipe-col-onboarded | Board column: Onboarded | jc-onboarding-board |
+| jcd-pipe-card | Participant card on the board | jc-onboarding-board |
+| jcd-pipe-card-schedule | Card button: Schedule / Re-schedule | jc-onboarding-board |
+| jcd-pipe-card-onboard | Card button: Mark Onboarded | jc-onboarding-board |
+| jcd-pipe-card-plan | Card button: Journey Plan | jc-onboarding-board |
+| jcd-pipe-card-notes | Card button: Notes | jc-onboarding-board |

@@ -30,6 +30,7 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { MatTableModule } from '@angular/material/table';
 import { CrossOverMetricsDialogComponent } from '../cross-over-metrics-dialog/cross-over-metrics-dialog.component';
 import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
+import { DragDropModule, CdkDragDrop } from '@angular/cdk/drag-drop';
 // Pure business rules, extracted 2026-09-10 — see journeycoach.engine.ts for what and why.
 import * as engine from './journeycoach.engine';
 import { scorePriority, PriorityInput } from '../journey-coach-health-dashboard/priority.engine';
@@ -151,7 +152,8 @@ export interface DialogContext {
     MatButtonToggleModule,
     MatTabsModule,
     MatTableModule,
-    ProfilePictureComponent
+    ProfilePictureComponent,
+    DragDropModule
   ],
   templateUrl: './journeycoach-dashboard.component.html',
   styleUrl: './journeycoach-dashboard.component.css',
@@ -863,6 +865,47 @@ export class JourneycoachDashboardComponent {
     put('pipeScheduled', scheduled);
     put('pipeOnboarded', onboarded);
     this.updateTableDataIfOpen(this.tableType);
+    this.cdr.markForCheck();
+  }
+
+  // ─── Pipeline card board (embed only; operator 2026-11-11) ───
+  // Forward-only moves that open the EXISTING flows; the card changes column only when that flow saves
+  // (the participantjourneyproduct subscription re-emits and recomputePipeline re-buckets it).
+  readonly pipelineColumns = ['pipe-col-na', 'pipe-col-ready', 'pipe-col-sched', 'pipe-col-ob'];
+
+  pipelineMove(from: number, to: number, row: any): { action?: 'schedule' | 'onboard'; block?: string } {
+    if (from < 0 || to < 0 || from === to) return {};
+    if (to < from) return { block: 'Cards move forward only. Use Re-schedule on the card to change a call.' };
+    if (from === 0) return { block: 'Not Assured needs a payment plan before onboarding.' };
+    if (to === 2) return { action: 'schedule' };
+    if (to === 3) {
+      return this.checkMarkOnboarding(row)
+        ? { block: 'Mark Onboarded opens after the scheduled call time.' }
+        : { action: 'onboard' };
+    }
+    return {};
+  }
+
+  onPipelineDrop(ev: CdkDragDrop<any>) {
+    const from = this.pipelineColumns.indexOf(ev.previousContainer.id);
+    const to = this.pipelineColumns.indexOf(ev.container.id);
+    const row = ev.item.data;
+    const move = this.pipelineMove(from, to, row);
+    if (move.block) { this.guard.openSnackBar(move.block, 'OK', 2500); return; }
+    if (move.action === 'schedule') this.openSchedule(row, 'onboarding');
+    if (move.action === 'onboard') this.markOnboarded(row);
+  }
+
+  pipeTrack(_i: number, row: any) { return row?.['docid'] || row?.['profileid']; }
+
+  daysSince(ts: any): number | null {
+    const d = ts?.toDate?.();
+    return d ? Math.max(0, Math.floor((Date.now() - d.getTime()) / 86400000)) : null;
+  }
+
+  isPast(ts: any): boolean {
+    const d = ts?.toDate?.();
+    return !!d && d.getTime() <= Date.now();
   }
 
   setPipelineJourney(id: string) {
