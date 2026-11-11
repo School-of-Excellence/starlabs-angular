@@ -1,4 +1,6 @@
-import { Component, OnDestroy } from '@angular/core';
+import { Component, OnDestroy, inject } from '@angular/core';
+import { AtcAudioComponent } from '../atc-audio/atc-audio.component';
+import { MediaUrlService } from '../../shared/media-url.service';
 import { arrayUnion, collection, collectionData, collectionSnapshots, doc, docSnapshots, getFirestore, orderBy, query, updateDoc, where } from '@angular/fire/firestore';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -33,7 +35,8 @@ import { MatExpansionModule } from '@angular/material/expansion';
     MatButtonModule,
     MatTableModule,
     MatTabsModule,
-    MatExpansionModule
+    MatExpansionModule,
+    AtcAudioComponent
   ],
   templateUrl: './review-flag-atc.component.html',
   styleUrl: './review-flag-atc.component.css'
@@ -335,6 +338,28 @@ export class ReviewFlagATCComponent implements OnDestroy {
     this.mapTranscriptionSubscription.set(atcid, [...this.mapTranscriptionSubscription.get(atcid), adjSubscription])
   }
 
+  private mediaUrl = inject(MediaUrlService)
+
+  // Stored image ref → loadable URL. A migrated row holds an object path an <img> cannot
+  // load; a legacy row holds a download URL, which resolve() passes straight back. Audio
+  // is absent by design — app-atc-audio resolves its own clip only when play is pressed.
+  noteImageUrls: Record<string, string> = {};
+
+  // Keeps an audio row's component alive across snapshots; without it a document change
+  // destroys the player mid-listen and loses the listener's place.
+  trackByMediaRef = (_: number, ref: string) => ref;
+
+  /** Resolve every image on a note in ONE batched call, as its document arrives. */
+  private async resolveNoteImages(notes: any): Promise<void> {
+    const refs: string[] = (notes?.['imagenotes'] ?? []).filter((r: unknown) => typeof r === 'string' && r);
+    if (refs.length === 0) return;
+    this.mediaUrl.prefetch(refs);
+    await Promise.all(refs.map(async (r) => {
+      const url = await this.mediaUrl.resolve(r);
+      if (url) this.noteImageUrls[r] = url;
+    }));
+  }
+
   fetchATCnotes(atcData){
     var noteid = atcData["notesid"]
     var mentoringid = atcData["mentoringid"]
@@ -343,6 +368,7 @@ export class ReviewFlagATCComponent implements OnDestroy {
         takeUntil(this.alphaSubscription),
       ).subscribe(doc =>{
         this.mapATCnotes[doc.id] = doc.data()
+        void this.resolveNoteImages(doc.data())
       })
     }
     if(mentoringid && !this.mapATCnotes[mentoringid]){
@@ -351,6 +377,7 @@ export class ReviewFlagATCComponent implements OnDestroy {
         debounceTime(300),
       ).subscribe(doc =>{
         this.mapATCnotes[doc.id] = doc.data()
+        void this.resolveNoteImages(doc.data())
       })
     }
   }

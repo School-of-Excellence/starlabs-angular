@@ -1,4 +1,5 @@
 import { Component } from '@angular/core';
+import { AtcAudioComponent } from '../../atc-audio/atc-audio.component';
 import { collection, collectionData, collectionSnapshots, getFirestore, orderBy, query, Query, QueryFieldFilterConstraint, QueryOrderByConstraint, where } from '@angular/fire/firestore';
 import { Router } from '@angular/router';
 import { AuthguardService } from '../../../authguard.service';
@@ -22,7 +23,8 @@ import { MatButtonModule } from '@angular/material/button';
     MatDividerModule,
     MatSelectModule,
     NgxMatSelectSearchModule,
-    MatButtonModule
+    MatButtonModule,
+    AtcAudioComponent
   ],
   templateUrl: './view-triple-atc.component.html',
   styleUrl: './view-triple-atc.component.css'
@@ -77,6 +79,17 @@ export class ViewTripleATCComponent {
     }]
   }]
   mapATCnotes = {}
+
+  // Stored image ref → loadable URL. A migrated row holds an object path an <img> cannot
+  // load; a legacy row holds a download URL, which resolve() passes straight back.
+  // NOTE this screen's getNotes() is commented out (see below), so mapATCnotes is never
+  // populated today and these stay empty — wired up so the template is correct if it is
+  // ever switched back on.
+  noteImageUrls: Record<string, string> = {};
+
+  // Keeps an audio row's component alive across snapshots, so a document change does not
+  // destroy the player mid-listen.
+  trackByMediaRef = (_: number, ref: string) => ref;
 
   // Metadata
   profileMap = {}
@@ -350,6 +363,7 @@ export class ViewTripleATCComponent {
       if(note.payload.exists()){
         var noteData = Object.assign({}, note.payload.data() ?? {})
         this.mapATCnotes[note.payload.id] = {...(this.mapATCnotes[note.payload.id] ?? {}), ...noteData}
+        void this.resolveNoteImages(noteData)
         this.firestore.collection("pick_for_mentoring", ref=>ref.where("atcid", "==", atcid).limit(1)).get().toPromise().then(mentoring=>{
           if(mentoring.size != 0){
             var mentorData = mentoring.docs[0].data()

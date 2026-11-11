@@ -667,18 +667,24 @@
                 <div *ngIf="(notesData['changeworkbrief'] || []).length != 0">
                   <label class="info-label">Changework Brief:</label>
                   <div>
+                    <!-- app-atc-audio owns the whole lifecycle for one clip: it resolves
+                         its signed URL on play, renews it before expiry, and resumes from
+                         the same position. The duration decides how long that URL lives. -->
                     <div *ngFor="let audio of notesData['changeworkbrief']; let i = index; trackBy: trackByAtcId">
-                      <audio class="audio-container" controls>
-                        <source [src]="audio" type="audio/wav">
-                      </audio>
+                      <app-atc-audio
+                        [path]="audio"
+                        [label]="(i + 1) + '.'"></app-atc-audio>
                     </div>
                   </div>
                 </div>
                 <div *ngIf="(notesData['imagenotes'] || []).length != 0">
                   <label class="info-label">Image Notes:</label>
                   <div class="image-notes-container">
+                    <!-- noteImageUrls holds the resolved URL; a migrated row stores a path
+                         an <img> cannot load, so render only once it has one. -->
                     <div class="image-preview" *ngFor="let image of notesData['imagenotes']; trackBy: trackByAtcId">
-                      <img [src]="image" height="80" width="80" (click)="viewImage(image)">
+                      <img *ngIf="noteImageUrls[image] as imageUrl"
+                           [src]="imageUrl" height="80" width="80" (click)="viewImage(imageUrl)">
                     </div>
                   </div>
                 </div>

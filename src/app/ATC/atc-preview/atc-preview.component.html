@@ -147,9 +147,10 @@
               <mat-icon>mic</mat-icon>
               <span>Recording {{i + 1}}</span>
             </div>
-            <audio controls class="audio-player">
-              <source [src]="sanitize(audio)">
-            </audio>
+            <!-- app-atc-audio resolves its own signed URL on play and renews it before
+                 expiry. The sanitize() wrapper is gone with it: a signed URL is built by
+                 the callable, never interpolated from user input. -->
+            <app-atc-audio [path]="audio"></app-atc-audio>
           </div>
         </div>
       </div>
@@ -167,7 +168,7 @@
           <h3 class="section-subtitle">Notes Images</h3>
           <div class="image-grid">
             <div *ngFor="let image of imageUrls" class="image-item">
-              <img [src]="image" alt="Note image" class="preview-image">
+              <img *ngIf="imageSrc[image] as src" [src]="src" alt="Note image" class="preview-image">
             </div>
           </div>
         </div>
@@ -177,7 +178,7 @@
           <h3 class="section-subtitle">Prescribed ATC Images</h3>
           <div class="image-grid">
             <div *ngFor="let image of atcImageUrls" class="image-item">
-              <img [src]="image" alt="ATC image" class="preview-image">
+              <img *ngIf="imageSrc[image] as src" [src]="src" alt="ATC image" class="preview-image">
             </div>
           </div>
         </div>

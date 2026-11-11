@@ -200,6 +200,138 @@
     </div>
   </div>
 
+  <!-- ============================================================
+       SECTION 1.5: PAST MONTHS PLANNING — view only
+       Collapsed by default. Fetched on first expand with ONE
+       participantplanning query (see loadPastMonthlyPlans): the saved
+       plans of the 6 calendar months before this one, newest first.
+       Nothing here is editable and nothing here is written back by
+       submitMonthlyPlan(), so history cannot be overwritten.
+  ============================================================ -->
+  <div class="section-card">
+    <div data-testid="jpl-div-028" class="section-label-bar past-label-bar" (click)="togglePastMonths()">
+      <mat-icon class="section-bar-icon">history</mat-icon>
+      <span>Past Months Planning</span>
+      <span class="past-count-chip" *ngIf="pastLoaded">{{ pastMonthlyPlanData.length }}</span>
+      <mat-icon class="chevron past-chevron" [class.open]="pastExpanded">expand_more</mat-icon>
+    </div>
+
+    <ng-container *ngIf="pastExpanded">
+
+      <div class="past-loading" *ngIf="pastLoading">
+        <mat-progress-spinner [diameter]="28" strokeWidth="3" mode="indeterminate"></mat-progress-spinner>
+        <span>Fetching past planning...</span>
+      </div>
+
+      <ng-container *ngIf="pastLoaded">
+
+        <div data-testid="jpl-div-030" class="past-empty" *ngIf="pastMonthlyPlanData.length === 0">
+          <mat-icon>event_busy</mat-icon>
+          <span>No planning saved in the past 6 months</span>
+        </div>
+
+        <div class="timeline-container" *ngIf="pastMonthlyPlanData.length > 0">
+          <div class="timeline-line"></div>
+
+          <div *ngFor="let month of pastMonthlyPlanData; let i = index" class="timeline-item">
+            <div class="timeline-dot past-dot"><mat-icon class="past-dot-icon">done_all</mat-icon></div>
+
+            <mat-card class="month-card past-month-card">
+
+              <!-- Past Month Header -->
+              <div data-testid="jpl-div-029" class="month-header" (click)="togglePastMonth(i)">
+                <div class="month-header-left">
+                  <span class="month-title">{{ month.display }}</span>
+                  <span class="past-readonly-tag">View only</span>
+                  <span class="month-prod-chip" *ngFor="let id of month.data.products">
+                    <mat-icon class="month-prod-icon">shopping_bag</mat-icon>
+                    {{ (mapProduct[id] || {})['product'] }}
+                  </span>
+                </div>
+                <mat-icon class="chevron" [class.open]="month.expanded">expand_more</mat-icon>
+              </div>
+
+              <!-- Past Month Body — read-only summary -->
+              <ng-container *ngIf="month.expanded">
+                <div class="cat-grid">
+
+                  <!-- Solar Voice -->
+                  <div data-testid="jpl-div-031" class="cat-col">
+                    <div class="cat-col-header">
+                      <mat-icon class="cat-icon">record_voice_over</mat-icon>
+                      <span class="cat-title">Solar Voice</span>
+                    </div>
+                    <div class="empty-cat" *ngIf="month.data.solarvoice.length === 0">No Plan</div>
+                    <div class="past-slot" *ngFor="let row of month.data.solarvoice">
+                      <div class="past-slot-names">
+                        <span class="past-name-chip" *ngFor="let id of row.playlist">{{ pastContentName('solarvoice', id) }}</span>
+                      </div>
+                      <div class="past-slot-meta">
+                        <span class="past-meta-chip"><mat-icon class="past-meta-icon">event</mat-icon>{{ pastDayLabel(row.preferredday) }}</span>
+                        <span class="past-meta-chip"><mat-icon class="past-meta-icon">schedule</mat-icon>{{ pastTimeLabel(row.preferredtime) }}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- EiFlix -->
+                  <div data-testid="jpl-div-032" class="cat-col">
+                    <div class="cat-col-header">
+                      <mat-icon class="cat-icon">movie</mat-icon>
+                      <span class="cat-title">EiFlix</span>
+                    </div>
+                    <div class="empty-cat" *ngIf="month.data.eiflix.length === 0">No Plan</div>
+                    <div class="past-slot" *ngFor="let row of month.data.eiflix">
+                      <div class="past-slot-names">
+                        <span class="past-name-chip" *ngFor="let id of row.playlist">{{ pastContentName('eiflix', id) }}</span>
+                      </div>
+                      <div class="past-slot-meta">
+                        <span class="past-meta-chip"><mat-icon class="past-meta-icon">event</mat-icon>{{ pastDayLabel(row.preferredday) }}</span>
+                        <span class="past-meta-chip"><mat-icon class="past-meta-icon">schedule</mat-icon>{{ pastTimeLabel(row.preferredtime) }}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- General Content -->
+                  <div data-testid="jpl-div-033" class="cat-col">
+                    <div class="cat-col-header">
+                      <mat-icon class="cat-icon">library_books</mat-icon>
+                      <span class="cat-title">General Content</span>
+                    </div>
+                    <div class="empty-cat" *ngIf="month.data.generalcontent.length === 0">No Plan</div>
+                    <div class="past-slot" *ngFor="let row of month.data.generalcontent">
+                      <div class="past-slot-names">
+                        <span class="past-name-chip" *ngFor="let id of row.playlist">{{ pastContentName('generalcontent', id) }}</span>
+                      </div>
+                      <div class="past-slot-meta">
+                        <span class="past-meta-chip"><mat-icon class="past-meta-icon">event</mat-icon>{{ pastDayLabel(row.preferredday) }}</span>
+                        <span class="past-meta-chip"><mat-icon class="past-meta-icon">schedule</mat-icon>{{ pastTimeLabel(row.preferredtime) }}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Workshop -->
+                  <div data-testid="jpl-div-034" class="cat-col cat-col-last">
+                    <div class="cat-col-header">
+                      <mat-icon class="cat-icon">event</mat-icon>
+                      <span class="cat-title">Workshop</span>
+                    </div>
+                    <div class="empty-cat" *ngIf="month.data.workshop.length === 0">No workshops</div>
+                    <div class="past-slot" *ngFor="let id of month.data.workshop">
+                      <div class="past-slot-names">
+                        <span class="past-name-chip">{{ pastWorkshopTitle[id] }}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </ng-container>
+            </mat-card>
+          </div>
+        </div>
+      </ng-container>
+    </ng-container>
+  </div>
+
   <!-- SECTION 2: Content Monthly Plan — unchanged -->
   <div class="section-card">
     <div class="section-label-bar">

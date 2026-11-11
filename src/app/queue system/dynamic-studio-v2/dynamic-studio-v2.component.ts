@@ -1,4 +1,5 @@
 import { Component, OnInit, ChangeDetectorRef, QueryList, ElementRef, ViewChildren, ViewChild, NgZone, TemplateRef, inject } from '@angular/core';
+import { AtcAudioComponent } from '../../ATC/atc-audio/atc-audio.component';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { MatDialog, MatDialogRef, MatDialogModule } from '@angular/material/dialog';
 import { firstValueFrom, Subject, Subscription, takeUntil } from 'rxjs';
@@ -74,6 +75,7 @@ import {
     ReactiveFormsModule,
     MatDialogModule,
     ViewParticipantAtcComponent,
+    AtcAudioComponent,
   ],
   templateUrl: './dynamic-studio-v2.component.html',
   styleUrl: './dynamic-studio-v2.component.css'

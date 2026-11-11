@@ -172,10 +172,13 @@
                 <div *ngIf="(notesData['changeworkbrief'] || []).length != 0" class="comment-container">
                   <label class="info-label">Changework Brief:</label>
                   <div>
-                    <div *ngFor="let audio of notesData['changeworkbrief']; let i = index">
-                      <audio class="audio-container" controls>
-                        <source [src]="audio" type="audio/wav">
-                      </audio>
+                    <!-- trackBy matters here: this screen holds live snapshots, and without
+                         it any document change recreates these components and kills playback
+                         mid-listen. app-atc-audio resolves and renews its own URL. -->
+                    <div *ngFor="let audio of notesData['changeworkbrief']; let i = index; trackBy: trackByMediaRef">
+                      <app-atc-audio
+                        [path]="audio"
+                        [label]="(i + 1) + '.'"></app-atc-audio>
                     </div>
                   </div>
                 </div>

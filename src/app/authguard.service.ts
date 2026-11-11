@@ -1849,6 +1849,9 @@ export class AuthguardService {
     // the activeprovider doc; omitted = default (oci) resolved at join time.
     mediaProvider?: string
   }){
+    if([null, undefined].includes(roomData["mediaProvider"])){
+      roomData["mediaProvider"] = "oci"
+    }
     const roomDoc = doc(this.firestore, "openviduroom", roomData["roomid"])
     await setDoc(roomDoc, roomData, {merge: true})
   }

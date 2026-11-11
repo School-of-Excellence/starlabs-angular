@@ -6,7 +6,7 @@ import { AuthguardService } from '../../authguard.service';
 import { Subject, Subscription, takeUntil, timer } from 'rxjs';
 import * as RecordRTC from 'recordrtc';
 import { DomSanitizer } from '@angular/platform-browser';
-import { getDownloadURL, ref, Storage, uploadBytes } from '@angular/fire/storage';
+import { ref, Storage, uploadBytes } from '@angular/fire/storage';
 import { MatDialog } from '@angular/material/dialog';
 import { AtcOptionComponent } from '../../ATC/atc-option/atc-option.component';
 import { NetworkStatusService } from '../../network-status.service';
@@ -1674,16 +1674,22 @@ export class EditAtcComponent {
   async updateChangeWorkBrief() {
 
     try {
-      // Upload audio files
+      // Upload audio files.
+      // The object PATH is stored, never a download URL: a download URL carries a token
+      // with no TTL that bypasses Storage Rules, so one leaked row is a permanent public
+      // handle on the recording. A path is useless on its own — reading it needs a signed
+      // URL from getMediaUrls, which only a signed-in caller can mint.
       const audioPromises = this.audioBlob.map(async (blob, i) => {
         const audioID = this.audioBlobURL[i].split('/');
         const fileName = `ATC_Audio_Notes/${this.loggedProfileID}/New Audio - ${(i + 1).toString()} ${audioID[audioID.length - 1]}`;
 
         const storageRef = ref(this.storage, fileName);
         const snapshot = await uploadBytes(storageRef, blob);
-        const url = await getDownloadURL(snapshot.ref);
 
-        return url;
+        // Only the path. The clip's length is NOT recorded here — getMediaUrls reads it
+        // from the file's own WAV header when it signs, so a length stored alongside
+        // could only ever be a second, forgeable copy of something already knowable.
+        return snapshot.ref.fullPath;
       });
 
       // Upload image files
@@ -1692,19 +1698,18 @@ export class EditAtcComponent {
 
         const storageRef = ref(this.storage, fileName);
         const snapshot = await uploadBytes(storageRef, imageFile);
-        const url = await getDownloadURL(snapshot.ref);
 
-        return url;
+        return snapshot.ref.fullPath;
       });
 
       // Wait for all uploads to complete
-      const [audioUrls, imageUrls] = await Promise.all([
+      const [audioPaths, imagePaths] = await Promise.all([
         Promise.all(audioPromises),
         Promise.all(imagePromises)
       ]);
 
-      // Update ATC notes with all URLs
-      await this.updateATCnotes(audioUrls, imageUrls);
+      // Update ATC notes with all paths
+      await this.updateATCnotes(audioPaths, imagePaths);
 
     } catch (error) {
       console.error('Error uploading files:', error);
@@ -1788,8 +1793,7 @@ export class EditAtcComponent {
 
       try {
         const snapshot = await uploadBytes(storageRef, imageFile);
-        const imageURL = await getDownloadURL(snapshot.ref);
-        atcImageURL.push(imageURL);
+        atcImageURL.push(snapshot.ref.fullPath);   // path, not a tokenised download URL
       } catch (error) {
         console.error('Error uploading image:', error);
       }

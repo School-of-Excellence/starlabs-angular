@@ -1314,9 +1314,10 @@
                   <div class="atc-audio-list">
                     <div class="atc-audio" *ngFor="let audio of atc['cwbrief']; let i = index; trackBy: trackByDocId">
                       <span class="atc-audio__index">{{ i + 1 }}</span>
-                      <audio controls>
-                        <source [src]="audio" type="audio/wav">
-                      </audio>
+                      <!-- app-atc-audio resolves its own signed URL on play and renews it
+                           before expiry, resuming from the same position. -->
+                      <app-atc-audio
+                        [path]="audio"></app-atc-audio>
                     </div>
                   </div>
                 </div>

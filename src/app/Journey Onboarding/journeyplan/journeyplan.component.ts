@@ -5,7 +5,7 @@ import { MatTableDataSource } from '@angular/material/table';
 import { ActivatedRoute } from '@angular/router';
 import { AuthguardService } from '../../authguard.service';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
-import { collection, collectionData, collectionSnapshots, doc, Firestore, getDoc, getDocs, getFirestore, orderBy, query, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
+import { collection, collectionData, collectionSnapshots, doc, Firestore, getDoc, getDocs, getFirestore, limit, orderBy, query, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
 import { Subject, takeUntil } from 'rxjs';
 import { CommonModule, Location } from '@angular/common';
 import { getApp } from '@angular/fire/app';
@@ -74,6 +74,12 @@ export class JourneyplanComponent {
   eiFlixSeriesList = []
   generalContentList = []
   upcomingWorkshop = {}
+
+  pastMonthlyPlanData = []
+  pastWorkshopTitle = {}
+  pastExpanded = false
+  pastLoaded = false
+  pastLoading = false
 
   mapprofile = {};
   mapjourneyname = {};
@@ -215,6 +221,34 @@ export class JourneyplanComponent {
     await this.loadExistingMonthlyPlans();
   }
 
+  // Each stored entry has a single `playlist` doc reference. Group entries that share
+  // the same preferredday + preferredtime back into a single UI row with a playlist array.
+  private groupFlatEntries(entries: any[]) {
+    const map = new Map<string, any>();
+    for (const e of (entries ?? [])) {
+      const playlistId: string | null = e.playlist?.id ?? null;
+      const day = e.preferredday ?? 'all';
+      const time = e.preferredtime ?? 'all';
+      const key = `${day}__${time}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          playlist: playlistId ? [playlistId] : [],
+          preferredday: day,
+          preferredtime: time,
+          allTime: time === 'all',
+          completedcontent: e.completedcontent ?? [],
+          completedplaylist: e.completedplaylist ?? [],
+        });
+      } else {
+        const row = map.get(key);
+        if (playlistId && !row.playlist.includes(playlistId)) {
+          row.playlist.push(playlistId);
+        }
+      }
+    }
+    return Array.from(map.values());
+  }
+
   async loadExistingMonthlyPlans() {
     for (const month of this.monthlyPlanData) {
       const docSnap = await getDoc(doc(this.firestore, 'participantplanning', month.docId));
@@ -222,37 +256,9 @@ export class JourneyplanComponent {
 
       const d = docSnap.data();
 
-      // Each stored entry has a single `playlist` doc reference. Group entries that share
-      // the same preferredday + preferredtime back into a single UI row with a playlist array.
-      const groupFlatEntries = (entries: any[]) => {
-        const map = new Map<string, any>();
-        for (const e of (entries ?? [])) {
-          const playlistId: string | null = e.playlist?.id ?? null;
-          const day = e.preferredday ?? 'all';
-          const time = e.preferredtime ?? 'all';
-          const key = `${day}__${time}`;
-          if (!map.has(key)) {
-            map.set(key, {
-              playlist: playlistId ? [playlistId] : [],
-              preferredday: day,
-              preferredtime: time,
-              allTime: time === 'all',
-              completedcontent: e.completedcontent ?? [],
-              completedplaylist: e.completedplaylist ?? [],
-            });
-          } else {
-            const row = map.get(key);
-            if (playlistId && !row.playlist.includes(playlistId)) {
-              row.playlist.push(playlistId);
-            }
-          }
-        }
-        return Array.from(map.values());
-      };
-
-      month.data.solarvoice = groupFlatEntries(d['solarvoice']);
-      month.data.eiflix = groupFlatEntries(d['eiflix']);
-      month.data.generalcontent = groupFlatEntries(d['generalcontent']);
+      month.data.solarvoice = this.groupFlatEntries(d['solarvoice']);
+      month.data.eiflix = this.groupFlatEntries(d['eiflix']);
+      month.data.generalcontent = this.groupFlatEntries(d['generalcontent']);
 
       month.data.workshop = (d['workshop'] ?? []).map((ref: any) => ref?.id ?? null).filter(Boolean);
       month.data.products = (d['products'] ?? []).map((ref: any) => ref?.id ?? null).filter(Boolean);
@@ -320,6 +326,101 @@ export class JourneyplanComponent {
 
   toggleMonth(index: number) {
     this.monthlyPlanData[index].expanded = !this.monthlyPlanData[index].expanded;
+  }
+
+  // ---------- Past months planning (view only) ----------
+
+  togglePastMonths() {
+    this.pastExpanded = !this.pastExpanded;
+    if (this.pastExpanded && !this.pastLoaded) {
+      this.loadPastMonthlyPlans();
+    }
+  }
+
+  togglePastMonth(index: number) {
+    this.pastMonthlyPlanData[index].expanded = !this.pastMonthlyPlanData[index].expanded;
+  }
+
+  // One query: the saved plans of the 6 calendar months before the current one,
+  // newest first. The `<` bound keeps the current month out of this section, so a
+  // month can never appear here and in Plan Monthly Content at the same time.
+  async loadPastMonthlyPlans() {
+    this.pastLoading = true;
+
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const sixMonthsBack = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+
+    const snap = await getDocs(query(
+      collection(this.firestore, 'participantplanning'),
+      where('profileid', '==', this.clientdata['profileid']),
+      where('monthstartdate', '>=', sixMonthsBack),
+      where('monthstartdate', '<', monthStart),
+      orderBy('monthstartdate', 'desc'),
+      limit(6)
+    ));
+
+    this.pastMonthlyPlanData = snap.docs.map(docSnap => {
+      const d = docSnap.data();
+      const date = d['monthstartdate'].toDate();
+      const monthName = date.toLocaleString('default', { month: 'long' });
+
+      return {
+        display: `${monthName} ${date.getFullYear()}`,
+        month: date.getMonth() + 1,
+        year: date.getFullYear(),
+        docId: docSnap.id,
+        expanded: false,
+        data: {
+          solarvoice: this.groupFlatEntries(d['solarvoice']),
+          eiflix: this.groupFlatEntries(d['eiflix']),
+          generalcontent: this.groupFlatEntries(d['generalcontent']),
+          workshop: (d['workshop'] ?? []).map((ref: any) => ref?.id ?? null).filter(Boolean),
+          products: (d['products'] ?? []).map((ref: any) => ref?.id ?? null).filter(Boolean)
+        }
+      };
+    });
+
+    await this.loadPastWorkshopTitles();
+
+    this.pastLoaded = true;
+    this.pastLoading = false;
+  }
+
+  // `upcomingWorkshop` only covers this month onward, so past workshop titles
+  // are read here from the ids the saved plans actually reference.
+  async loadPastWorkshopTitles() {
+    const ids = new Set<string>();
+    for (const month of this.pastMonthlyPlanData) {
+      for (const id of month.data.workshop) {
+        ids.add(id);
+      }
+    }
+
+    await Promise.all(Array.from(ids).map(async id => {
+      const snap = await getDoc(doc(this.firestore, 'workshopconfiguration', id));
+      this.pastWorkshopTitle[id] = snap.data()['detailpage']['title'];
+    }));
+  }
+
+  pastContentName(category: string, id: string): string {
+    if (category === 'solarvoice') {
+      return (this.solarVoicePlaylist.find(e => e['id'] === id) || {})['name'];
+    }
+    if (category === 'eiflix') {
+      return (this.eiFlixSeriesList.find(e => e['id'] === id) || {})['seriesName'];
+    }
+    return (this.generalContentList.find(e => e['docid'] === id) || {})['title'];
+  }
+
+  pastDayLabel(day: string): string {
+    if (day === 'weekday') return 'Weekdays';
+    if (day === 'weekend') return 'Weekends';
+    return 'All Days';
+  }
+
+  pastTimeLabel(time: string): string {
+    return time === 'all' ? 'All Time' : time;
   }
 
   async submitMonthlyPlan() {

@@ -155,10 +155,12 @@
             <div *ngIf="(notesData['changeworkbrief'] || []).length != 0">
               <label class="info-label">Changework Brief:</label>
               <div>
-                <div *ngFor="let audio of notesData['changeworkbrief']; let i = index">
-                  <audio class="audio-container" controls>
-                    <source [src]="audio" type="audio/wav">
-                  </audio>
+                <!-- app-atc-audio resolves its own signed URL on play and renews it before
+                     expiry. trackBy keeps the player alive across live snapshots. -->
+                <div *ngFor="let audio of notesData['changeworkbrief']; let i = index; trackBy: trackByMediaRef">
+                  <app-atc-audio
+                    [path]="audio"
+                    [label]="(i + 1) + '.'"></app-atc-audio>
                 </div>
               </div>
             </div>
@@ -166,7 +168,8 @@
               <label class="info-label">Image Notes:</label>
               <div class="image-notes-container">
                 <div class="image-preview" *ngFor="let image of notesData['imagenotes']">
-                  <img [src]="image" height="80" width="80" (click)="viewImage(image)">
+                  <img *ngIf="noteImageUrls[image] as imageUrl"
+                       [src]="imageUrl" height="80" width="80" (click)="viewImage(imageUrl)">
                 </div>
               </div>
             </div>

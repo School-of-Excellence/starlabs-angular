@@ -502,10 +502,12 @@
                 </div>
               </div>
               <div *ngIf="atc['cwbrief'].length != 0">
-                <div class="mt-3 ml-2" *ngFor="let audio of atc['cwbrief']">
-                  <audio controls="">
-                    <source [src]="audio" type="audio/wav">
-                  </audio>
+                <!-- Live operational screen: trackBy is what stops a queue snapshot from
+                     destroying the player mid-listen. app-atc-audio owns its own URL. -->
+                <div class="mt-3 ml-2" *ngFor="let audio of atc['cwbrief']; let i = index; trackBy: trackByMediaRef">
+                  <app-atc-audio
+                    [path]="audio"
+                    [label]="(i + 1) + '.'"></app-atc-audio>
                 </div>
               </div>
             </div>

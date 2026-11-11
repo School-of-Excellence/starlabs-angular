@@ -1,7 +1,7 @@
 import { Component, OnInit, NgZone } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { collection, collectionData, collectionSnapshots, doc, DocumentReference, Firestore, getDoc, getDocs, getFirestore, limit, orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
-import { Storage, ref, uploadBytes, getDownloadURL, deleteObject, uploadBytesResumable } from '@angular/fire/storage';
+import { Storage, ref, uploadBytes, deleteObject, uploadBytesResumable } from '@angular/fire/storage';
 import { AuthguardService } from '../../authguard.service';
 import { CommonModule, DatePipe, Location } from '@angular/common';
 import * as RecordRTC from 'recordrtc';
@@ -11,6 +11,7 @@ import { Clipboard } from '@angular/cdk/clipboard';
 import { MatDialog } from '@angular/material/dialog';
 import { ConnectivityGuardService } from '../../shared/connectivity-guard.service';
 import { MediaCacheService, PendingMedia } from '../../shared/media-cache.service';
+import { MediaUrlService } from '../../shared/media-url.service';
 import { ATCDraftService } from '../../shared/atc-draft.service';
 import { parseAtcOutput } from '../../ATC-Ops/atc-ops.types';
 import { resolveProcedurePseudonym } from '../../ATC-Ops/procedure-pseudonyms';
@@ -385,6 +386,7 @@ export class PrescribeATCComponent {
     private connectivity: ConnectivityGuardService,
     private mediaCache: MediaCacheService,
     private draftService: ATCDraftService,
+    private mediaUrl: MediaUrlService,
     private ngZone: NgZone
   ) {
     this.settingup = true
@@ -1438,16 +1440,34 @@ export class PrescribeATCComponent {
     }
   }
 
+
+  /**
+   * A draft stores object PATHS. Resolve one to something fetchable before touching it.
+   *
+   * Without this, `fetch("Uploaded ATC/x.png")` resolves against the app's own origin and
+   * the SPA answers 200 with index.html — so the restore silently produced a 9 KB
+   * `text/html` File named `image_0.jpg`, and re-saving would have uploaded that over the
+   * real image. A 404 would have been kinder; this failed quietly.
+   *
+   * Legacy drafts hold http(s) URLs and pass straight through.
+   */
+  private async fetchableRef(ref: string): Promise<string | null> {
+    if (!ref) return null;
+    return this.mediaUrl.resolve(ref);
+  }
+
   async loadAudioFromURLs(audioURLs: string[]) {
     this.audioBlobURL = [];
     this.audioBlob = [];
 
     // load sequentially so the arrays stay index-aligned with existingAudioURLs
     for (let index = 0; index < audioURLs.length; index++) {
-      const url = audioURLs[index];
-      // always keep the uploaded audio (plays from the URL when online); placeholder keeps alignment if offline
-      this.audioBlobURL.push(url);
+      const ref = audioURLs[index];
+      const url = await this.fetchableRef(ref);
+      // play from the RESOLVED url; a bare path would 404 (or worse, hit the SPA)
+      this.audioBlobURL.push(url ?? ref);
       try {
+        if (!url) throw new Error("could not resolve ref");
         const response = await fetch(url);
         if (!response.ok) throw new Error(`Failed to fetch audio: ${response.status}`);
         this.audioBlob.push(await response.blob());
@@ -1465,10 +1485,12 @@ export class PrescribeATCComponent {
 
     // load sequentially so the arrays stay index-aligned with existingNoteImageURLs
     for (let index = 0; index < imageURLs.length; index++) {
-      const url = imageURLs[index];
-      // always keep the uploaded image (shows from the URL when online); placeholder keeps alignment if offline
-      this.previewNoteImages.push(url);
+      const ref = imageURLs[index];
+      const url = await this.fetchableRef(ref);
+      // show the RESOLVED url; a bare path renders as a broken image
+      this.previewNoteImages.push(url ?? ref);
       try {
+        if (!url) throw new Error("could not resolve ref");
         const response = await fetch(url);
         if (!response.ok) throw new Error(`Failed to fetch image: ${response.status}`);
         const blob = await response.blob();
@@ -1487,10 +1509,12 @@ export class PrescribeATCComponent {
 
     // load sequentially so the arrays stay index-aligned with existingATCImageURLs
     for (let index = 0; index < imageURLs.length; index++) {
-      const url = imageURLs[index];
-      // always keep the uploaded image (shows from the URL when online); placeholder keeps alignment if offline
-      this.previewATCImages.push(url);
+      const ref = imageURLs[index];
+      const url = await this.fetchableRef(ref);
+      // show the RESOLVED url; a bare path renders as a broken image
+      this.previewATCImages.push(url ?? ref);
       try {
+        if (!url) throw new Error("could not resolve ref");
         const response = await fetch(url);
         if (!response.ok) throw new Error(`Failed to fetch image: ${response.status}`);
         const blob = await response.blob();
@@ -1597,7 +1621,10 @@ export class PrescribeATCComponent {
               reject(error);
             },
             async () => {
-              const url = await getDownloadURL(uploadTask.snapshot.ref);
+              // Store the PATH, not a download URL: a download URL carries a token with no
+              // TTL that bypasses Storage Rules, so one leaked row is a permanent public
+              // handle on the file. Reading a path requires a signed URL from getMediaUrls.
+              const url = uploadTask.snapshot.ref.fullPath;
               console.log(`Audio ${index} uploaded successfully:`, url);
               resolve(url);
             }
@@ -1667,7 +1694,10 @@ export class PrescribeATCComponent {
               resolve(null);
             },
             async () => {
-              const url = await getDownloadURL(uploadTask.snapshot.ref);
+              // Store the PATH, not a download URL: a download URL carries a token with no
+              // TTL that bypasses Storage Rules, so one leaked row is a permanent public
+              // handle on the file. Reading a path requires a signed URL from getMediaUrls.
+              const url = uploadTask.snapshot.ref.fullPath;
               console.log(`Note image ${index} uploaded successfully:`, url);
               resolve(url);
             }
@@ -1739,7 +1769,10 @@ export class PrescribeATCComponent {
               resolve(null);
             },
             async () => {
-              const url = await getDownloadURL(uploadTask.snapshot.ref);
+              // Store the PATH, not a download URL: a download URL carries a token with no
+              // TTL that bypasses Storage Rules, so one leaked row is a permanent public
+              // handle on the file. Reading a path requires a signed URL from getMediaUrls.
+              const url = uploadTask.snapshot.ref.fullPath;
               console.log(`ATC image ${index} uploaded successfully:`, url);
               resolve(url);
             }

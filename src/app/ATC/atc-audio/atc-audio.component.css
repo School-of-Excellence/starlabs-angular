@@ -1,0 +1,51 @@
+.atc-audio {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 4px 0;
+}
+
+.atc-audio__label {
+  font-size: 12px;
+  opacity: 0.7;
+  min-width: 18px;
+}
+
+.atc-audio__start {
+  padding: 6px 16px;
+  border: 1px solid currentColor;
+  border-radius: 16px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.atc-audio__start:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.atc-audio__player {
+  height: 36px;
+  max-width: 100%;
+}
+
+.atc-audio__error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #b3261e;
+}
+
+.atc-audio__error button {
+  border: none;
+  background: none;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0;
+}

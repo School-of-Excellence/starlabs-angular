@@ -1,5 +1,7 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CommonModule, DatePipe } from "@angular/common";
+import { AtcAudioComponent } from '../atc-audio/atc-audio.component';
+import { MediaUrlService } from '../../shared/media-url.service';
 import { collection, doc, getDoc, getDocs, getFirestore, orderBy, query, updateDoc } from '@angular/fire/firestore';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthguardService } from '../../authguard.service';
@@ -25,7 +27,8 @@ import { isWiSHProduct } from '../shared/atc-product';
     MatChipsModule,
     MatFormFieldModule,
     MatInputModule,
-    FormsModule
+    FormsModule,
+    AtcAudioComponent
   ],
   templateUrl: './atc-preview.component.html',
   styleUrl: './atc-preview.component.css'
@@ -77,9 +80,27 @@ export class AtcPreviewComponent {
   specialistsByActivity: any[] = [];
   adjustmentAwarenessDetail: any = {};
 
+  private mediaUrl = inject(MediaUrlService);
+
   audioUrls: string[] = [];
   imageUrls: string[] = [];
   atcImageUrls: string[] = [];
+
+  // Stored image ref → loadable URL. A migrated row holds an object path an <img> cannot
+  // load; a legacy row holds a download URL, which resolve() passes straight back. Audio
+  // is absent by design — app-atc-audio resolves its own clip when play is pressed.
+  imageSrc: Record<string, string> = {};
+
+  /** Resolve a set of image refs in ONE batched call. */
+  private async resolveImages(refs: string[]): Promise<void> {
+    const wanted = (refs ?? []).filter(r => typeof r === 'string' && r);
+    if (wanted.length === 0) return;
+    this.mediaUrl.prefetch(wanted);
+    await Promise.all(wanted.map(async (r) => {
+      const url = await this.mediaUrl.resolve(r);
+      if (url) this.imageSrc[r] = url;
+    }));
+  }
 
   // Notes for actions
   actionNotes: string = '';
@@ -201,6 +222,7 @@ export class AtcPreviewComponent {
             this.existingNotes = snap.data();
             this.audioUrls = this.existingNotes['changeworkbrief'] || [];
             this.imageUrls = this.existingNotes['imagenotes'] || [];
+            void this.resolveImages(this.imageUrls);
           }
         });
       }
@@ -215,6 +237,7 @@ export class AtcPreviewComponent {
       this.reportATC.atceducation = atcDocData["atceducation"] != null ? atcDocData["atceducation"] : [];
       this.reportATC.validator = atcDocData["validator"]?.map((e: any) => e.id);
       this.atcImageUrls = atcDocData["prescription_image"] || [];
+      void this.resolveImages(this.atcImageUrls);
 
       var atcActivity = Object.keys(atcDocData["bigactivity"] ?? {});
       if (atcActivity.length == 0) {

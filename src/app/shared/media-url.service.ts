@@ -6,17 +6,21 @@ interface MediaUrlResult {
   ref: string;
   url?: string;
   expiresAt?: number;
+  /** Seconds, measured server-side from the file. Null for images and unreadable audio. */
+  duration?: number | null;
   error?: string;
 }
 
 interface MediaUrlsResponse {
-  expiresAt: number;
   results: MediaUrlResult[];
 }
 
 /**
  * Turns whatever is stored in a Firestore media field into something an <img>, <audio>
  * or <video> can load.
+ *
+ * Contract and history: specs/journals/2026-11-12-atc-signed-urls-option-c.md, and the
+ * Cloud Functions companion at docs/journals/2026-11-12-getmediaurls-atc-signed-urls.md.
  *
  * TWO KINDS OF STORED VALUE, two behaviours:
  *
@@ -32,15 +36,19 @@ interface MediaUrlsResponse {
  * never-expiring token, so a legacy row keeps that exposure until it is migrated to a
  * path. The security win arrives with the data migration, not with this service.
  *
- * BATCHING — a table of ten media rows should cost ONE round-trip, not ten. Calls landing
- * within BATCH_MS are coalesced into a single request, and a ref already in flight
- * attaches to the pending request instead of starting another.
+ * BATCHING — a note with six clips and four images should cost ONE round-trip, not ten.
+ * Calls landing within BATCH_MS are coalesced into a single request, and a ref already in
+ * flight attaches to the pending request instead of starting another.
  *
- * CACHING — a resolved URL is held until SKEW_MS before its expiry, so no <img> is ever
- * handed a nearly-dead URL. Combined with the window rounding on the server (see
- * media_signed_url.js) the URL string is identical for every user inside a window, so the
- * browser and CDN caches keep working and the server signs each object at most once per
- * window.
+ * LIFETIME IS DECIDED SERVER-SIDE, and this service does not get a say. The callable reads
+ * each clip's length from the file itself and grants `duration + 20 min`; images get 15
+ * minutes. An earlier revision sent a `duration` up with the request, which meant anyone
+ * signed in could ask for a year-long URL from the browser console. Nothing is sent now,
+ * so there is nothing to forge.
+ *
+ * SHARING — the callable hands the same URL to everyone while it still carries
+ * `duration + 5 min`, so viewers share a string and the browser can serve a large
+ * recording from cache instead of downloading it again.
  */
 @Injectable({ providedIn: 'root' })
 export class MediaUrlService {
@@ -53,12 +61,12 @@ export class MediaUrlService {
 
   /** A URL this close to expiry is treated as already stale. */
   private static readonly SKEW_MS = 60_000;
-  /** Coalescing window — one animation frame is enough to collect a table page. */
+  /** Coalescing window — one animation frame is enough to collect a document's media. */
   private static readonly BATCH_MS = 16;
   /** Must not exceed MAX_REFS in the callable. */
   private static readonly MAX_PER_CALL = 200;
 
-  private cache = new Map<string, { url: string; expiresAt: number }>();
+  private cache = new Map<string, { url: string; expiresAt: number; duration: number | null }>();
   private waiting = new Map<string, ((url: string | null) => void)[]>();
   private queue = new Set<string>();
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
@@ -103,12 +111,41 @@ export class MediaUrlService {
     });
   }
 
+  /**
+   * Warm the cache for a whole document's media in ONE call, fire-and-forget.
+   *
+   * Because the loop is synchronous every ref lands in the same BATCH_MS window, so a
+   * screen that calls this once on load pays a single round-trip however many clips and
+   * images the note holds. Elements that later call resolve() find the ref cached, or
+   * attach to the request already in flight — never a second one.
+   */
+  prefetch(refs: string[]): void {
+    for (const ref of refs) {
+      if (!ref || MediaUrlService.isFetchableUrl(ref)) continue;
+      const hit = this.cache.get(ref);
+      if (hit && hit.expiresAt - MediaUrlService.SKEW_MS > Date.now()) continue;
+      if (this.waiting.has(ref)) continue;
+      void this.resolve(ref);
+    }
+  }
+
   /** When the current URL for `ref` expires, as epoch ms, or null if not cached. */
   expiryOf(ref: string): number | null {
     return this.cache.get(ref)?.expiresAt ?? null;
   }
 
-  /** Drop a cached URL so the next resolve() re-signs. The expiry retry path. */
+  /**
+   * The clip's length in seconds as the server measured it, or null for an image, an
+   * unreadable file, or a ref that has not been resolved yet.
+   *
+   * Worth having because it is known before the browser has loaded any audio, so a caller
+   * can reason about whether a URL will outlast playback without waiting for metadata.
+   */
+  durationOf(ref: string): number | null {
+    return this.cache.get(ref)?.duration ?? null;
+  }
+
+  /** Drop a cached URL so the next resolve() re-requests. The expiry retry path. */
   invalidate(ref: string): void {
     this.cache.delete(ref);
   }
@@ -134,7 +171,7 @@ export class MediaUrlService {
       const { data } = await this.call({ refs });
       for (const r of data.results) {
         if (r.url && r.expiresAt) {
-          this.cache.set(r.ref, { url: r.url, expiresAt: r.expiresAt });
+          this.cache.set(r.ref, { url: r.url, expiresAt: r.expiresAt, duration: r.duration ?? null });
           this.stats.signed++;
           this.settle(r.ref, r.url);
         } else {
