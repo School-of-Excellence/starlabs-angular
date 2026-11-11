@@ -106,7 +106,7 @@ Literal `data-testid` strings only — no `${interpolation}` (gate section 1.1 /
 |---|---|---|
 | jx-evprep-board | Board component inside the Ev. Prep panel | jc-evprep-board |
 | evp-root | Board component root | jc-evprep-board |
-| evp-preview | Design-preview banner | jc-evprep-board |
+| evp-preview | Design-preview banner (Returning board only) | jc-evprep-board |
 | evp-board | One board (data-board = new / returning) | jc-evprep-board |
 | evp-board-total | Board total | jc-evprep-board |
 | evp-col | One column (data-stage = stage key) | jc-evprep-board |
@@ -120,3 +120,8 @@ Literal `data-testid` strings only — no `${interpolation}` (gate section 1.1 /
 | evp-move-note | Move note (required) | jc-evprep-board |
 | evp-move-save | Save note & move | jc-evprep-board |
 | evp-move-cancel | Cancel move | jc-evprep-board |
+| evp-card-variation | Variation chip on a live card | jc-evprep-board |
+| evp-move-variation | Variation picker when starting a prep | jc-evprep-board |
+| evp-move-error | Why a move is blocked / failed | jc-evprep-board |
+| evp-loading | Live board loading state | jc-evprep-board |
+| evp-error | Live board load error + Retry | jc-evprep-board |
