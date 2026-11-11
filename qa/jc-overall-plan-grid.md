@@ -49,3 +49,4 @@ documentId() in chunk30, cached. No PII collection read.
 - Fail if reverted: yes (12 of 12 FAIL against the previous sources)
 - Last run: PASS 12/12
 - jc-overall-summary OV1/OV2/OV15 updated to the new section (approved replacement).
+- Live 2026-11-11 (localhost:4303, starlabs-test): coach view grid ready, 6 months Nov 26..Apr 27, rows Solar Voice / EiFlix / General content / Workshops + product WiSH (Jan 27 = 1); cell 1 == drill 1 (native ahd overlay); Viewing = All shows 'Pick a coach to see plans.'

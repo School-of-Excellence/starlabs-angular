@@ -524,7 +524,7 @@
     <!-- Compact iOS summary strip — tap a card to apply the matching lever filter. -->
     <section class="ios-mini-summary" *ngIf="selectedCoachId !== UNASSIGNED">
       <button type="button" class="ios-mini-card" data-testid="jchd-mc-needs" [class.is-on]="activeLever==='needsAttention'"
-        (click)="setLever(activeLever==='needsAttention' ? 'all' : 'needsAttention')"
+        (click)="activeLever==='needsAttention' ? setLever('all') : goToParticipantsWithLever('needsAttention')"
         matTooltip="Lapsed · journey not started · open tickets · A&H critical / needs attention. Marked-addressed participants are excluded.">
         <span class="mc-label"><span class="mc-dot dot-red"></span>Needs Attention</span>
         <span class="mc-num">{{ needsAttentionCount }}</span>

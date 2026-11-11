@@ -88,5 +88,8 @@ check('NF18', 'snapshot taken only after every tile input lands (paged: tickets 
   () => /void Promise\.all\(\[exactP, attnP, llP\]\)\.then\(\(\) => this\.ensureDailySnapshot\(\)\)/.test(src)
      && /void exactP\.then\(\(\) => this\.ensureDailySnapshot\(\)\)/.test(method('loadFullPortfolio')));
 
+check('NF19', 'Needs Attention tile opens the list through the summary filter (tile == list), like the hero',
+  () => /data-testid="jchd-mc-needs" \[class\.is-on\]="activeLever==='needsAttention'"\s*\(click\)="activeLever==='needsAttention' \? setLever\('all'\) : goToParticipantsWithLever\('needsAttention'\)"/.test(strip0));
+
 console.log(failed ? `\n${failed} FAILED` : '\nALL PASS');
 process.exit(failed ? 1 : 0);
