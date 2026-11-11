@@ -33,3 +33,4 @@ One line per live contract (gate section 1.1).
 | jc-evprep-board | /journey-coach-health (Ev. Preparation tab, New board live) | qa/checks/jc-evprep-board.mjs | 2026-11-11 PASS (23/23; 13 FAIL on revert) |
 | jc-health-finance-collapse | /journey-coach-health | qa/checks/jc-health-finance-collapse.mjs | 2026-11-09 PASS (patched 10/10; 8 FAIL on revert; live light+dark + drill) |
 | jc-overall-next30 | /journey-coach-health (Overall Summary · Scheduled) | qa/checks/jc-overall-next30.mjs | 2026-11-11 PASS (9/9; 7 FAIL on revert) |
+| jc-overall-plan-grid | /journey-coach-health (Overall Summary · Planned journey) | qa/checks/jc-overall-plan-grid.mjs | 2026-11-11 PASS (12/12; 12 FAIL on revert) |

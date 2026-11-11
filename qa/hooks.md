@@ -96,8 +96,12 @@ Literal `data-testid` strings only — no `${interpolation}` (gate section 1.1 /
 | ov-obs-week | Onboarding next 7 days | jc-overall-summary |
 | ov-obs-month | Onboarding next 30 days | jc-overall-next30 |
 | ov-obs-done | Onboarding completed in range | jc-overall-summary |
-| ov-se | Ready for SE card | jc-overall-summary |
-| ov-se-pending | Ready for SE pending note | jc-overall-summary |
+| ov-plan | Planned journey card | jc-overall-plan-grid |
+| ov-plan-pick | Pick a coach note (ALL/UNASSIGNED) | jc-overall-plan-grid |
+| ov-plan-grid | Plan grid table | jc-overall-plan-grid |
+| ov-plan-row | Plan grid row | jc-overall-plan-grid |
+| ov-plan-cell | Plan grid cell (drill) | jc-overall-plan-grid |
+| ov-plan-error | Plan load error | jc-overall-plan-grid |
 | ov-health | Participant health card | jc-overall-summary |
 | ov-health-total | Active Ecosystem participant total | jc-overall-summary |
 | ov-ah | Ask A&H & Love Letter card | jc-overall-summary |

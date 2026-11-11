@@ -1,6 +1,6 @@
 // Journey Coach Health -> Overall Summary tab (operator spec 2026-11-11).
 // Sections: date range + Viewing as; 1 Sales by Journey; 2 Onboarding status; 3 Scheduled & completed;
-// 4 Ready for SE (pending Ev. Preparation); 5 Participant health; 6 Ask A&H & Love Letter.
+// 4 Planned journey · next 6 months (was Ready for SE); 5 Participant health; 6 Ask A&H & Love Letter.
 // Revert the change and these assertions go RED.
 import { readFileSync } from 'node:fs';
 
@@ -21,10 +21,10 @@ const panel = (() => { const i = html.indexOf('data-testid="jx-panel-overall"');
 const planning = html.slice(html.indexOf('<ng-container *ngIf="experienceTab === \'planning\'">'), html.indexOf('<!-- ═══ end Journey Planning tab ═══ -->'));
 
 check('OV1', 'placeholder replaced: Overall panel has all six sections',
-  () => !panel.includes('Cross-area summary') && ['ov-sales', 'ov-onboarding', 'ov-schedule', 'ov-se', 'ov-health', 'ov-ah']
+  () => !panel.includes('Cross-area summary') && ['ov-sales', 'ov-onboarding', 'ov-schedule', 'ov-plan', 'ov-health', 'ov-ah']
       .every(t => panel.includes(`data-testid="${t}"`)));
-check('OV2', 'section order matches the spec (1 Sales, 2 Onboarding, 3 Schedule, 4 SE, 5 Health, 6 A&H)',
-  () => { const o = ['ov-sales', 'ov-onboarding', 'ov-schedule', 'ov-se', 'ov-health', 'ov-ah'].map(t => panel.indexOf(`data-testid="${t}"`));
+check('OV2', 'section order matches the spec (1 Sales, 2 Onboarding, 3 Schedule, 4 Plan grid, 5 Health, 6 A&H)',
+  () => { const o = ['ov-sales', 'ov-onboarding', 'ov-schedule', 'ov-plan', 'ov-health', 'ov-ah'].map(t => panel.indexOf(`data-testid="${t}"`));
           return o.every((v, i) => v > 0 && (i === 0 || v > o[i - 1])); });
 check('OV3', 'ONE shared Onboarding dashboard: mounted on Overall or Onboarding, hidden off its tab (not *ngIf per tab)',
   () => /\*ngIf="jcdMounted" \[class\.jx-offstage\]="experienceTab !== 'onboarding'" data-testid="jx-panel-onboarding"/.test(html)
@@ -77,8 +77,8 @@ check('OV14', 'A&H on Overall = the Planning table\'s docs; at All it is identic
   () => /const docs = scope \? this\.ahDocs\.filter\(d => scope\.has\(d\.profileid\)\) : this\.ahDocs;/.test(body('ovAh'))
      && /if \(scope && !scope\.has\(d\.profileid\)\) return false;/.test(body('openAhDrill'))
      && /data-testid="ov-ah-needsattention-combined"/.test(panel));
-check('OV15', 'Ready for SE is an honest pending placeholder (no invented numbers)',
-  () => /data-testid="ov-se-pending"/.test(panel) && !/ov-se[^"]*"[^>]*>\{\{/.test(panel));
+check('OV15', 'Ready for SE placeholder replaced by the 6-month plan grid (item 2, jc-overall-plan-grid)',
+  () => !/data-testid="ov-se(-pending)?"/.test(panel) && /data-testid="ov-plan-grid"/.test(panel));
 check('OV16', 'drills reuse the native overlay, now outside the Planning container; no new dialog component',
   () => !planning.includes('class="ahd-backdrop"') && html.indexOf('class="ahd-backdrop"') > html.indexOf('<!-- ═══ end Journey Planning tab ═══ -->')
      && /this\.ahDrill\.set\(\{ title, entries: sorted \}\)/.test(pbody('openOvDrill'))

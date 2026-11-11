@@ -1233,22 +1233,30 @@
         <p class="ov-foot">Today and Next 7 days match Journey Planning's Schedule card. Next 30 days = booked sessions in the 30 days after today (includes the next 7). Completed = attended sessions in the date range.</p>
       </section>
 
-      <!-- 4. Ready for SE (Scope Enhancement) — data comes from the Ev. Preparation tab -->
-      <section class="ios2-card ov-card ov-s6" data-testid="ov-se">
+      <!-- 4. Planned journey · next 6 months (participantplanning, Viewing as = a specific coach) -->
+      <section class="ios2-card ov-card ov-s6" data-testid="ov-plan">
         <div class="ios2-head">
-          <span class="ios2-app ap-orange"><mat-icon>trending_up</mat-icon></span>
-          <span class="ios2-title">Ready for SE</span>
-          <span class="ov-scope">Scope Enhancement</span>
+          <span class="ios2-app ap-orange"><mat-icon>event_note</mat-icon></span>
+          <span class="ios2-title">Planned journey · next 6 months</span>
+          <span class="ov-scope ov-scope-coach">Viewing as</span>
         </div>
-        <div class="ov-pending" data-testid="ov-se-pending">Pending: this fills in once the Ev. Preparation tab records the month SE is planned for each participant.</div>
-        <div class="ah-table ov-ghost">
-          <table>
-            <thead><tr><th class="ah-flag">SE month</th><th>New</th><th>Existing</th></tr></thead>
-            <tbody>
-              <tr class="ah-total"><td class="ah-flag">Overall</td><td>–</td><td>–</td></tr>
-            </tbody>
-          </table>
-        </div>
+        <div class="ov-pending" *ngIf="!ovPlanCoachScoped()" data-testid="ov-plan-pick">Pick a coach to see plans.</div>
+        <ng-container *ngIf="ovPlanCoachScoped()">
+          <p class="ios2-empty" *ngIf="!ovPlan() || ovPlan()?.status === 'loading'">Loading…</p>
+          <p class="ios2-empty" *ngIf="ovPlan()?.status === 'error'" data-testid="ov-plan-error">Plans could not be loaded.</p>
+          <div class="ah-table" *ngIf="ovPlan()?.status === 'ready'" data-testid="ov-plan-grid">
+            <table>
+              <thead><tr><th class="ah-flag">Planned</th><th *ngFor="let m of ovPlanMonths()">{{ m.label }}</th></tr></thead>
+              <tbody>
+                <tr *ngFor="let r of ovPlan()?.rows ?? []" data-testid="ov-plan-row">
+                  <td class="ah-flag">{{ r.label }}</td>
+                  <td *ngFor="let c of r.cells; let i = index"><button type="button" class="ah-num" data-testid="ov-plan-cell" [disabled]="!c.length" (click)="ovPlanDrill(r, i)">{{ c.length }}</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </ng-container>
+        <p class="ov-foot">Participants of the viewed coach with each item in their journey plan for that month. Products show by name.</p>
       </section>
 
       <!-- 5. Participant health (Coach-set health, Active participants on Ecosystem products) -->

@@ -133,6 +133,10 @@ type CoachMetric = 'caseload' | 'active' | 'needToday' | 'goingQuiet' | 'flagged
 interface JcDoneEvent { profileid: string; coachId: string | null; ms: number; onboarding?: boolean; }
 /** Overall Summary · Sales by Journey row (counts of the dashboard's Gross New / Upgrade / Add-on sets). */
 interface OvSalesRow { id: string; name: string; newN: number; upN: number; addN: number; total: number; }
+/** Overall Summary · Planned journey: one `participantplanning` doc reduced to what the grid needs. */
+interface OvPlanDoc { profileid: string; ym: string; solarvoice: boolean; eiflix: boolean; generalcontent: boolean; workshop: boolean; productIds: string[]; }
+/** One grid row: a plan category or a product name; cells[i] = distinct participants planned in month i. */
+interface OvPlanRow { key: string; label: string; cells: string[][]; }
 
 /** Product-type classification, derived from the `journey` collection's `type` field
  *  (and the special-cased FTO journey for gifts) — the same signal the sales dashboards use. */
@@ -247,6 +251,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     // ONE shared Onboarding dashboard instance (operator 2026-11-11, option B): mounted the first time
     // Overall or Onboarding opens, then kept alive (hidden off its tab) so both tabs read the same load.
     if (t === 'overall' || t === 'onboarding') this.jcdMounted = true;
+    if (t === 'overall') void this.ensureOvPlan();
   }
 
   // ═══ Overall Summary tab (operator spec 2026-11-11) ═══════════════════════════════════════════
@@ -398,6 +403,109 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     const ev = what === 'done' ? this.ovDone(onboarding) : this.ovPending(onboarding, what);
     this.openOvDrill(title, ev.map(e => ({ profileid: e.profileid, name: this.nameOf(e.profileid), created: e.ms })),
       what === 'done' ? 'desc' : 'asc');
+  }
+
+  // ── 4. Planned journey · next 6 months (participantplanning, written by journeyplan.component) ──
+  //  One doc per participant per month (id `${profileid}_${MM}_${YYYY}`). Read ONLY for the viewed coach's
+  //  roster in batched `profileid in` queries (no composite index; month filtered client-side). Product
+  //  names resolve from the referenced `products` docs (catalog, cached). ALL / UNASSIGNED show a note.
+  ovPlan = signal<{ coachId: string; status: 'loading' | 'ready' | 'error'; rows: OvPlanRow[] } | null>(null);
+  private ovPlanToken = 0;
+  private productNameCache: Record<string, string> = {};
+  /** The grid only renders for a specific coach (ALL / UNASSIGNED would mean reading every plan). */
+  ovPlanCoachScoped(): boolean {
+    return !!this.selectedCoachId && this.selectedCoachId !== this.ALL && this.selectedCoachId !== this.UNASSIGNED;
+  }
+  /** Next 6 months, current month first. */
+  ovPlanMonths(): { ym: string; label: string; ms: number }[] {
+    const now = new Date();
+    const out: { ym: string; label: string; ms: number }[] = [];
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+      out.push({ ym: this.ovYm(d), label: d.toLocaleString('en-US', { month: 'short' }) + ' ' + String(d.getFullYear()).slice(2), ms: d.getTime() });
+    }
+    return out;
+  }
+  private ovYm(d: Date): string { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
+  /** Load (once per coach) the plan docs for the viewed coach's roster and build the grid. */
+  async ensureOvPlan(): Promise<void> {
+    if (!this.ovPlanCoachScoped() || this.experienceTab !== 'overall') return;
+    const coachId = this.selectedCoachId;
+    const cur = this.ovPlan();
+    if (cur && cur.coachId === coachId && cur.status !== 'error') return;
+    const ids = this.rosterIds();
+    if (!ids.length && this.loading) return;   // roster not loaded yet; ngOnInit re-calls once it is
+    const token = ++this.ovPlanToken;
+    this.ovPlan.set({ coachId, status: 'loading', rows: [] });
+    try {
+      const months = this.ovPlanMonths();
+      const inWindow = new Set(months.map(m => m.ym));
+      const docs: OvPlanDoc[] = [];
+      const snaps = await Promise.all(this.chunk30(ids).map(c =>
+        getDocs(query(collection(this.firestore, 'participantplanning'), where('profileid', 'in', c)))));
+      for (const snap of snaps) snap.forEach(d => {
+        const x: any = d.data();
+        const pid = typeof x['profileid'] === 'string' ? x['profileid'] : '';
+        let ms = this.toDate(x['monthstartdate']);
+        if (!ms) {   // fall back to the deterministic doc id `${profileid}_${MM}_${YYYY}`
+          const m = /_(\d{2})_(\d{4})$/.exec(d.id);
+          if (m) ms = new Date(Number(m[2]), Number(m[1]) - 1, 1);
+        }
+        if (!pid || !ms) return;
+        const ym = this.ovYm(ms);
+        if (!inWindow.has(ym)) return;
+        const arr = (v: any): any[] => Array.isArray(v) ? v : [];
+        docs.push({
+          profileid: pid, ym,
+          solarvoice: arr(x['solarvoice']).length > 0, eiflix: arr(x['eiflix']).length > 0,
+          generalcontent: arr(x['generalcontent']).length > 0, workshop: arr(x['workshop']).length > 0,
+          productIds: arr(x['products']).map((r: any) => (typeof r === 'string' ? r : r?.id) ?? '').filter(Boolean),
+        });
+      });
+      // resolve product names (catalog collection), batched by document id, cached across coaches
+      const need = [...new Set(docs.flatMap(d => d.productIds))].filter(id => !(id in this.productNameCache));
+      const psnaps = await Promise.all(this.chunk30(need).map(c =>
+        getDocs(query(collection(this.firestore, 'products'), where(documentId(), 'in', c)))));
+      for (const ps of psnaps) ps.forEach(d => {
+        const x: any = d.data();
+        this.productNameCache[d.id] = String(x['product'] ?? x['name'] ?? '').trim() || 'Unnamed product';
+      });
+      for (const id of need) if (!(id in this.productNameCache)) this.productNameCache[id] = 'Unknown product';
+      if (token !== this.ovPlanToken) return;
+      this.ovPlan.set({ coachId, status: 'ready', rows: this.buildOvPlanRows(docs, months.map(m => m.ym)) });
+    } catch (e) {
+      console.warn('participantplanning read failed', e);
+      if (token === this.ovPlanToken) this.ovPlan.set({ coachId, status: 'error', rows: [] });
+    }
+  }
+  /** Rows: Solar Voice, EiFlix, General content, Workshops, then one row per planned product name.
+   *  Cell = distinct participants with that item planned in that month. */
+  private buildOvPlanRows(docs: OvPlanDoc[], yms: string[]): OvPlanRow[] {
+    const idx = new Map(yms.map((ym, i) => [ym, i]));
+    const cats: { key: keyof OvPlanDoc; label: string }[] = [
+      { key: 'solarvoice', label: 'Solar Voice' }, { key: 'eiflix', label: 'EiFlix' },
+      { key: 'generalcontent', label: 'General content' }, { key: 'workshop', label: 'Workshops' },
+    ];
+    const sets = (): Set<string>[] => yms.map(() => new Set<string>());
+    const catRows = cats.map(c => ({ key: 'cat:' + c.key, label: c.label, sets: sets() }));
+    const prodRows = new Map<string, { key: string; label: string; sets: Set<string>[] }>();
+    for (const d of docs) {
+      const i = idx.get(d.ym); if (i == null) continue;
+      cats.forEach((c, k) => { if (d[c.key]) catRows[k].sets[i].add(d.profileid); });
+      for (const pid of d.productIds) {
+        const name = this.productNameCache[pid] ?? 'Unknown product';
+        let r = prodRows.get(name);
+        if (!r) { r = { key: 'prod:' + name, label: name, sets: sets() }; prodRows.set(name, r); }
+        r.sets[i].add(d.profileid);
+      }
+    }
+    const prods = [...prodRows.values()].sort((a, b) => a.label.localeCompare(b.label));
+    return [...catRows, ...prods].map(r => ({ key: r.key, label: r.label, cells: r.sets.map(s => [...s]) }));
+  }
+  /** Click a cell: the participants behind it (list length == cell). */
+  ovPlanDrill(row: OvPlanRow, i: number): void {
+    const m = this.ovPlanMonths()[i]; if (!m) return;
+    this.openOvDrill(`${row.label} · ${m.label}`, (row.cells[i] ?? []).map(pid => ({ profileid: pid, name: this.nameOf(pid), created: m.ms })));
   }
 
   // ── 5. Participant health: Active participants on Ecosystem products, by coach-set health state ──
@@ -717,6 +825,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     try {
       await this.resolveCoach();
       await this.loadPortfolio();
+      void this.ensureOvPlan();   // no-op unless Overall is open on a specific coach
     } catch (err: any) {
       console.error('Health dashboard load error', err);
       this.loadError = 'Failed to load the dashboard. Please make sure you are logged in. ' + (err?.message ?? '');
@@ -3505,6 +3614,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       if (this.paginator) this.paginator.firstPage();
       await this.loadFullPortfolio();   // roster is in memory; this only re-scopes the joins
     }
+    void this.ensureOvPlan();   // Overall plan grid follows Viewing as (no-op off Overall / for ALL)
   }
 
   /** Map a KPI card key to its lever. 'total' resets the board to 'all'. */
