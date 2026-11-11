@@ -11,6 +11,22 @@ Literal `data-testid` strings only — no `${interpolation}` (gate section 1.1 /
 | sched-ob-col | Summary Schedule — Onboarding column | jc-health-3fixes |
 | sched-jc-overdue | JC overdue count tile | jc-health-3fixes |
 | jchd-row-due | Participants row follow-up due chip | jc-health-followups |
+| jchd-mc-needs | Participants tile: Needs Attention | jc-health-na-finance-trend |
+| jchd-mc-quiet | Participants tile: Going quiet | jc-health-na-finance-trend |
+| jchd-mc-locked | Participants tile: Payments locked | jc-health-na-finance-trend |
+| jchd-mc-defaulted | Participants tile: Payment defaulted | jc-health-na-finance-trend |
+| jchd-mc-renewing | Participants tile: Renewing 90d | jc-health-na-finance-trend |
+| jchd-mc-tickets | Participants tile: People with tickets | jc-health-na-finance-trend |
+| jchd-mc-flagged | Participants tile: Flagged | jc-health-na-finance-trend |
+| jchd-sum-quiet | Summary Going quiet tile | jc-health-na-finance-trend |
+| jchd-trend | Trend (delta + sparkline) inside a tile | jc-health-na-finance-trend |
+| jchd-trend-delta | Delta vs yesterday | jc-health-na-finance-trend |
+| jchd-trend-spark | 14-day sparkline | jc-health-na-finance-trend |
+| jchd-new-na | Summary Needs attention +N new | jc-health-na-finance-trend |
+| jchd-new-gq | Summary Going quiet +N new | jc-health-na-finance-trend |
+| jchd-mc-new-na | Participants Needs Attention +N new | jc-health-na-finance-trend |
+| jchd-mc-new-gq | Participants Going quiet +N new | jc-health-na-finance-trend |
+| jchd-row-new | Table row New pill (new since yesterday) | jc-health-na-finance-trend |
 | sched-fu | Schedule card Follow-ups group | jc-health-followups |
 | sched-fu-today | Follow-ups due today tile | jc-health-followups |
 | sched-fu-week | Follow-ups next 7 days tile | jc-health-followups |

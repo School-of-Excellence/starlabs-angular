@@ -174,6 +174,11 @@ interface JourneyGroup { id: string; name: string; journeys: string[]; }
 
 interface AhDrillEntry { profileid: string; name: string; created: number; }
 
+/** Daily trend (item 6): one healthtracker_activity {type:'daily_snapshot'} doc per scope per day,
+ *  id `snap_${scope}_${YYYY-MM-DD}`, no profileid (never in a timeline), no names. */
+type TrendKey = 'needsAttention' | 'goingQuiet' | 'paymentsLocked' | 'defaulted';
+interface DailySnap { date: string; counts: Record<TrendKey, number>; needsAttentionIds: string[]; goingQuietIds: string[]; }
+
 /** One scheduled follow-up: a healthtracker_activity {type:'schedule'} event. Open until a
  *  {type:'schedule_done', scheduleId} event exists for it. dueMs = local midnight of the due day. */
 interface FollowUp { id: string; profileid: string; dueMs: number | null; note: string; actorName: string; }
@@ -965,9 +970,11 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.accumulatePagedSummary();   // now uses fullIndexBuilt for base-wide totals
     this.applyFilters();             // recomputes fullBaseMatchIds + dataSource
     this.setProgress(85, 'Indexed full base · loading activity…');
-    void this.loadExactOpenTickets();            // exact open-ticket counts, base-wide
-    void this.loadAttentionDataInBackground();   // Going-quiet / Needs-Attention base-wide
-    void this.loadLoveLetterTagsBaseWide();      // A&H love-letter / ask-A&H tags, base-wide (recent window)
+    const exactP = this.loadExactOpenTickets();            // exact open-ticket counts, base-wide
+    const attnP = this.loadAttentionDataInBackground();   // Going-quiet / Needs-Attention base-wide
+    const llP = this.loadLoveLetterTagsBaseWide();        // A&H love-letter / ask-A&H tags, base-wide (recent window)
+    // daily trend snapshot once every input of the four tiles has landed
+    void Promise.all([exactP, attnP, llP]).then(() => this.ensureDailySnapshot()).catch(() => {});
   }
 
   /** B-in-the-background: after first paint + index, load touchpoints + attended coach appointments
@@ -1011,7 +1018,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       // is not, because the lever filters re-derive their own scope from it.
       if (!this.liteInScope(lite)) continue;
       if (goingQuiet) gq++;
-      if (this.isNeedsAttentionLite(lite)) na++;
+      if (this.isNeedsAttentionLite(lite) && !this.isAddressedLite(lite)) na++;
     }
     this.fullBaseGoingQuiet = gq;
     this.fullBaseNeedsAttention.set(na);
@@ -1022,7 +1029,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
    *  dependent joins scoped to that coach's participants, and render. */
   private async loadFullPortfolio(): Promise<void> {
     await this.ensureFullIndex();
-    void this.loadExactOpenTickets();   // background; rows re-render when the exact counts land
+    const exactP = this.loadExactOpenTickets();   // background; rows re-render when the exact counts land
     this.setProgress(55, 'Loaded base…');
     this.unassignedCount = this.countUnassignedInRoster();
 
@@ -1031,6 +1038,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
     this.computeRows();
     this.setProgress(100, 'Ready');
+    void exactP.then(() => this.ensureDailySnapshot()).catch(() => {});   // daily trend snapshot
   }
 
   /** Distinct profileids in the selected coach's base — from the METADATA roster (coachedby lives
@@ -1134,7 +1142,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       // until then keep the earlier fallback rather than flash 0.
       if (this.contactDataLoaded()) this.summary.goingQuiet = filteredIdx.reduce((n, l) => n + (this.isGoingQuietBucketLite(l) ? 1 : 0), 0);
       // base-wide needs-attention / flagged / shown-count / health — all scoped to the filtered set
-      this.fullBaseNeedsAttention.set(filteredIdx.reduce((n, l) => n + (this.isNeedsAttentionLite(l) ? 1 : 0), 0));
+      this.fullBaseNeedsAttention.set(filteredIdx.reduce((n, l) => n + (this.isNeedsAttentionLite(l) && !this.isAddressedLite(l) ? 1 : 0), 0));
       this.pagedFilteredCount.set(filteredIdx.length);
       const h = { happy: 0, neutral: 0, unhappy: 0, atRisk: 0, critical: 0, notAssessed: 0, total: 0 };
       for (const l of filteredIdx) {
@@ -1156,6 +1164,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     } else {
       this.summary.total = this.loadedRowCount;
     }
+    this.refreshTrend();
   }
 
   private chunk30<T>(arr: T[]): T[][] {
@@ -2770,15 +2779,16 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   // ---- "Mark addressed": a coach-set acknowledgement that drops a participant out of Needs
   //      Attention until a NEW issue appears (stored as an 'addressed' healthtracker_activity event). ----
   /** The Needs-Attention issue keys currently active on a row. */
-  private activeIssues(r: PortfolioRow): string[] {
+  private activeIssues(r: { lapsed: boolean; notStarted: boolean; openTickets: number; llCritical?: boolean; llAttention?: boolean }): string[] {
     // Keys MUST match the isNeedsAttention() predicate (doc item 4) so the Mark-addressed snapshot
     // re-surfaces a participant when a NEW needs-attention issue appears. Going-quiet & renewals are
-    // no longer needs-attention issues (own tiles), so they are not tracked here.
+    // no longer needs-attention issues (own tiles), so they are not tracked here. Payments locked /
+    // defaulted left Needs attention 2026-11-11 (own tiles: hero finance chips + Participants tiles).
+    // Takes the shared fields so the lite index (paged views) uses the SAME keys (isAddressedLite).
     const out: string[] = [];
     if (r.lapsed) out.push('lapsed');
     if (r.notStarted) out.push('notStarted');
     if (r.openTickets > 0) out.push('tickets');
-    if (['locked', 'defaulted'].includes((r.financialstatus ?? '').toLowerCase())) out.push('financial');
     if (r.llCritical) out.push('llCritical');
     if (r.llAttention) out.push('llAttention');
     return out;
@@ -2786,7 +2796,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   /** Needs-attention — the ONE actionable-now predicate (doc item 4), the single source of truth that
    *  every count / lever / hero / coach-card site delegates to. Renewals and going-quiet are
    *  deliberately NOT folded in (they keep their own tiles/levers) so the count stays honest;
-   *  financial locked / defaulted are in. Love-letter critical / needs-attention join in doc item 5. */
+   *  financial locked / defaulted were REMOVED 2026-11-11 (they keep their own tiles). Love-letter
+   *  critical / needs-attention join in doc item 5. */
   /** "Going Quiet" BUCKET membership — quiet AND not already a Needs-Attention case, so a participant
    *  shows in exactly ONE of the two buckets (Needs Attention wins; per Joshua — no duplicates). Every
    *  Going-Quiet count / lever / list uses this; the raw `goingQuiet` flag stays for the scoreboard
@@ -2805,22 +2816,17 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     if (r.lapsed) out.push('Lapsed');
     if (r.notStarted) out.push('Journey not started');
     if (r.openTickets > 0) out.push(`${r.openTickets} open ticket${r.openTickets > 1 ? 's' : ''}`);
-    const fin = (r.financialstatus ?? '').toLowerCase();
-    if (fin === 'locked') out.push('Payments locked');
-    else if (fin === 'defaulted') out.push('Payments defaulted');
     if (r.llCritical) out.push('Critical');
     if (r.llAttention) out.push('Needs Attention');
     return out;
   }
   private isNeedsAttention(r: PortfolioRow): boolean {
     return r.lapsed || r.notStarted || r.openTickets > 0
-      || ['locked', 'defaulted'].includes((r.financialstatus ?? '').toLowerCase())
       || !!r.llCritical || !!r.llAttention;
   }
   /** Base-wide (lite index) twin of isNeedsAttention — same rule over a LiteIndexRow. */
   private isNeedsAttentionLite(l: LiteIndexRow): boolean {
     return l.lapsed || l.notStarted || l.openTickets > 0
-      || ['locked', 'defaulted'].includes((l.financialstatus ?? '').toLowerCase())
       || !!l.llCritical || !!l.llAttention;
   }
   /** Does this row have at least one live Needs-Attention issue, i.e. is there anything to address?
@@ -2833,9 +2839,16 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   /** True when the coach marked this participant addressed AND no NEW issue type has appeared since
    *  (current issues are a subset of the snapshot). A new issue re-surfaces them into Needs Attention. */
   isAddressed(r: PortfolioRow): boolean {
-    const rec = this.addressedByProfile()[r.profileid];
+    return this.addressedCovers(r.profileid, this.activeIssues(r));
+  }
+  /** Lite-index twin of isAddressed: the paged (ALL / UNASSIGNED) Needs-attention COUNT and matched
+   *  set exclude addressed participants exactly like the list does (they used to ignore it). */
+  private isAddressedLite(l: LiteIndexRow): boolean {
+    return this.addressedCovers(l.profileid, this.activeIssues(l));
+  }
+  private addressedCovers(profileid: string, cur: string[]): boolean {
+    const rec = this.addressedByProfile()[profileid];
     if (!rec || !rec.issues.length) return false;
-    const cur = this.activeIssues(r);
     if (!cur.length) return false;                       // nothing active -> not in Needs Attention anyway
     return cur.every(i => rec.issues.includes(i));
   }
@@ -2875,6 +2888,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     const map = this.addressedByProfile();
     const prev = map[row.profileid] ?? null;
     this.addressedByProfile.set({ ...map, [row.profileid]: { issues, date: new Date() } });
+    this.recomputeSummary();   // paged Needs-attention count excludes addressed too (count == list)
     this.applyFilters();
     try {
       await this.logActivity(row.profileid, 'addressed', { issues });
@@ -2883,6 +2897,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       const rb = { ...this.addressedByProfile() };
       if (prev) rb[row.profileid] = prev; else delete rb[row.profileid];
       this.addressedByProfile.set(rb);
+      this.recomputeSummary();
       this.applyFilters();
       this.guard.openSnackBar('Could not update: ' + (e?.message ?? 'permission denied'), 'Close', 5000);
     }
@@ -2988,6 +3003,121 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     return local;
   });
   get needsAttentionCount(): number { return this._needsAttentionCount(); }
+
+  // ---- Daily trend + new since yesterday (item 6) ----
+  //  First dashboard load per day per scope (coach profileid or ALL) writes one deterministic
+  //  setDoc snapshot of the four tile counts + the Needs-attention / Going-quiet id lists, taken
+  //  under the DEFAULT summary filter (Active, all journeys) so the numbers equal the tiles. The last
+  //  14 are read back by id (documentId() in, no index). Trend UI shows only when yesterday's snapshot
+  //  exists, the data for the scope is ready, and the summary filter is the default (no fake numbers).
+  private snaps = signal<{ scope: string; list: DailySnap[] } | null>(null);
+  trend = signal<{ k: Record<TrendKey, { delta: number; spark: string | null }>; naNew: Set<string>; gqNew: Set<string> } | null>(null);
+  private trendDataScope: string | null = null;
+  private snapToken = 0;
+  private isoDay(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+  private dayOffset(n: number): Date { const t = new Date(); return new Date(t.getFullYear(), t.getMonth(), t.getDate() + n); }
+  /** Snapshot scope: a coach's profileid, or ALL. Unassigned has no snapshot. */
+  private snapScope(): string | null {
+    if (!this.selectedCoachId || this.selectedCoachId === this.UNASSIGNED) return null;
+    return this.selectedCoachId === this.ALL ? 'ALL' : this.selectedCoachId;
+  }
+  private trendFilterDefault(): boolean { return this.sumLifecycle() === 'active' && this.sumJourneys().size === 0; }
+  /** The tile id sets under the CURRENT summary filter — the same sets the tiles count and open. */
+  private currentTrendIds(): { na: string[]; gq: string[] } {
+    if (this.pagedMode) {
+      const idx = this.fullIndex.filter(l => this.liteInScope(l) && this.matchesSummaryJourneyLite(l) && this.matchesSummaryLifecycleLite(l));
+      return {
+        na: idx.filter(l => this.isNeedsAttentionLite(l) && !this.isAddressedLite(l)).map(l => l.profileid),
+        gq: idx.filter(l => this.isGoingQuietBucketLite(l)).map(l => l.profileid),
+      };
+    }
+    return { na: this.needsAttentionRows().map(r => r.profileid), gq: this.goingQuietRows().map(r => r.profileid) };
+  }
+  private liveTrendCounts(ids: { na: string[]; gq: string[] }): Record<TrendKey, number> {
+    return { needsAttention: ids.na.length, goingQuiet: ids.gq.length, paymentsLocked: this.summary.paymentsLocked, defaulted: this.summary.defaulted };
+  }
+  /** Called once the scope's data is complete (full: after exact tickets; paged: after contact data,
+   *  A&H tags and exact tickets). Reads the last 14 snapshots and writes today's if it is missing. */
+  private async ensureDailySnapshot(): Promise<void> {
+    const scope = this.snapScope(); if (!scope) return;
+    if (this.pagedMode && !(this.fullIndexBuilt && this.contactDataLoaded())) return;
+    this.trendDataScope = scope;
+    const token = ++this.snapToken;
+    const today = this.isoDay(new Date());
+    const ids = Array.from({ length: 14 }, (_, i) => `snap_${scope}_${this.isoDay(this.dayOffset(-i))}`);
+    try {
+      const snap = await getDocs(query(collection(this.firestore, 'healthtracker_activity'), where(documentId(), 'in', ids)));
+      const list: DailySnap[] = [];
+      const arr = (v: any): string[] => Array.isArray(v) ? v.filter((x: any) => typeof x === 'string') : [];
+      snap.forEach(d => {
+        const x: any = d.data();
+        if (x['type'] !== 'daily_snapshot' || x['scope'] !== scope || typeof x['date'] !== 'string') return;
+        const c = x['counts'] ?? {};
+        list.push({ date: x['date'], needsAttentionIds: arr(x['needsAttentionIds']), goingQuietIds: arr(x['goingQuietIds']),
+          counts: { needsAttention: Number(c['needsAttention']) || 0, goingQuiet: Number(c['goingQuiet']) || 0,
+                    paymentsLocked: Number(c['paymentsLocked']) || 0, defaulted: Number(c['defaulted']) || 0 } });
+      });
+      if (token !== this.snapToken || scope !== this.snapScope()) return;
+      if (!list.some(x => x.date === today) && this.trendFilterDefault()) {
+        const cur = this.currentTrendIds();
+        const counts = this.liveTrendCounts(cur);
+        await setDoc(doc(this.firestore, 'healthtracker_activity', `snap_${scope}_${today}`), {
+          type: 'daily_snapshot', scope, date: today, counts,
+          needsAttentionIds: cur.na, goingQuietIds: cur.gq, timestamp: serverTimestamp(),
+        });
+        list.push({ date: today, counts, needsAttentionIds: cur.na, goingQuietIds: cur.gq });
+      }
+      if (token !== this.snapToken) return;
+      list.sort((a, b) => a.date.localeCompare(b.date));
+      this.snaps.set({ scope, list });
+      this.refreshTrend();
+    } catch (e) {
+      console.warn('daily snapshot failed (non-fatal)', e);
+    }
+  }
+  /** Recompute deltas / sparklines / new-since-yesterday from the live tile sets (called after every
+   *  summary recompute). Nothing shows until yesterday's snapshot exists for this scope. */
+  private refreshTrend(): void {
+    const s = this.snaps(); const scope = this.snapScope();
+    const yIso = this.isoDay(this.dayOffset(-1));
+    const yday = s && s.scope === scope ? s.list.find(x => x.date === yIso) : undefined;
+    if (!s || !yday || this.trendDataScope !== scope || !this.trendFilterDefault()) {
+      if (this.trend()) this.trend.set(null);
+      return;
+    }
+    const cur = this.currentTrendIds();
+    const live = this.liveTrendCounts(cur);
+    const keys: TrendKey[] = ['needsAttention', 'goingQuiet', 'paymentsLocked', 'defaulted'];
+    const k = {} as Record<TrendKey, { delta: number; spark: string | null }>;
+    for (const key of keys) {
+      const pts: { i: number; v: number }[] = [];
+      for (let i = 13; i >= 1; i--) {
+        const sn = s.list.find(x => x.date === this.isoDay(this.dayOffset(-i)));
+        if (sn) pts.push({ i: 13 - i, v: sn.counts[key] });
+      }
+      pts.push({ i: 13, v: live[key] });   // today = the live tile value
+      k[key] = { delta: live[key] - yday.counts[key], spark: pts.length >= 2 ? this.sparkPoints(pts) : null };
+    }
+    const yNa = new Set(yday.needsAttentionIds), yGq = new Set(yday.goingQuietIds);
+    this.trend.set({ k, naNew: new Set(cur.na.filter(id => !yNa.has(id))), gqNew: new Set(cur.gq.filter(id => !yGq.has(id))) });
+  }
+  /** SVG polyline points for a 52x14 sparkline (x = day slot of the 14-day window). */
+  private sparkPoints(pts: { i: number; v: number }[]): string {
+    const vs = pts.map(p => p.v);
+    const min = Math.min(...vs), span = (Math.max(...vs) - min) || 1;
+    return pts.map(p => `${p.i * 4},${(13 - ((p.v - min) / span) * 12).toFixed(1)}`).join(' ');
+  }
+  trendFor(k: TrendKey): { delta: number; spark: string | null } | null { return this.trend()?.k[k] ?? null; }
+  newCount(kind: 'na' | 'gq'): number { const t = this.trend(); return t ? (kind === 'na' ? t.naNew.size : t.gqNew.size) : 0; }
+  /** Highlight a row in the opened Needs-attention / Going-quiet list when it is new since yesterday. */
+  isNewRow(r: PortfolioRow): boolean {
+    const t = this.trend(); if (!t) return false;
+    if (this.activeLever === 'needsAttention') return t.naNew.has(r.profileid);
+    if (this.activeLever === 'goingQuiet' || this.goingQuietOnly) return t.gqNew.has(r.profileid);
+    return false;
+  }
 
   /** Real participant rows behind a given Summary card (from the loaded base). */
   goingQuietRows = computed<PortfolioRow[]>(() =>
@@ -3713,6 +3843,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     // active summary filter. (Initial load sets selectedCoachId via loadPortfolio, not here.)
     if (id === this.selectedCoachId) return;
     this.selectedCoachId = id;
+    this.trendDataScope = null;   // hide the trend until the new scope's data is complete
+    this.trend.set(null);
     this.activeLever = 'all';
     this.assignTargetCoachId = '';
     // scope changed → reset the summary filter to its default (Active, no journey).
@@ -4019,6 +4151,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       if ((r.financialstatus ?? '').toLowerCase() === 'late') s.missed++;
     }
     this.summary = s;
+    this.refreshTrend();
   }
 
   applyFilters(): void {
@@ -4157,7 +4290,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       if (this.activeLever === 'goingQuiet' && !this.isGoingQuietBucketLite(lite)) return false;
       if (this.goingQuietOnly && !this.isGoingQuietBucketLite(lite)) return false;
       if (this.activeLever === 'needsAttention'
-        && !this.isNeedsAttentionLite(lite)) return false;
+        && (!this.isNeedsAttentionLite(lite) || this.isAddressedLite(lite))) return false;
     }
     return true;
   }

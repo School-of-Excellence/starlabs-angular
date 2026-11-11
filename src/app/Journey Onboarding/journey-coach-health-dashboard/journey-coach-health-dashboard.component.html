@@ -124,7 +124,9 @@
           <div class="ios2-head">
             <span class="ios2-app ap-red"><mat-icon>priority_high</mat-icon></span>
             <span class="ios2-title">Needs attention</span>
+            <span class="jchd-new" *ngIf="newCount('na') > 0" data-testid="jchd-new-na" matTooltip="New since yesterday">+{{ newCount('na') }} new</span>
             <span class="ios2-big">{{ needsAttentionCount }}</span>
+            <ng-container *ngTemplateOutlet="trendTpl; context: { k: 'needsAttention' }"></ng-container>
           </div>
           <div class="ios2-people" *ngIf="needsAttentionRows().length; else naEmpty">
             <span class="ios2-person" *ngFor="let r of needsAttentionRows() | slice:0:3">
@@ -140,9 +142,11 @@
           <span class="ios2-fin-label">Finance</span>
           <button type="button" class="ios2-fin-chip fin-defaulted" (click)="goToDefaulted()" matTooltip="Participants with defaulted payments" data-testid="jchd-hero-defaulted">
             <mat-icon>credit_card_off</mat-icon><span class="ios2-fin-n">{{ summary.defaulted }}</span><span class="ios2-fin-l">Defaulted</span>
+            <ng-container *ngTemplateOutlet="trendTpl; context: { k: 'defaulted' }"></ng-container>
           </button>
           <button type="button" class="ios2-fin-chip fin-locked" (click)="goToPaymentsLocked()" matTooltip="Participants with locked payments" data-testid="jchd-hero-locked">
             <mat-icon>lock</mat-icon><span class="ios2-fin-n">{{ summary.paymentsLocked }}</span><span class="ios2-fin-l">Payments locked</span>
+            <ng-container *ngTemplateOutlet="trendTpl; context: { k: 'paymentsLocked' }"></ng-container>
           </button>
         </div>
         </div>
@@ -187,9 +191,13 @@
       <!-- Row 2: KPI tiles. Unassigned was removed (operator directive, 2026-08-26) — the
            coach selector still offers the Unassigned scope, with its own live count. -->
       <div class="ios2-tiles">
-        <button type="button" class="ios2-tile" (click)="goToParticipantsWithLever('goingQuiet')">
+        <button type="button" class="ios2-tile" (click)="goToParticipantsWithLever('goingQuiet')" data-testid="jchd-sum-quiet">
           <span class="ios2-app ap-orange"><mat-icon>notifications_paused</mat-icon></span>
           <span class="ios2-n">{{ summary.goingQuiet }}</span><span class="ios2-l">Going quiet</span>
+          <span class="jchd-trend-row">
+            <span class="jchd-new" *ngIf="newCount('gq') > 0" data-testid="jchd-new-gq" matTooltip="New since yesterday">+{{ newCount('gq') }} new</span>
+            <ng-container *ngTemplateOutlet="trendTpl; context: { k: 'goingQuiet' }"></ng-container>
+          </span>
         </button>
         <!-- Defaulted & Payments locked relocated into the Needs-attention hero finance breakdown. -->
         <button type="button" class="ios2-tile" (click)="goToMissed()">
@@ -515,35 +523,51 @@
 
     <!-- Compact iOS summary strip — tap a card to apply the matching lever filter. -->
     <section class="ios-mini-summary" *ngIf="selectedCoachId !== UNASSIGNED">
-      <button type="button" class="ios-mini-card" [class.is-on]="activeLever==='needsAttention'"
+      <button type="button" class="ios-mini-card" data-testid="jchd-mc-needs" [class.is-on]="activeLever==='needsAttention'"
         (click)="setLever(activeLever==='needsAttention' ? 'all' : 'needsAttention')"
-        matTooltip="Going quiet · lapsed · not started · renewing · open tickets">
+        matTooltip="Lapsed · journey not started · open tickets · A&H critical / needs attention. Marked-addressed participants are excluded.">
         <span class="mc-label"><span class="mc-dot dot-red"></span>Needs Attention</span>
         <span class="mc-num">{{ needsAttentionCount }}</span>
+        <span class="mc-trend">
+          <span class="jchd-new" *ngIf="newCount('na') > 0" data-testid="jchd-mc-new-na">+{{ newCount('na') }} new</span>
+          <ng-container *ngTemplateOutlet="trendTpl; context: { k: 'needsAttention' }"></ng-container>
+        </span>
       </button>
-      <button type="button" class="ios-mini-card" [class.is-on]="kpiActive('goingQuiet')" (click)="kpi('goingQuiet')"
+      <button type="button" class="ios-mini-card" data-testid="jchd-mc-quiet" [class.is-on]="kpiActive('goingQuiet')" (click)="kpi('goingQuiet')"
         matTooltip="No coach contact in {{ QUIET_DAYS }}+ days (touchpoints + appointments, base-wide)">
         <span class="mc-label"><span class="mc-dot dot-orange"></span>Going quiet<span class="mc-scope" *ngIf="pagedMode && !contactDataLoaded()"
           matTooltip="Loading activity data — count finalizes in a moment."> loading…</span></span>
         <span class="mc-num">{{ summary.goingQuiet }}</span>
+        <span class="mc-trend">
+          <span class="jchd-new" *ngIf="newCount('gq') > 0" data-testid="jchd-mc-new-gq">+{{ newCount('gq') }} new</span>
+          <ng-container *ngTemplateOutlet="trendTpl; context: { k: 'goingQuiet' }"></ng-container>
+        </span>
       </button>
-      <button type="button" class="ios-mini-card" [class.is-on]="financeFilters.includes('locked')"
+      <button type="button" class="ios-mini-card" data-testid="jchd-mc-locked" [class.is-on]="financeFilters.includes('locked')"
         (click)="financeFilters.includes('locked') ? clearFilters() : goToPaymentsLocked()"
         matTooltip="Participants with locked payments">
         <span class="mc-label"><span class="mc-dot dot-red"></span>Payments locked</span>
         <span class="mc-num">{{ summary.paymentsLocked }}</span>
+        <span class="mc-trend"><ng-container *ngTemplateOutlet="trendTpl; context: { k: 'paymentsLocked' }"></ng-container></span>
       </button>
-      <button type="button" class="ios-mini-card" [class.is-on]="kpiActive('renewalsSoon')" (click)="kpi('renewalsSoon')"
+      <button type="button" class="ios-mini-card" data-testid="jchd-mc-defaulted" [class.is-on]="financeFilters.includes('defaulted')"
+        (click)="financeFilters.includes('defaulted') ? clearFilters() : goToDefaulted()"
+        matTooltip="Participants with defaulted payments">
+        <span class="mc-label"><span class="mc-dot dot-purple"></span>Payment defaulted</span>
+        <span class="mc-num">{{ summary.defaulted }}</span>
+        <span class="mc-trend"><ng-container *ngTemplateOutlet="trendTpl; context: { k: 'defaulted' }"></ng-container></span>
+      </button>
+      <button type="button" class="ios-mini-card" data-testid="jchd-mc-renewing" [class.is-on]="kpiActive('renewalsSoon')" (click)="kpi('renewalsSoon')"
         matTooltip="Active subscription ending within the next 90 days">
         <span class="mc-label"><span class="mc-dot dot-blue"></span>Renewing 90d</span>
         <span class="mc-num">{{ summary.renewalsSoon }}</span>
       </button>
-      <button type="button" class="ios-mini-card" [class.is-on]="kpiActive('tickets')" (click)="kpi('tickets')"
+      <button type="button" class="ios-mini-card" data-testid="jchd-mc-tickets" [class.is-on]="kpiActive('tickets')" (click)="kpi('tickets')"
               matTooltip="Participants with at least one OPEN support ticket (not a ticket total)">
         <span class="mc-label"><span class="mc-dot dot-teal"></span>People with tickets</span>
         <span class="mc-num">{{ summary.withOpenTickets }}</span>
       </button>
-      <button type="button" class="ios-mini-card" [class.is-on]="kpiActive('flagged')" (click)="kpi('flagged')"
+      <button type="button" class="ios-mini-card" data-testid="jchd-mc-flagged" [class.is-on]="kpiActive('flagged')" (click)="kpi('flagged')"
         matTooltip="Flagged participants (visible to all coaches)">
         <span class="mc-label"><span class="mc-dot dot-pink"></span>Flagged</span>
         <span class="mc-num">{{ flaggedCount() }}</span>
@@ -739,6 +763,7 @@
               <app-profile-picture [profileId]="r.profileid" [name]="r.name" [size]="32"></app-profile-picture>
               <span class="cp-id-wrap">
                 <span class="cp-name">{{ r.name }}
+                  <span class="jchd-new jchd-new-row" *ngIf="isNewRow(r)" data-testid="jchd-row-new" matTooltip="New since yesterday">New</span>
                   <span class="flag-icon" *ngIf="r.flagged" matTooltip="Flagged">
                     <mat-icon>flag</mat-icon>
                   </span>
@@ -871,6 +896,7 @@
             [class.no-tap]="selectedCoachId === UNASSIGNED"
             (click)="selectedCoachId !== UNASSIGNED && openSlideover(row)"
             [class.jchd-row-focused]="i === focusedRowIndex"
+            [class.jchd-row-new]="isNewRow(row)"
             [attr.aria-current]="i === focusedRowIndex ? 'true' : null"></tr>
       </table>
 
@@ -1367,3 +1393,14 @@
     </div>
   </section>
 </div>
+
+<!-- Daily trend (item 6): delta vs yesterday + 14-day sparkline; renders nothing until yesterday's snapshot exists -->
+<ng-template #trendTpl let-k="k">
+  <span class="jchd-trend" *ngIf="trendFor(k) as t" data-testid="jchd-trend">
+    <span class="jchd-delta" [class.up]="t.delta > 0" [class.down]="t.delta < 0" data-testid="jchd-trend-delta"
+          matTooltip="Change vs yesterday">{{ t.delta > 0 ? '+' + t.delta : t.delta }}</span>
+    <svg class="jchd-spark" *ngIf="t.spark" viewBox="0 0 52 14" preserveAspectRatio="none" aria-hidden="true" data-testid="jchd-trend-spark">
+      <polyline [attr.points]="t.spark"></polyline>
+    </svg>
+  </span>
+</ng-template>

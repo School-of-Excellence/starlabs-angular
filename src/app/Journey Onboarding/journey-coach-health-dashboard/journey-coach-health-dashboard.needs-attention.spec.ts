@@ -48,9 +48,9 @@ for (const [name, predicate] of cases) {
       expect(predicate({ ...clean, openTickets: 2 })).toBeTruthy();
     });
 
-    it('flags locked / defaulted finance case-insensitively, but not other statuses', () => {
-      expect(predicate({ ...clean, financialstatus: 'Locked' })).toBeTruthy();
-      expect(predicate({ ...clean, financialstatus: 'DEFAULTED' })).toBeTruthy();
+    it('does NOT flag any finance status (locked / defaulted left Needs attention 2026-11-11; own tiles)', () => {
+      expect(predicate({ ...clean, financialstatus: 'Locked' })).toBeFalsy();
+      expect(predicate({ ...clean, financialstatus: 'DEFAULTED' })).toBeFalsy();
       // 'late' (the Missed tile's field value) is intentionally NOT a Needs-attention trigger.
       expect(predicate({ ...clean, financialstatus: 'late' })).toBeFalsy();
       expect(predicate({ ...clean, financialstatus: 'active' })).toBeFalsy();

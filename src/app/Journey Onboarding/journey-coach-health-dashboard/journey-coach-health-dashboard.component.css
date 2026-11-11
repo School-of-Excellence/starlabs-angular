@@ -3240,3 +3240,19 @@ td.mat-mdc-cell span {
 .jcs-fu { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--hairline); }
 .jcs-tag-fu { background: rgba(255,149,0,0.14); color: var(--sem-orange-fg); }
 .jcp-when.is-overdue { color: var(--sem-red); font-weight: var(--fw-semibold); }
+
+/* Daily trend + new since yesterday (item 6) */
+.jchd-trend { display: inline-flex; align-items: center; gap: 5px; vertical-align: middle; }
+.jchd-delta { font-size: var(--fs-100); font-weight: var(--fw-bold); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.jchd-delta.up { color: var(--sem-red); }
+.jchd-delta.down { color: var(--sem-green-fg); }
+.jchd-spark { width: 52px; height: 14px; overflow: visible; }
+.jchd-spark polyline { fill: none; stroke: var(--ink-3); stroke-width: 1.4; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.jchd-new { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: var(--fs-100); font-weight: var(--fw-semibold);
+  color: var(--sem-red); background: rgba(255,59,48,0.12); white-space: nowrap; }
+.jchd-new-row { margin-left: 4px; }
+.ios2-tile .jchd-trend-row { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+.ios-mini-summary .ios-mini-card .mc-trend { display: flex; align-items: center; gap: 6px; min-height: 0; }
+.ios-mini-summary .ios-mini-card .mc-trend:empty { display: none; }
+.ios-mini-summary .ios-mini-card .mc-dot.dot-purple { background: var(--sem-purple); }
+.jchd-table .jchd-data-row.jchd-row-new td.mat-mdc-cell { background: rgba(255,59,48,0.05); }

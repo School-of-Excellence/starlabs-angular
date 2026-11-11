@@ -32,8 +32,8 @@ for (const [id, trigger, re] of [
   ['NR7', 'llCritical',    /r\.llCritical/],
   ['NR8', 'llAttention',   /r\.llAttention/],
 ]) check(id, `trigger "${trigger}" fires the predicate AND yields a reason`, () => re.test(na) && re.test(nr));
-check('NR9', 'both finance states (locked, defaulted) are labelled',
-  () => /'locked'/.test(nr) && /'defaulted'/.test(nr) && /\['locked', 'defaulted'\]/.test(na));
+check('NR9', 'finance (locked / defaulted) is NOT a needs-attention trigger nor a reason (removed 2026-11-11, own tiles)',
+  () => !/locked|defaulted|financialstatus/.test(na) && !/locked|defaulted|financialstatus/.test(nr));
 check('NR10', 'going-quiet and renewals are deliberately NOT reasons (they keep their own tiles)',
   () => !/goingQuiet|renewal/i.test(nr));
 
@@ -43,8 +43,6 @@ const reasons = (r) => {
   if (r.lapsed) out.push('Lapsed');
   if (r.notStarted) out.push('Journey not started');
   if (r.openTickets > 0) out.push(`${r.openTickets} open ticket${r.openTickets > 1 ? 's' : ''}`);
-  const fin = (r.financialstatus ?? '').toLowerCase();
-  if (fin === 'locked') out.push('Payments locked'); else if (fin === 'defaulted') out.push('Payments defaulted');
   if (r.llCritical) out.push('Critical');
   if (r.llAttention) out.push('Needs Attention');
   return out;
@@ -53,9 +51,9 @@ check('NR11', 'a clean row yields no reasons',
   () => reasons({ openTickets: 0 }).length === 0);
 check('NR12', 'ticket count is pluralised',
   () => reasons({ openTickets: 1 })[0] === '1 open ticket' && reasons({ openTickets: 3 })[0] === '3 open tickets');
-check('NR13', 'locked and defaulted are mutually exclusive labels',
-  () => reasons({ openTickets: 0, financialstatus: 'LOCKED' }).join() === 'Payments locked'
-     && reasons({ openTickets: 0, financialstatus: 'defaulted' }).join() === 'Payments defaulted');
+check('NR13', 'a locked / defaulted row alone yields no reason (finance has its own tiles)',
+  () => reasons({ openTickets: 0, financialstatus: 'LOCKED' }).length === 0
+     && reasons({ openTickets: 0, financialstatus: 'defaulted' }).length === 0);
 
 check('NR14', 'the summary row shows reasons, falling back to r.reason',
   () => /\(r\.naReasons && r\.naReasons\.length\) \? r\.naReasons\.join\(' · '\) : r\.reason/.test(html));

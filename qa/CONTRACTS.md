@@ -35,3 +35,4 @@ One line per live contract (gate section 1.1).
 | jc-overall-next30 | /journey-coach-health (Overall Summary · Scheduled) | qa/checks/jc-overall-next30.mjs | 2026-11-11 PASS (9/9; 7 FAIL on revert) |
 | jc-overall-plan-grid | /journey-coach-health (Overall Summary · Planned journey) | qa/checks/jc-overall-plan-grid.mjs | 2026-11-11 PASS (12/12; 12 FAIL on revert) |
 | jc-health-followups | /journey-coach-health (Planning: row chip, slide-over, Schedule card) | qa/checks/jc-health-followups.mjs | 2026-11-11 PASS (13/13; 12 FAIL on revert) |
+| jc-health-na-finance-trend | /journey-coach-health (Planning: NA rule, Participants tiles, daily trend) | qa/checks/jc-health-na-finance-trend.mjs | 2026-11-11 PASS (18/18; 17 FAIL on revert) |
