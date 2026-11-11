@@ -364,13 +364,17 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
   // ── 3. Scheduled & completed (Journey Coaching and Onboarding kept separate) ──
   /** Booked sessions for one schedule, same predicates as the Planning Schedule card (schedCounts). */
-  private ovPending(onboarding: boolean, bucket: 'today' | 'week'): JcDoneEvent[] {
+  private ovPending(onboarding: boolean, bucket: 'today' | 'week' | 'month'): JcDoneEvent[] {
     const now = Date.now();
     const endToday = this.endOfDay(new Date()).getTime();
     const week7 = endToday + 7 * 86400000;
+    // Next 30 days = days 1-30 after today (includes the next 7; today excluded, like 'week').
+    const month30 = endToday + 30 * 86400000;
     const inScope = new Set(this.rosterIds());
     return this.jcPendingEvents().filter(e => (e.onboarding === true) === onboarding && inScope.has(e.profileid)
-      && e.ms >= now && (bucket === 'today' ? e.ms <= endToday : (e.ms > endToday && e.ms <= week7)));
+      && e.ms >= now && (bucket === 'today' ? e.ms <= endToday
+        : bucket === 'week' ? (e.ms > endToday && e.ms <= week7)
+        : (e.ms > endToday && e.ms <= month30)));
   }
   /** Attended sessions in the Overall date range (JC = jcDoneEvents, Onboarding = obDoneEvents). */
   private ovDone(onboarding: boolean): JcDoneEvent[] {
@@ -381,14 +385,16 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     return (onboarding ? this.obDoneEvents() : this.jcDoneEvents())
       .filter(e => inScope.has(e.profileid) && e.ms >= from && e.ms <= to);
   }
-  ovSched(): { jcToday: number; jcWeek: number; jcDone: number; obToday: number; obWeek: number; obDone: number; ready: boolean } {
+  ovSched(): { jcToday: number; jcWeek: number; jcMonth: number; jcDone: number; obToday: number; obWeek: number; obMonth: number; obDone: number; ready: boolean } {
     return {
-      jcToday: this.ovPending(false, 'today').length, jcWeek: this.ovPending(false, 'week').length, jcDone: this.ovDone(false).length,
-      obToday: this.ovPending(true, 'today').length, obWeek: this.ovPending(true, 'week').length, obDone: this.ovDone(true).length,
+      jcToday: this.ovPending(false, 'today').length, jcWeek: this.ovPending(false, 'week').length,
+      jcMonth: this.ovPending(false, 'month').length, jcDone: this.ovDone(false).length,
+      obToday: this.ovPending(true, 'today').length, obWeek: this.ovPending(true, 'week').length,
+      obMonth: this.ovPending(true, 'month').length, obDone: this.ovDone(true).length,
       ready: this.contactDataLoaded(),
     };
   }
-  ovSchedDrill(onboarding: boolean, what: 'today' | 'week' | 'done', title: string): void {
+  ovSchedDrill(onboarding: boolean, what: 'today' | 'week' | 'month' | 'done', title: string): void {
     const ev = what === 'done' ? this.ovDone(onboarding) : this.ovPending(onboarding, what);
     this.openOvDrill(title, ev.map(e => ({ profileid: e.profileid, name: this.nameOf(e.profileid), created: e.ms })),
       what === 'done' ? 'desc' : 'asc');

@@ -1214,21 +1214,23 @@
         </div>
         <div class="ov-srow" *ngIf="ovSched() as k">
           <span><span class="jcs-tag jcs-tag-jc">Journey Coaching</span></span>
-          <div class="ov-tiles ov-t3">
+          <div class="ov-tiles ov-t4">
             <button type="button" class="jcp-tile" (click)="ovSchedDrill(false, 'today', 'Journey Coaching · scheduled today')" data-testid="ov-jc-today"><span class="jcp-num">{{ k.jcToday }}</span><span class="jcp-label">Scheduled today</span></button>
             <button type="button" class="jcp-tile" (click)="ovSchedDrill(false, 'week', 'Journey Coaching · next 7 days')" data-testid="ov-jc-week"><span class="jcp-num">{{ k.jcWeek }}</span><span class="jcp-label">Next 7 days</span></button>
+            <button type="button" class="jcp-tile" (click)="ovSchedDrill(false, 'month', 'Journey Coaching · next 30 days')" data-testid="ov-jc-month"><span class="jcp-num">{{ k.jcMonth }}</span><span class="jcp-label">Next 30 days</span></button>
             <button type="button" class="jcp-tile ov-good" (click)="ovSchedDrill(false, 'done', 'Journey Coaching · completed')" data-testid="ov-jc-done"><span class="jcp-num">{{ k.jcDone }}</span><span class="jcp-label">Completed · in range</span></button>
           </div>
         </div>
         <div class="ov-srow" *ngIf="ovSched() as k">
           <span><span class="jcs-tag jcs-tag-ob">Onboarding</span></span>
-          <div class="ov-tiles ov-t3">
+          <div class="ov-tiles ov-t4">
             <button type="button" class="jcp-tile" (click)="ovSchedDrill(true, 'today', 'Onboarding · scheduled today')" data-testid="ov-obs-today"><span class="jcp-num">{{ k.obToday }}</span><span class="jcp-label">Scheduled today</span></button>
             <button type="button" class="jcp-tile" (click)="ovSchedDrill(true, 'week', 'Onboarding · next 7 days')" data-testid="ov-obs-week"><span class="jcp-num">{{ k.obWeek }}</span><span class="jcp-label">Next 7 days</span></button>
+            <button type="button" class="jcp-tile" (click)="ovSchedDrill(true, 'month', 'Onboarding · next 30 days')" data-testid="ov-obs-month"><span class="jcp-num">{{ k.obMonth }}</span><span class="jcp-label">Next 30 days</span></button>
             <button type="button" class="jcp-tile ov-good" (click)="ovSchedDrill(true, 'done', 'Onboarding · completed')" data-testid="ov-obs-done"><span class="jcp-num">{{ k.obDone }}</span><span class="jcp-label">Completed · in range</span></button>
           </div>
         </div>
-        <p class="ov-foot">Today and Next 7 days match Journey Planning's Schedule card. Completed = attended sessions in the date range.</p>
+        <p class="ov-foot">Today and Next 7 days match Journey Planning's Schedule card. Next 30 days = booked sessions in the 30 days after today (includes the next 7). Completed = attended sessions in the date range.</p>
       </section>
 
       <!-- 4. Ready for SE (Scope Enhancement) — data comes from the Ev. Preparation tab -->

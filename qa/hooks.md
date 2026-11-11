@@ -90,9 +90,11 @@ Literal `data-testid` strings only — no `${interpolation}` (gate section 1.1 /
 | ov-schedule | Scheduled & completed card | jc-overall-summary |
 | ov-jc-today | JC scheduled today | jc-overall-summary |
 | ov-jc-week | JC next 7 days | jc-overall-summary |
+| ov-jc-month | JC next 30 days | jc-overall-next30 |
 | ov-jc-done | JC completed in range | jc-overall-summary |
 | ov-obs-today | Onboarding scheduled today | jc-overall-summary |
 | ov-obs-week | Onboarding next 7 days | jc-overall-summary |
+| ov-obs-month | Onboarding next 30 days | jc-overall-next30 |
 | ov-obs-done | Onboarding completed in range | jc-overall-summary |
 | ov-se | Ready for SE card | jc-overall-summary |
 | ov-se-pending | Ready for SE pending note | jc-overall-summary |
