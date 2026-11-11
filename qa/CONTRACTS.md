@@ -32,4 +32,8 @@ One line per live contract (gate section 1.1).
 | jc-overall-summary | /journey-coach-health (Overall Summary tab) | qa/checks/jc-overall-summary.mjs | 2026-11-11 PASS (19/19; 17 FAIL on revert; live Apr 2026 All: sales 14 = drill 14, JC done 22, OB done 6, onboarding 7/0/7/0 == Onboarding tab, A&H 5 == Planning) |
 | jc-evprep-board | /journey-coach-health (Ev. Preparation tab, New board live) | qa/checks/jc-evprep-board.mjs | 2026-11-11 PASS (23/23; 13 FAIL on revert) |
 | jc-health-finance-collapse | /journey-coach-health | qa/checks/jc-health-finance-collapse.mjs | 2026-11-09 PASS (patched 10/10; 8 FAIL on revert; live light+dark + drill) |
+| jc-overall-next30 | /journey-coach-health (Overall Summary · Scheduled) | qa/checks/jc-overall-next30.mjs | 2026-11-11 PASS (9/9; 7 FAIL on revert) |
+| jc-overall-plan-grid | /journey-coach-health (Overall Summary · Planned journey) | qa/checks/jc-overall-plan-grid.mjs | 2026-11-11 PASS (12/12; 12 FAIL on revert) |
+| jc-health-followups | /journey-coach-health (Planning: row chip, slide-over, Schedule card) | qa/checks/jc-health-followups.mjs | 2026-11-11 PASS (13/13; 12 FAIL on revert) |
+| jc-health-na-finance-trend | /journey-coach-health (Planning: NA rule, Participants tiles, daily trend) | qa/checks/jc-health-na-finance-trend.mjs | 2026-11-11 PASS (18/18; 17 FAIL on revert) |
 | jc-onboarding-pending-tiles | /journey-coach-health (Onboarding tab) | qa/checks/jc-onboarding-pending-tiles.mjs | 2026-11-11 PASS (10/10; revert: 9 FAIL + pipeline PL2/PL14 + board KB1 FAIL; live Apr 2026: chip 16 == table 16 == footer 16, columns 5/1/2/0 == tables) |

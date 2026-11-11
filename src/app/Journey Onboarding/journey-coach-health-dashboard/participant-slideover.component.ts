@@ -65,6 +65,9 @@ export interface SlideoverActivityItem {
   toCoachName?: string | null;   // coach_change
 }
 
+/** One open scheduled follow-up shown in the slide-over's Upcoming section (item 5). */
+export interface SlideoverFollowUp { id: string; dueDate: Date | null; note: string; actorName: string; overdue: boolean; }
+
 /** Payload the inline Log composer hands back to the dashboard via onLog(type, payload). Only the
  *  fields for the chosen `type` are populated; the dashboard maps these to the right write. */
 export interface SlideoverLogPayload {
@@ -93,6 +96,9 @@ export interface SlideoverData {
   addressed: boolean;
   needsAttention: boolean;
   onMarkAddressed: (next: boolean) => void;
+  // open scheduled follow-ups (read live, so a new Schedule log or Mark done shows at once) + Mark done.
+  followUps?: () => SlideoverFollowUp[];
+  onFollowUpDone?: (scheduleId: string) => Promise<void> | void;
   // resolved dashboard theme (the slide-over + its composer render in CDK overlays outside .jchd-wrap,
   // so they can't inherit the dashboard's [data-theme]; used to add the dark overlay panelClass).
   isDark?: boolean;
@@ -249,6 +255,18 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
               <ng-template #noUpcoming><p class="so-empty">No upcoming events.</p></ng-template>
             </div>
           </ng-container>
+          <!-- Follow-ups (item 5): scheduled via New log > Schedule; Mark done closes one -->
+          <p class="so-group-label">Follow-ups</p>
+          <ul class="so-list" data-testid="so-fu-list" *ngIf="followUpList().length; else noFollowUps">
+            <li *ngFor="let f of followUpList()" class="so-list-row" data-testid="so-fu-item">
+              <span class="so-list-main">{{ f.note || 'Follow-up' }}</span>
+              <span class="so-list-side">
+                <span class="so-pill" [ngClass]="f.overdue ? 'so-pill-cancel' : 'so-pill-neutral'">{{ f.dueDate ? ('Due ' + (f.dueDate | date:'d MMM')) : 'No date' }}</span>
+                <button type="button" class="so-fu-done" data-testid="so-fu-done" [disabled]="fuBusy.has(f.id)" (click)="markFollowUpDone(f.id)">Mark done</button>
+              </span>
+            </li>
+          </ul>
+          <ng-template #noFollowUps><p class="so-empty" data-testid="so-fu-empty">No open follow-ups.</p></ng-template>
         </section>
 
         <!-- Appointments -->
@@ -807,6 +825,9 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
     .so-pill-neutral { color: rgba(60,60,67,.6); background: rgba(120,120,128,.12); border: none; }
     .so-pill-amber { color: #c25e00; background: rgba(255,149,0,.14); border: none; }
     .so-pill-cancel { color: #d70015; background: rgba(255,59,48,.12); border: none; }
+    .so-fu-done { font: inherit; font-size: 11.5px; font-weight: 600; padding: 2px 9px; border-radius: 8px; border: none; cursor: pointer;
+      color: var(--so-accent); background: rgba(0,122,255,.10); }
+    .so-fu-done:disabled { opacity: .5; cursor: default; }
 
     /* ticket category soft chip */
     .so-cat {
@@ -1502,6 +1523,15 @@ export class ParticipantSlideoverComponent implements OnInit {
     this.resetComposer();
   }
 
+  /** Open follow-ups, read live from the dashboard (empty when the host passes none). */
+  followUpList(): SlideoverFollowUp[] { return this.data.followUps?.() ?? []; }
+  fuBusy = new Set<string>();
+  async markFollowUpDone(id: string): Promise<void> {
+    if (!this.data.onFollowUpDone || this.fuBusy.has(id)) return;
+    this.fuBusy.add(id);
+    try { await this.data.onFollowUpDone(id); } finally { this.fuBusy.delete(id); }
+  }
+
   private resetComposer(): void {
     this.composerType = 'call';
     this.composerNote = '';
@@ -1556,6 +1586,7 @@ export class ParticipantSlideoverComponent implements OnInit {
       case 'call': return 'is-call';
       case 'health': return 'is-health';
       case 'schedule': return 'is-schedule';
+      case 'schedule_done': return 'is-schedule';
       case 'note': return 'is-note';
       case 'flag': return 'is-flag';
       case 'coach_change': return 'is-coach';
@@ -1569,6 +1600,7 @@ export class ParticipantSlideoverComponent implements OnInit {
       case 'call': return a.outcome ? `Call · ${this.titleCase(a.outcome)}` : 'Call';
       case 'health': return `Health · ${coachHealthLabel(a.state ?? null)}`;
       case 'schedule': return a.dueDate ? `Schedule · due ${this.shortDate(a.dueDate)}` : 'Schedule';
+      case 'schedule_done': return 'Follow-up done';
       case 'note': return 'Note';
       case 'flag': return a.flagged ? 'Flagged' : 'Flag removed';
       case 'coach_change': {

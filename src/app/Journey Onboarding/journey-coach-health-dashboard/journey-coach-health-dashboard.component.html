@@ -124,7 +124,9 @@
           <div class="ios2-head">
             <span class="ios2-app ap-red"><mat-icon>priority_high</mat-icon></span>
             <span class="ios2-title">Needs attention</span>
+            <span class="jchd-new" *ngIf="newCount('na') > 0" data-testid="jchd-new-na" matTooltip="New since yesterday">+{{ newCount('na') }} new</span>
             <span class="ios2-big">{{ needsAttentionCount }}</span>
+            <ng-container *ngTemplateOutlet="trendTpl; context: { k: 'needsAttention' }"></ng-container>
           </div>
           <div class="ios2-people" *ngIf="needsAttentionRows().length; else naEmpty">
             <span class="ios2-person" *ngFor="let r of needsAttentionRows() | slice:0:3">
@@ -140,9 +142,11 @@
           <span class="ios2-fin-label">Finance</span>
           <button type="button" class="ios2-fin-chip fin-defaulted" (click)="goToDefaulted()" matTooltip="Participants with defaulted payments" data-testid="jchd-hero-defaulted">
             <mat-icon>credit_card_off</mat-icon><span class="ios2-fin-n">{{ summary.defaulted }}</span><span class="ios2-fin-l">Defaulted</span>
+            <ng-container *ngTemplateOutlet="trendTpl; context: { k: 'defaulted' }"></ng-container>
           </button>
           <button type="button" class="ios2-fin-chip fin-locked" (click)="goToPaymentsLocked()" matTooltip="Participants with locked payments" data-testid="jchd-hero-locked">
             <mat-icon>lock</mat-icon><span class="ios2-fin-n">{{ summary.paymentsLocked }}</span><span class="ios2-fin-l">Payments locked</span>
+            <ng-container *ngTemplateOutlet="trendTpl; context: { k: 'paymentsLocked' }"></ng-container>
           </button>
         </div>
         </div>
@@ -187,9 +191,13 @@
       <!-- Row 2: KPI tiles. Unassigned was removed (operator directive, 2026-08-26) — the
            coach selector still offers the Unassigned scope, with its own live count. -->
       <div class="ios2-tiles">
-        <button type="button" class="ios2-tile" (click)="goToParticipantsWithLever('goingQuiet')">
+        <button type="button" class="ios2-tile" (click)="goToParticipantsWithLever('goingQuiet')" data-testid="jchd-sum-quiet">
           <span class="ios2-app ap-orange"><mat-icon>notifications_paused</mat-icon></span>
           <span class="ios2-n">{{ summary.goingQuiet }}</span><span class="ios2-l">Going quiet</span>
+          <span class="jchd-trend-row">
+            <span class="jchd-new" *ngIf="newCount('gq') > 0" data-testid="jchd-new-gq" matTooltip="New since yesterday">+{{ newCount('gq') }} new</span>
+            <ng-container *ngTemplateOutlet="trendTpl; context: { k: 'goingQuiet' }"></ng-container>
+          </span>
         </button>
         <!-- Defaulted & Payments locked relocated into the Needs-attention hero finance breakdown. -->
         <button type="button" class="ios2-tile" (click)="goToMissed()">
@@ -261,6 +269,23 @@
             <ng-template #noObSched><p class="ios2-empty" *ngIf="obSchedCounts().ready">Nothing scheduled.</p></ng-template>
           </div>
 
+        </div>
+        <!-- Follow-ups (item 5): coach-scheduled follow-ups from the slide-over's New log > Schedule -->
+        <div class="jcs-fu" data-testid="sched-fu" *ngIf="fuCounts() as fc">
+          <div class="jcs-colhead"><span class="jcs-tag jcs-tag-fu">Follow-ups</span></div>
+          <div class="jcp-row">
+            <button type="button" class="jcp-tile" data-testid="sched-fu-today" [class.is-on]="fuBucket()==='today'" (click)="setFuBucket('today')" matTooltip="Filter to due today"><span class="jcp-num">{{ fc.today }}</span><span class="jcp-label">Today</span></button>
+            <button type="button" class="jcp-tile" data-testid="sched-fu-week" [class.is-on]="fuBucket()==='week'" (click)="setFuBucket('week')" matTooltip="Filter to the next 7 days"><span class="jcp-num">{{ fc.week }}</span><span class="jcp-label">Next 7 days</span></button>
+            <button type="button" class="jcp-tile jcp-overdue" data-testid="sched-fu-overdue" [class.is-on]="fuBucket()==='overdue'" (click)="setFuBucket('overdue')" matTooltip="Filter to overdue"><span class="jcp-num">{{ fc.overdue }}</span><span class="jcp-label">Overdue</span></button>
+          </div>
+          <div class="jcp-list" data-testid="sched-fu-list" *ngIf="fuList().length; else noFu">
+            <div class="jcp-item" data-testid="sched-fu-item" *ngFor="let f of fuList()" (click)="openJcParticipant(f.profileid)" matTooltip="Open participant">
+              <span class="ios-avatar av-xs" [ngClass]="avatarClass(f.profileid)">{{ initials(f.participant) }}</span>
+              <span class="jcp-who"><span class="jcp-p">{{ f.participant }}</span><span class="jcp-c" *ngIf="f.note">{{ f.note }}</span></span>
+              <span class="jcp-when" [class.is-overdue]="f.overdue">{{ f.dueMs | date:'EEE d MMM' }}</span>
+            </div>
+          </div>
+          <ng-template #noFu><p class="ios2-empty">No follow-ups due.</p></ng-template>
         </div>
       </section>
 
@@ -498,35 +523,51 @@
 
     <!-- Compact iOS summary strip — tap a card to apply the matching lever filter. -->
     <section class="ios-mini-summary" *ngIf="selectedCoachId !== UNASSIGNED">
-      <button type="button" class="ios-mini-card" [class.is-on]="activeLever==='needsAttention'"
-        (click)="setLever(activeLever==='needsAttention' ? 'all' : 'needsAttention')"
-        matTooltip="Going quiet · lapsed · not started · renewing · open tickets">
+      <button type="button" class="ios-mini-card" data-testid="jchd-mc-needs" [class.is-on]="activeLever==='needsAttention'"
+        (click)="activeLever==='needsAttention' ? setLever('all') : goToParticipantsWithLever('needsAttention')"
+        matTooltip="Lapsed · journey not started · open tickets · A&H critical / needs attention. Marked-addressed participants are excluded.">
         <span class="mc-label"><span class="mc-dot dot-red"></span>Needs Attention</span>
         <span class="mc-num">{{ needsAttentionCount }}</span>
+        <span class="mc-trend">
+          <span class="jchd-new" *ngIf="newCount('na') > 0" data-testid="jchd-mc-new-na">+{{ newCount('na') }} new</span>
+          <ng-container *ngTemplateOutlet="trendTpl; context: { k: 'needsAttention' }"></ng-container>
+        </span>
       </button>
-      <button type="button" class="ios-mini-card" [class.is-on]="kpiActive('goingQuiet')" (click)="kpi('goingQuiet')"
+      <button type="button" class="ios-mini-card" data-testid="jchd-mc-quiet" [class.is-on]="kpiActive('goingQuiet')" (click)="kpi('goingQuiet')"
         matTooltip="No coach contact in {{ QUIET_DAYS }}+ days (touchpoints + appointments, base-wide)">
         <span class="mc-label"><span class="mc-dot dot-orange"></span>Going quiet<span class="mc-scope" *ngIf="pagedMode && !contactDataLoaded()"
           matTooltip="Loading activity data — count finalizes in a moment."> loading…</span></span>
         <span class="mc-num">{{ summary.goingQuiet }}</span>
+        <span class="mc-trend">
+          <span class="jchd-new" *ngIf="newCount('gq') > 0" data-testid="jchd-mc-new-gq">+{{ newCount('gq') }} new</span>
+          <ng-container *ngTemplateOutlet="trendTpl; context: { k: 'goingQuiet' }"></ng-container>
+        </span>
       </button>
-      <button type="button" class="ios-mini-card" [class.is-on]="financeFilters.includes('locked')"
+      <button type="button" class="ios-mini-card" data-testid="jchd-mc-locked" [class.is-on]="financeFilters.includes('locked')"
         (click)="financeFilters.includes('locked') ? clearFilters() : goToPaymentsLocked()"
         matTooltip="Participants with locked payments">
         <span class="mc-label"><span class="mc-dot dot-red"></span>Payments locked</span>
         <span class="mc-num">{{ summary.paymentsLocked }}</span>
+        <span class="mc-trend"><ng-container *ngTemplateOutlet="trendTpl; context: { k: 'paymentsLocked' }"></ng-container></span>
       </button>
-      <button type="button" class="ios-mini-card" [class.is-on]="kpiActive('renewalsSoon')" (click)="kpi('renewalsSoon')"
+      <button type="button" class="ios-mini-card" data-testid="jchd-mc-defaulted" [class.is-on]="financeFilters.includes('defaulted')"
+        (click)="financeFilters.includes('defaulted') ? clearFilters() : goToDefaulted()"
+        matTooltip="Participants with defaulted payments">
+        <span class="mc-label"><span class="mc-dot dot-purple"></span>Payment defaulted</span>
+        <span class="mc-num">{{ summary.defaulted }}</span>
+        <span class="mc-trend"><ng-container *ngTemplateOutlet="trendTpl; context: { k: 'defaulted' }"></ng-container></span>
+      </button>
+      <button type="button" class="ios-mini-card" data-testid="jchd-mc-renewing" [class.is-on]="kpiActive('renewalsSoon')" (click)="kpi('renewalsSoon')"
         matTooltip="Active subscription ending within the next 90 days">
         <span class="mc-label"><span class="mc-dot dot-blue"></span>Renewing 90d</span>
         <span class="mc-num">{{ summary.renewalsSoon }}</span>
       </button>
-      <button type="button" class="ios-mini-card" [class.is-on]="kpiActive('tickets')" (click)="kpi('tickets')"
+      <button type="button" class="ios-mini-card" data-testid="jchd-mc-tickets" [class.is-on]="kpiActive('tickets')" (click)="kpi('tickets')"
               matTooltip="Participants with at least one OPEN support ticket (not a ticket total)">
         <span class="mc-label"><span class="mc-dot dot-teal"></span>People with tickets</span>
         <span class="mc-num">{{ summary.withOpenTickets }}</span>
       </button>
-      <button type="button" class="ios-mini-card" [class.is-on]="kpiActive('flagged')" (click)="kpi('flagged')"
+      <button type="button" class="ios-mini-card" data-testid="jchd-mc-flagged" [class.is-on]="kpiActive('flagged')" (click)="kpi('flagged')"
         matTooltip="Flagged participants (visible to all coaches)">
         <span class="mc-label"><span class="mc-dot dot-pink"></span>Flagged</span>
         <span class="mc-num">{{ flaggedCount() }}</span>
@@ -722,12 +763,15 @@
               <app-profile-picture [profileId]="r.profileid" [name]="r.name" [size]="32"></app-profile-picture>
               <span class="cp-id-wrap">
                 <span class="cp-name">{{ r.name }}
+                  <span class="jchd-new jchd-new-row" *ngIf="isNewRow(r)" data-testid="jchd-row-new" matTooltip="New since yesterday">New</span>
                   <span class="flag-icon" *ngIf="r.flagged" matTooltip="Flagged">
                     <mat-icon>flag</mat-icon>
                   </span>
                 </span>
                 <span class="cp-email" *ngIf="r.email">{{ r.email }}</span>
                 <span class="cp-id">{{ r.number || '—' }}</span>
+                <span class="jchd-due" *ngIf="rowDue(r.profileid) as due" [class.is-overdue]="due.overdue" data-testid="jchd-row-due"
+                      [matTooltip]="due.overdue ? 'Follow-up overdue' : 'Scheduled follow-up'">Due {{ due.ms | date:'d MMM' }}</span>
               </span>
             </span>
           </td>
@@ -852,6 +896,7 @@
             [class.no-tap]="selectedCoachId === UNASSIGNED"
             (click)="selectedCoachId !== UNASSIGNED && openSlideover(row)"
             [class.jchd-row-focused]="i === focusedRowIndex"
+            [class.jchd-row-new]="isNewRow(row)"
             [attr.aria-current]="i === focusedRowIndex ? 'true' : null"></tr>
       </table>
 
@@ -1214,39 +1259,49 @@
         </div>
         <div class="ov-srow" *ngIf="ovSched() as k">
           <span><span class="jcs-tag jcs-tag-jc">Journey Coaching</span></span>
-          <div class="ov-tiles ov-t3">
+          <div class="ov-tiles ov-t4">
             <button type="button" class="jcp-tile" (click)="ovSchedDrill(false, 'today', 'Journey Coaching · scheduled today')" data-testid="ov-jc-today"><span class="jcp-num">{{ k.jcToday }}</span><span class="jcp-label">Scheduled today</span></button>
             <button type="button" class="jcp-tile" (click)="ovSchedDrill(false, 'week', 'Journey Coaching · next 7 days')" data-testid="ov-jc-week"><span class="jcp-num">{{ k.jcWeek }}</span><span class="jcp-label">Next 7 days</span></button>
+            <button type="button" class="jcp-tile" (click)="ovSchedDrill(false, 'month', 'Journey Coaching · next 30 days')" data-testid="ov-jc-month"><span class="jcp-num">{{ k.jcMonth }}</span><span class="jcp-label">Next 30 days</span></button>
             <button type="button" class="jcp-tile ov-good" (click)="ovSchedDrill(false, 'done', 'Journey Coaching · completed')" data-testid="ov-jc-done"><span class="jcp-num">{{ k.jcDone }}</span><span class="jcp-label">Completed · in range</span></button>
           </div>
         </div>
         <div class="ov-srow" *ngIf="ovSched() as k">
           <span><span class="jcs-tag jcs-tag-ob">Onboarding</span></span>
-          <div class="ov-tiles ov-t3">
+          <div class="ov-tiles ov-t4">
             <button type="button" class="jcp-tile" (click)="ovSchedDrill(true, 'today', 'Onboarding · scheduled today')" data-testid="ov-obs-today"><span class="jcp-num">{{ k.obToday }}</span><span class="jcp-label">Scheduled today</span></button>
             <button type="button" class="jcp-tile" (click)="ovSchedDrill(true, 'week', 'Onboarding · next 7 days')" data-testid="ov-obs-week"><span class="jcp-num">{{ k.obWeek }}</span><span class="jcp-label">Next 7 days</span></button>
+            <button type="button" class="jcp-tile" (click)="ovSchedDrill(true, 'month', 'Onboarding · next 30 days')" data-testid="ov-obs-month"><span class="jcp-num">{{ k.obMonth }}</span><span class="jcp-label">Next 30 days</span></button>
             <button type="button" class="jcp-tile ov-good" (click)="ovSchedDrill(true, 'done', 'Onboarding · completed')" data-testid="ov-obs-done"><span class="jcp-num">{{ k.obDone }}</span><span class="jcp-label">Completed · in range</span></button>
           </div>
         </div>
-        <p class="ov-foot">Today and Next 7 days match Journey Planning's Schedule card. Completed = attended sessions in the date range.</p>
+        <p class="ov-foot">Today and Next 7 days match Journey Planning's Schedule card. Next 30 days = booked sessions in the 30 days after today (includes the next 7). Completed = attended sessions in the date range.</p>
       </section>
 
-      <!-- 4. Ready for SE (Scope Enhancement) — data comes from the Ev. Preparation tab -->
-      <section class="ios2-card ov-card ov-s6" data-testid="ov-se">
+      <!-- 4. Planned journey · next 6 months (participantplanning, Viewing as = a specific coach) -->
+      <section class="ios2-card ov-card ov-s6" data-testid="ov-plan">
         <div class="ios2-head">
-          <span class="ios2-app ap-orange"><mat-icon>trending_up</mat-icon></span>
-          <span class="ios2-title">Ready for SE</span>
-          <span class="ov-scope">Scope Enhancement</span>
+          <span class="ios2-app ap-orange"><mat-icon>event_note</mat-icon></span>
+          <span class="ios2-title">Planned journey · next 6 months</span>
+          <span class="ov-scope ov-scope-coach">Viewing as</span>
         </div>
-        <div class="ov-pending" data-testid="ov-se-pending">Pending: this fills in once the Ev. Preparation tab records the month SE is planned for each participant.</div>
-        <div class="ah-table ov-ghost">
-          <table>
-            <thead><tr><th class="ah-flag">SE month</th><th>New</th><th>Existing</th></tr></thead>
-            <tbody>
-              <tr class="ah-total"><td class="ah-flag">Overall</td><td>–</td><td>–</td></tr>
-            </tbody>
-          </table>
-        </div>
+        <div class="ov-pending" *ngIf="!ovPlanCoachScoped()" data-testid="ov-plan-pick">Pick a coach to see plans.</div>
+        <ng-container *ngIf="ovPlanCoachScoped()">
+          <p class="ios2-empty" *ngIf="!ovPlan() || ovPlan()?.status === 'loading'">Loading…</p>
+          <p class="ios2-empty" *ngIf="ovPlan()?.status === 'error'" data-testid="ov-plan-error">Plans could not be loaded.</p>
+          <div class="ah-table" *ngIf="ovPlan()?.status === 'ready'" data-testid="ov-plan-grid">
+            <table>
+              <thead><tr><th class="ah-flag">Planned</th><th *ngFor="let m of ovPlanMonths()">{{ m.label }}</th></tr></thead>
+              <tbody>
+                <tr *ngFor="let r of ovPlan()?.rows ?? []" data-testid="ov-plan-row">
+                  <td class="ah-flag">{{ r.label }}</td>
+                  <td *ngFor="let c of r.cells; let i = index"><button type="button" class="ah-num" data-testid="ov-plan-cell" [disabled]="!c.length" (click)="ovPlanDrill(r, i)">{{ c.length }}</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </ng-container>
+        <p class="ov-foot">Participants of the viewed coach with each item in their journey plan for that month. Products show by name.</p>
       </section>
 
       <!-- 5. Participant health (Coach-set health, Active participants on Ecosystem products) -->
@@ -1338,3 +1393,14 @@
     </div>
   </section>
 </div>
+
+<!-- Daily trend (item 6): delta vs yesterday + 14-day sparkline; renders nothing until yesterday's snapshot exists -->
+<ng-template #trendTpl let-k="k">
+  <span class="jchd-trend" *ngIf="trendFor(k) as t" data-testid="jchd-trend">
+    <span class="jchd-delta" [class.up]="t.delta > 0" [class.down]="t.delta < 0" data-testid="jchd-trend-delta"
+          matTooltip="Change vs yesterday">{{ t.delta > 0 ? '+' + t.delta : t.delta }}</span>
+    <svg class="jchd-spark" *ngIf="t.spark" viewBox="0 0 52 14" preserveAspectRatio="none" aria-hidden="true" data-testid="jchd-trend-spark">
+      <polyline [attr.points]="t.spark"></polyline>
+    </svg>
+  </span>
+</ng-template>
