@@ -198,6 +198,15 @@ export class SegmentBoardComponent implements AfterViewInit, OnDestroy {
       const ws = wb.Sheets[wb.SheetNames[0]];
       return ws ? (XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' }) as unknown[][]).map(r => r.map(c => String(c ?? ''))) : [];
     },
+    writeTable: async (fileName, rows) => {
+      // Import & move template: one sheet, header row only (Name, Email); xlsx writes and downloads it
+      const XLSX = await import('xlsx');
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      ws['!cols'] = rows[0].map(() => ({ wch: 32 }));
+      XLSX.utils.book_append_sheet(wb, ws, 'Participants');
+      XLSX.writeFile(wb, fileName);
+    },
     loadCatalog: async () => {
       const [journeys, products, modes, events, queues] = await Promise.all([
         this.journeys(), getDocs(collection(this.firestore, 'products')),
@@ -257,8 +266,10 @@ export class SegmentBoardComponent implements AfterViewInit, OnDestroy {
         return { segmentid: data['segmentid'] ?? d.id, profilelist: data['profilelist'] ?? [], lastupdated: data['lastupdated']?.toDate?.() ?? null };
       });
     },
-    saveLists: async lists => {
-      // one batch per 450 lists (Firestore allows 500 writes per batch)
+    saveLists: async (lists, history = []) => {
+      // one batch per 450 lists (Firestore allows 500 writes per batch); history (Import & move) rides in the last batch,
+      // so the list change and its record land together
+      const pid = history.length ? await this.profileId() : '';
       for (let i = 0; i < lists.length; i += 450) {
         const batch = writeBatch(this.firestore);
         for (const l of lists.slice(i, i + 450)) {
@@ -266,6 +277,7 @@ export class SegmentBoardComponent implements AfterViewInit, OnDestroy {
             segmentname: l.segmentname, segmentid: l.segmentid, profilelist: l.profilelist, lastupdated: serverTimestamp(),
           });
         }
+        if (i + 450 >= lists.length) this.writeHistory(batch, history, pid);
         await batch.commit();
       }
     },
