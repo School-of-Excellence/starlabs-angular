@@ -1054,3 +1054,180 @@ textarea {
     padding: 10px 12px
   }
 }
+/* ---------- additions for the live data version ---------- */
+.banner.error {
+  background: var(--red-soft);
+  color: var(--red)
+}
+
+/* sticky header + hover for the live tables */
+.card.scroll table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 1
+}
+
+.card.scroll tbody tr:hover td {
+  background: var(--accent-soft)
+}
+
+/* long emails should not blow up the table */
+td {
+  word-break: break-word
+}
+
+/* ---------- funnel table + popup ---------- */
+.num {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-weight: 700;
+  padding: 2px 6px
+}
+
+.num:hover {
+  text-decoration: underline
+}
+
+.hidden-toggle td {
+  color: var(--muted);
+  font-weight: 600
+}
+
+.muted-row td {
+  color: var(--muted)
+}
+
+.scrim.center {
+  justify-content: center;
+  align-items: center
+}
+
+.modal {
+  background: var(--surface);
+  border-radius: 14px;
+  width: min(1040px, 94%);
+  max-height: 85vh;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column
+}
+
+.modal .panel-head {
+  align-items: center;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line)
+}
+
+.modal-body {
+  overflow: auto;
+  margin-top: 12px
+}
+
+.modal-body thead th {
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  z-index: 1
+}
+
+.stage-2 .box, .stage-3 .box { cursor: pointer; }
+
+.stage-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .35);
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center
+}
+
+.stage-modal {
+  background: var(--surface);
+  border-radius: 14px;
+  width: min(1040px, 94vw);
+  max-height: 85vh;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column
+}
+
+.stage-modal .panel-head {
+  align-items: center;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line)
+}
+
+.stage-modal-body {
+  overflow: auto;
+  margin-top: 12px
+}
+
+.stage-modal-body thead th {
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  z-index: 1
+}
+
+.pdot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  margin-right: 8px;
+}
+
+.mixcol {
+  min-width: 280px;
+}
+
+.legend {
+  display: flex;
+  gap: 10px;
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: none;
+  margin-top: 4px;
+  color: #6b7280;
+}
+
+.legend i {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  margin-right: 4px;
+}
+
+.mix {
+  display: flex;
+  gap: 3px;
+  width: 270px;
+  align-items: flex-end;
+}
+
+.segwrap {
+  flex-basis: 0;
+  min-width: 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+.segn {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.segbar {
+  height: 10px;
+  border-radius: 2px;
+}
+
+.avgcol {
+  font-size: 12px;
+  white-space: nowrap;
+}
