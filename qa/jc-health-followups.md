@@ -51,3 +51,4 @@ roster client-side. Open = schedule without a schedule_done for its id. Buckets 
 - Fail if reverted: yes (12 of 13 FAIL against the previous sources; FU13 is a completeness guard)
 - Last run: PASS 13/13
 - Live 2026-11-11 (localhost:4303, starlabs-test, test participant 'Test 104'): New log > Schedule (due +2d) -> without reload slide-over Follow-ups 1 row, row chip 'Due 13 Nov', Schedule card Next 7 days 0 -> 1; tiles == lists (Next 7 1/1, Overdue 1/1, Today 0/empty); Mark done -> slide-over 'No open follow-ups.', Next 7 days 0; persists after reload. Page responsive: 0 long tasks with the slide-over open, 482 frames / 4s. Left on starlabs-test: one schedule + one schedule_done activity for Test 104.
+- Not verified live: ALL / UNASSIGNED follow-up row chips after a save there (saved in a coach view only); light mode of the chip / slide-over list (checked in dark only).
