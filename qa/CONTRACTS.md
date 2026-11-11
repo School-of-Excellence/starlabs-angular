@@ -30,5 +30,6 @@ One line per live contract (gate section 1.1).
 
 | jc-onboarding-board | /journey-coach-health (Onboarding tab) | qa/checks/jc-onboarding-board.mjs | 2026-11-11 PASS (13/13; 13 FAIL on revert; live: columns == tiles, blocks + dialogs verified, no writes) |
 | jc-overall-summary | /journey-coach-health (Overall Summary tab) | qa/checks/jc-overall-summary.mjs | 2026-11-11 PASS (19/19; 17 FAIL on revert; live Apr 2026 All: sales 14 = drill 14, JC done 22, OB done 6, onboarding 7/0/7/0 == Onboarding tab, A&H 5 == Planning) |
-| jc-evprep-board | /journey-coach-health (Ev. Preparation tab) | qa/checks/jc-evprep-board.mjs | 2026-11-11 PASS (13/13; 13 FAIL on revert) |
+| jc-evprep-board | /journey-coach-health (Ev. Preparation tab, New board live) | qa/checks/jc-evprep-board.mjs | 2026-11-11 PASS (23/23; 13 FAIL on revert) |
 | jc-health-finance-collapse | /journey-coach-health | qa/checks/jc-health-finance-collapse.mjs | 2026-11-09 PASS (patched 10/10; 8 FAIL on revert; live light+dark + drill) |
+| jc-onboarding-pending-tiles | /journey-coach-health (Onboarding tab) | qa/checks/jc-onboarding-pending-tiles.mjs | 2026-11-11 PASS (10/10; revert: 9 FAIL + pipeline PL2/PL14 + board KB1 FAIL; live Apr 2026: chip 16 == table 16 == footer 16, columns 5/1/2/0 == tables) |

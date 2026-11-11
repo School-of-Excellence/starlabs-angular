@@ -519,8 +519,11 @@ export function loadingProgressPercent(loadingStates: Record<string, boolean>): 
  * sale with no status yet is treated as awaiting approval rather than as an unknown.
  * (component: getPendingCount)
  */
+export function isPending(row: any): boolean {
+  return [null, undefined, "", "pending"].includes(row?.['status']?.toLowerCase());
+}
 export function countPending(rows: any[]): number {
-  return rows.filter((e) => [null, undefined, "", "pending"].includes(e['status']?.toLowerCase())).length;
+  return rows.filter(isPending).length;
 }
 
 /** Assured means a payment plan exists. (component: getAssuredCount) */

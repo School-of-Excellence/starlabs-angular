@@ -5,7 +5,7 @@ App command: npx ng serve --configuration development --port 4300
 URL: http://localhost:4300/journey-coach-health (click tab "2 Onboarding")
 
 ## Requirement (operator, 2026-11-11)
-"When I say pipeline, I want to see and move cards." A card board (Sources-board style) under the 4 count tiles,
+"When I say pipeline, I want to see and move cards." A card board (Sources-board style) inside the pipeline card (the 4 count tiles were folded into its column headers 2026-11-11),
 one column per stage (Not Assured / Ready for Onboarding / Scheduled for Onboarding / Onboarded).
 Decisions: moves open the existing flow; forward only; keep tiles + table; card buttons Schedule/Re-schedule,
 Mark Onboarded, Journey Plan, Notes.

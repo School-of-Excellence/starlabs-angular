@@ -46,11 +46,12 @@ Literal `data-testid` strings only — no `${interpolation}` (gate section 1.1 /
 |---|---|---|
 | jcd-embed-gross-count | Gross Sales count (embed only) | jc-onboarding-count-only |
 | jcd-embed-assured-count | Assured Sales count (embed only) | jc-onboarding-count-only |
+| jcd-embed-gross-pending | Gross Sales "Pending approval N" chip (embed only) -> gross table, Status = Pending | jc-onboarding-pending-tiles |
 | jcd-pipe | Onboarding pipeline card (embed only) | jc-onboarding-pipeline |
-| jcd-pipe-notassured | Pipeline stage: Not Assured count | jc-onboarding-pipeline |
-| jcd-pipe-ready | Pipeline stage: Ready for Onboarding count | jc-onboarding-pipeline |
-| jcd-pipe-scheduled | Pipeline stage: Scheduled for Onboarding count | jc-onboarding-pipeline |
-| jcd-pipe-onboarded | Pipeline stage: Onboarded count | jc-onboarding-pipeline |
+| jcd-pipe-notassured | Pipeline stage: Not Assured count button on the board column header (opens its table) | jc-onboarding-pipeline, jc-onboarding-pending-tiles |
+| jcd-pipe-ready | Pipeline stage: Ready for Onboarding count button on the board column header (opens its table) | jc-onboarding-pipeline, jc-onboarding-pending-tiles |
+| jcd-pipe-scheduled | Pipeline stage: Scheduled for Onboarding count button on the board column header (opens its table) | jc-onboarding-pipeline, jc-onboarding-pending-tiles |
+| jcd-pipe-onboarded | Pipeline stage: Onboarded count button on the board column header (opens its table) | jc-onboarding-pipeline, jc-onboarding-pending-tiles |
 | jcd-pipe-journey | Pipeline Journey selector | jc-onboarding-pipeline |
 | jcd-pipe-journey-all | Journey selector: All | jc-onboarding-pipeline |
 | jcd-pipe-journey-opt | Journey selector: one journey | jc-onboarding-pipeline |
@@ -106,7 +107,7 @@ Literal `data-testid` strings only — no `${interpolation}` (gate section 1.1 /
 |---|---|---|
 | jx-evprep-board | Board component inside the Ev. Prep panel | jc-evprep-board |
 | evp-root | Board component root | jc-evprep-board |
-| evp-preview | Design-preview banner | jc-evprep-board |
+| evp-preview | Design-preview banner (Returning board only) | jc-evprep-board |
 | evp-board | One board (data-board = new / returning) | jc-evprep-board |
 | evp-board-total | Board total | jc-evprep-board |
 | evp-col | One column (data-stage = stage key) | jc-evprep-board |
@@ -120,3 +121,8 @@ Literal `data-testid` strings only — no `${interpolation}` (gate section 1.1 /
 | evp-move-note | Move note (required) | jc-evprep-board |
 | evp-move-save | Save note & move | jc-evprep-board |
 | evp-move-cancel | Cancel move | jc-evprep-board |
+| evp-card-variation | Variation chip on a live card | jc-evprep-board |
+| evp-move-variation | Variation picker when starting a prep | jc-evprep-board |
+| evp-move-error | Why a move is blocked / failed | jc-evprep-board |
+| evp-loading | Live board loading state | jc-evprep-board |
+| evp-error | Live board load error + Retry | jc-evprep-board |
