@@ -16,6 +16,8 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
 import {MatSlideToggleModule} from '@angular/material/slide-toggle';
+import { Clipboard } from '@angular/cdk/clipboard';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 
 @Component({
   selector: 'app-update-delivery',
@@ -105,7 +107,9 @@ export class UpdateDeliveryComponent {
     @Inject(MAT_DIALOG_DATA) public dialogdata:any,
     public dialogRef: MatDialogRef<any>,
     private formbuilder: FormBuilder,
-    private _snackBar: MatSnackBar
+    private _snackBar: MatSnackBar,
+    private clipboard: Clipboard,
+    private sanitizer: DomSanitizer
   ){
     // form initiation
       this.appointmentform = this.formbuilder.group ({
@@ -113,6 +117,7 @@ export class UpdateDeliveryComponent {
         duration: [, {validators: [Validators.required], updateOn:"change"}],
         ischangeworkrequired: [false, {validators: [], updateOn:"change"}],
         groupappointment: [false, {validators: [], updateOn:"change"}],
+        queueappointment: [false, {validators: [], updateOn:"change"}],  
         maxbooking: [1, {validators: [], updateOn:"change"}],
         docid: [, {}]
       })
@@ -160,9 +165,11 @@ export class UpdateDeliveryComponent {
           duration: dialogdata.duration,
           ischangeworkrequired: dialogdata.ischangeworkrequired ?? false,
           groupappointment: dialogdata.groupappointment ?? false,
+          queueappointment: dialogdata.queueappointment ?? false,   
           maxbooking: dialogdata.maxbooking ?? null,
           docid: dialogdata.docid
         })
+        this.onAppointmentCheckboxChange()   
       }
       else if(this.selectedType == "Form"){
         const formCollectionDoc = doc(collection(this.firestore,"delivery forms"),dialogdata.docid)
@@ -364,11 +371,12 @@ export class UpdateDeliveryComponent {
       this.loading = true
       var docid = value.docid ?? doc(collection(this.firestore,"appointmenttype")).id
       const docRef = doc(this.firestore,"appointmenttype",docid)
-      setDoc(docRef,{
+       setDoc(docRef,{
         appointmenttype: value.appointmentname,
         duration: value.duration,
         ischangeworkrequired: value.ischangeworkrequired,
         groupappointment: value.groupappointment,
+        queueappointment: value.queueappointment,
         maxbooking: value.groupappointment ? value.maxbooking : null,
         id: docid
       },{merge:true}).then(()=>{
@@ -413,6 +421,17 @@ export class UpdateDeliveryComponent {
         alert(err)
       })
     }
+  }
+
+  onAppointmentCheckboxChange(){
+    const group  = this.appointmentform.get('groupappointment')
+    const change = this.appointmentform.get('ischangeworkrequired')
+    const opts   = { emitEvent: false }
+
+    if(group.value && change.value){ change.setValue(false, opts) }
+
+    group.value  ? change.disable(opts) : change.enable(opts)
+    change.value ? group.disable(opts)  : group.enable(opts)
   }
 
   submitQueue(value){
@@ -645,6 +664,60 @@ export class UpdateDeliveryComponent {
         options.push(isUpper ? ch.toUpperCase() : ch)
       }
     }
+  }
+
+  // ── media URL tools (video/audio fields): copy the pasted link, or play it inline ──
+  // open players are tracked per field FormGroup so each field toggles on its own
+  private mediaOpen = new WeakSet<AbstractControl>()
+  // sanitized iframe URLs are cached by URL: a fresh SafeResourceUrl each change-detection
+  // pass would make the <iframe> reload continuously
+  private embedCache = new Map<string, SafeResourceUrl>()
+
+  mediaUrl(ctrl:AbstractControl):string {
+    const opts = ctrl?.get('options')?.value
+    return Array.isArray(opts) && opts.length ? String(opts[0]).trim() : ''
+  }
+
+  copyMediaUrl(ctrl:AbstractControl){
+    const url = this.mediaUrl(ctrl)
+    if(!url){ return }
+    this.openSnackBar(this.clipboard.copy(url) ? 'Link copied' : 'Could not copy the link', 1500)
+  }
+
+  isMediaOpen(ctrl:AbstractControl):boolean {
+    return this.mediaOpen.has(ctrl) && !!this.mediaUrl(ctrl)
+  }
+
+  toggleMedia(ctrl:AbstractControl){
+    this.mediaOpen.has(ctrl) ? this.mediaOpen.delete(ctrl) : this.mediaOpen.add(ctrl)
+  }
+
+  // YouTube (watch / youtu.be / shorts / embed) and Vimeo links → an embeddable URL; anything else → null (played as a file)
+  private toEmbedUrl(url:string):string | null {
+    let u:URL
+    try { u = new URL(url) } catch { return null }
+    const host = u.hostname.replace(/^www\.|^m\./, '')
+    let yt:string | null = null
+    if(host === 'youtu.be'){ yt = u.pathname.slice(1).split('/')[0] }
+    else if(host === 'youtube.com' || host === 'youtube-nocookie.com'){
+      if(u.pathname === '/watch'){ yt = u.searchParams.get('v') }
+      else { const m = u.pathname.match(/^\/(embed|shorts|live|v)\/([^/?#]+)/); yt = m ? m[2] : null }
+    }
+    if(yt){ return `https://www.youtube.com/embed/${encodeURIComponent(yt)}` }
+    if(host === 'vimeo.com' || host === 'player.vimeo.com'){
+      const id = u.pathname.split('/').filter(Boolean).find(p => /^\d+$/.test(p))
+      if(id){ return `https://player.vimeo.com/video/${id}` }
+    }
+    return null
+  }
+
+  mediaEmbed(ctrl:AbstractControl):SafeResourceUrl | null {
+    const embed = this.toEmbedUrl(this.mediaUrl(ctrl))
+    if(!embed){ return null }
+    if(!this.embedCache.has(embed)){
+      this.embedCache.set(embed, this.sanitizer.bypassSecurityTrustResourceUrl(embed))
+    }
+    return this.embedCache.get(embed)
   }
 
   remove(i:number,j:number,optioninput?:HTMLInputElement) {

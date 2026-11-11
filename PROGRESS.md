@@ -67,3 +67,24 @@
    `required`; neither can select the first option without moving away and back.
 9. Carried over: `atc-development` is not a deploy branch, so the appointment prefill is still
    unreleased.
+
+## Last session changes (2026-11-03) — journal `specs/journals/2026-11-03-participant-view-and-slider-contract.md`
+- **`participantview` on ATC model forms** — a "Participant can view" checkbox per form row; the participant
+  app shows a form only when it is true. Absent reads false (old models expose nothing); a row added in the
+  dialog starts true. Covered by hub `journey/atcmodel-forms.spec.ts` AMF-06.
+- **ATC model dialog** — the forms list became a labelled grid with a stacked fallback under 760px, and the
+  dialog went from a fixed 540px to 920px capped at 95vw. The checkbox had squeezed the form-name column to
+  one character per line.
+- **Flipping answers now render in both previews** (`form-overlay-view`, `form-template-preview`). They had
+  never been rendered at all — zero flipping code in either.
+- **Slider contract: a 0-based index into `options`**, both apps, both slider kinds. Web moved to
+  `[min]="0"` / `[max]="options.length - 1"` and now shows the option label instead of the number; the
+  hardcoded `[max]="10"` on the flipping slider is gone. `sliderPosition` clamps every read in both repos.
+  This fixed a `RangeError` that took the app down on the flipping slider and, more quietly, on the last
+  option of every plain slider.
+- **Time contract: `"HH:mm"`**, 24-hour, zero-padded, converted at each UI boundary (`time-value.ts`;
+  `FillForm.dart`). The web had been storing a Timestamp that the app could not read. No migration needed —
+  reads accept all four shapes.
+- **Failure mid-session**: the fill screens were switched to labels while the previews still showed raw
+  indices, so every slider read one apart between a form and its preview. Fixed. A reported app-side `+1`
+  turned out to be a stale build.

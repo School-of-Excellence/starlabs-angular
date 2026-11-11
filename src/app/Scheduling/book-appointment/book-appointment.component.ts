@@ -98,6 +98,9 @@ export class BookAppointmentComponent implements OnInit, OnChanges{
   rolePersons = {}
   filteredProfile = ""
   goback:boolean = false
+  // groupappointment variables
+  isGroupAppointment: boolean = false
+  mapAppointmentData = {}
 
   constructor(
     private firestore: Firestore,
@@ -141,7 +144,10 @@ export class BookAppointmentComponent implements OnInit, OnChanges{
   }
 
   ngOnInit(): void {
-    this.guard.getAppointmentMap().then(data => this.mapAppointments = data.map)
+    this.guard.getAppointmentMap().then(data => {
+      this.mapAppointments = data.map
+      this.mapAppointmentData = data.mapData 
+    })
     this.guard.getAppointmentRolesMap().then(data => this.mapRoles = data?.map ?? {})
     this.guard.getProductMap().then(data => this.mapProduct = data)
     this.guard.getProfileMap().then(data =>{
@@ -233,6 +239,7 @@ export class BookAppointmentComponent implements OnInit, OnChanges{
     // this.displaySlot = []
     this.selectedSlot = null
     this.selectedDate = null
+    this.isGroupAppointment = this.mapAppointmentData[this.selectedAppointment.id]?.["groupappointment"] == true
     this.matDialog.open(LoadingProgressComponent, {disableClose : true, data : {type : "spinner", msg : "Loading..."}})
     console.log(this.selectedAppointment)
     // Roles and their specialists: AppointmentBookingService.rolesFor (shared with the studio's calendar booking).
@@ -290,7 +297,8 @@ export class BookAppointmentComponent implements OnInit, OnChanges{
               if(localSlot != undefined && localSlot != null && localSlot.length != 0){
                 for (let a = 0; a < localSlot.length; a++){
                   var data = localSlot[a]
-                  if(data.booked == false && data.available == true){
+                  var isSlotOpen = (data.booked == false || this.isGroupAppointment) && data.available == true
+                  if(isSlotOpen){
                     slotsOfEIS.push({
                       slotstart: data.slotstart.toDate(),
                       slotend: data.slotend.toDate(),
@@ -338,6 +346,7 @@ export class BookAppointmentComponent implements OnInit, OnChanges{
 
   async confirmSlot(){
     var selectedSlot = this.userAvailableSlots[this.selectedSlot]
+    var mapBookingCount = {}
     console.log(selectedSlot)
     if(!selectedSlot){
       alert("Select a Slot to Book!")

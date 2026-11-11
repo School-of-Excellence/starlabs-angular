@@ -1,4 +1,4 @@
-import { anyToDate, saleWindow, purchasesInWindow, watsonPurchaseRows, buildSaleBuyers, formatRupees, sortSaleBuyers, saleExportRows } from './watson-purchases';
+import { anyToDate, saleWindow, purchasesInWindow, watsonPurchaseRows, buildSaleBuyers, formatRupees, sortSaleBuyers, saleExportRows, saleBuyersInRange, saleBuyersTotal } from './watson-purchases';
 import { createCsvContent } from './workshop-dashboard/workshop-dashboard.engine';
 
 /** Sale Achieved (workshop dashboard, live workshops) — window and matching, without Watson. */
@@ -107,6 +107,39 @@ describe('watson-purchases — Sale Achieved window and matching', () => {
   it('survives the CSV writer when a product name contains a comma', () => {
     const csv = createCsvContent(saleExportRows([buyer('Arvind', 1, '2026-01-01', [{ dateLabel: '1 Jan 2026', product: 'Scale, Grow', amount: 1 }])]));
     expect(csv.split('\n')[1]).toBe('Arvind,arvind@x.com,98400,1 Jan 2026,"Scale, Grow",1');
+  });
+  // ---- Sale Achieved panel: date range + total value (operator 2026-11-02) ----
+  const bought = (y: number, m: number, d: number, amount: number, hh = 0) => ({ date: new Date(y, m - 1, d, hh), product: 'P', amount });
+  const two = () => [
+    { name: 'Arvind', saleTotal: 3000, salePurchases: [bought(2026, 4, 1, 1000), bought(2026, 4, 20, 2000, 23)] },
+    { name: 'Bala', saleTotal: 500, salePurchases: [bought(2026, 3, 5, 500)] },
+  ];
+
+  it('keeps only purchases inside the range, whole days at both ends, and recomputes each total', () => {
+    const out: any[] = saleBuyersInRange(two(), '2026-04-01', '2026-04-20');
+    expect(out.map((b) => b.name)).withContext('Bala bought before the range -> dropped').toEqual(['Arvind']);
+    expect(out[0].salePurchases.length).withContext('1 Apr 00:00 and 20 Apr 23:00 both count').toBe(2);
+    const narrow: any[] = saleBuyersInRange(two(), '2026-04-02', '2026-04-30');
+    expect(narrow[0].salePurchases.length).withContext('1 Apr left out').toBe(1);
+    expect(narrow[0].saleTotal).toBe(2000);
+    expect(narrow[0].saleTotalLabel).toBe('₹2,000');
+    expect(narrow[0].saleLastDate).toBe(new Date(2026, 3, 20, 23).getTime());
+  });
+
+  it('treats a blank end as open, swaps a reversed pair, and leaves the list alone with no range', () => {
+    const list = two();
+    expect(saleBuyersInRange(list, '', '')).withContext('no range -> same list').toBe(list);
+    expect(saleBuyersInRange(two(), '2026-04-10', '').map((b: any) => b.saleTotal)).withContext('open To').toEqual([2000]);
+    expect(saleBuyersInRange(two(), '', '2026-03-31').map((b: any) => b.name)).withContext('open From').toEqual(['Bala']);
+    expect(saleBuyersInRange(two(), '2026-04-30', '2026-04-01').map((b: any) => b.saleTotal)).withContext('reversed').toEqual([3000]);
+    expect(saleBuyersInRange(two(), '2026-05-01', '2026-05-31')).withContext('nothing bought').toEqual([]);
+    expect(list[0].salePurchases.length).withContext('input not mutated').toBe(2);
+  });
+
+  it('totals the buyers listed', () => {
+    expect(saleBuyersTotal(two())).toBe(3500);
+    expect(saleBuyersTotal([])).toBe(0);
+    expect(formatRupees(saleBuyersTotal(saleBuyersInRange(two(), '2026-04-02', '')))).toBe('₹2,000');
   });
 });
 
