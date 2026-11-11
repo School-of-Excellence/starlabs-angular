@@ -428,6 +428,9 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   /** Next 6 months, current month first. */
   ovPlanMonths(): { ym: string; label: string; ms: number }[] {
     const now = new Date();
+    return this.memo('ovPlanMonths', [now.getFullYear(), now.getMonth()], () => this.buildOvPlanMonths(now));
+  }
+  private buildOvPlanMonths(now: Date): { ym: string; label: string; ms: number }[] {
     const out: { ym: string; label: string; ms: number }[] = [];
     for (let i = 0; i < 6; i++) {
       const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
@@ -589,6 +592,17 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.openAhDrill(coll, flag, resolvedOnly, title, this.ovAhScope());
   }
 
+  /** Template-bound lists must keep their identity between checks (a fresh array every check makes
+   *  *ngFor rebuild its rows each cycle, which re-triggers change detection). memo() returns the
+   *  cached value while every key entry is identical. */
+  private memoStore: Record<string, { k: any[]; v: any }> = {};
+  private memo<T>(slot: string, key: any[], fn: () => T): T {
+    const m = this.memoStore[slot];
+    if (m && m.k.length === key.length && m.k.every((x, i) => x === key[i])) return m.v as T;
+    const v = fn();
+    this.memoStore[slot] = { k: key, v };
+    return v;
+  }
   /** Overall drills reuse the native A&H drill overlay (no new dialog component). */
   private openOvDrill(title: string, entries: AhDrillEntry[], order: 'asc' | 'desc' = 'desc'): void {
     if (!entries.length) return;
@@ -1826,10 +1840,19 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   }
   /** Earliest open follow-up for a participant (row chip). Undated follow-ups get no chip. */
   rowDue(profileid: string): { ms: number; overdue: boolean } | null {
-    const f = (this.fuByProfile()[profileid] ?? []).find(x => x.dueMs != null);
-    if (!f || f.dueMs == null) return null;
-    return { ms: f.dueMs, overdue: f.dueMs < this.startOfDay(new Date()).getTime() };
+    return this.fuDueMap()[profileid] ?? null;
   }
+  /** Earliest dated open follow-up per participant, stable objects (one per fuByProfile change). */
+  private fuDueMap = computed(() => {
+    const today = this.startOfDay(new Date()).getTime();
+    const out: Record<string, { ms: number; overdue: boolean }> = {};
+    const by = this.fuByProfile();
+    for (const pid of Object.keys(by)) {
+      const f = by[pid].find(x => x.dueMs != null);
+      if (f && f.dueMs != null) out[pid] = { ms: f.dueMs, overdue: f.dueMs < today };
+    }
+    return out;
+  });
   /** Bucket of one dated follow-up relative to today. */
   private fuBucketOf(dueMs: number): 'overdue' | 'today' | 'week' | null {
     const today = this.startOfDay(new Date()).getTime();
@@ -1847,28 +1870,34 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     return out;
   }
   fuCounts(): { today: number; week: number; overdue: number } {
-    const c = { today: 0, week: 0, overdue: 0 };
-    for (const f of this.fuInScope()) { const b = this.fuBucketOf(f.dueMs!); if (b) c[b]++; }
-    return c;
+    return this.memo('fuCounts', this.fuKey(), () => {
+      const c = { today: 0, week: 0, overdue: 0 };
+      for (const f of this.fuInScope()) { const b = this.fuBucketOf(f.dueMs!); if (b) c[b]++; }
+      return c;
+    });
+  }
+  /** Inputs of the Follow-ups card: data, scope, roster, day. */
+  private fuKey(): any[] {
+    return [this.fuByProfile(), this.selectedCoachId, this.metaMap, this.allRows(), this.isoDay(new Date())];
   }
   fuBucket = signal<'all' | 'today' | 'week' | 'overdue'>('all');
   setFuBucket(b: 'today' | 'week' | 'overdue'): void { this.fuBucket.set(this.fuBucket() === b ? 'all' : b); }
   /** The Follow-ups list under the tiles: 'all' = overdue + today + next 7 days (the tiles' horizon). */
   fuList(): { profileid: string; participant: string; note: string; dueMs: number; overdue: boolean }[] {
     const sel = this.fuBucket();
-    return this.fuInScope()
+    return this.memo('fuList', [...this.fuKey(), sel], () => this.fuInScope()
       .map(f => ({ f, b: this.fuBucketOf(f.dueMs!) }))
       .filter(x => x.b != null && (sel === 'all' || x.b === sel))
       .sort((a, b) => a.f.dueMs! - b.f.dueMs!)
-      .map(({ f, b }) => ({ profileid: f.profileid, participant: this.nameOf(f.profileid), note: f.note, dueMs: f.dueMs!, overdue: b === 'overdue' }));
+      .map(({ f, b }) => ({ profileid: f.profileid, participant: this.nameOf(f.profileid), note: f.note, dueMs: f.dueMs!, overdue: b === 'overdue' })));
   }
   /** Slide-over list for one participant (live: read through a callback on every check). */
   private slideoverFollowUps(profileid: string): SlideoverFollowUp[] {
     const today = this.startOfDay(new Date()).getTime();
-    return (this.fuByProfile()[profileid] ?? []).map(f => ({
+    return this.memo('so-fu', [profileid, this.fuByProfile(), today], () => (this.fuByProfile()[profileid] ?? []).map(f => ({
       id: f.id, dueDate: f.dueMs != null ? new Date(f.dueMs) : null, note: f.note, actorName: f.actorName,
       overdue: f.dueMs != null && f.dueMs < today,
-    }));
+    })));
   }
   /** Mark done: additive {type:'schedule_done', scheduleId} event; the follow-up leaves every list. */
   async markFollowUpDone(profileid: string, scheduleId: string): Promise<void> {

@@ -47,7 +47,8 @@ check('FU5', 'loaded on first paint and on every Viewing change',
   () => /void this\.loadFollowUps\(\);/.test(method(src, 'onCoachChange')) && /await this\.loadPortfolio\(\);[\s\S]{0,200}void this\.loadFollowUps\(\);/.test(src));
 check('FU6', 'participants table: literal jchd-row-due chip, red when overdue',
   () => /<span class="jchd-due" \*ngIf="rowDue\(r\.profileid\) as due" \[class\.is-overdue\]="due\.overdue" data-testid="jchd-row-due"/.test(html)
-     && /overdue: f\.dueMs < this\.startOfDay\(new Date\(\)\)\.getTime\(\)/.test(method(src, 'rowDue')));
+     && /return this\.fuDueMap\(\)\[profileid\] \?\? null;/.test(method(src, 'rowDue'))
+     && /private fuDueMap = computed\(\(\) => \{[\s\S]*?overdue: f\.dueMs < today/.test(src));
 check('FU7', 'slide-over: Follow-ups list in the Events/Upcoming section, Mark done button, literal hooks',
   () => { const i = so.indexOf('No upcoming events.'); const seg = so.slice(i, i + 2000);
           return i > 0 && /<p class="so-group-label">Follow-ups<\/p>/.test(seg) && /data-testid="so-fu-list"/.test(seg)
@@ -72,11 +73,16 @@ check('FU11', 'Schedule card (Journey Planning): Follow-ups Today / Next 7 / Ove
      && /this\.fuBucket\.set\(this\.fuBucket\(\) === b \? 'all' : b\)/.test(method(src, 'setFuBucket')));
 check('FU12', 'tile == list: counts and list share fuInScope + fuBucketOf; Viewing scope = rosterIds',
   () => /for \(const f of this\.fuInScope\(\)\) \{ const b = this\.fuBucketOf\(f\.dueMs!\); if \(b\) c\[b\]\+\+; \}/.test(method(src, 'fuCounts'))
-     && /return this\.fuInScope\(\)\s*\.map\(f => \(\{ f, b: this\.fuBucketOf\(f\.dueMs!\) \}\)\)\s*\.filter\(x => x\.b != null && \(sel === 'all' \|\| x\.b === sel\)\)/.test(method(src, 'fuList'))
+     && /\(\) => this\.fuInScope\(\)\s*\.map\(f => \(\{ f, b: this\.fuBucketOf\(f\.dueMs!\) \}\)\)\s*\.filter\(x => x\.b != null && \(sel === 'all' \|\| x\.b === sel\)\)/.test(method(src, 'fuList'))
      && /const inScope = new Set\(this\.rosterIds\(\)\);/.test(method(src, 'fuInScope')));
 check('FU13', 'completeness: the JC and Onboarding schedule columns are unchanged and still disjoint',
   () => planning.includes('data-testid="sched-jc-col"') && planning.includes('data-testid="sched-ob-col"')
      && /if \(\(e\.onboarding === true\) !== onboarding\) continue;/.test(method(src, 'schedCounts')));
+
+check('FU14', 'template lists keep identity between checks (memoized), so *ngFor does not rebuild rows every cycle',
+  () => /return this\.memo\('fuCounts', this\.fuKey\(\),/.test(method(src, 'fuCounts'))
+     && /return this\.memo\('fuList', \[\.\.\.this\.fuKey\(\), sel\],/.test(method(src, 'fuList'))
+     && /return this\.memo\('so-fu', \[profileid, this\.fuByProfile\(\), today\],/.test(method(src, 'slideoverFollowUps')));
 
 console.log(failed ? `\n${failed} FAILED` : '\nALL PASS');
 process.exit(failed ? 1 : 0);

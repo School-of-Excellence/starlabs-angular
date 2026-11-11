@@ -45,7 +45,7 @@ check('PG2', 'cell = distinct participants per month; 6 columns; out-of-window d
 check('PG3', 'products group by NAME (two ids named the same = one row, distinct people)',
   () => n('DFU Pro') === '2,0,1,0,0,0' && n('Eco Plus') === '0,0,1,0,0,0');
 check('PG4', 'months: next 6, current month first',
-  () => /for \(let i = 0; i < 6; i\+\+\)/.test(method('ovPlanMonths')) && /new Date\(now\.getFullYear\(\), now\.getMonth\(\) \+ i, 1\)/.test(method('ovPlanMonths')));
+  () => /for \(let i = 0; i < 6; i\+\+\)/.test(method('buildOvPlanMonths')) && /new Date\(now\.getFullYear\(\), now\.getMonth\(\) \+ i, 1\)/.test(method('buildOvPlanMonths')));
 check('PG5', 'read scoped to the viewed coach roster: participantplanning where profileid in chunk30 (no whole-collection read)',
   () => { const e = method('ensureOvPlan');
           return /const ids = this\.rosterIds\(\);/.test(e) && /this\.chunk30\(ids\)\.map\(c =>\s*getDocs\(query\(collection\(this\.firestore, 'participantplanning'\), where\('profileid', 'in', c\)\)\)\)/.test(e)
@@ -70,6 +70,9 @@ check('PG11', 'card titled "Planned journey · next 6 months", grid + row hooks 
      && /data-testid="ov-plan-row"/.test(card) && !/data-testid="ov-se/.test(html) && !/Ready for SE<\/span>/.test(html));
 check('PG12', 'stale coach responses dropped (token guard)',
   () => /if \(token !== this\.ovPlanToken\) return;/.test(method('ensureOvPlan')));
+
+check('PG13', 'month columns keep identity between checks (memoized per month)',
+  () => /return this\.memo\('ovPlanMonths', \[now\.getFullYear\(\), now\.getMonth\(\)\], \(\) => this\.buildOvPlanMonths\(now\)\);/.test(method('ovPlanMonths')));
 
 console.log(failed ? `\n${failed} FAILED` : '\nALL PASS');
 process.exit(failed ? 1 : 0);
