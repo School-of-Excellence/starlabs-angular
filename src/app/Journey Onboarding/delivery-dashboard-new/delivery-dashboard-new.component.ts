@@ -554,8 +554,7 @@ export class DeliveryDashboardNewComponent implements OnInit {
     this.ongoingParticipants = this.dfuRows
       .filter(r => {
         const inDelivery = r.status === 'ongoing';
-        return inDelivery;
-        // add mode condition
+        return inDelivery && r.mode === this.PRIORITY_MODE;
       })
       .map(r => ({ ...r, days: this.daysBetween(r.initiatedDate || r.ongoingDate, this.TODAY) }));
   }
@@ -718,7 +717,7 @@ export class DeliveryDashboardNewComponent implements OnInit {
   }
 
   isYetToStart(r: DfuRow): boolean {
-    return r.unconsumed && this.isEligible(r);
+    return r.unconsumed && r.status === "" && this.isEligible(r);
   }
 
   // build the funnel table
