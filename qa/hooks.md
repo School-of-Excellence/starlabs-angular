@@ -100,3 +100,23 @@ Literal `data-testid` strings only — no `${interpolation}` (gate section 1.1 /
 | ov-health-total | Active Ecosystem participant total | jc-overall-summary |
 | ov-ah | Ask A&H & Love Letter card | jc-overall-summary |
 | ov-ah-needsattention-combined | A&H Needs Attention combined | jc-overall-summary |
+
+## jc-evprep-board — Journey Coach Health Ev. Preparation tab (kanban boards)
+| testid | element | contract |
+|---|---|---|
+| jx-evprep-board | Board component inside the Ev. Prep panel | jc-evprep-board |
+| evp-root | Board component root | jc-evprep-board |
+| evp-preview | Design-preview banner | jc-evprep-board |
+| evp-board | One board (data-board = new / returning) | jc-evprep-board |
+| evp-board-total | Board total | jc-evprep-board |
+| evp-col | One column (data-stage = stage key) | jc-evprep-board |
+| evp-col-count | Column count | jc-evprep-board |
+| evp-empty | Empty column text | jc-evprep-board |
+| evp-card | Participant card (data-profile = profile id) | jc-evprep-board |
+| evp-card-days | "In stage Nd" chip | jc-evprep-board |
+| evp-card-next | Move to next stage | jc-evprep-board |
+| evp-card-back | Move to previous stage | jc-evprep-board |
+| evp-move | Move box overlay | jc-evprep-board |
+| evp-move-note | Move note (required) | jc-evprep-board |
+| evp-move-save | Save note & move | jc-evprep-board |
+| evp-move-cancel | Cancel move | jc-evprep-board |
