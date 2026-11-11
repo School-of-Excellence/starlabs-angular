@@ -2507,6 +2507,7 @@ mat-dialog-actions,
 .jcd-root.jcd-embed .content > .card.span4 { grid-column: span 6; }
 .jcd-root.jcd-embed .content > .card.span8 { grid-column: span 12; }
 .jcd-root.jcd-embed .loading-overlay { position: relative; inset: auto; min-height: 220px; z-index: auto; border-radius: 14px; }
+.jcd-root.jcd-embed .jcd-embed-count { font-size: 34px; padding: 6px 0 2px; }
 @media (max-width: 1200px) {
   .jcd-root.jcd-embed .content > .card.span4,
   .jcd-root.jcd-embed .content > .card.span8 { grid-column: span 12; }

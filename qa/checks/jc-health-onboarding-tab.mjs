@@ -34,7 +34,9 @@ check('OT4', 'brand, love pill and theme toggle are hidden in embed mode',
      && /class="themebtn" \*ngIf="!embedOnboarding"/.test(jhtml));
 const keep = jhtml.slice(jhtml.indexOf('<!-- GROSS SALES -->'), jhtml.indexOf('<!-- AR HEALTH'));
 check('OT5', 'Gross & Assured sales cards are NOT gated (they render in the tab)',
-  () => keep.includes('data-testid="jcd-div-012"') && keep.includes('data-testid="jcd-div-020"') && !keep.includes('embedOnboarding'));
+  // Card containers themselves carry no *ngIf; count-only bodies in embed mode are covered by jc-onboarding-count-only.
+  () => /<div data-testid="jcd-div-012" class="card span4" \(click\)="onBoxClick\('grossSales'\)"/.test(keep)
+     && /<div data-testid="jcd-div-020" class="card span4" \(click\)="onBoxClick\('assuredSales'\)"/.test(keep));
 // End the slice BEFORE the rail's gate so the gate itself isn't counted as gating the card.
 const railGate = jhtml.indexOf('<ng-container *ngIf="!embedOnboarding"><!-- rail');
 const row2 = jhtml.slice(jhtml.indexOf('<!-- ROW 2 -->'), railGate >= 0 ? railGate : jhtml.indexOf('<div class="rail a">'));

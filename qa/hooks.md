@@ -40,3 +40,9 @@ Literal `data-testid` strings only — no `${interpolation}` (gate section 1.1 /
 | pm-row | participant row in the PM table | delivery-dashboard-days-waiting |
 | pm-days-waiting | DAYS WAITING badge in a row | delivery-dashboard-days-waiting |
 | pm-row-info | "Showing X to Y of N entries" footer | delivery-dashboard-days-waiting |
+
+## journeycoach-dashboard — embedded in Journey Coach Health Onboarding tab
+| testid | element | contract |
+|---|---|---|
+| jcd-embed-gross-count | Gross Sales count (embed only) | jc-onboarding-count-only |
+| jcd-embed-assured-count | Assured Sales count (embed only) | jc-onboarding-count-only |
