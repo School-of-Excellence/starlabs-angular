@@ -23,8 +23,8 @@
             <span class="ov-showing" *ngIf="isFiltered">Showing {{ filteredRows.length | number }} of {{ overviewRows.length | number }}</span>
           </div>
           <div style="display:flex;gap: 10px;">
-            <button class="btn-create" (click)="openEventEditor(null)">Create Event</button>
-            <button class="btn-create" (click)="openCTAConfig()">Configure CTA</button>
+            <button data-testid="epc-overview-create-event" class="btn-create" (click)="openEventEditor(null)">Create Event</button>
+            <button data-testid="epc-overview-configure-cta" class="btn-create" (click)="openCTAConfig()">Configure CTA</button>
           </div>
         </div>
 
@@ -80,7 +80,7 @@
                   <td class="r"><span class="ov-mut">…</span></td>
                   <td class="r"><span class="ov-mut">…</span></td>
                   <td class="ev-act">
-                    <button type="button" class="ev-edit-btn" title="Edit event" (click)="openEventEditor(event['docid']);$event.stopPropagation()">Edit</button>
+                    <button data-testid="epc-row-edit-loading" type="button" class="ev-edit-btn" title="Edit event" (click)="openEventEditor(event['docid']);$event.stopPropagation()">Edit</button>
                   </td>
                 </tr>
 
@@ -113,7 +113,7 @@
                   <td class="r"><span class="ov-warn" *ngIf="row.error" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span><span class="ov-num ov-ne" *ngIf="!row.error && row.notEligible !== null">{{ row.notEligible | number }}</span><span class="ov-mut" *ngIf="!row.error && row.notEligible === null">…</span></td>
                   <td class="r"><span class="ov-warn" *ngIf="row.error" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span><span class="ov-num" [ngClass]="row.approved ? 'ov-app' : 'ov-zero'" *ngIf="!row.error && row.approved !== null">{{ row.approved | number }}</span><span class="ov-mut" *ngIf="!row.error && row.approved === null">…</span></td>
                   <td class="ev-act">
-                    <button type="button" class="ev-edit-btn" title="Edit event" (click)="openEventEditor(event['docid']);$event.stopPropagation()">Edit</button>
+                    <button data-testid="epc-row-edit" type="button" class="ev-edit-btn" title="Edit event" (click)="openEventEditor(event['docid']);$event.stopPropagation()">Edit</button>
                   </td>
                   <td class="ov-c-go"><mat-icon class="ov-chev">chevron_right</mat-icon></td>
                 </tr>

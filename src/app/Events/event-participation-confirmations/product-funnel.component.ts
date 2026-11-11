@@ -2073,9 +2073,9 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
   // ================================== Table Rows =========================
 
   // function to check finance filter
-  private financeMatches(r: PRow): boolean {
+  private financeMatches(pid: string): boolean {
     if (this.financeFilter === 'all') return true;
-    const norm = (r.finance || '').toLowerCase().replace('fullypaid', 'fully paid').replace(/\s+/g, ' ').trim();
+    const norm = (this.participantMetadata[pid]?.financialstatus || '').toLowerCase().replace('fullypaid', 'fully paid').replace(/\s+/g, ' ').trim();
     return norm === this.financeFilter;
   }
 

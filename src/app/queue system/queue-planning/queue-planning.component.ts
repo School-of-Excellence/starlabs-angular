@@ -1,5 +1,5 @@
 import { Component, inject, OnDestroy, OnInit, TemplateRef, ViewChild } from '@angular/core';
-import { collection, collectionData, doc, DocumentData, Firestore, getDoc, getDocs, orderBy, Query, query, serverTimestamp, setDoc, Timestamp, updateDoc, where } from '@angular/fire/firestore';
+import { collection, collectionData, doc, DocumentData, Firestore, getDoc, getDocs, orderBy, Query, query, serverTimestamp, setDoc, Timestamp, updateDoc, where,deleteDoc,writeBatch } from '@angular/fire/firestore';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { AuthguardService } from '../../authguard.service';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
@@ -42,16 +42,22 @@ interface PlanningRow {
     [stageName: string]: {
       cohortIds: string[];
       dates: Array<{
-        title: string | null,
-        description: string | null,
-        startdate: Date | null;
-        enddate: Date | null;
-        starttime: string;
-        endtime: string;
-        maxslot: number;
-        usedslot: number;
-        bigparticipants: any[];
-        participants: any[];
+          docid?: string;
+          slottype?: 'queue' | 'appointment';
+          availabilityid?: string;
+          hostref?: any;
+          appointmentref?: any;
+          bookedby?: any;
+          title: string | null,
+          description: string | null,
+          startdate: Date | null;
+          enddate: Date | null;
+          starttime: string;
+          endtime: string;
+          maxslot: number;
+          usedslot: number;
+          bigparticipants: any[];
+          participants: any[];
       }>;
     };
   };
@@ -119,6 +125,7 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
   segmentList = [];
   cohortsList = [];
   queueStages: string[] = [];
+  stageProperty: any = {};
   queueTokenList = [];
   cohortQueuePlannerList = [];
   planningRows: PlanningRow[] = [];
@@ -160,6 +167,8 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
   // For editing date entry
   editingRow: PlanningRow = null;
   editingStageName: string = null;
+  // The slot dialog currently open; its afterClosed reset only runs while it is still current.
+  private activeDateDialogRef: any = null;
   editingDateIndex: number = null;
   editingDateEntry: any = {
     title: null,
@@ -205,6 +214,15 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
   panelTitle: string = 'Participants';
   slotDialogMode: 'single' | 'multi' = 'single';
   currentSlotInfo: any = null;
+
+  editingSlotType: 'queue' | 'appointment' | null = null;
+  appointmentSlotOptions: any[] = [];
+  selectedAppointmentSlots: any[] = [];
+  loadingAppointmentSlots: boolean = false;
+  appointmentDateStart: Date | null = null;
+  appointmentDateEnd: Date | null = null;
+  appointmentGroups: any[] = [];                      
+  appointmentSpecialistFilter: string | null = null;
 
   private storage = inject(Storage);
   private destroy$ = new Subject<void>();
@@ -623,7 +641,7 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
       }
 
       if (shouldHaveConfirmed) {
-        const stageSlots = token.selectedstageslot || {};
+        const stageSlots = this.tokenStageSlots(token);
         const selectedSlot = stageSlots[stageName];
 
         // FIXED: Check if participant has selected ANY slot for this stage
@@ -909,6 +927,7 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
       const queueDoc = await getDoc(queueRef);
       if (queueDoc.exists()) {
         this.queueStages = queueDoc.data()['stages'] || [];
+        this.stageProperty = queueDoc.data()['stageproperty'] || {};
         this.setupDisplayedColumns();
       }
 
@@ -937,11 +956,12 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
         var stageSlot = {}
         for (let i = 0; i < tokens.length; i++) {
           const tokenData = tokens[i];
-          if(tokenData["selectedstageslot"]){
-            Object.keys(tokenData["selectedstageslot"]).forEach(stage =>{
-              var slotData = tokenData["selectedstageslot"][stage]
-              slotData["startdate"] = slotData["startdate"].toDate()
-              slotData["enddate"] = slotData["enddate"].toDate()
+          const tokenSlots = this.tokenStageSlots(tokenData);
+          if(Object.keys(tokenSlots).length){
+            Object.keys(tokenSlots).forEach(stage =>{
+              var slotData = tokenSlots[stage]
+              slotData["startdate"] = slotData["startdate"]?.toDate ? slotData["startdate"].toDate() : slotData["startdate"]
+              slotData["enddate"] = slotData["enddate"]?.toDate ? slotData["enddate"].toDate() : slotData["enddate"]
               stageSlot[stage] = stageSlot[stage] ?? []
               stageSlot[stage].push({
                 ...slotData,
@@ -967,43 +987,46 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
       });
       this.subscriptions.push(cohortPlannerSub);
 
-      const draftQuery = query(
-        collection(this.firestore, 'queue planning draft'),
-        where('queueid', '==', this.selectedQueue['docid']),
-        where('deleted', '==', false),
-        orderBy('updatedAt', 'desc')
-      );
+      // const draftQuery = query(
+      //   collection(this.firestore, 'queue planning draft'),
+      //   where('queueid', '==', this.selectedQueue['docid']),
+      //   where('deleted', '==', false),
+      //   orderBy('updatedAt', 'desc')
+      // );
 
-      const draftDocs = await getDocs(draftQuery);
+      // const draftDocs = await getDocs(draftQuery);
 
-      if (draftDocs.docs.length > 0) {
-        loading.close();
-        const selectedDraft = await this.showDraftSelectionDialog(draftDocs.docs);
+      // if (draftDocs.docs.length > 0) {
+      //   loading.close();
+      //   const selectedDraft = await this.showDraftSelectionDialog(draftDocs.docs);
 
-        if (selectedDraft) {
-          loading = this.dialog.open(LoadingProgressComponent, {
-            data: {
-              msg: "Loading Draft..."
-            },
-            disableClose: true
-          });
-          await this.loadDraftFromFirestore(selectedDraft);
-          loading.close();
-          return;
-        }
-      }
+      //   if (selectedDraft) {
+      //     loading = this.dialog.open(LoadingProgressComponent, {
+      //       data: {
+      //         msg: "Loading Draft..."
+      //       },
+      //       disableClose: true
+      //     });
+      //     await this.loadDraftFromFirestore(selectedDraft);
+      //     loading.close();
+      //     return;
+      //   }
+      // }
 
-      const planningQuery = query(collection(this.firestore, 'queue planning'), where('queueid', '==', this.selectedQueue['docid']));
+      const planningQuery = query(collection(this.firestore, 'queue availability'), where('queueid', '==', this.selectedQueue['docid']));
 
-      const planningSub = collectionData(planningQuery, { idField: 'id' }).subscribe(async (planningDocs) => {
-        if (planningDocs.length > 0) {
-          const existingPlanning = planningDocs[0];
-          this.existingPlanningDocId = existingPlanning.id;
+      // const planningSub = collectionData(planningQuery, { idField: 'id' }).subscribe(async (planningDocs) => {
+      //   if (planningDocs.length > 0) {
+      //     const existingPlanning = planningDocs[0];
+      //     this.existingPlanningDocId = existingPlanning.id;
 
-          await this.loadExistingPlanning(existingPlanning, this.queueTokenList || [], this.cohortQueuePlannerList || []);
-        } else {
-          this.addRow();
-        }
+      //     await this.loadExistingPlanning(existingPlanning, this.queueTokenList || [], this.cohortQueuePlannerList || []);
+      //   } else {
+      //     this.addRow();
+      //   }
+      // });
+      const planningSub = collectionData(planningQuery, { idField: 'id' }).subscribe(planningData =>{
+        this.loadExistingPlanning(planningData, this.queueTokenList || [], this.cohortQueuePlannerList || []);
       });
       this.subscriptions.push(planningSub);
 
@@ -1015,113 +1038,193 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
     }
   }
 
-  async loadExistingPlanning(planningData: any, queuetokenlist: any, cohortqueueplannerlist: any) {
+  // async loadExistingPlanning(planningData: any, queuetokenlist: any, cohortqueueplannerlist: any) {
+  //   this.queueTokenList = queuetokenlist;
+  //   this.cohortQueuePlannerList = cohortqueueplannerlist;
+  //   this.planningRows = [];
+
+  //   if (planningData.planning && planningData.planning.length > 0) {
+  //     for (const variationPlanning of planningData.planning) {
+  //       const variationId = variationPlanning.variationid;
+
+  //       if (variationPlanning.segments && variationPlanning.segments.length > 0) {
+  //         for (const segmentData of variationPlanning.segments) {
+  //           const segmentId = segmentData.segmentid;
+
+  //           const newRow: PlanningRow = {
+  //             id: this.generateRowId(),
+  //             selectedSegment: segmentId,
+  //             selectedVariation: variationId,
+  //             stageData: {}
+  //           };
+
+  //           this.queueStages.forEach(stage => {
+  //             newRow.stageData[stage] = {
+  //               cohortIds: [],
+  //               dates: []
+  //             };
+  //           });
+
+  //           if (segmentData.stagecohort && segmentData.stagecohort.length > 0) {
+  //             segmentData.stagecohort.forEach(stageCohort => {
+  //               const stageName = stageCohort.stagename;
+  //               if (this.queueStages.includes(stageName)) {
+  //                 if (!newRow.stageData[stageName]) {
+  //                   newRow.stageData[stageName] = { cohortIds: [], dates: [] };
+  //                 }
+  //                 if (stageCohort.cohort && Array.isArray(stageCohort.cohort)) {
+  //                   newRow.stageData[stageName].cohortIds = stageCohort.cohort;
+  //                 } else if (stageCohort.cohortid) {
+  //                   newRow.stageData[stageName].cohortIds = [stageCohort.cohortid];
+  //                 }
+  //               }
+  //             });
+  //           }
+  //           else if (segmentData.cohortid) {
+  //             this.queueStages.forEach(stage => {
+  //               if (newRow.stageData[stage]) {
+  //                 newRow.stageData[stage].cohortIds = [segmentData.cohortid];
+  //               }
+  //             });
+  //           }
+
+  //           if (segmentData.slots && segmentData.slots.length > 0) {
+  //             const stageMap = new Map<string, any[]>();
+
+  //             segmentData.slots.forEach(slot => {
+  //               const stageName = slot.stagename;
+  //               if (!stageMap.has(stageName)) {
+  //                 stageMap.set(stageName, []);
+  //               }
+
+  //               const startDate = slot.startdate ? slot.startdate.toDate() : null;
+  //               const endDate = slot.enddate ? slot.enddate.toDate() : null;
+
+  //               const bigparticipants = this.getBigParticipantsForSlot(
+  //                 variationId,
+  //                 segmentId,
+  //                 stageName,
+  //                 startDate,
+  //                 endDate
+  //               );
+
+  //               const participants = this.getParticipantsForSlot(
+  //                 variationId,
+  //                 segmentId,
+  //                 stageName,
+  //                 startDate,
+  //                 endDate
+  //               );
+
+  //               stageMap.get(stageName).push({
+  //                 title: slot.title ?? null,
+  //                 description: slot.description ?? null,
+  //                 startdate: startDate ? new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()) : null,
+  //                 enddate: endDate ? new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()) : null,
+  //                 starttime: startDate ? this.formatTimeTo24Hour(startDate) : '09:00',
+  //                 endtime: endDate ? this.formatTimeTo24Hour(endDate) : '17:00',
+  //                 maxslot: slot.maxslot || 0,
+  //                 usedslot: slot.usedslot || 0,
+  //                 bigparticipants: bigparticipants,
+  //                 participants: participants
+  //               });
+  //             });
+
+  //             stageMap.forEach((dates, stageName) => {
+  //               if (this.queueStages.includes(stageName)) {
+  //                 if (!newRow.stageData[stageName]) {
+  //                   newRow.stageData[stageName] = { cohortIds: [], dates: [] };
+  //                 }
+  //                 newRow.stageData[stageName].dates = dates;
+  //               }
+  //             });
+  //           }
+
+  //           this.planningRows.push(newRow);
+  //         }
+  //       }
+  //     }
+  //   }
+
+  //   if (this.planningRows.length === 0) {
+  //     this.addRow();
+  //   }
+  // }
+
+  loadExistingPlanning(planningData: any, queuetokenlist: any, cohortqueueplannerlist: any) {
     this.queueTokenList = queuetokenlist;
     this.cohortQueuePlannerList = cohortqueueplannerlist;
     this.planningRows = [];
 
-    if (planningData.planning && planningData.planning.length > 0) {
-      for (const variationPlanning of planningData.planning) {
-        const variationId = variationPlanning.variationid;
+    const rowMap = new Map<string, PlanningRow>();
 
-        if (variationPlanning.segments && variationPlanning.segments.length > 0) {
-          for (const segmentData of variationPlanning.segments) {
-            const segmentId = segmentData.segmentid;
+    for (const slot of planningData) {
+      const rowKey = slot.variationid + '_' + slot.segmentid;
 
-            const newRow: PlanningRow = {
-              id: this.generateRowId(),
-              selectedSegment: segmentId,
-              selectedVariation: variationId,
-              stageData: {}
-            };
+      if (!rowMap.has(rowKey)) {
+        const newRow: PlanningRow = {
+          id: this.generateRowId(),
+          selectedSegment: slot.segmentid,
+          selectedVariation: slot.variationid,
+          stageData: {}
+        };
 
-            this.queueStages.forEach(stage => {
-              newRow.stageData[stage] = {
-                cohortIds: [],
-                dates: []
-              };
-            });
+        this.queueStages.forEach(stage => {
+          newRow.stageData[stage] = {
+            cohortIds: [],
+            dates: []
+          };
+        });
 
-            if (segmentData.stagecohort && segmentData.stagecohort.length > 0) {
-              segmentData.stagecohort.forEach(stageCohort => {
-                const stageName = stageCohort.stagename;
-                if (this.queueStages.includes(stageName)) {
-                  if (!newRow.stageData[stageName]) {
-                    newRow.stageData[stageName] = { cohortIds: [], dates: [] };
-                  }
-                  if (stageCohort.cohort && Array.isArray(stageCohort.cohort)) {
-                    newRow.stageData[stageName].cohortIds = stageCohort.cohort;
-                  } else if (stageCohort.cohortid) {
-                    newRow.stageData[stageName].cohortIds = [stageCohort.cohortid];
-                  }
-                }
-              });
-            }
-            else if (segmentData.cohortid) {
-              this.queueStages.forEach(stage => {
-                if (newRow.stageData[stage]) {
-                  newRow.stageData[stage].cohortIds = [segmentData.cohortid];
-                }
-              });
-            }
-
-            if (segmentData.slots && segmentData.slots.length > 0) {
-              const stageMap = new Map<string, any[]>();
-
-              segmentData.slots.forEach(slot => {
-                const stageName = slot.stagename;
-                if (!stageMap.has(stageName)) {
-                  stageMap.set(stageName, []);
-                }
-
-                const startDate = slot.startdate ? slot.startdate.toDate() : null;
-                const endDate = slot.enddate ? slot.enddate.toDate() : null;
-
-                const bigparticipants = this.getBigParticipantsForSlot(
-                  variationId,
-                  segmentId,
-                  stageName,
-                  startDate,
-                  endDate
-                );
-
-                const participants = this.getParticipantsForSlot(
-                  variationId,
-                  segmentId,
-                  stageName,
-                  startDate,
-                  endDate
-                );
-
-                stageMap.get(stageName).push({
-                  title: slot.title ?? null,
-                  description: slot.description ?? null,
-                  startdate: startDate ? new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()) : null,
-                  enddate: endDate ? new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()) : null,
-                  starttime: startDate ? this.formatTimeTo24Hour(startDate) : '09:00',
-                  endtime: endDate ? this.formatTimeTo24Hour(endDate) : '17:00',
-                  maxslot: slot.maxslot || 0,
-                  usedslot: slot.usedslot || 0,
-                  bigparticipants: bigparticipants,
-                  participants: participants
-                });
-              });
-
-              stageMap.forEach((dates, stageName) => {
-                if (this.queueStages.includes(stageName)) {
-                  if (!newRow.stageData[stageName]) {
-                    newRow.stageData[stageName] = { cohortIds: [], dates: [] };
-                  }
-                  newRow.stageData[stageName].dates = dates;
-                }
-              });
-            }
-
-            this.planningRows.push(newRow);
-          }
-        }
+        rowMap.set(rowKey, newRow);
       }
+
+      const row = rowMap.get(rowKey);
+      if (!row.stageData[slot.stagename]) continue;
+
+      if (slot.cohort && slot.cohort.length > 0) {
+        row.stageData[slot.stagename].cohortIds = slot.cohort;
+      }
+
+      const startDate = slot.startdate ? slot.startdate.toDate() : null;
+      const endDate = slot.enddate ? slot.enddate.toDate() : null;
+
+      const bigparticipants = this.getBigParticipantsForSlot(
+        slot.variationid,
+        slot.segmentid,
+        slot.stagename,
+        startDate,
+        endDate
+      );
+      const participants = this.getParticipantsForSlot(
+        slot.variationid,
+        slot.segmentid,
+        slot.stagename,
+        startDate,
+        endDate
+      );
+
+      row.stageData[slot.stagename].dates.push({
+        docid: slot.id,
+        slottype: slot.slottype,
+        availabilityid: slot.availabilityid ?? null,
+        hostref: slot.hostref ?? null,
+        appointmentref: slot.appointmentref ?? null,
+        bookedby: slot.bookedby ?? null,
+        title: slot.title ?? null,
+        description: slot.description ?? null,
+        startdate: startDate ? new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()) : null,
+        enddate: endDate ? new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()) : null,
+        starttime: startDate ? this.formatTimeTo24Hour(startDate) : '09:00',
+        endtime: endDate ? this.formatTimeTo24Hour(endDate) : '17:00',
+        maxslot: slot.maxslot || 0,
+        usedslot: slot.usedslot || 0,
+        bigparticipants: bigparticipants,
+        participants: participants
+      });
     }
+
+    this.planningRows = Array.from(rowMap.values());
 
     if (this.planningRows.length === 0) {
       this.addRow();
@@ -1277,6 +1380,12 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
     return matchingParticipants;
   }
 
+  /** A token's booked slot per stage. queue-planning-review writes bookings to `bookedslot`
+   *  (renamed from `selectedstageslot` in 854ad880); older tokens may still carry the old field. */
+  private tokenStageSlots(token: any): Record<string, any> {
+    return token?.['bookedslot'] ?? token?.['selectedstageslot'] ?? {};
+  }
+
   getParticipantsForSlot(variationid: string, segmentid: string, stagename: string, startdate: Date, enddate: Date): any[] {
     const toTime = (d: any): number | null => {
       if (!d) return null;
@@ -1295,7 +1404,7 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
     for (const token of this.queueTokenList || []) {
       if (token.variationid !== variationid) continue;
 
-      const stageSlots = token.selectedstageslot || {};
+      const stageSlots = this.tokenStageSlots(token);
       const slot = stageSlots[stagename];
 
       if (
@@ -1395,16 +1504,31 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
   //   });
   // }
 
-  removeDateFromStage(row: PlanningRow, stageName: string, dateIndex: number) {
-    const check = confirm('Are you sure want to remove the slot?');
-    if (!check) {
-      return null;
-    } else {
-      const dateRanges = row.stageData[stageName].dates;
-      if (dateRanges.length > 0) {
-        dateRanges.splice(dateIndex, 1);
-        this.savePlanning();
-      }
+  async removeDateFromStage(row: PlanningRow, stageName: string, dateIndex: number) {
+    const dateRanges = row.stageData[stageName].dates;
+    const entry = dateRanges[dateIndex];
+
+    const booked = !!(entry['appointmentref'] || entry['bookedby']) || (entry['usedslot'] || 0) > 0 || (entry.participants?.length || 0) > 0;
+
+    if (booked) {
+      alert('This slot is booked. Please cancel the booking first, then delete the slot.');
+      return;
+    }
+
+    if (!confirm('Are you sure want to remove the slot?')) return;
+
+    if (!entry['docid']) {
+      dateRanges.splice(dateIndex, 1);
+      return;
+    }
+
+    try {
+      await deleteDoc(doc(this.firestore, 'queue availability', entry['docid']));
+      dateRanges.splice(dateIndex, 1);
+      this.guard.openSnackBar('Slot removed', 'OK', 600);
+    } catch (err) {
+      console.log(err);
+      alert('Error removing slot');
     }
   }
 
@@ -1415,6 +1539,10 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
     if (!variation) return false;
 
     return variation.stages && variation.stages.includes(stageName);
+  }
+
+  stageSupportsAppointment(stageName: string): boolean {
+    return this.stageProperty?.[stageName]?.actiontype === 'appointment' && this.stageProperty?.[stageName]?.actionresource != null;
   }
 
   getAvailableSegments(currentRowId: string): any[] {
@@ -1620,7 +1748,157 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
     }));
   }
 
-  async savePlanning() {
+  // async savePlanning() {
+  //   const rowsToValidate = this.planningRows.filter(row => row.selectedSegment || row.selectedVariation);
+
+  //   for (const row of rowsToValidate) {
+  //     if (!row.selectedSegment) {
+  //       alert('Please select a segment for all rows that have a variation selected');
+  //       return;
+  //     }
+  //     if (!row.selectedVariation) {
+  //       alert('Please select a variation for all rows that have a segment selected');
+  //       return;
+  //     }
+  //   }
+
+  //   const combinations = new Set<string>();
+  //   for (const row of this.planningRows) {
+  //     if (row.selectedSegment && row.selectedVariation) {
+  //       const combinationKey = `${row.selectedSegment}_${row.selectedVariation}`;
+  //       if (combinations.has(combinationKey)) {
+  //         alert(`Duplicate combination found: ${this.getSegmentName(row.selectedSegment)} with ${this.getVariationName(row.selectedVariation)}. Each segment can only be used once per variation.`);
+  //         return;
+  //       }
+  //       combinations.add(combinationKey);
+  //     }
+  //   }
+
+  //   const loading = this.dialog.open(LoadingProgressComponent, {
+  //     data: {
+  //       msg: "Saving Queue Planning..."
+  //     },
+  //     disableClose: true
+  //   });
+
+  //   try {
+  //     const docId = this.existingPlanningDocId || this.generateUniqueId();
+
+  //     const variationMap = new Map<string, any[]>();
+
+  //     this.planningRows.forEach(row => {
+  //       if (row.selectedSegment && row.selectedVariation) {
+  //         if (!variationMap.has(row.selectedVariation)) {
+  //           variationMap.set(row.selectedVariation, []);
+  //         }
+  //         variationMap.get(row.selectedVariation).push(row);
+  //       }
+  //     });
+
+  //     const planning = [];
+
+  //     variationMap.forEach((rows, variationId) => {
+  //       const variationPlanning = {
+  //         variationid: variationId,
+  //         segments: []
+  //       };
+
+  //       rows.forEach(row => {
+  //         const stagecohort = [];
+  //         Object.keys(row.stageData).forEach(stageName => {
+  //           if (row.stageData[stageName].cohortIds && row.stageData[stageName].cohortIds.length > 0) {
+  //             stagecohort.push({
+  //               stagename: stageName,
+  //               cohort: row.stageData[stageName].cohortIds
+  //             });
+  //           }
+  //         });
+
+  //         const slots = [];
+
+  //         Object.keys(row.stageData).forEach(stageName => {
+  //           row.stageData[stageName].dates.forEach(dateEntry => {
+  //             if (dateEntry.startdate && dateEntry.enddate) {
+  //               const startDateTime = this.combineDateAndTime(dateEntry.startdate, dateEntry.starttime);
+  //               const endDateTime = this.combineDateAndTime(dateEntry.enddate, dateEntry.endtime);
+
+  //               const bigparticipants = this.getBigParticipantsForSlot(
+  //                 variationId,
+  //                 row.selectedSegment,
+  //                 stageName,
+  //                 startDateTime,
+  //                 endDateTime
+  //               );
+
+  //               const participants = this.getParticipantsForSlot(
+  //                 variationId,
+  //                 row.selectedSegment,
+  //                 stageName,
+  //                 startDateTime,
+  //                 endDateTime
+  //               );
+
+  //               const slotObj: any = {
+  //                 title: dateEntry.title,
+  //                 description: dateEntry.description,
+  //                 stagename: stageName,
+  //                 startdate: Timestamp.fromDate(startDateTime),
+  //                 enddate: Timestamp.fromDate(endDateTime),
+  //                 maxslot: dateEntry.maxslot || 0,
+  //                 usedslot: participants.length,
+  //                 bigparticipants: bigparticipants.map(p => p.id)
+  //               };
+
+  //               slots.push(slotObj);
+  //             }
+  //           });
+  //         });
+
+  //         variationPlanning.segments.push({
+  //           segmentid: row.selectedSegment,
+  //           stagecohort: stagecohort,
+  //           slots: slots
+  //         });
+  //       });
+
+  //       if (variationPlanning.segments.length > 0) {
+  //         planning.push(variationPlanning);
+  //       }
+  //     });
+
+  //     const planningData = {
+  //       docid: docId,
+  //       queueid: this.selectedQueue['docid'],
+  //       planning: planning,
+  //       queueref: doc(this.firestore, 'queue generation', this.selectedQueue['docid']),
+  //       segmentlist: Array.from(new Set(this.planningRows.map(r => r.selectedSegment).filter(s => s))),
+  //       variationlist: Array.from(new Set(this.planningRows.map(r => r.selectedVariation).filter(v => v))),
+  //       updatedAt: serverTimestamp()
+  //     };
+
+  //     if (!this.existingPlanningDocId) {
+  //       planningData['createdAt'] = serverTimestamp();
+  //     }
+
+  //     const planningRef = doc(this.firestore, 'queue planning', docId);
+  //     await setDoc(planningRef, planningData, { merge: true });
+
+  //     this.existingPlanningDocId = docId;
+
+  //     if (this.currentDraftDocId) {
+  //       await this.clearDraft();
+  //     }
+
+  //     loading.close();
+  //     this.guard.openSnackBar('Queue planning saved successfully', 'OK',600);
+
+  //   } catch (error) {
+  //     console.error('Error saving planning:', error);
+  //     loading.close();
+  //     alert('Error saving queue planning. Please try again.');
+  //   }
+  // }
+  savePlanning() {
     const rowsToValidate = this.planningRows.filter(row => row.selectedSegment || row.selectedVariation);
 
     for (const row of rowsToValidate) {
@@ -1645,130 +1923,6 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
         combinations.add(combinationKey);
       }
     }
-
-    const loading = this.dialog.open(LoadingProgressComponent, {
-      data: {
-        msg: "Saving Queue Planning..."
-      },
-      disableClose: true
-    });
-
-    try {
-      const docId = this.existingPlanningDocId || this.generateUniqueId();
-
-      const variationMap = new Map<string, any[]>();
-
-      this.planningRows.forEach(row => {
-        if (row.selectedSegment && row.selectedVariation) {
-          if (!variationMap.has(row.selectedVariation)) {
-            variationMap.set(row.selectedVariation, []);
-          }
-          variationMap.get(row.selectedVariation).push(row);
-        }
-      });
-
-      const planning = [];
-
-      variationMap.forEach((rows, variationId) => {
-        const variationPlanning = {
-          variationid: variationId,
-          segments: []
-        };
-
-        rows.forEach(row => {
-          const stagecohort = [];
-          Object.keys(row.stageData).forEach(stageName => {
-            if (row.stageData[stageName].cohortIds && row.stageData[stageName].cohortIds.length > 0) {
-              stagecohort.push({
-                stagename: stageName,
-                cohort: row.stageData[stageName].cohortIds
-              });
-            }
-          });
-
-          const slots = [];
-
-          Object.keys(row.stageData).forEach(stageName => {
-            row.stageData[stageName].dates.forEach(dateEntry => {
-              if (dateEntry.startdate && dateEntry.enddate) {
-                const startDateTime = this.combineDateAndTime(dateEntry.startdate, dateEntry.starttime);
-                const endDateTime = this.combineDateAndTime(dateEntry.enddate, dateEntry.endtime);
-
-                const bigparticipants = this.getBigParticipantsForSlot(
-                  variationId,
-                  row.selectedSegment,
-                  stageName,
-                  startDateTime,
-                  endDateTime
-                );
-
-                const participants = this.getParticipantsForSlot(
-                  variationId,
-                  row.selectedSegment,
-                  stageName,
-                  startDateTime,
-                  endDateTime
-                );
-
-                const slotObj: any = {
-                  title: dateEntry.title,
-                  description: dateEntry.description,
-                  stagename: stageName,
-                  startdate: Timestamp.fromDate(startDateTime),
-                  enddate: Timestamp.fromDate(endDateTime),
-                  maxslot: dateEntry.maxslot || 0,
-                  usedslot: participants.length,
-                  bigparticipants: bigparticipants.map(p => p.id)
-                };
-
-                slots.push(slotObj);
-              }
-            });
-          });
-
-          variationPlanning.segments.push({
-            segmentid: row.selectedSegment,
-            stagecohort: stagecohort,
-            slots: slots
-          });
-        });
-
-        if (variationPlanning.segments.length > 0) {
-          planning.push(variationPlanning);
-        }
-      });
-
-      const planningData = {
-        docid: docId,
-        queueid: this.selectedQueue['docid'],
-        planning: planning,
-        queueref: doc(this.firestore, 'queue generation', this.selectedQueue['docid']),
-        segmentlist: Array.from(new Set(this.planningRows.map(r => r.selectedSegment).filter(s => s))),
-        variationlist: Array.from(new Set(this.planningRows.map(r => r.selectedVariation).filter(v => v))),
-        updatedAt: serverTimestamp()
-      };
-
-      if (!this.existingPlanningDocId) {
-        planningData['createdAt'] = serverTimestamp();
-      }
-
-      const planningRef = doc(this.firestore, 'queue planning', docId);
-      await setDoc(planningRef, planningData, { merge: true });
-
-      this.existingPlanningDocId = docId;
-
-      if (this.currentDraftDocId) {
-        await this.clearDraft();
-      }
-
-      loading.close();
-      this.guard.openSnackBar('Queue planning saved successfully', 'OK',600);
-
-    } catch (error) {
-      console.error('Error saving planning:', error);
-      loading.close();
-      alert('Error saving queue planning. Please try again.');
-    }
   }
 
   generateUniqueId(): string {
@@ -1788,11 +1942,24 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
     };
   }
 
-  saveCohortEdit() {
+  async saveCohortEdit() {
     if (this.editingRow && this.editingStageName) {
       this.editingRow.stageData[this.editingStageName].cohortIds = this.editingCohortData.cohortIds || [];
+      
+      const dates=this.editingRow.stageData[this.editingStageName].dates;
+      const batch = writeBatch(this .firestore);
 
-      this.savePlanning();
+      dates.forEach(dateEntry =>{
+        if (dateEntry['docid']){
+          batch.update(doc(this.firestore,'queue availability',dateEntry['docid']),{
+            cohort: this.editingCohortData.cohortIds || []
+          });
+        }
+      });
+
+      if (dates.length > 0) {
+        await batch.commit();
+      }
 
       this.editingRow = null;
       this.editingStageName = null;
@@ -2068,7 +2235,8 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
   createSlotMultipleSegments(stageName: string) {
   this.slotDialogMode = 'multi';
   this.editingStageName = stageName;
-  
+  this.editingSlotType = this.stageSupportsAppointment(stageName) ? null : 'queue';
+
   // Reset the multi-slot data
   this.multiSlotData = {
     selectedStage: stageName,
@@ -2095,14 +2263,19 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
   // Use setTimeout to ensure the view is ready
   setTimeout(() => {
     const dialogRef = this.dialog.open(this.dateEditDialog, {
-      width: '600px',
+      maxWidth: '95vw',
       maxHeight: '90vh',
       disableClose: false
     });
+    this.activeDateDialogRef = dialogRef;
 
     dialogRef.afterClosed().subscribe(() => {
+      // A late close of an earlier dialog must not wipe the state of one opened since.
+      if (this.activeDateDialogRef !== dialogRef) return;
+      this.activeDateDialogRef = null;
       this.searchSegmentForMulti = '';
       this.slotDialogMode = 'single';
+      this.editingSlotType = null;
       this.availableSegmentsCache = []; // Clear cache
     });
   }, 0);
@@ -2169,6 +2342,7 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
     this.editingRow = row;
     this.editingStageName = stageName;
     this.editingDateIndex = null; // null means we're adding, not editing
+    this.editingSlotType = this.stageSupportsAppointment(stageName) ? null : 'queue';
 
     if (!row.stageData[stageName]) {
       row.stageData[stageName] = {
@@ -2192,14 +2366,20 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
     };
 
     const dialogRef = this.dialog.open(this.dateEditDialog, {
-      width: '500px'
+      maxWidth: '95vw'
     });
 
+    this.activeDateDialogRef = dialogRef;
+
     dialogRef.afterClosed().subscribe(() => {
+      // A late close of an earlier dialog must not wipe the state of one opened since.
+      if (this.activeDateDialogRef !== dialogRef) return;
+      this.activeDateDialogRef = null;
       this.editingRow = null;
       this.editingStageName = null;
       this.editingDateIndex = null;
       this.slotDialogMode = 'single';
+      this.editingSlotType = null;
     });
   }
 
@@ -2211,7 +2391,9 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
     this.editingDateIndex = dateIndex;
 
     const dateEntry = row.stageData[stageName].dates[dateIndex];
+    this.editingSlotType = dateEntry.slottype || 'queue';
     this.editingDateEntry = {
+      docid: dateEntry.docid ?? null,
       title: dateEntry.title ? dateEntry.title : null,
       description: dateEntry.description ? dateEntry.description : null,
       startdate: dateEntry.startdate ? new Date(dateEntry.startdate) : null,
@@ -2221,40 +2403,184 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
       maxslot: dateEntry.maxslot || 0,
       usedslot: dateEntry.usedslot || 0,
       bigparticipants: dateEntry.bigparticipants || [],
-      participants: dateEntry.participants || []
+      participants: dateEntry.participants || [],
+      hostref: dateEntry.hostref ?? null,
+      appointmentref: dateEntry.appointmentref ?? null,
+      bookedby: dateEntry.bookedby ?? null
     };
-
+    this.appointmentDateStart = null;
+    this.appointmentDateEnd = null;
+    this.appointmentSlotOptions = [];
+    this.selectedAppointmentSlots = [];
     const dialogRef = this.dialog.open(this.dateEditDialog, {
-      width: '500px'
+      maxWidth: '95vw'
     });
+    this.activeDateDialogRef = dialogRef;
 
     dialogRef.afterClosed().subscribe(() => {
+      // A late close of an earlier dialog must not wipe the state of one opened since.
+      if (this.activeDateDialogRef !== dialogRef) return;
+      this.activeDateDialogRef = null;
       this.editingRow = null;
       this.editingStageName = null;
       this.editingDateIndex = null;
       this.slotDialogMode = 'single';
+      this.editingSlotType = null;
     });
   }
 
   // Update saveDateEntry to handle both adding and editing
-  saveDateEntry() {
-    if (this.editingRow && this.editingStageName !== null) {
-      const startDateTime = this.combineDateAndTime(
-        this.editingDateEntry.startdate,
-        this.editingDateEntry.starttime
-      );
-      const endDateTime = this.combineDateAndTime(
-        this.editingDateEntry.enddate,
-        this.editingDateEntry.endtime
-      );
+  // saveDateEntry() {
+  //   if (this.editingRow && this.editingStageName !== null) {
+  //     const startDateTime = this.combineDateAndTime(
+  //       this.editingDateEntry.startdate,
+  //       this.editingDateEntry.starttime
+  //     );
+  //     const endDateTime = this.combineDateAndTime(
+  //       this.editingDateEntry.enddate,
+  //       this.editingDateEntry.endtime
+  //     );
 
-      if (!startDateTime || !endDateTime) {
-        alert('Please select valid start and end dates');
+  //     if (!startDateTime || !endDateTime) {
+  //       alert('Please select valid start and end dates');
+  //       return;
+  //     }
+
+  //     if (endDateTime <= startDateTime) {
+  //       alert('End date/time must be after start date/time');
+  //       return;
+  //     }
+
+  //     const bigparticipants = this.getBigParticipantsForSlot(
+  //       this.editingRow.selectedVariation,
+  //       this.editingRow.selectedSegment,
+  //       this.editingStageName,
+  //       startDateTime,
+  //       endDateTime
+  //     );
+
+  //     const participants = this.getParticipantsForSlot(
+  //       this.editingRow.selectedVariation,
+  //       this.editingRow.selectedSegment,
+  //       this.editingStageName,
+  //       startDateTime,
+  //       endDateTime
+  //     );
+
+  //     const newDateEntry = {
+  //       ...this.editingDateEntry,
+  //       bigparticipants: bigparticipants,
+  //       participants: participants,
+  //       usedslot: participants.length
+  //     };
+
+  //     if (this.editingDateIndex !== null) {
+  //       // Editing existing slot
+  //       this.editingRow.stageData[this.editingStageName].dates[this.editingDateIndex] = newDateEntry;
+  //     } else {
+  //       // Adding new slot - check for duplicates
+  //       const isDuplicate = this.editingRow.stageData[this.editingStageName].dates.some(dateEntry => {
+  //         const existingStart = this.combineDateAndTime(dateEntry.startdate, dateEntry.starttime);
+  //         const existingEnd = this.combineDateAndTime(dateEntry.enddate, dateEntry.endtime);
+          
+  //         return existingStart?.getTime() === startDateTime?.getTime() && 
+  //               existingEnd?.getTime() === endDateTime?.getTime();
+  //       });
+
+  //       if (isDuplicate) {
+  //         alert('A slot with the same date and time already exists for this stage');
+  //         return;
+  //       }
+
+  //       // Add new slot
+  //       this.editingRow.stageData[this.editingStageName].dates.push(newDateEntry);
+  //     }
+
+  //     this.dialog.closeAll();
+  //     this.savePlanning();
+  //   }
+  // }
+
+  async saveDateEntry() {
+  if (this.editingRow && this.editingStageName !== null) {
+    const startDateTime = this.combineDateAndTime(
+      this.editingDateEntry.startdate,
+      this.editingDateEntry.starttime
+    );
+    const endDateTime = this.combineDateAndTime(
+      this.editingDateEntry.enddate,
+      this.editingDateEntry.endtime
+    );
+    if (!startDateTime || !endDateTime) {
+      alert('Please select valid start and end dates');
+      return;
+    }
+    if (endDateTime <= startDateTime) {
+      alert('End date/time must be after start date/time');
+      return;
+    }
+
+    const participants = this.getParticipantsForSlot(
+      this.editingRow.selectedVariation,
+      this.editingRow.selectedSegment,
+      this.editingStageName,
+      startDateTime,
+      endDateTime
+    );
+
+    const slotData: any = {
+      queueid: this.selectedQueue['docid'],
+      queueref: doc(this.firestore, 'queue generation', this.selectedQueue['docid']),
+      variationid: this.editingRow.selectedVariation,
+      segmentid: this.editingRow.selectedSegment,
+      stagename: this.editingStageName,
+      slottype: 'queue',
+      title: this.editingDateEntry.title,
+      description: this.editingDateEntry.description,
+      startdate: Timestamp.fromDate(startDateTime),
+      enddate: Timestamp.fromDate(endDateTime),
+      maxslot: this.editingDateEntry.maxslot || 0,
+      usedslot: participants.length,
+      cohort: this.editingRow.stageData[this.editingStageName].cohortIds || [],
+      updatedAt: serverTimestamp()
+    };
+
+    if (this.editingDateIndex !== null) {
+      const existingEntry = this.editingRow.stageData[this.editingStageName].dates[this.editingDateIndex];
+
+      const isDuplicate = this.editingRow.stageData[this.editingStageName].dates.some((dateEntry, index) => {
+        if (index === this.editingDateIndex) return false;
+        const existingStart = this.combineDateAndTime(dateEntry.startdate, dateEntry.starttime);
+        const existingEnd = this.combineDateAndTime(dateEntry.enddate, dateEntry.endtime);
+        return existingStart?.getTime() === startDateTime?.getTime() &&
+              existingEnd?.getTime() === endDateTime?.getTime();
+      });
+
+      if (isDuplicate) {
+        alert('A slot with the same date and time already exists for this stage');
         return;
       }
 
-      if (endDateTime <= startDateTime) {
-        alert('End date/time must be after start date/time');
+      await setDoc(doc(this.firestore, 'queue availability', existingEntry['docid']), slotData, { merge: true });
+
+      this.editingRow.stageData[this.editingStageName].dates[this.editingDateIndex] = {
+        ...this.editingDateEntry,
+        docid: existingEntry['docid'],
+        slottype: 'queue',
+        bigparticipants: existingEntry.bigparticipants,
+        participants: participants,
+        usedslot: participants.length
+      };
+    } else {
+      const isDuplicate = this.editingRow.stageData[this.editingStageName].dates.some(dateEntry => {
+        const existingStart = this.combineDateAndTime(dateEntry.startdate, dateEntry.starttime);
+        const existingEnd = this.combineDateAndTime(dateEntry.enddate, dateEntry.endtime);
+        return existingStart?.getTime() === startDateTime?.getTime() &&
+              existingEnd?.getTime() === endDateTime?.getTime();
+      });
+
+      if (isDuplicate) {
+        alert('A slot with the same date and time already exists for this stage');
         return;
       }
 
@@ -2266,56 +2592,32 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
         endDateTime
       );
 
-      const participants = this.getParticipantsForSlot(
-        this.editingRow.selectedVariation,
-        this.editingRow.selectedSegment,
-        this.editingStageName,
-        startDateTime,
-        endDateTime
-      );
+      slotData.createdAt = serverTimestamp();
+      const newDocRef = doc(collection(this.firestore, 'queue availability'));
+      await setDoc(newDocRef, slotData);
 
-      const newDateEntry = {
+      this.editingRow.stageData[this.editingStageName].dates.push({
         ...this.editingDateEntry,
+        docid: newDocRef.id,
+        slottype: 'queue',
         bigparticipants: bigparticipants,
         participants: participants,
         usedslot: participants.length
-      };
-
-      if (this.editingDateIndex !== null) {
-        // Editing existing slot
-        this.editingRow.stageData[this.editingStageName].dates[this.editingDateIndex] = newDateEntry;
-      } else {
-        // Adding new slot - check for duplicates
-        const isDuplicate = this.editingRow.stageData[this.editingStageName].dates.some(dateEntry => {
-          const existingStart = this.combineDateAndTime(dateEntry.startdate, dateEntry.starttime);
-          const existingEnd = this.combineDateAndTime(dateEntry.enddate, dateEntry.endtime);
-          
-          return existingStart?.getTime() === startDateTime?.getTime() && 
-                existingEnd?.getTime() === endDateTime?.getTime();
-        });
-
-        if (isDuplicate) {
-          alert('A slot with the same date and time already exists for this stage');
-          return;
-        }
-
-        // Add new slot
-        this.editingRow.stageData[this.editingStageName].dates.push(newDateEntry);
-      }
-
-      this.dialog.closeAll();
-      this.savePlanning();
+      });
     }
+
+    this.dialog.closeAll();
+    this.guard.openSnackBar('Slot saved successfully', 'OK', 600);
   }
+}
 
   // Keep the saveMultiSegmentSlot method as is
-  saveMultiSegmentSlot() {
+  async saveMultiSegmentSlot() {
     if (!this.isMultiSlotDataValid()) {
       alert('Please fill in all required fields');
       return;
     }
 
-    // Use editingDateEntry values for the slot data
     const startDateTime = this.combineDateAndTime(this.editingDateEntry.startdate, this.editingDateEntry.starttime);
     const endDateTime = this.combineDateAndTime(this.editingDateEntry.enddate, this.editingDateEntry.endtime);
 
@@ -2330,62 +2632,69 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
     }
 
     const stageName = this.editingStageName;
-    let slotsCreated = 0;
+    const batch = writeBatch(this.firestore);
+    const rowsToUpdate = [];
     let skippedDuplicates = 0;
-    
-    // Create slots for all selected segments - ONLY for the selected stage
-    this.multiSlotData.selectedSegments.forEach(rowId => {
+
+    for (const rowId of this.multiSlotData.selectedSegments) {
       const row = this.planningRows.find(r => r.id === rowId);
-      
-      if (row) {
-        // Double-check stage is available for this variation
-        if (!this.isStageAvailableForVariation(row, stageName)) {
-          console.warn(`Stage ${stageName} is not available for variation ${this.getVariationName(row.selectedVariation)}`);
-          return;
-        }
 
-        // Initialize stage data if it doesn't exist
-        if (!row.stageData[stageName]) {
-          row.stageData[stageName] = {
-            cohortIds: [],
-            dates: []
-          };
-        }
+      if (!row) continue;
 
-        // Check for duplicate slots
-        const isDuplicate = row.stageData[stageName].dates.some(dateEntry => {
-          const existingStart = this.combineDateAndTime(dateEntry.startdate, dateEntry.starttime);
-          const existingEnd = this.combineDateAndTime(dateEntry.enddate, dateEntry.endtime);
-          
-          return existingStart?.getTime() === startDateTime?.getTime() && 
-                existingEnd?.getTime() === endDateTime?.getTime();
-        });
+      if (!this.isStageAvailableForVariation(row, stageName)) {
+        console.warn(`Stage ${stageName} is not available for variation ${this.getVariationName(row.selectedVariation)}`);
+        continue;
+      }
 
-        if (isDuplicate) {
-          console.warn(`Duplicate slot exists for ${this.getSegmentName(row.selectedSegment)} at ${stageName}`);
-          skippedDuplicates++;
-          return;
-        }
+      if (!row.stageData[stageName]) {
+        row.stageData[stageName] = {
+          cohortIds: [],
+          dates: []
+        };
+      }
 
-        // Calculate participants for this slot
-        const bigparticipants = this.getBigParticipantsForSlot(
-          row.selectedVariation,
-          row.selectedSegment,
-          stageName,
-          startDateTime,
-          endDateTime
-        );
+      const isDuplicate = row.stageData[stageName].dates.some(dateEntry => {
+        const existingStart = this.combineDateAndTime(dateEntry.startdate, dateEntry.starttime);
+        const existingEnd = this.combineDateAndTime(dateEntry.enddate, dateEntry.endtime);
+        return existingStart?.getTime() === startDateTime?.getTime() &&
+              existingEnd?.getTime() === endDateTime?.getTime();
+      });
 
-        const participants = this.getParticipantsForSlot(
-          row.selectedVariation,
-          row.selectedSegment,
-          stageName,
-          startDateTime,
-          endDateTime
-        );
+      if (isDuplicate) {
+        console.warn(`Duplicate slot exists for ${this.getSegmentName(row.selectedSegment)} at ${stageName}`);
+        skippedDuplicates++;
+        continue;
+      }
 
-        // Add the new slot - ONLY to this specific stage
-        row.stageData[stageName].dates.push({
+      const bigparticipants = this.getBigParticipantsForSlot(row.selectedVariation, row.selectedSegment, stageName, startDateTime, endDateTime);
+      const participants = this.getParticipantsForSlot(row.selectedVariation, row.selectedSegment, stageName, startDateTime, endDateTime);
+
+      const slotData = {
+        queueid: this.selectedQueue['docid'],
+        queueref: doc(this.firestore, 'queue generation', this.selectedQueue['docid']),
+        variationid: row.selectedVariation,
+        segmentid: row.selectedSegment,
+        stagename: stageName,
+        slottype: 'queue',
+        title: this.editingDateEntry.title,
+        description: this.editingDateEntry.description,
+        startdate: Timestamp.fromDate(startDateTime),
+        enddate: Timestamp.fromDate(endDateTime),
+        maxslot: this.editingDateEntry.maxslot,
+        usedslot: participants.length,
+        cohort: row.stageData[stageName].cohortIds || [],
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+
+      const newDocRef = doc(collection(this.firestore, 'queue availability'));
+      batch.set(newDocRef, slotData);
+
+      rowsToUpdate.push({
+        row: row,
+        dateEntry: {
+          docid: newDocRef.id,
+          slottype: 'queue',
           title: this.editingDateEntry.title,
           description: this.editingDateEntry.description,
           startdate: new Date(this.editingDateEntry.startdate),
@@ -2396,27 +2705,38 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
           usedslot: participants.length,
           bigparticipants: bigparticipants,
           participants: participants
-        });
+        }
+      });
+    }
 
-        slotsCreated++;
-      }
-    });
-
-    this.dialog.closeAll();
-
-    if (slotsCreated > 0) {
-      let message = `Successfully created ${slotsCreated} slot(s) for stage "${stageName}"`;
-      if (skippedDuplicates > 0) {
-        message += ` (${skippedDuplicates} duplicate(s) skipped)`;
-      }
-      this.guard.openSnackBar(message, 'OK',600);
-      this.savePlanning();
-    } else {
+    if (rowsToUpdate.length === 0) {
+      this.dialog.closeAll();
       if (skippedDuplicates > 0) {
         alert(`No new slots were created. ${skippedDuplicates} duplicate slot(s) were found.`);
       } else {
         alert('No slots were created. Please check the console for warnings.');
       }
+      return;
+    }
+
+    try {
+      await batch.commit();
+
+      rowsToUpdate.forEach(entry => {
+        entry.row.stageData[stageName].dates.push(entry.dateEntry);
+      });
+
+      this.dialog.closeAll();
+
+      let message = `Successfully created ${rowsToUpdate.length} slot(s) for stage "${stageName}"`;
+      if (skippedDuplicates > 0) {
+        message += ` (${skippedDuplicates} duplicate(s) skipped)`;
+      }
+      this.guard.openSnackBar(message, 'OK', 600);
+    } catch (err) {
+      console.log(err);
+      this.dialog.closeAll();
+      alert('Error creating slots. Please try again.');
     }
   }
 
@@ -2460,7 +2780,7 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
 
     this.queueTokenList.forEach(token => {
       if (token.variationid === variationId) {
-        const stageSlots = token.selectedstageslot || {};
+        const stageSlots = this.tokenStageSlots(token);
         
         // Check if any stage has this segment selected
         Object.keys(stageSlots).forEach(stageName => {
@@ -2523,4 +2843,214 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
     });
   }
 
+  async fetchAppointmentAvailability(stageName: string) {
+    if (!this.appointmentDateStart) return;
+
+    this.loadingAppointmentSlots = true;
+    this.appointmentSlotOptions = [];
+    this.appointmentGroups = [];
+    this.selectedAppointmentSlots = [];
+
+    const appointmentTypeRef = this.stageProperty?.[stageName]?.['actionresource'];
+    if (!appointmentTypeRef) {
+      // No appointment type for this stage (or no stage at all) — nothing to load, never leave the spinner on.
+      this.loadingAppointmentSlots = false;
+      return;
+    }
+    const now = new Date();
+    const from = new Date(this.appointmentDateStart); from.setHours(0, 0, 0, 0);
+    const to = new Date(this.appointmentDateEnd || this.appointmentDateStart); to.setHours(23, 59, 59, 999);
+
+    const availabilityDocs = await getDocs(query(
+      collection(this.firestore, 'availability'),
+      where('appointments', 'array-contains', appointmentTypeRef)
+    ));
+
+    const openSlots = [];
+
+    availabilityDocs.docs.forEach(availDoc => {
+      const data = availDoc.data();
+      const slotsForType = data[appointmentTypeRef.id] || [];
+
+      slotsForType.forEach(s => {
+        const slotStartDate = s.slotstart?.toDate ? s.slotstart.toDate() : new Date(s.slotstart);
+
+        if (s.available === true && s.booked !== true && slotStartDate >= now && slotStartDate >= from && slotStartDate <= to) {
+          openSlots.push({
+            availabilityid: availDoc.id,
+            hostref: data['profileref'],
+            specialistName: this.mapProfile[data['profileref'].id] || data['profileref'].id,
+            slotstart: s.slotstart,
+            slotend: s.slotend,
+            selected: false
+          });
+        }
+      });
+    });
+
+    openSlots.sort((a, b) => a.slotstart.toDate().getTime() - b.slotstart.toDate().getTime());
+
+    // Hide slots already reserved in a queue
+    const reservedDocs = await getDocs(query(
+      collection(this.firestore, 'queue availability'),
+      where('slottype', '==', 'appointment'),
+      where('startdate', '>=', Timestamp.fromDate(new Date(from.getTime() - 24 * 60 * 60 * 1000))),
+      where('startdate', '<=', Timestamp.fromDate(to))
+    ));
+    const editingDocId = this.editingDateIndex !== null ? this.editingDateEntry.docid : null;
+    const reserved = reservedDocs.docs.filter(d => d.id !== editingDocId).map(d => d.data());
+
+    this.appointmentSlotOptions = openSlots.filter(open =>
+      !reserved.some(r =>
+        r['hostref']?.id === open.hostref?.id &&
+        r['startdate'].toMillis() < open.slotend.toMillis() &&
+        r['enddate'].toMillis() > open.slotstart.toMillis()
+      )
+    );
+    const bySpecialist = new Map<string, any>();
+    for (const slot of this.appointmentSlotOptions) {
+      const hostId = slot.hostref.id;
+      if (!bySpecialist.has(hostId)) {
+        bySpecialist.set(hostId, { hostId, name: slot.specialistName, days: new Map() });
+      }
+      const days = bySpecialist.get(hostId).days;
+      const start = slot.slotstart.toDate();
+      const dayKey = start.toDateString();
+      if (!days.has(dayKey)) days.set(dayKey, { date: start, slots: [] });
+      days.get(dayKey).slots.push(slot);
+    }
+    this.appointmentGroups = [...bySpecialist.values()].map(g => ({ ...g, days: [...g.days.values()] }));
+    this.appointmentSpecialistFilter = null;
+    this.loadingAppointmentSlots = false;
+  }
+
+  async saveAppointmentSlots() {
+    if (this.selectedAppointmentSlots.length === 0) {
+      alert('Please select at least one slot');
+      return;
+    }
+    const stageName = this.editingStageName;
+    let targetRows: PlanningRow[] = [];
+    if (this.slotDialogMode === 'multi') {
+      targetRows = (this.multiSlotData.selectedSegments || [])
+        .map(rowId => this.planningRows.find(r => r.id === rowId))
+        .filter(r => r && this.isStageAvailableForVariation(r, stageName));
+      if (targetRows.length === 0) {
+        alert('Please select at least one segment');
+        return;
+      }
+    } else {
+      targetRows = [this.editingRow];
+    }
+
+    const batch = writeBatch(this.firestore);
+    const isEdit = this.editingDateIndex !== null;
+    if (isEdit) {
+      const oldSnap = await getDoc(doc(this.firestore, 'queue availability', this.editingDateEntry.docid));
+      const oldData = oldSnap.exists() ? oldSnap.data() : null;
+      if (oldData && (oldData['appointmentref'] || oldData['bookedby'])) {
+        alert('This slot has just been booked by a participant, so it cannot be changed.');
+        return;
+      }
+    }
+    const pending: Array<{ row: PlanningRow, entry: any }> = [];
+    let skipped = 0;
+
+    for (const row of targetRows) {
+      if (!row.stageData[stageName]) {
+        row.stageData[stageName] = { cohortIds: [], dates: [] };
+      }
+
+      for (const slot of this.selectedAppointmentSlots) {
+        const slotStartMs = slot.slotstart.toDate().getTime();
+
+        const isDuplicate = row.stageData[stageName].dates.some(d =>
+          d.slottype === 'appointment' &&
+          d.availabilityid === slot.availabilityid &&
+          this.combineDateAndTime(d.startdate, d.starttime)?.getTime() === slotStartMs
+        );
+        if (isDuplicate) { skipped++; continue; }
+
+        const newDocRef = isEdit? doc(this.firestore, 'queue availability', this.editingDateEntry.docid): doc(collection(this.firestore, 'queue availability'));
+
+        if (isEdit) {
+          batch.update(newDocRef, {
+            startdate: slot.slotstart,
+            enddate: slot.slotend,
+            availabilityid: slot.availabilityid,
+            hostref: slot.hostref,
+            updatedAt: serverTimestamp()
+          });
+        } else {
+          batch.set(newDocRef, {
+            queueid: this.selectedQueue['docid'],
+            queueref: doc(this.firestore, 'queue generation', this.selectedQueue['docid']),
+            variationid: row.selectedVariation,
+            segmentid: row.selectedSegment,
+            stagename: stageName,
+            slottype: 'appointment',
+            startdate: slot.slotstart,
+            enddate: slot.slotend,
+            availabilityid: slot.availabilityid,
+            appointmenttypeid: this.stageProperty[stageName]['actionresource'].id,
+            hostref: slot.hostref,
+            appointmentref: null,
+            bookedby: null,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          });
+        }
+
+        pending.push({
+          row,
+          entry: {
+            docid: newDocRef.id,
+            slottype: 'appointment',
+            availabilityid: slot.availabilityid,
+            startdate: slot.slotstart.toDate(),
+            enddate: slot.slotend.toDate(),
+            starttime: this.formatTimeTo24Hour(slot.slotstart.toDate()),
+            endtime: this.formatTimeTo24Hour(slot.slotend.toDate()),
+            hostref: slot.hostref,
+            specialistName: slot.specialistName,
+            bigparticipants: [],
+            participants: []
+          }
+        });
+      }
+    }
+
+    if (pending.length === 0) {
+      alert(skipped > 0 ? `No new slots created. ${skipped} duplicate(s) skipped.` : 'No slots were created.');
+      return;
+    }
+
+    try {
+      await batch.commit();
+      pending.forEach(p => {
+        if (isEdit) p.row.stageData[stageName].dates[this.editingDateIndex] = p.entry;
+        else p.row.stageData[stageName].dates.push(p.entry);
+      });
+      this.dialog.closeAll();
+      let msg = isEdit ? 'Appointment slot updated' : `${pending.length} appointment slot(s) reserved`;
+      if (skipped > 0) msg += ` (${skipped} duplicate(s) skipped)`;
+      this.guard.openSnackBar(msg, 'OK', 600);
+    } catch (err) {
+      console.log(err);
+      alert('Error saving appointment slots. Please try again.');
+    }
+  }
+
+  toggleAppointmentSlotSelection(slot: any) {
+    slot.selected = !slot.selected;
+    this.selectedAppointmentSlots = this.appointmentSlotOptions.filter(s => s.selected);
+    // Disable slots that overlap a selected slot of the same specialist
+    this.appointmentSlotOptions.forEach(s => {
+      s.blocked = !s.selected && this.selectedAppointmentSlots.some(o =>
+        o.hostref?.id === s.hostref?.id &&
+        o.slotstart.toMillis() < s.slotend.toMillis() &&
+        o.slotend.toMillis() > s.slotstart.toMillis()
+      );
+    });
+  }
 }

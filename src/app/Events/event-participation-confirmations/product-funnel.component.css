@@ -331,6 +331,7 @@
 .sx-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; padding: 10px 12px; }
 .sx-seq { width: 210px; }
 .sx-search { width: 200px; }
+.sx-finance { width: 150px; }
 .sx-hint { font-size: 13px; color: #8a90a0; }
 
 .sx-approve { height: 40px; padding: 0 16px; border-radius: 8px; font-size: 14px; font-weight: 500;
@@ -772,3 +773,31 @@
 .sx-jcard { animation: sx-pop .18s ease-out; }
 @keyframes sx-pop { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .sx-jcard { animation: none; } }
+
+.sx-bd-panel { position: relative; }
+
+/* Group Journey button (top-right of the Approved card) */
+.sx-bd-gbtn {
+  appearance: none;
+  -webkit-appearance: none;
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 3px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: #efe9fb;
+  color: #7a4fc2;
+  font: 600 12px Inter, system-ui, sans-serif;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.sx-bd-gbtn:hover { background: #e4dbf8; }
+.sx-bd-gbtn:focus-visible { outline: 2px solid #1f5bd8; outline-offset: 2px; }
+.sx-bd-gbtn.on { background: #7a4fc2; color: #fff; }
+.sx-bd-gbtn-icon { width: 14px; height: 14px; font-size: 14px; line-height: 14px; }
