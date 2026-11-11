@@ -22,10 +22,9 @@ const rp = body('recomputePipeline');
 check('PL1', 'pipeline card renders only in embed mode, above the table section',
   () => /<div class="card span8 jcd-pipe" id="jcd-onb-pipeline" data-testid="jcd-pipe" \*ngIf="embedOnboarding">/.test(html)
      && html.indexOf('data-testid="jcd-pipe"') < html.indexOf('<div class="jcd-table-section"'));
-check('PL2', 'four stage counts, each opens its own table',
+check('PL2', 'four stage counts live on the board column headers (count button), each opens its own table',
   () => [['jcd-pipe-notassured', 'pipeNotAssured'], ['jcd-pipe-ready', 'pipeReady'], ['jcd-pipe-scheduled', 'pipeScheduled'], ['jcd-pipe-onboarded', 'pipeOnboarded']]
-      .every(([t, k]) => new RegExp(`data-testid="${t}"[^>]*\\(click\\)="onBoxClick\\('${k}'\\)"`).test(html)
-        && html.includes(`{{ originalData['${k}'].count }}`)));
+      .every(([t, k]) => new RegExp(`<div class="jcd-kcol-head">[^\\n]*<button type="button" class="jcd-kcount" data-testid="${t}"[^>]*\\[class\\.on\\]="showTable && tableType === '${k}'" \\(click\\)="onBoxClick\\('${k}'\\)">\\{\\{ originalData\\['${k}'\\]\\.count \\}\\}</button></div>`).test(html)));
 check('PL3', 'tile == list: every stage table reads the same originalData key its tile counts',
   () => ['pipeNotAssured', 'pipeReady', 'pipeScheduled', 'pipeOnboarded']
       .every(k => new RegExp(`${k}: \\{[^}]*dataKey: '${k}'`).test(ts)));
@@ -63,8 +62,9 @@ check('PL12', 'old 5-bucket intake funnel removed from the Onboarding tab',
           return !sec.includes('<app-onboarding-pipeline>') && !sec.includes('jx-onboarding-pipeline'); });
 check('PL13', 'table opens only from a count (showTable defaults false; no auto-open)',
   () => /\n  showTable = false;/.test(ts) && !/this\.showTable = true;[^\n]*\n[^\n]*embedOnboarding/.test(ts));
-check('PL14', 'pipeline styles scoped to .jcd-embed',
-  () => /\.jcd-root\.jcd-embed \.jcd-pstrip \{/.test(css) && !/^\.jcd-root \.jcd-pstrip/m.test(css));
+check('PL14', 'pipeline styles scoped to .jcd-embed; the old tile-row styles are gone',
+  () => /\.jcd-root\.jcd-embed \.jcd-kcol-sub \{/.test(css) && /\.jcd-root\.jcd-embed \.k-na \.jcd-kcount\.on \{/.test(css)
+     && !/jcd-pstrip/.test(css) && !/^\.jcd-root \.jcd-kcol-sub/m.test(css));
 
 console.log(failed ? `\n${failed} FAIL` : '\nALL PASS');
 process.exit(failed ? 1 : 0);

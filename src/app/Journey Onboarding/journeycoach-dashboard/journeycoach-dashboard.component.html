@@ -64,6 +64,8 @@
   <div class="cbody">
     <!-- Embedded in coach-health Onboarding tab: count only (operator 2026-11-11). Standalone keeps full detail. -->
     <div class="big jcd-embed-count" data-testid="jcd-embed-gross-count" *ngIf="embedOnboarding">{{originalData['grosssale'].count}}</div>
+    <!-- Embed: pending-approval chip opens the gross sales table filtered to Status = Pending (same predicate as the count). -->
+    <button type="button" class="jcd-embed-pending" data-testid="jcd-embed-gross-pending" *ngIf="embedOnboarding" [class.on]="showTable && tableType === 'grossSales' && filterForm.value.status === 'Pending'" (click)="openGrossPending($event)">Pending approval <b>{{ getGrossPendingCount() }}</b></button>
     <ng-container *ngIf="!embedOnboarding">
     <div class="big"><span class="c">&#8377;</span>{{totalGrossValue.toLocaleString('en-IN')}}</div><div class="sub2">EMI &#8377;{{totalGrossEMI.toLocaleString('en-IN')}} · {{approvedGrossSales}} approved · +{{pendingGrossSales}} pending</div>
     <div class="split"><div class="sbox pos"><div class="k">New</div><div data-testid="jcd-div-013" class="v" (click)="onGrossSplitClick($event,'grossNewSales')">{{grossSalesSplit['new']}}</div><div class="m">&#8377;{{grossSalesSplit['newEMI'].toLocaleString('en-IN')}}</div></div><div class="sbox"><div class="k">Upgrade</div><div data-testid="jcd-div-014" class="v" (click)="onGrossSplitClick($event,'grossUpgradeSales')">{{grossSalesSplit['upgrades']}}</div><div class="m">&#8377;{{grossSalesSplit['upgradesEMI'].toLocaleString('en-IN')}}</div></div><div class="sbox"><div class="k">Add-on</div><div data-testid="jcd-div-015" class="v" (click)="onGrossSplitClick($event,'grossAddonSales')">{{grossSalesSplit['addons']}}</div><div class="m">&#8377;{{grossSalesSplit['addonsEMI'].toLocaleString('en-IN')}}</div></div></div>
@@ -139,39 +141,33 @@
     </div>
   </div>
   <div class="cbody">
-    <div class="jcd-pstrip">
-      <div data-testid="jcd-pipe-notassured" class="orc st1" [class.on]="showTable && tableType === 'pipeNotAssured'" (click)="onBoxClick('pipeNotAssured')"><div class="k">Not Assured</div><div class="s">Gross sales · no payment plan</div><div class="v">{{ originalData['pipeNotAssured'].count }}</div></div>
-      <div data-testid="jcd-pipe-ready" class="orc st2" [class.on]="showTable && tableType === 'pipeReady'" (click)="onBoxClick('pipeReady')"><div class="k">Ready for Onboarding</div><div class="s">Assured sales · no call booked</div><div class="v">{{ originalData['pipeReady'].count }}</div></div>
-      <div data-testid="jcd-pipe-scheduled" class="orc st3" [class.on]="showTable && tableType === 'pipeScheduled'" (click)="onBoxClick('pipeScheduled')"><div class="k">Scheduled for Onboarding</div><div class="s">Call booked · not onboarded</div><div class="v">{{ originalData['pipeScheduled'].count }}</div></div>
-      <div data-testid="jcd-pipe-onboarded" class="orc st4" [class.on]="showTable && tableType === 'pipeOnboarded'" (click)="onBoxClick('pipeOnboarded')"><div class="k">Onboarded</div><div class="s">Marked onboarded</div><div class="v">{{ originalData['pipeOnboarded'].count }}</div></div>
-    </div>
-    <div class="sub2">Date filter: purchase date for the first three stages, onboarded date for Onboarded · each participant sits in one stage · click a count to open its table</div>
+    <div class="sub2">Date filter: purchase date for the first three stages, onboarded date for Onboarded · each participant sits in one stage · click a column count to open its table</div>
 
     <!-- Card board: drag a card forward to open the existing Schedule / Mark Onboarded flow -->
     <div class="jcd-kboard" cdkDropListGroup data-testid="jcd-pipe-board">
       <div class="jcd-kcol k-na">
-        <div class="jcd-kcol-head"><span class="jcd-kcol-title">Not Assured</span><span class="jcd-kcount">{{ originalData['pipeNotAssured'].count }}</span></div>
+        <div class="jcd-kcol-head"><div class="jcd-kcol-hl"><span class="jcd-kcol-title">Not Assured</span><span class="jcd-kcol-sub">Gross sales · no payment plan</span></div><button type="button" class="jcd-kcount" data-testid="jcd-pipe-notassured" title="Open table" [class.on]="showTable && tableType === 'pipeNotAssured'" (click)="onBoxClick('pipeNotAssured')">{{ originalData['pipeNotAssured'].count }}</button></div>
         <div class="jcd-kcol-body" cdkDropList id="pipe-col-na" [cdkDropListData]="originalData['pipeNotAssured'].data" (cdkDropListDropped)="onPipelineDrop($event)" data-testid="jcd-pipe-col-notassured">
           <div class="jcd-kdrag" *ngFor="let row of originalData['pipeNotAssured'].data; trackBy: pipeTrack" cdkDrag [cdkDragData]="row" cdkDragPreviewContainer="parent"><ng-container *ngTemplateOutlet="pipeCard; context: { $implicit: row, stage: 'na' }"></ng-container></div>
           <div class="jcd-kempty" *ngIf="!originalData['pipeNotAssured'].count">No participants in this stage.</div>
         </div>
       </div>
       <div class="jcd-kcol k-ready">
-        <div class="jcd-kcol-head"><span class="jcd-kcol-title">Ready for Onboarding</span><span class="jcd-kcount">{{ originalData['pipeReady'].count }}</span></div>
+        <div class="jcd-kcol-head"><div class="jcd-kcol-hl"><span class="jcd-kcol-title">Ready for Onboarding</span><span class="jcd-kcol-sub">Assured sales · no call booked</span></div><button type="button" class="jcd-kcount" data-testid="jcd-pipe-ready" title="Open table" [class.on]="showTable && tableType === 'pipeReady'" (click)="onBoxClick('pipeReady')">{{ originalData['pipeReady'].count }}</button></div>
         <div class="jcd-kcol-body" cdkDropList id="pipe-col-ready" [cdkDropListData]="originalData['pipeReady'].data" (cdkDropListDropped)="onPipelineDrop($event)" data-testid="jcd-pipe-col-ready">
           <div class="jcd-kdrag" *ngFor="let row of originalData['pipeReady'].data; trackBy: pipeTrack" cdkDrag [cdkDragData]="row" cdkDragPreviewContainer="parent"><ng-container *ngTemplateOutlet="pipeCard; context: { $implicit: row, stage: 'ready' }"></ng-container></div>
           <div class="jcd-kempty" *ngIf="!originalData['pipeReady'].count">No participants in this stage.</div>
         </div>
       </div>
       <div class="jcd-kcol k-sched">
-        <div class="jcd-kcol-head"><span class="jcd-kcol-title">Scheduled for Onboarding</span><span class="jcd-kcount">{{ originalData['pipeScheduled'].count }}</span></div>
+        <div class="jcd-kcol-head"><div class="jcd-kcol-hl"><span class="jcd-kcol-title">Scheduled for Onboarding</span><span class="jcd-kcol-sub">Call booked · not onboarded</span></div><button type="button" class="jcd-kcount" data-testid="jcd-pipe-scheduled" title="Open table" [class.on]="showTable && tableType === 'pipeScheduled'" (click)="onBoxClick('pipeScheduled')">{{ originalData['pipeScheduled'].count }}</button></div>
         <div class="jcd-kcol-body" cdkDropList id="pipe-col-sched" [cdkDropListData]="originalData['pipeScheduled'].data" (cdkDropListDropped)="onPipelineDrop($event)" data-testid="jcd-pipe-col-scheduled">
           <div class="jcd-kdrag" *ngFor="let row of originalData['pipeScheduled'].data; trackBy: pipeTrack" cdkDrag [cdkDragData]="row" cdkDragPreviewContainer="parent"><ng-container *ngTemplateOutlet="pipeCard; context: { $implicit: row, stage: 'sched' }"></ng-container></div>
           <div class="jcd-kempty" *ngIf="!originalData['pipeScheduled'].count">No participants in this stage.</div>
         </div>
       </div>
       <div class="jcd-kcol k-ob">
-        <div class="jcd-kcol-head"><span class="jcd-kcol-title">Onboarded</span><span class="jcd-kcount">{{ originalData['pipeOnboarded'].count }}</span></div>
+        <div class="jcd-kcol-head"><div class="jcd-kcol-hl"><span class="jcd-kcol-title">Onboarded</span><span class="jcd-kcol-sub">Marked onboarded</span></div><button type="button" class="jcd-kcount" data-testid="jcd-pipe-onboarded" title="Open table" [class.on]="showTable && tableType === 'pipeOnboarded'" (click)="onBoxClick('pipeOnboarded')">{{ originalData['pipeOnboarded'].count }}</button></div>
         <div class="jcd-kcol-body" cdkDropList id="pipe-col-ob" [cdkDropListData]="originalData['pipeOnboarded'].data" (cdkDropListDropped)="onPipelineDrop($event)" data-testid="jcd-pipe-col-onboarded">
           <div class="jcd-kdrag" *ngFor="let row of originalData['pipeOnboarded'].data; trackBy: pipeTrack" cdkDrag [cdkDragData]="row" [cdkDragDisabled]="true"><ng-container *ngTemplateOutlet="pipeCard; context: { $implicit: row, stage: 'ob' }"></ng-container></div>
           <div class="jcd-kempty" *ngIf="!originalData['pipeOnboarded'].count">No participants in this stage.</div>
@@ -776,7 +772,7 @@
     <!-- Pagination -->
     <div class="jcd-pagination-bar">
       <div class="jcd-pagination-info">
-        Showing {{ (currentPage-1)*itemsPerPage+1 }}–{{ Math.min(currentPage*itemsPerPage, filteredTableData.length) }} of {{ filteredTableData.length }}
+        Showing {{ (currentPage-1)*itemsPerPage+1 }}–{{ Math.min(currentPage*itemsPerPage, currentTableConfig?.data?.length || 0) }} of {{ currentTableConfig?.data?.length || 0 }}
       </div>
       <div class="jcd-pagination-btns">
         <button data-testid="jcd-btn-159" class="jcd-pg-btn" (click)="firstPage()" [disabled]="currentPage===1" title="First">

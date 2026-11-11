@@ -22,7 +22,8 @@ The 5-bucket intake funnel (incl. Welcome Call buckets) is removed from this tab
 
 ## User moves
 1. Open the URL, click Onboarding (testid: jx-tab-onboarding). No table is open.
-2. Pipeline (testid: jcd-pipe) shows 4 counts: jcd-pipe-notassured, jcd-pipe-ready, jcd-pipe-scheduled, jcd-pipe-onboarded.
+2. Pipeline (testid: jcd-pipe) shows 4 counts on the board column headers (count buttons; the separate tile row was
+   removed 2026-11-11, see jc-onboarding-pending-tiles): jcd-pipe-notassured, jcd-pipe-ready, jcd-pipe-scheduled, jcd-pipe-onboarded.
 3. Click a stage count: its table opens below with that many rows; actions are the existing Schedule / Mark Onboarded / Journey Plan.
 4. Click a journey (testid: jcd-pipe-journey-opt): stage counts and the open table change; "All" (jcd-pipe-journey-all) restores.
 5. Click To onboard (jcd-div-035): table shows Schedule, Action, Journey Plan together; mobile + email under the

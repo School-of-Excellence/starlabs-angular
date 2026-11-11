@@ -946,6 +946,15 @@ export class JourneycoachDashboardComponent {
   getGrossAssuredCount() { return engine.countAssured(this.originalData['grosssale']?.data || []); }
   getGrossNotAssuredCount() { return engine.countNotAssured(this.originalData['grosssale']?.data || []); }
 
+  // Embed Gross Sales "Pending approval" chip: open the gross sales table with only Status = Pending applied,
+  // so the rows shown == getGrossPendingCount(). Keeps the table open if it already is (no toggle-close).
+  openGrossPending(event: Event) {
+    event.stopPropagation();
+    if (!(this.showTable && this.tableType === 'grossSales')) this.onBoxClick('grossSales');
+    this.filterForm.patchValue({ search: '', journey: '', journeycoach: '', purchaseStart: '', purchaseEnd: '', assured: '', status: 'Pending', saleType: '', customerStatus: '' });
+    this.filterTableData(this.filterForm.value);
+  }
+
   // Participant Health (Option B): KPI strip from real sources; full coach-set-health board lives at /journey-coach-health
   goToHealthBoard() { const url = this.router.serializeUrl(this.router.createUrlTree(['/journey-coach-health'])); window.open(url, '_blank'); }
   getRenewingSoon() { return (this.originalData['currentMonth']?.count || 0) + (this.originalData['nextMonth']?.count || 0); }
@@ -3230,10 +3239,11 @@ export class JourneycoachDashboardComponent {
 
       if (selectedStatusData.trim()) {
 
+        // Same predicate as the Pending legend/chip counts (engine.isPending), so filter rows == count.
         if (selectedStatusData == 'Approved') {
-          matchesStatus = ![null, undefined, ""].includes(row['status']);
+          matchesStatus = !engine.isPending(row);
         } else {
-          matchesStatus = [null, undefined, ""].includes(row['status']);
+          matchesStatus = engine.isPending(row);
         }
 
       }
