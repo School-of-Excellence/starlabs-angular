@@ -3608,9 +3608,13 @@ export class DeliveryDashboardCloneComponent {
                     minimumpayment: this.minimumPayment,
                     tentativestart: this.tentativeStartDate,
                     deliverytype: this.selectedDeliveryType,
-                    statusdate: {
-                        initiated: serverTimestamp()
-                    }
+                    // Dot path, NOT `statusdate: { initiated: ... }`. updateDoc REPLACES a map
+                    // value, so the object form silently destroyed statusdate.started / .ongoing /
+                    // .completed — the very fields this dashboard reads to compute lastActivity.
+                    // Re-initiating a mid-flow participant wiped their history and dropped them out
+                    // of Stuck Cases. Matches queue-planning-review.component.ts:5606 and
+                    // product-funnel.component.ts:1031, which both already use this form.
+                    'statusdate.initiated': serverTimestamp()
                 })
             );
             await Promise.all(updatePromises);
