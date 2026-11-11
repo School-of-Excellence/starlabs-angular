@@ -33,7 +33,7 @@ import { AuthguardService } from '../../authguard.service';
 import { computeHealth, normalizeTier, recencyScore, HealthState, ParticipantSignals } from './health-score.engine';
 import { LogCallDialogComponent, LogCallResult } from './log-call-dialog.component';
 import { SetHealthStateDialogComponent, SetHealthStateResult } from './set-health-state-dialog.component';
-import { ParticipantSlideoverComponent, SlideoverData, SlideoverActivityItem, SlideoverLogPayload } from './participant-slideover.component';
+import { ParticipantSlideoverComponent, SlideoverData, SlideoverActivityItem, SlideoverLogPayload, SlideoverFollowUp } from './participant-slideover.component';
 import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 import { JourneycoachDashboardComponent } from '../journeycoach-dashboard/journeycoach-dashboard.component';
 import { JcEvprepBoardComponent } from '../jc-evprep-board/jc-evprep-board.component';
@@ -133,6 +133,10 @@ type CoachMetric = 'caseload' | 'active' | 'needToday' | 'goingQuiet' | 'flagged
 interface JcDoneEvent { profileid: string; coachId: string | null; ms: number; onboarding?: boolean; }
 /** Overall Summary · Sales by Journey row (counts of the dashboard's Gross New / Upgrade / Add-on sets). */
 interface OvSalesRow { id: string; name: string; newN: number; upN: number; addN: number; total: number; }
+/** Overall Summary · Planned journey: one `participantplanning` doc reduced to what the grid needs. */
+interface OvPlanDoc { profileid: string; ym: string; solarvoice: boolean; eiflix: boolean; generalcontent: boolean; workshop: boolean; productIds: string[]; }
+/** One grid row: a plan category or a product name; cells[i] = distinct participants planned in month i. */
+interface OvPlanRow { key: string; label: string; cells: string[][]; }
 
 /** Product-type classification, derived from the `journey` collection's `type` field
  *  (and the special-cased FTO journey for gifts) — the same signal the sales dashboards use. */
@@ -169,6 +173,15 @@ interface LiteIndexRow {
 interface JourneyGroup { id: string; name: string; journeys: string[]; }
 
 interface AhDrillEntry { profileid: string; name: string; created: number; }
+
+/** Daily trend (item 6): one healthtracker_activity {type:'daily_snapshot'} doc per scope per day,
+ *  id `snap_${scope}_${YYYY-MM-DD}`, no profileid (never in a timeline), no names. */
+type TrendKey = 'needsAttention' | 'goingQuiet' | 'paymentsLocked' | 'defaulted';
+interface DailySnap { date: string; counts: Record<TrendKey, number>; needsAttentionIds: string[]; goingQuietIds: string[]; }
+
+/** One scheduled follow-up: a healthtracker_activity {type:'schedule'} event. Open until a
+ *  {type:'schedule_done', scheduleId} event exists for it. dueMs = local midnight of the due day. */
+interface FollowUp { id: string; profileid: string; dueMs: number | null; note: string; actorName: string; }
 
 /** Ask A&H / Love Letter analytics (item 3) — flag breakdown per collection + combined + resolved. */
 interface AHFlagCounts { total: number; tagged: number; opportunity: number; liked: number; critical: number; resolved: number; }
@@ -247,6 +260,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     // ONE shared Onboarding dashboard instance (operator 2026-11-11, option B): mounted the first time
     // Overall or Onboarding opens, then kept alive (hidden off its tab) so both tabs read the same load.
     if (t === 'overall' || t === 'onboarding') this.jcdMounted = true;
+    if (t === 'overall') void this.ensureOvPlan();
   }
 
   // ═══ Overall Summary tab (operator spec 2026-11-11) ═══════════════════════════════════════════
@@ -364,13 +378,17 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
   // ── 3. Scheduled & completed (Journey Coaching and Onboarding kept separate) ──
   /** Booked sessions for one schedule, same predicates as the Planning Schedule card (schedCounts). */
-  private ovPending(onboarding: boolean, bucket: 'today' | 'week'): JcDoneEvent[] {
+  private ovPending(onboarding: boolean, bucket: 'today' | 'week' | 'month'): JcDoneEvent[] {
     const now = Date.now();
     const endToday = this.endOfDay(new Date()).getTime();
     const week7 = endToday + 7 * 86400000;
+    // Next 30 days = days 1-30 after today (includes the next 7; today excluded, like 'week').
+    const month30 = endToday + 30 * 86400000;
     const inScope = new Set(this.rosterIds());
     return this.jcPendingEvents().filter(e => (e.onboarding === true) === onboarding && inScope.has(e.profileid)
-      && e.ms >= now && (bucket === 'today' ? e.ms <= endToday : (e.ms > endToday && e.ms <= week7)));
+      && e.ms >= now && (bucket === 'today' ? e.ms <= endToday
+        : bucket === 'week' ? (e.ms > endToday && e.ms <= week7)
+        : (e.ms > endToday && e.ms <= month30)));
   }
   /** Attended sessions in the Overall date range (JC = jcDoneEvents, Onboarding = obDoneEvents). */
   private ovDone(onboarding: boolean): JcDoneEvent[] {
@@ -381,17 +399,125 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     return (onboarding ? this.obDoneEvents() : this.jcDoneEvents())
       .filter(e => inScope.has(e.profileid) && e.ms >= from && e.ms <= to);
   }
-  ovSched(): { jcToday: number; jcWeek: number; jcDone: number; obToday: number; obWeek: number; obDone: number; ready: boolean } {
+  ovSched(): { jcToday: number; jcWeek: number; jcMonth: number; jcDone: number; obToday: number; obWeek: number; obMonth: number; obDone: number; ready: boolean } {
     return {
-      jcToday: this.ovPending(false, 'today').length, jcWeek: this.ovPending(false, 'week').length, jcDone: this.ovDone(false).length,
-      obToday: this.ovPending(true, 'today').length, obWeek: this.ovPending(true, 'week').length, obDone: this.ovDone(true).length,
+      jcToday: this.ovPending(false, 'today').length, jcWeek: this.ovPending(false, 'week').length,
+      jcMonth: this.ovPending(false, 'month').length, jcDone: this.ovDone(false).length,
+      obToday: this.ovPending(true, 'today').length, obWeek: this.ovPending(true, 'week').length,
+      obMonth: this.ovPending(true, 'month').length, obDone: this.ovDone(true).length,
       ready: this.contactDataLoaded(),
     };
   }
-  ovSchedDrill(onboarding: boolean, what: 'today' | 'week' | 'done', title: string): void {
+  ovSchedDrill(onboarding: boolean, what: 'today' | 'week' | 'month' | 'done', title: string): void {
     const ev = what === 'done' ? this.ovDone(onboarding) : this.ovPending(onboarding, what);
     this.openOvDrill(title, ev.map(e => ({ profileid: e.profileid, name: this.nameOf(e.profileid), created: e.ms })),
       what === 'done' ? 'desc' : 'asc');
+  }
+
+  // ── 4. Planned journey · next 6 months (participantplanning, written by journeyplan.component) ──
+  //  One doc per participant per month (id `${profileid}_${MM}_${YYYY}`). Read ONLY for the viewed coach's
+  //  roster in batched `profileid in` queries (no composite index; month filtered client-side). Product
+  //  names resolve from the referenced `products` docs (catalog, cached). ALL / UNASSIGNED show a note.
+  ovPlan = signal<{ coachId: string; status: 'loading' | 'ready' | 'error'; rows: OvPlanRow[] } | null>(null);
+  private ovPlanToken = 0;
+  private productNameCache: Record<string, string> = {};
+  /** The grid only renders for a specific coach (ALL / UNASSIGNED would mean reading every plan). */
+  ovPlanCoachScoped(): boolean {
+    return !!this.selectedCoachId && this.selectedCoachId !== this.ALL && this.selectedCoachId !== this.UNASSIGNED;
+  }
+  /** Next 6 months, current month first. */
+  ovPlanMonths(): { ym: string; label: string; ms: number }[] {
+    const now = new Date();
+    return this.memo('ovPlanMonths', [now.getFullYear(), now.getMonth()], () => this.buildOvPlanMonths(now));
+  }
+  private buildOvPlanMonths(now: Date): { ym: string; label: string; ms: number }[] {
+    const out: { ym: string; label: string; ms: number }[] = [];
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+      out.push({ ym: this.ovYm(d), label: d.toLocaleString('en-US', { month: 'short' }) + ' ' + String(d.getFullYear()).slice(2), ms: d.getTime() });
+    }
+    return out;
+  }
+  private ovYm(d: Date): string { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
+  /** Load (once per coach) the plan docs for the viewed coach's roster and build the grid. */
+  async ensureOvPlan(): Promise<void> {
+    if (!this.ovPlanCoachScoped() || this.experienceTab !== 'overall') return;
+    const coachId = this.selectedCoachId;
+    const cur = this.ovPlan();
+    if (cur && cur.coachId === coachId && cur.status !== 'error') return;
+    const ids = this.rosterIds();
+    if (!ids.length && this.loading) return;   // roster not loaded yet; ngOnInit re-calls once it is
+    const token = ++this.ovPlanToken;
+    this.ovPlan.set({ coachId, status: 'loading', rows: [] });
+    try {
+      const months = this.ovPlanMonths();
+      const inWindow = new Set(months.map(m => m.ym));
+      const docs: OvPlanDoc[] = [];
+      const snaps = await Promise.all(this.chunk30(ids).map(c =>
+        getDocs(query(collection(this.firestore, 'participantplanning'), where('profileid', 'in', c)))));
+      for (const snap of snaps) snap.forEach(d => {
+        const x: any = d.data();
+        const pid = typeof x['profileid'] === 'string' ? x['profileid'] : '';
+        let ms = this.toDate(x['monthstartdate']);
+        if (!ms) {   // fall back to the deterministic doc id `${profileid}_${MM}_${YYYY}`
+          const m = /_(\d{2})_(\d{4})$/.exec(d.id);
+          if (m) ms = new Date(Number(m[2]), Number(m[1]) - 1, 1);
+        }
+        if (!pid || !ms) return;
+        const ym = this.ovYm(ms);
+        if (!inWindow.has(ym)) return;
+        const arr = (v: any): any[] => Array.isArray(v) ? v : [];
+        docs.push({
+          profileid: pid, ym,
+          solarvoice: arr(x['solarvoice']).length > 0, eiflix: arr(x['eiflix']).length > 0,
+          generalcontent: arr(x['generalcontent']).length > 0, workshop: arr(x['workshop']).length > 0,
+          productIds: arr(x['products']).map((r: any) => (typeof r === 'string' ? r : r?.id) ?? '').filter(Boolean),
+        });
+      });
+      // resolve product names (catalog collection), batched by document id, cached across coaches
+      const need = [...new Set(docs.flatMap(d => d.productIds))].filter(id => !(id in this.productNameCache));
+      const psnaps = await Promise.all(this.chunk30(need).map(c =>
+        getDocs(query(collection(this.firestore, 'products'), where(documentId(), 'in', c)))));
+      for (const ps of psnaps) ps.forEach(d => {
+        const x: any = d.data();
+        this.productNameCache[d.id] = String(x['product'] ?? x['name'] ?? '').trim() || 'Unnamed product';
+      });
+      for (const id of need) if (!(id in this.productNameCache)) this.productNameCache[id] = 'Unknown product';
+      if (token !== this.ovPlanToken) return;
+      this.ovPlan.set({ coachId, status: 'ready', rows: this.buildOvPlanRows(docs, months.map(m => m.ym)) });
+    } catch (e) {
+      console.warn('participantplanning read failed', e);
+      if (token === this.ovPlanToken) this.ovPlan.set({ coachId, status: 'error', rows: [] });
+    }
+  }
+  /** Rows: Solar Voice, EiFlix, General content, Workshops, then one row per planned product name.
+   *  Cell = distinct participants with that item planned in that month. */
+  private buildOvPlanRows(docs: OvPlanDoc[], yms: string[]): OvPlanRow[] {
+    const idx = new Map(yms.map((ym, i) => [ym, i]));
+    const cats: { key: keyof OvPlanDoc; label: string }[] = [
+      { key: 'solarvoice', label: 'Solar Voice' }, { key: 'eiflix', label: 'EiFlix' },
+      { key: 'generalcontent', label: 'General content' }, { key: 'workshop', label: 'Workshops' },
+    ];
+    const sets = (): Set<string>[] => yms.map(() => new Set<string>());
+    const catRows = cats.map(c => ({ key: 'cat:' + c.key, label: c.label, sets: sets() }));
+    const prodRows = new Map<string, { key: string; label: string; sets: Set<string>[] }>();
+    for (const d of docs) {
+      const i = idx.get(d.ym); if (i == null) continue;
+      cats.forEach((c, k) => { if (d[c.key]) catRows[k].sets[i].add(d.profileid); });
+      for (const pid of d.productIds) {
+        const name = this.productNameCache[pid] ?? 'Unknown product';
+        let r = prodRows.get(name);
+        if (!r) { r = { key: 'prod:' + name, label: name, sets: sets() }; prodRows.set(name, r); }
+        r.sets[i].add(d.profileid);
+      }
+    }
+    const prods = [...prodRows.values()].sort((a, b) => a.label.localeCompare(b.label));
+    return [...catRows, ...prods].map(r => ({ key: r.key, label: r.label, cells: r.sets.map(s => [...s]) }));
+  }
+  /** Click a cell: the participants behind it (list length == cell). */
+  ovPlanDrill(row: OvPlanRow, i: number): void {
+    const m = this.ovPlanMonths()[i]; if (!m) return;
+    this.openOvDrill(`${row.label} · ${m.label}`, (row.cells[i] ?? []).map(pid => ({ profileid: pid, name: this.nameOf(pid), created: m.ms })));
   }
 
   // ── 5. Participant health: Active participants on Ecosystem products, by coach-set health state ──
@@ -466,6 +592,17 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.openAhDrill(coll, flag, resolvedOnly, title, this.ovAhScope());
   }
 
+  /** Template-bound lists must keep their identity between checks (a fresh array every check makes
+   *  *ngFor rebuild its rows each cycle, which re-triggers change detection). memo() returns the
+   *  cached value while every key entry is identical. */
+  private memoStore: Record<string, { k: any[]; v: any }> = {};
+  private memo<T>(slot: string, key: any[], fn: () => T): T {
+    const m = this.memoStore[slot];
+    if (m && m.k.length === key.length && m.k.every((x, i) => x === key[i])) return m.v as T;
+    const v = fn();
+    this.memoStore[slot] = { k: key, v };
+    return v;
+  }
   /** Overall drills reuse the native A&H drill overlay (no new dialog component). */
   private openOvDrill(title: string, entries: AhDrillEntry[], order: 'asc' | 'desc' = 'desc'): void {
     if (!entries.length) return;
@@ -711,6 +848,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     try {
       await this.resolveCoach();
       await this.loadPortfolio();
+      void this.ensureOvPlan();   // no-op unless Overall is open on a specific coach
+      void this.loadFollowUps();  // scheduled follow-ups for the scope (row chip / slide-over / Schedule card)
     } catch (err: any) {
       console.error('Health dashboard load error', err);
       this.loadError = 'Failed to load the dashboard. Please make sure you are logged in. ' + (err?.message ?? '');
@@ -845,9 +984,11 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.accumulatePagedSummary();   // now uses fullIndexBuilt for base-wide totals
     this.applyFilters();             // recomputes fullBaseMatchIds + dataSource
     this.setProgress(85, 'Indexed full base · loading activity…');
-    void this.loadExactOpenTickets();            // exact open-ticket counts, base-wide
-    void this.loadAttentionDataInBackground();   // Going-quiet / Needs-Attention base-wide
-    void this.loadLoveLetterTagsBaseWide();      // A&H love-letter / ask-A&H tags, base-wide (recent window)
+    const exactP = this.loadExactOpenTickets();            // exact open-ticket counts, base-wide
+    const attnP = this.loadAttentionDataInBackground();   // Going-quiet / Needs-Attention base-wide
+    const llP = this.loadLoveLetterTagsBaseWide();        // A&H love-letter / ask-A&H tags, base-wide (recent window)
+    // daily trend snapshot once every input of the four tiles has landed
+    void Promise.all([exactP, attnP, llP]).then(() => this.ensureDailySnapshot()).catch(() => {});
   }
 
   /** B-in-the-background: after first paint + index, load touchpoints + attended coach appointments
@@ -891,7 +1032,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       // is not, because the lever filters re-derive their own scope from it.
       if (!this.liteInScope(lite)) continue;
       if (goingQuiet) gq++;
-      if (this.isNeedsAttentionLite(lite)) na++;
+      if (this.isNeedsAttentionLite(lite) && !this.isAddressedLite(lite)) na++;
     }
     this.fullBaseGoingQuiet = gq;
     this.fullBaseNeedsAttention.set(na);
@@ -902,7 +1043,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
    *  dependent joins scoped to that coach's participants, and render. */
   private async loadFullPortfolio(): Promise<void> {
     await this.ensureFullIndex();
-    void this.loadExactOpenTickets();   // background; rows re-render when the exact counts land
+    const exactP = this.loadExactOpenTickets();   // background; rows re-render when the exact counts land
     this.setProgress(55, 'Loaded base…');
     this.unassignedCount = this.countUnassignedInRoster();
 
@@ -911,6 +1052,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
     this.computeRows();
     this.setProgress(100, 'Ready');
+    void exactP.then(() => this.ensureDailySnapshot()).catch(() => {});   // daily trend snapshot
   }
 
   /** Distinct profileids in the selected coach's base — from the METADATA roster (coachedby lives
@@ -1014,7 +1156,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       // until then keep the earlier fallback rather than flash 0.
       if (this.contactDataLoaded()) this.summary.goingQuiet = filteredIdx.reduce((n, l) => n + (this.isGoingQuietBucketLite(l) ? 1 : 0), 0);
       // base-wide needs-attention / flagged / shown-count / health — all scoped to the filtered set
-      this.fullBaseNeedsAttention.set(filteredIdx.reduce((n, l) => n + (this.isNeedsAttentionLite(l) ? 1 : 0), 0));
+      this.fullBaseNeedsAttention.set(filteredIdx.reduce((n, l) => n + (this.isNeedsAttentionLite(l) && !this.isAddressedLite(l) ? 1 : 0), 0));
       this.pagedFilteredCount.set(filteredIdx.length);
       const h = { happy: 0, neutral: 0, unhappy: 0, atRisk: 0, critical: 0, notAssessed: 0, total: 0 };
       for (const l of filteredIdx) {
@@ -1036,6 +1178,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     } else {
       this.summary.total = this.loadedRowCount;
     }
+    this.refreshTrend();
   }
 
   private chunk30<T>(arr: T[]): T[][] {
@@ -1638,6 +1781,136 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   jcSchedList = computed(() => this.schedList(false));
   obSchedList = computed(() => this.schedList(true));
 
+  // ---- Follow-ups (item 5): the slide-over's "New log > Schedule" writes healthtracker_activity
+  //  {type:'schedule', dueDate}; a {type:'schedule_done', scheduleId} event closes it. Loaded per scope:
+  //  a specific coach = batched `profileid in` chunks of the roster (two equality queries per chunk, no
+  //  composite index); ALL / UNASSIGNED = the two `type ==` equality reads (same shape as loadAddressed),
+  //  filtered to the roster client-side. Signals so the row chip, the slide-over list and the Schedule
+  //  card update without a reload after a save / Mark done.
+  private fuSched = signal<Record<string, FollowUp>>({});
+  private fuDone = signal<Record<string, true>>({});
+  private fuLoadedIds = new Set<string>();
+  private fuAllLoaded = false;
+  /** Open follow-ups per participant, earliest due first (undated last). */
+  fuByProfile = computed(() => {
+    const done = this.fuDone();
+    const out: Record<string, FollowUp[]> = {};
+    for (const f of Object.values(this.fuSched())) {
+      if (done[f.id]) continue;
+      (out[f.profileid] ??= []).push(f);
+    }
+    for (const k of Object.keys(out)) out[k].sort((a, b) => (a.dueMs ?? Infinity) - (b.dueMs ?? Infinity));
+    return out;
+  });
+  private async loadFollowUps(): Promise<void> {
+    const coll = collection(this.firestore, 'healthtracker_activity');
+    try {
+      const sched: Record<string, FollowUp> = {};
+      const done: Record<string, true> = {};
+      const take = (snaps: any[]) => snaps.forEach(snap => snap.forEach((d: any) => {
+        const x: any = d.data();
+        if (x['type'] === 'schedule_done') { if (typeof x['scheduleId'] === 'string') done[x['scheduleId']] = true; return; }
+        if (x['type'] !== 'schedule' || typeof x['profileid'] !== 'string') return;
+        const due = this.toDate(x['dueDate']);
+        sched[d.id] = { id: d.id, profileid: x['profileid'], dueMs: due ? this.startOfDay(due).getTime() : null,
+          note: typeof x['note'] === 'string' ? x['note'] : '', actorName: typeof x['actorName'] === 'string' ? x['actorName'] : '' };
+      }));
+      if (this.pagedMode) {
+        if (this.fuAllLoaded) return;
+        take(await Promise.all([
+          getDocs(query(coll, where('type', '==', 'schedule'))),
+          getDocs(query(coll, where('type', '==', 'schedule_done'))),
+        ]));
+        this.fuAllLoaded = true;
+      } else {
+        if (this.fuAllLoaded) return;   // base-wide read already covers every roster
+        const ids = this.rosterIds().filter(id => !this.fuLoadedIds.has(id));
+        if (!ids.length) return;
+        take(await Promise.all(this.chunk30(ids).flatMap(c => [
+          getDocs(query(coll, where('profileid', 'in', c), where('type', '==', 'schedule'))),
+          getDocs(query(coll, where('profileid', 'in', c), where('type', '==', 'schedule_done'))),
+        ])));
+        ids.forEach(id => this.fuLoadedIds.add(id));
+      }
+      this.fuSched.update(m => ({ ...m, ...sched }));
+      this.fuDone.update(m => ({ ...m, ...done }));
+    } catch (e) {
+      console.warn('follow-ups load failed (non-fatal)', e);
+    }
+  }
+  /** Earliest open follow-up for a participant (row chip). Undated follow-ups get no chip. */
+  rowDue(profileid: string): { ms: number; overdue: boolean } | null {
+    return this.fuDueMap()[profileid] ?? null;
+  }
+  /** Earliest dated open follow-up per participant, stable objects (one per fuByProfile change). */
+  private fuDueMap = computed(() => {
+    const today = this.startOfDay(new Date()).getTime();
+    const out: Record<string, { ms: number; overdue: boolean }> = {};
+    const by = this.fuByProfile();
+    for (const pid of Object.keys(by)) {
+      const f = by[pid].find(x => x.dueMs != null);
+      if (f && f.dueMs != null) out[pid] = { ms: f.dueMs, overdue: f.dueMs < today };
+    }
+    return out;
+  });
+  /** Bucket of one dated follow-up relative to today. */
+  private fuBucketOf(dueMs: number): 'overdue' | 'today' | 'week' | null {
+    const today = this.startOfDay(new Date()).getTime();
+    if (dueMs < today) return 'overdue';
+    if (dueMs === today) return 'today';
+    if (dueMs <= today + 7 * 86400000) return 'week';   // days 1-7 after today
+    return null;
+  }
+  /** Follow-ups in the current Viewing scope (roster), dated, open. */
+  private fuInScope(): FollowUp[] {
+    const inScope = new Set(this.rosterIds());
+    const by = this.fuByProfile();
+    const out: FollowUp[] = [];
+    for (const pid of Object.keys(by)) if (inScope.has(pid)) for (const f of by[pid]) if (f.dueMs != null) out.push(f);
+    return out;
+  }
+  fuCounts(): { today: number; week: number; overdue: number } {
+    return this.memo('fuCounts', this.fuKey(), () => {
+      const c = { today: 0, week: 0, overdue: 0 };
+      for (const f of this.fuInScope()) { const b = this.fuBucketOf(f.dueMs!); if (b) c[b]++; }
+      return c;
+    });
+  }
+  /** Inputs of the Follow-ups card: data, scope, roster, day. */
+  private fuKey(): any[] {
+    return [this.fuByProfile(), this.selectedCoachId, this.metaMap, this.allRows(), this.isoDay(new Date())];
+  }
+  fuBucket = signal<'all' | 'today' | 'week' | 'overdue'>('all');
+  setFuBucket(b: 'today' | 'week' | 'overdue'): void { this.fuBucket.set(this.fuBucket() === b ? 'all' : b); }
+  /** The Follow-ups list under the tiles: 'all' = overdue + today + next 7 days (the tiles' horizon). */
+  fuList(): { profileid: string; participant: string; note: string; dueMs: number; overdue: boolean }[] {
+    const sel = this.fuBucket();
+    return this.memo('fuList', [...this.fuKey(), sel], () => this.fuInScope()
+      .map(f => ({ f, b: this.fuBucketOf(f.dueMs!) }))
+      .filter(x => x.b != null && (sel === 'all' || x.b === sel))
+      .sort((a, b) => a.f.dueMs! - b.f.dueMs!)
+      .map(({ f, b }) => ({ profileid: f.profileid, participant: this.nameOf(f.profileid), note: f.note, dueMs: f.dueMs!, overdue: b === 'overdue' })));
+  }
+  /** Slide-over list for one participant (live: read through a callback on every check). */
+  private slideoverFollowUps(profileid: string): SlideoverFollowUp[] {
+    const today = this.startOfDay(new Date()).getTime();
+    return this.memo('so-fu', [profileid, this.fuByProfile(), today], () => (this.fuByProfile()[profileid] ?? []).map(f => ({
+      id: f.id, dueDate: f.dueMs != null ? new Date(f.dueMs) : null, note: f.note, actorName: f.actorName,
+      overdue: f.dueMs != null && f.dueMs < today,
+    })));
+  }
+  /** Mark done: additive {type:'schedule_done', scheduleId} event; the follow-up leaves every list. */
+  async markFollowUpDone(profileid: string, scheduleId: string): Promise<void> {
+    try {
+      await this.logActivity(profileid, 'schedule_done', { scheduleId });
+      this.fuDone.update(m => ({ ...m, [scheduleId]: true }));
+      this.guard.openSnackBar('Follow-up marked done', 'Close');
+    } catch (e: any) {
+      console.error('markFollowUpDone failed', e);
+      this.guard.openSnackBar('Could not mark done: ' + (e?.message ?? 'permission denied'), 'Close', 5000);
+    }
+  }
+
 
   /** Scoped A&H love-letter / ask-A&H tags for a set of participants (doc item 5): batched
    *  where('profileid','in',chunk), one-shot getDocs; unresolved, NON-happy tags (critical /
@@ -2195,6 +2468,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       addressed: this.isAddressed(row),
       needsAttention: this.isNeedsAttention(row),
       onMarkAddressed: (next: boolean) => this.markAddressed(row, next),
+      followUps: () => this.slideoverFollowUps(row.profileid),
+      onFollowUpDone: (scheduleId: string) => this.markFollowUpDone(row.profileid, scheduleId),
       isDark: this.isDark,   // the slide-over + its composer render in CDK overlays outside .jchd-wrap
     };
     this.dialog.open(ParticipantSlideoverComponent, {
@@ -2438,7 +2713,11 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
    *  parallel write here. Keeps the slide-over's Schedule tab honest (it records, it does not fabricate). */
   async writeSchedule(row: PortfolioRow, dueDate: Date | null, note: string): Promise<void> {
     try {
-      await this.logActivity(row.profileid, 'schedule', { dueDate: dueDate ?? null, note });
+      const ref: any = await this.logActivity(row.profileid, 'schedule', { dueDate: dueDate ?? null, note });
+      // show it at once in the row chip, the slide-over list and the Schedule card (no reload)
+      if (ref?.id) this.fuSched.update(m => ({ ...m, [ref.id]: {
+        id: ref.id, profileid: row.profileid, dueMs: dueDate ? this.startOfDay(dueDate).getTime() : null,
+        note, actorName: this.coachName } }));
       this.guard.openSnackBar(`Scheduled follow-up logged for ${row.name}`, 'Close');
     } catch (e: any) {
       console.error('writeSchedule failed', e);
@@ -2529,15 +2808,16 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   // ---- "Mark addressed": a coach-set acknowledgement that drops a participant out of Needs
   //      Attention until a NEW issue appears (stored as an 'addressed' healthtracker_activity event). ----
   /** The Needs-Attention issue keys currently active on a row. */
-  private activeIssues(r: PortfolioRow): string[] {
+  private activeIssues(r: { lapsed: boolean; notStarted: boolean; openTickets: number; llCritical?: boolean; llAttention?: boolean }): string[] {
     // Keys MUST match the isNeedsAttention() predicate (doc item 4) so the Mark-addressed snapshot
     // re-surfaces a participant when a NEW needs-attention issue appears. Going-quiet & renewals are
-    // no longer needs-attention issues (own tiles), so they are not tracked here.
+    // no longer needs-attention issues (own tiles), so they are not tracked here. Payments locked /
+    // defaulted left Needs attention 2026-11-11 (own tiles: hero finance chips + Participants tiles).
+    // Takes the shared fields so the lite index (paged views) uses the SAME keys (isAddressedLite).
     const out: string[] = [];
     if (r.lapsed) out.push('lapsed');
     if (r.notStarted) out.push('notStarted');
     if (r.openTickets > 0) out.push('tickets');
-    if (['locked', 'defaulted'].includes((r.financialstatus ?? '').toLowerCase())) out.push('financial');
     if (r.llCritical) out.push('llCritical');
     if (r.llAttention) out.push('llAttention');
     return out;
@@ -2545,7 +2825,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   /** Needs-attention — the ONE actionable-now predicate (doc item 4), the single source of truth that
    *  every count / lever / hero / coach-card site delegates to. Renewals and going-quiet are
    *  deliberately NOT folded in (they keep their own tiles/levers) so the count stays honest;
-   *  financial locked / defaulted are in. Love-letter critical / needs-attention join in doc item 5. */
+   *  financial locked / defaulted were REMOVED 2026-11-11 (they keep their own tiles). Love-letter
+   *  critical / needs-attention join in doc item 5. */
   /** "Going Quiet" BUCKET membership — quiet AND not already a Needs-Attention case, so a participant
    *  shows in exactly ONE of the two buckets (Needs Attention wins; per Joshua — no duplicates). Every
    *  Going-Quiet count / lever / list uses this; the raw `goingQuiet` flag stays for the scoreboard
@@ -2564,22 +2845,17 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     if (r.lapsed) out.push('Lapsed');
     if (r.notStarted) out.push('Journey not started');
     if (r.openTickets > 0) out.push(`${r.openTickets} open ticket${r.openTickets > 1 ? 's' : ''}`);
-    const fin = (r.financialstatus ?? '').toLowerCase();
-    if (fin === 'locked') out.push('Payments locked');
-    else if (fin === 'defaulted') out.push('Payments defaulted');
     if (r.llCritical) out.push('Critical');
     if (r.llAttention) out.push('Needs Attention');
     return out;
   }
   private isNeedsAttention(r: PortfolioRow): boolean {
     return r.lapsed || r.notStarted || r.openTickets > 0
-      || ['locked', 'defaulted'].includes((r.financialstatus ?? '').toLowerCase())
       || !!r.llCritical || !!r.llAttention;
   }
   /** Base-wide (lite index) twin of isNeedsAttention — same rule over a LiteIndexRow. */
   private isNeedsAttentionLite(l: LiteIndexRow): boolean {
     return l.lapsed || l.notStarted || l.openTickets > 0
-      || ['locked', 'defaulted'].includes((l.financialstatus ?? '').toLowerCase())
       || !!l.llCritical || !!l.llAttention;
   }
   /** Does this row have at least one live Needs-Attention issue, i.e. is there anything to address?
@@ -2592,9 +2868,16 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   /** True when the coach marked this participant addressed AND no NEW issue type has appeared since
    *  (current issues are a subset of the snapshot). A new issue re-surfaces them into Needs Attention. */
   isAddressed(r: PortfolioRow): boolean {
-    const rec = this.addressedByProfile()[r.profileid];
+    return this.addressedCovers(r.profileid, this.activeIssues(r));
+  }
+  /** Lite-index twin of isAddressed: the paged (ALL / UNASSIGNED) Needs-attention COUNT and matched
+   *  set exclude addressed participants exactly like the list does (they used to ignore it). */
+  private isAddressedLite(l: LiteIndexRow): boolean {
+    return this.addressedCovers(l.profileid, this.activeIssues(l));
+  }
+  private addressedCovers(profileid: string, cur: string[]): boolean {
+    const rec = this.addressedByProfile()[profileid];
     if (!rec || !rec.issues.length) return false;
-    const cur = this.activeIssues(r);
     if (!cur.length) return false;                       // nothing active -> not in Needs Attention anyway
     return cur.every(i => rec.issues.includes(i));
   }
@@ -2634,6 +2917,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     const map = this.addressedByProfile();
     const prev = map[row.profileid] ?? null;
     this.addressedByProfile.set({ ...map, [row.profileid]: { issues, date: new Date() } });
+    this.recomputeSummary();   // paged Needs-attention count excludes addressed too (count == list)
     this.applyFilters();
     try {
       await this.logActivity(row.profileid, 'addressed', { issues });
@@ -2642,6 +2926,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       const rb = { ...this.addressedByProfile() };
       if (prev) rb[row.profileid] = prev; else delete rb[row.profileid];
       this.addressedByProfile.set(rb);
+      this.recomputeSummary();
       this.applyFilters();
       this.guard.openSnackBar('Could not update: ' + (e?.message ?? 'permission denied'), 'Close', 5000);
     }
@@ -2747,6 +3032,121 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     return local;
   });
   get needsAttentionCount(): number { return this._needsAttentionCount(); }
+
+  // ---- Daily trend + new since yesterday (item 6) ----
+  //  First dashboard load per day per scope (coach profileid or ALL) writes one deterministic
+  //  setDoc snapshot of the four tile counts + the Needs-attention / Going-quiet id lists, taken
+  //  under the DEFAULT summary filter (Active, all journeys) so the numbers equal the tiles. The last
+  //  14 are read back by id (documentId() in, no index). Trend UI shows only when yesterday's snapshot
+  //  exists, the data for the scope is ready, and the summary filter is the default (no fake numbers).
+  private snaps = signal<{ scope: string; list: DailySnap[] } | null>(null);
+  trend = signal<{ k: Record<TrendKey, { delta: number; spark: string | null }>; naNew: Set<string>; gqNew: Set<string> } | null>(null);
+  private trendDataScope: string | null = null;
+  private snapToken = 0;
+  private isoDay(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+  private dayOffset(n: number): Date { const t = new Date(); return new Date(t.getFullYear(), t.getMonth(), t.getDate() + n); }
+  /** Snapshot scope: a coach's profileid, or ALL. Unassigned has no snapshot. */
+  private snapScope(): string | null {
+    if (!this.selectedCoachId || this.selectedCoachId === this.UNASSIGNED) return null;
+    return this.selectedCoachId === this.ALL ? 'ALL' : this.selectedCoachId;
+  }
+  private trendFilterDefault(): boolean { return this.sumLifecycle() === 'active' && this.sumJourneys().size === 0; }
+  /** The tile id sets under the CURRENT summary filter — the same sets the tiles count and open. */
+  private currentTrendIds(): { na: string[]; gq: string[] } {
+    if (this.pagedMode) {
+      const idx = this.fullIndex.filter(l => this.liteInScope(l) && this.matchesSummaryJourneyLite(l) && this.matchesSummaryLifecycleLite(l));
+      return {
+        na: idx.filter(l => this.isNeedsAttentionLite(l) && !this.isAddressedLite(l)).map(l => l.profileid),
+        gq: idx.filter(l => this.isGoingQuietBucketLite(l)).map(l => l.profileid),
+      };
+    }
+    return { na: this.needsAttentionRows().map(r => r.profileid), gq: this.goingQuietRows().map(r => r.profileid) };
+  }
+  private liveTrendCounts(ids: { na: string[]; gq: string[] }): Record<TrendKey, number> {
+    return { needsAttention: ids.na.length, goingQuiet: ids.gq.length, paymentsLocked: this.summary.paymentsLocked, defaulted: this.summary.defaulted };
+  }
+  /** Called once the scope's data is complete (full: after exact tickets; paged: after contact data,
+   *  A&H tags and exact tickets). Reads the last 14 snapshots and writes today's if it is missing. */
+  private async ensureDailySnapshot(): Promise<void> {
+    const scope = this.snapScope(); if (!scope) return;
+    if (this.pagedMode && !(this.fullIndexBuilt && this.contactDataLoaded())) return;
+    this.trendDataScope = scope;
+    const token = ++this.snapToken;
+    const today = this.isoDay(new Date());
+    const ids = Array.from({ length: 14 }, (_, i) => `snap_${scope}_${this.isoDay(this.dayOffset(-i))}`);
+    try {
+      const snap = await getDocs(query(collection(this.firestore, 'healthtracker_activity'), where(documentId(), 'in', ids)));
+      const list: DailySnap[] = [];
+      const arr = (v: any): string[] => Array.isArray(v) ? v.filter((x: any) => typeof x === 'string') : [];
+      snap.forEach(d => {
+        const x: any = d.data();
+        if (x['type'] !== 'daily_snapshot' || x['scope'] !== scope || typeof x['date'] !== 'string') return;
+        const c = x['counts'] ?? {};
+        list.push({ date: x['date'], needsAttentionIds: arr(x['needsAttentionIds']), goingQuietIds: arr(x['goingQuietIds']),
+          counts: { needsAttention: Number(c['needsAttention']) || 0, goingQuiet: Number(c['goingQuiet']) || 0,
+                    paymentsLocked: Number(c['paymentsLocked']) || 0, defaulted: Number(c['defaulted']) || 0 } });
+      });
+      if (token !== this.snapToken || scope !== this.snapScope()) return;
+      if (!list.some(x => x.date === today) && this.trendFilterDefault()) {
+        const cur = this.currentTrendIds();
+        const counts = this.liveTrendCounts(cur);
+        await setDoc(doc(this.firestore, 'healthtracker_activity', `snap_${scope}_${today}`), {
+          type: 'daily_snapshot', scope, date: today, counts,
+          needsAttentionIds: cur.na, goingQuietIds: cur.gq, timestamp: serverTimestamp(),
+        });
+        list.push({ date: today, counts, needsAttentionIds: cur.na, goingQuietIds: cur.gq });
+      }
+      if (token !== this.snapToken) return;
+      list.sort((a, b) => a.date.localeCompare(b.date));
+      this.snaps.set({ scope, list });
+      this.refreshTrend();
+    } catch (e) {
+      console.warn('daily snapshot failed (non-fatal)', e);
+    }
+  }
+  /** Recompute deltas / sparklines / new-since-yesterday from the live tile sets (called after every
+   *  summary recompute). Nothing shows until yesterday's snapshot exists for this scope. */
+  private refreshTrend(): void {
+    const s = this.snaps(); const scope = this.snapScope();
+    const yIso = this.isoDay(this.dayOffset(-1));
+    const yday = s && s.scope === scope ? s.list.find(x => x.date === yIso) : undefined;
+    if (!s || !yday || this.trendDataScope !== scope || !this.trendFilterDefault()) {
+      if (this.trend()) this.trend.set(null);
+      return;
+    }
+    const cur = this.currentTrendIds();
+    const live = this.liveTrendCounts(cur);
+    const keys: TrendKey[] = ['needsAttention', 'goingQuiet', 'paymentsLocked', 'defaulted'];
+    const k = {} as Record<TrendKey, { delta: number; spark: string | null }>;
+    for (const key of keys) {
+      const pts: { i: number; v: number }[] = [];
+      for (let i = 13; i >= 1; i--) {
+        const sn = s.list.find(x => x.date === this.isoDay(this.dayOffset(-i)));
+        if (sn) pts.push({ i: 13 - i, v: sn.counts[key] });
+      }
+      pts.push({ i: 13, v: live[key] });   // today = the live tile value
+      k[key] = { delta: live[key] - yday.counts[key], spark: pts.length >= 2 ? this.sparkPoints(pts) : null };
+    }
+    const yNa = new Set(yday.needsAttentionIds), yGq = new Set(yday.goingQuietIds);
+    this.trend.set({ k, naNew: new Set(cur.na.filter(id => !yNa.has(id))), gqNew: new Set(cur.gq.filter(id => !yGq.has(id))) });
+  }
+  /** SVG polyline points for a 52x14 sparkline (x = day slot of the 14-day window). */
+  private sparkPoints(pts: { i: number; v: number }[]): string {
+    const vs = pts.map(p => p.v);
+    const min = Math.min(...vs), span = (Math.max(...vs) - min) || 1;
+    return pts.map(p => `${p.i * 4},${(13 - ((p.v - min) / span) * 12).toFixed(1)}`).join(' ');
+  }
+  trendFor(k: TrendKey): { delta: number; spark: string | null } | null { return this.trend()?.k[k] ?? null; }
+  newCount(kind: 'na' | 'gq'): number { const t = this.trend(); return t ? (kind === 'na' ? t.naNew.size : t.gqNew.size) : 0; }
+  /** Highlight a row in the opened Needs-attention / Going-quiet list when it is new since yesterday. */
+  isNewRow(r: PortfolioRow): boolean {
+    const t = this.trend(); if (!t) return false;
+    if (this.activeLever === 'needsAttention') return t.naNew.has(r.profileid);
+    if (this.activeLever === 'goingQuiet' || this.goingQuietOnly) return t.gqNew.has(r.profileid);
+    return false;
+  }
 
   /** Real participant rows behind a given Summary card (from the loaded base). */
   goingQuietRows = computed<PortfolioRow[]>(() =>
@@ -3472,6 +3872,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     // active summary filter. (Initial load sets selectedCoachId via loadPortfolio, not here.)
     if (id === this.selectedCoachId) return;
     this.selectedCoachId = id;
+    this.trendDataScope = null;   // hide the trend until the new scope's data is complete
+    this.trend.set(null);
     this.activeLever = 'all';
     this.assignTargetCoachId = '';
     // scope changed → reset the summary filter to its default (Active, no journey).
@@ -3499,6 +3901,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       if (this.paginator) this.paginator.firstPage();
       await this.loadFullPortfolio();   // roster is in memory; this only re-scopes the joins
     }
+    void this.ensureOvPlan();   // Overall plan grid follows Viewing as (no-op off Overall / for ALL)
+    void this.loadFollowUps();  // follow-ups for the new scope (cached per id / base-wide once)
   }
 
   /** Map a KPI card key to its lever. 'total' resets the board to 'all'. */
@@ -3776,6 +4180,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       if ((r.financialstatus ?? '').toLowerCase() === 'late') s.missed++;
     }
     this.summary = s;
+    this.refreshTrend();
   }
 
   applyFilters(): void {
@@ -3914,7 +4319,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       if (this.activeLever === 'goingQuiet' && !this.isGoingQuietBucketLite(lite)) return false;
       if (this.goingQuietOnly && !this.isGoingQuietBucketLite(lite)) return false;
       if (this.activeLever === 'needsAttention'
-        && !this.isNeedsAttentionLite(lite)) return false;
+        && (!this.isNeedsAttentionLite(lite) || this.isAddressedLite(lite))) return false;
     }
     return true;
   }

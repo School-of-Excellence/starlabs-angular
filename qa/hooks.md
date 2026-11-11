@@ -10,6 +10,33 @@ Literal `data-testid` strings only — no `${interpolation}` (gate section 1.1 /
 | sched-jc-col | Summary Schedule — Journey Coaching column | jc-health-3fixes |
 | sched-ob-col | Summary Schedule — Onboarding column | jc-health-3fixes |
 | sched-jc-overdue | JC overdue count tile | jc-health-3fixes |
+| jchd-row-due | Participants row follow-up due chip | jc-health-followups |
+| jchd-mc-needs | Participants tile: Needs Attention | jc-health-na-finance-trend |
+| jchd-mc-quiet | Participants tile: Going quiet | jc-health-na-finance-trend |
+| jchd-mc-locked | Participants tile: Payments locked | jc-health-na-finance-trend |
+| jchd-mc-defaulted | Participants tile: Payment defaulted | jc-health-na-finance-trend |
+| jchd-mc-renewing | Participants tile: Renewing 90d | jc-health-na-finance-trend |
+| jchd-mc-tickets | Participants tile: People with tickets | jc-health-na-finance-trend |
+| jchd-mc-flagged | Participants tile: Flagged | jc-health-na-finance-trend |
+| jchd-sum-quiet | Summary Going quiet tile | jc-health-na-finance-trend |
+| jchd-trend | Trend (delta + sparkline) inside a tile | jc-health-na-finance-trend |
+| jchd-trend-delta | Delta vs yesterday | jc-health-na-finance-trend |
+| jchd-trend-spark | 14-day sparkline | jc-health-na-finance-trend |
+| jchd-new-na | Summary Needs attention +N new | jc-health-na-finance-trend |
+| jchd-new-gq | Summary Going quiet +N new | jc-health-na-finance-trend |
+| jchd-mc-new-na | Participants Needs Attention +N new | jc-health-na-finance-trend |
+| jchd-mc-new-gq | Participants Going quiet +N new | jc-health-na-finance-trend |
+| jchd-row-new | Table row New pill (new since yesterday) | jc-health-na-finance-trend |
+| sched-fu | Schedule card Follow-ups group | jc-health-followups |
+| sched-fu-today | Follow-ups due today tile | jc-health-followups |
+| sched-fu-week | Follow-ups next 7 days tile | jc-health-followups |
+| sched-fu-overdue | Follow-ups overdue tile | jc-health-followups |
+| sched-fu-list | Follow-ups list | jc-health-followups |
+| sched-fu-item | Follow-ups list row | jc-health-followups |
+| so-fu-list | Slide-over Follow-ups list | jc-health-followups |
+| so-fu-item | Slide-over follow-up row | jc-health-followups |
+| so-fu-done | Slide-over Mark done | jc-health-followups |
+| so-fu-empty | Slide-over no follow-ups note | jc-health-followups |
 | sched-ob-overdue | Onboarding overdue count tile | jc-health-3fixes |
 | ah-needsattention-combined | A&H "Needs Attention · combined" cell | jc-health-3fixes |
 | ahd-overlay | Native A&H drill overlay panel | jc-health-3fixes |
@@ -91,12 +118,18 @@ Literal `data-testid` strings only — no `${interpolation}` (gate section 1.1 /
 | ov-schedule | Scheduled & completed card | jc-overall-summary |
 | ov-jc-today | JC scheduled today | jc-overall-summary |
 | ov-jc-week | JC next 7 days | jc-overall-summary |
+| ov-jc-month | JC next 30 days | jc-overall-next30 |
 | ov-jc-done | JC completed in range | jc-overall-summary |
 | ov-obs-today | Onboarding scheduled today | jc-overall-summary |
 | ov-obs-week | Onboarding next 7 days | jc-overall-summary |
+| ov-obs-month | Onboarding next 30 days | jc-overall-next30 |
 | ov-obs-done | Onboarding completed in range | jc-overall-summary |
-| ov-se | Ready for SE card | jc-overall-summary |
-| ov-se-pending | Ready for SE pending note | jc-overall-summary |
+| ov-plan | Planned journey card | jc-overall-plan-grid |
+| ov-plan-pick | Pick a coach note (ALL/UNASSIGNED) | jc-overall-plan-grid |
+| ov-plan-grid | Plan grid table | jc-overall-plan-grid |
+| ov-plan-row | Plan grid row | jc-overall-plan-grid |
+| ov-plan-cell | Plan grid cell (drill) | jc-overall-plan-grid |
+| ov-plan-error | Plan load error | jc-overall-plan-grid |
 | ov-health | Participant health card | jc-overall-summary |
 | ov-health-total | Active Ecosystem participant total | jc-overall-summary |
 | ov-ah | Ask A&H & Love Letter card | jc-overall-summary |

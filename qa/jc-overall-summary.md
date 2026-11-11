@@ -9,7 +9,7 @@ Top: date range (Month / Range) + Viewing as. Then:
 1. Sales by Journey — per journey: New / Upgrades / Add-ons / Overall (Gross, approved; Overall = N + U + A).
 2. Onboarding status — To be onboarded, <= 7 days, 7+ days, Onboarded; Avg days from ASV to Onboarding.
 3. Scheduled & completed — Journey Coaching and Onboarding rows: Scheduled today / Next 7 days / Completed in range.
-4. Ready for SE (Scope Enhancement) — pending until the Ev. Preparation tab records the planned-SE month.
+4. Planned journey · next 6 months (replaced Ready for SE 2026-11-11, see jc-overall-plan-grid).
 5. Participant health — Coach-set health renamed (Overall only), Active participants on Ecosystem products.
 6. Ask A&H & Love Letter — the Journey Planning table, scoped by Viewing as.
 
@@ -58,7 +58,7 @@ Top: date range (Month / Range) + Viewing as. Then:
 - ov-sales, ov-sales-row, ov-sales-total -> Sales by Journey
 - ov-onboarding, ov-ob-tobe, ov-ob-le7, ov-ob-gt7, ov-ob-onboarded, ov-ob-avg -> Onboarding status
 - ov-schedule, ov-jc-today, ov-jc-week, ov-jc-done, ov-obs-today, ov-obs-week, ov-obs-done -> Scheduled & completed
-- ov-se, ov-se-pending -> Ready for SE
+- ov-plan, ov-plan-grid -> Planned journey (jc-overall-plan-grid)
 - ov-health, ov-health-total -> Participant health
 - ov-ah, ov-ah-needsattention-combined -> A&H
 

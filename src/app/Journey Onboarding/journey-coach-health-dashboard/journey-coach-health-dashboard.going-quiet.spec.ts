@@ -60,9 +60,9 @@ for (const [name, bucket] of cases) {
       expect(bucket({ ...clean, goingQuiet: true, lapsed: true })).toBeFalsy();
     });
 
-    it('EXCLUDES a quiet row that is also payments-locked/defaulted', () => {
-      expect(bucket({ ...clean, goingQuiet: true, financialstatus: 'Locked' })).toBeFalsy();
-      expect(bucket({ ...clean, goingQuiet: true, financialstatus: 'DEFAULTED' })).toBeFalsy();
+    it('INCLUDES a quiet row that is payments-locked/defaulted (finance is no longer Needs attention)', () => {
+      expect(bucket({ ...clean, goingQuiet: true, financialstatus: 'Locked' })).toBeTruthy();
+      expect(bucket({ ...clean, goingQuiet: true, financialstatus: 'DEFAULTED' })).toBeTruthy();
     });
 
     it('EXCLUDES a quiet row with a love-letter critical / needs-attention tag', () => {
