@@ -1163,13 +1163,15 @@ function imvBuild(){
 }
 function imvReview(){
   IMV.rows=imvBuild(); IMV.tick=new Set(IMV.rows.filter(r=>r.status==='auto').map(r=>r.p.pid));
-  IMV.tab=IMV.tick.size?'tick':'untick'; IMV.q=''; IMV.moved=null;
+  IMV.q=''; IMV.moved=null; imvSetTab(IMV.tick.size?'tick':'untick');
 }
+// a tab's rows are fixed when it is opened, so ticking / unticking a row never makes it jump out of view
+function imvSetTab(tab){ IMV.tab=tab; IMV.inView=new Set(IMV.rows.map((r,i)=>imvGroup(r)===tab?i:-1).filter(i=>i>=0)); }
 const imvMovable=r=>['auto','manual','none'].includes(r.status);
 function imvGroup(r){ if(IMV.moved?.has(r.p?.pid)) return 'moved'; if(imvMovable(r)) return IMV.tick.has(r.p.pid)?'tick':'untick'; return r.status==='there'?'there':'nomatch'; }
 function imvView(){
   const q=IMV.q.trim().toLowerCase();
-  return IMV.rows.filter(r=>{ if(imvGroup(r)!==IMV.tab) return false;
+  return IMV.rows.filter((r,i)=>{ if(!IMV.inView.has(i)) return false;
     return !q||[r.value,r.p?.name,r.p?.email].some(x=>String(x||'').toLowerCase().includes(q)); });
 }
 const imvSegText=r=>r.status==='notfound'||r.status==='dup'?'':r.status==='multi'?`${fmt(r.n)} people`:(r.segs||[]).length?r.segs.map(id=>segName(master,id)).join(', '):'—';
@@ -1240,7 +1242,7 @@ async function imvMove(){
   IMV.saving=false;
   if(!r){ renderImv(); const e=$('#imvErr'); if(e) e.textContent=`Nothing was moved. ${err.textContent}`; return; }
   AUDIT.unshift({at:Date.now(),by:who(),type:'RULE_CHANGE',text:`${t.name}: ${plural(pids.length,'participant')} imported from ${IMV.source||'a pasted list'}`});
-  IMV.moved=new Set(pids); IMV.autos=r.autos; IMV.rows=imvBuild(); IMV.tab='moved';
+  IMV.moved=new Set(pids); IMV.autos=r.autos; IMV.rows=imvBuild(); imvSetTab('moved');
   render(); renderImv(); toast(`Moved ${plural(pids.length,'participant')} to ${t.name}.`);
 }
 // uP! / CPM column: counted with the products picked in this segment's own uP! / CPM attended conditions
@@ -2136,7 +2138,7 @@ listen(root,'click',e=>{
     if(dlg.id==='imvDlg'&&IMV){
       if(t.closest('#imvGo')){ imvReview(); renderImv(); }
       else if(t.closest('#imvMove')) imvMove();
-      else if(t.closest('[data-imvtab]')){ IMV.tab=t.closest('[data-imvtab]').dataset.imvtab; renderImv(); }
+      else if(t.closest('[data-imvtab]')){ imvSetTab(t.closest('[data-imvtab]').dataset.imvtab); renderImv(); }
       else if(t.closest('[data-act="imv-back"]')){ IMV.rows=null; IMV.moved=null; renderImv(); }
       else if(t.closest('[data-act="imv-export"]')) imvExport();
       else if(t.closest('[data-act="imv-template"]')) store.writeTable('import-participants-template.xlsx',[['Name','Email']]).catch(e=>toast(`Couldn’t make the template: ${e?.message||e}`));

@@ -910,3 +910,7 @@ ng build ok; hook-diff aligned (82). SGB-07 drives the panel (count, Not grouped
 - Drop `writeTable` and the `history` parameter of `saveLists` (store and component).
 - Remove the `record` parameter from `placeInManual`, and the two H_ACTION entries and the `members` H_FIELD.
 - `cmpDetect` / `cmpValues` can keep their state parameter; it defaults to CMP.
+
+**Follow-up (same day, found by the first e2e run of SGB-08):** ticking a row in the "Not ticked" view re-rendered it straight into "Will move", so it vanished under the cursor. Each tab's rows are now fixed when the tab opens (`imvSetTab` / `IMV.inView`). Ticks still update the counts at once, and the rows regroup on the next tab switch.
+
+**e2e, emulator lane (local, 2026-11-11):** segment-board.spec.ts passes 8 of 8 (SGB-01..08), with 4 ADDR blocks skipped as `fixme`.
