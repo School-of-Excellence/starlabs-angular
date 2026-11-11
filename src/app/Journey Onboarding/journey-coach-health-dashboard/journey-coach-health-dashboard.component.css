@@ -3232,3 +3232,11 @@ td.mat-mdc-cell span {
 @media (max-width: 560px) { .ov-legend { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .ov-seg button:focus-visible, .ov-ico:focus-visible, .ov-legend button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .ap-green { background: var(--sem-green); }
+
+/* Follow-ups (item 5): row chip + Schedule card group */
+.jchd-due { display: inline-block; width: fit-content; margin-top: 2px; padding: 1px 7px; border-radius: 999px;
+  font-size: var(--fs-100); font-weight: var(--fw-semibold); color: var(--blue-fg); background: rgba(0,122,255,0.12); }
+.jchd-due.is-overdue { color: var(--sem-red); background: rgba(255,59,48,0.14); }
+.jcs-fu { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--hairline); }
+.jcs-tag-fu { background: rgba(255,149,0,0.14); color: var(--sem-orange-fg); }
+.jcp-when.is-overdue { color: var(--sem-red); font-weight: var(--fw-semibold); }

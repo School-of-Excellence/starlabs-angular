@@ -262,6 +262,23 @@
           </div>
 
         </div>
+        <!-- Follow-ups (item 5): coach-scheduled follow-ups from the slide-over's New log > Schedule -->
+        <div class="jcs-fu" data-testid="sched-fu" *ngIf="fuCounts() as fc">
+          <div class="jcs-colhead"><span class="jcs-tag jcs-tag-fu">Follow-ups</span></div>
+          <div class="jcp-row">
+            <button type="button" class="jcp-tile" data-testid="sched-fu-today" [class.is-on]="fuBucket()==='today'" (click)="setFuBucket('today')" matTooltip="Filter to due today"><span class="jcp-num">{{ fc.today }}</span><span class="jcp-label">Today</span></button>
+            <button type="button" class="jcp-tile" data-testid="sched-fu-week" [class.is-on]="fuBucket()==='week'" (click)="setFuBucket('week')" matTooltip="Filter to the next 7 days"><span class="jcp-num">{{ fc.week }}</span><span class="jcp-label">Next 7 days</span></button>
+            <button type="button" class="jcp-tile jcp-overdue" data-testid="sched-fu-overdue" [class.is-on]="fuBucket()==='overdue'" (click)="setFuBucket('overdue')" matTooltip="Filter to overdue"><span class="jcp-num">{{ fc.overdue }}</span><span class="jcp-label">Overdue</span></button>
+          </div>
+          <div class="jcp-list" data-testid="sched-fu-list" *ngIf="fuList().length; else noFu">
+            <div class="jcp-item" data-testid="sched-fu-item" *ngFor="let f of fuList()" (click)="openJcParticipant(f.profileid)" matTooltip="Open participant">
+              <span class="ios-avatar av-xs" [ngClass]="avatarClass(f.profileid)">{{ initials(f.participant) }}</span>
+              <span class="jcp-who"><span class="jcp-p">{{ f.participant }}</span><span class="jcp-c" *ngIf="f.note">{{ f.note }}</span></span>
+              <span class="jcp-when" [class.is-overdue]="f.overdue">{{ f.dueMs | date:'EEE d MMM' }}</span>
+            </div>
+          </div>
+          <ng-template #noFu><p class="ios2-empty">No follow-ups due.</p></ng-template>
+        </div>
       </section>
 
       <!-- JC pipeline (doc item 8): completed JCs = attended journey-coach appointments, scoped to
@@ -728,6 +745,8 @@
                 </span>
                 <span class="cp-email" *ngIf="r.email">{{ r.email }}</span>
                 <span class="cp-id">{{ r.number || '—' }}</span>
+                <span class="jchd-due" *ngIf="rowDue(r.profileid) as due" [class.is-overdue]="due.overdue" data-testid="jchd-row-due"
+                      [matTooltip]="due.overdue ? 'Follow-up overdue' : 'Scheduled follow-up'">Due {{ due.ms | date:'d MMM' }}</span>
               </span>
             </span>
           </td>

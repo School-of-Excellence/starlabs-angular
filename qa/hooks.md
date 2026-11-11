@@ -10,6 +10,17 @@ Literal `data-testid` strings only — no `${interpolation}` (gate section 1.1 /
 | sched-jc-col | Summary Schedule — Journey Coaching column | jc-health-3fixes |
 | sched-ob-col | Summary Schedule — Onboarding column | jc-health-3fixes |
 | sched-jc-overdue | JC overdue count tile | jc-health-3fixes |
+| jchd-row-due | Participants row follow-up due chip | jc-health-followups |
+| sched-fu | Schedule card Follow-ups group | jc-health-followups |
+| sched-fu-today | Follow-ups due today tile | jc-health-followups |
+| sched-fu-week | Follow-ups next 7 days tile | jc-health-followups |
+| sched-fu-overdue | Follow-ups overdue tile | jc-health-followups |
+| sched-fu-list | Follow-ups list | jc-health-followups |
+| sched-fu-item | Follow-ups list row | jc-health-followups |
+| so-fu-list | Slide-over Follow-ups list | jc-health-followups |
+| so-fu-item | Slide-over follow-up row | jc-health-followups |
+| so-fu-done | Slide-over Mark done | jc-health-followups |
+| so-fu-empty | Slide-over no follow-ups note | jc-health-followups |
 | sched-ob-overdue | Onboarding overdue count tile | jc-health-3fixes |
 | ah-needsattention-combined | A&H "Needs Attention · combined" cell | jc-health-3fixes |
 | ahd-overlay | Native A&H drill overlay panel | jc-health-3fixes |

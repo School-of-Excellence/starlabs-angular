@@ -33,7 +33,7 @@ import { AuthguardService } from '../../authguard.service';
 import { computeHealth, normalizeTier, recencyScore, HealthState, ParticipantSignals } from './health-score.engine';
 import { LogCallDialogComponent, LogCallResult } from './log-call-dialog.component';
 import { SetHealthStateDialogComponent, SetHealthStateResult } from './set-health-state-dialog.component';
-import { ParticipantSlideoverComponent, SlideoverData, SlideoverActivityItem, SlideoverLogPayload } from './participant-slideover.component';
+import { ParticipantSlideoverComponent, SlideoverData, SlideoverActivityItem, SlideoverLogPayload, SlideoverFollowUp } from './participant-slideover.component';
 import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 import { JourneycoachDashboardComponent } from '../journeycoach-dashboard/journeycoach-dashboard.component';
 import { JcEvprepBoardComponent } from '../jc-evprep-board/jc-evprep-board.component';
@@ -173,6 +173,10 @@ interface LiteIndexRow {
 interface JourneyGroup { id: string; name: string; journeys: string[]; }
 
 interface AhDrillEntry { profileid: string; name: string; created: number; }
+
+/** One scheduled follow-up: a healthtracker_activity {type:'schedule'} event. Open until a
+ *  {type:'schedule_done', scheduleId} event exists for it. dueMs = local midnight of the due day. */
+interface FollowUp { id: string; profileid: string; dueMs: number | null; note: string; actorName: string; }
 
 /** Ask A&H / Love Letter analytics (item 3) — flag breakdown per collection + combined + resolved. */
 interface AHFlagCounts { total: number; tagged: number; opportunity: number; liked: number; critical: number; resolved: number; }
@@ -826,6 +830,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       await this.resolveCoach();
       await this.loadPortfolio();
       void this.ensureOvPlan();   // no-op unless Overall is open on a specific coach
+      void this.loadFollowUps();  // scheduled follow-ups for the scope (row chip / slide-over / Schedule card)
     } catch (err: any) {
       console.error('Health dashboard load error', err);
       this.loadError = 'Failed to load the dashboard. Please make sure you are logged in. ' + (err?.message ?? '');
@@ -1753,6 +1758,121 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   jcSchedList = computed(() => this.schedList(false));
   obSchedList = computed(() => this.schedList(true));
 
+  // ---- Follow-ups (item 5): the slide-over's "New log > Schedule" writes healthtracker_activity
+  //  {type:'schedule', dueDate}; a {type:'schedule_done', scheduleId} event closes it. Loaded per scope:
+  //  a specific coach = batched `profileid in` chunks of the roster (two equality queries per chunk, no
+  //  composite index); ALL / UNASSIGNED = the two `type ==` equality reads (same shape as loadAddressed),
+  //  filtered to the roster client-side. Signals so the row chip, the slide-over list and the Schedule
+  //  card update without a reload after a save / Mark done.
+  private fuSched = signal<Record<string, FollowUp>>({});
+  private fuDone = signal<Record<string, true>>({});
+  private fuLoadedIds = new Set<string>();
+  private fuAllLoaded = false;
+  /** Open follow-ups per participant, earliest due first (undated last). */
+  fuByProfile = computed(() => {
+    const done = this.fuDone();
+    const out: Record<string, FollowUp[]> = {};
+    for (const f of Object.values(this.fuSched())) {
+      if (done[f.id]) continue;
+      (out[f.profileid] ??= []).push(f);
+    }
+    for (const k of Object.keys(out)) out[k].sort((a, b) => (a.dueMs ?? Infinity) - (b.dueMs ?? Infinity));
+    return out;
+  });
+  private async loadFollowUps(): Promise<void> {
+    const coll = collection(this.firestore, 'healthtracker_activity');
+    try {
+      const sched: Record<string, FollowUp> = {};
+      const done: Record<string, true> = {};
+      const take = (snaps: any[]) => snaps.forEach(snap => snap.forEach((d: any) => {
+        const x: any = d.data();
+        if (x['type'] === 'schedule_done') { if (typeof x['scheduleId'] === 'string') done[x['scheduleId']] = true; return; }
+        if (x['type'] !== 'schedule' || typeof x['profileid'] !== 'string') return;
+        const due = this.toDate(x['dueDate']);
+        sched[d.id] = { id: d.id, profileid: x['profileid'], dueMs: due ? this.startOfDay(due).getTime() : null,
+          note: typeof x['note'] === 'string' ? x['note'] : '', actorName: typeof x['actorName'] === 'string' ? x['actorName'] : '' };
+      }));
+      if (this.pagedMode) {
+        if (this.fuAllLoaded) return;
+        take(await Promise.all([
+          getDocs(query(coll, where('type', '==', 'schedule'))),
+          getDocs(query(coll, where('type', '==', 'schedule_done'))),
+        ]));
+        this.fuAllLoaded = true;
+      } else {
+        if (this.fuAllLoaded) return;   // base-wide read already covers every roster
+        const ids = this.rosterIds().filter(id => !this.fuLoadedIds.has(id));
+        if (!ids.length) return;
+        take(await Promise.all(this.chunk30(ids).flatMap(c => [
+          getDocs(query(coll, where('profileid', 'in', c), where('type', '==', 'schedule'))),
+          getDocs(query(coll, where('profileid', 'in', c), where('type', '==', 'schedule_done'))),
+        ])));
+        ids.forEach(id => this.fuLoadedIds.add(id));
+      }
+      this.fuSched.update(m => ({ ...m, ...sched }));
+      this.fuDone.update(m => ({ ...m, ...done }));
+    } catch (e) {
+      console.warn('follow-ups load failed (non-fatal)', e);
+    }
+  }
+  /** Earliest open follow-up for a participant (row chip). Undated follow-ups get no chip. */
+  rowDue(profileid: string): { ms: number; overdue: boolean } | null {
+    const f = (this.fuByProfile()[profileid] ?? []).find(x => x.dueMs != null);
+    if (!f || f.dueMs == null) return null;
+    return { ms: f.dueMs, overdue: f.dueMs < this.startOfDay(new Date()).getTime() };
+  }
+  /** Bucket of one dated follow-up relative to today. */
+  private fuBucketOf(dueMs: number): 'overdue' | 'today' | 'week' | null {
+    const today = this.startOfDay(new Date()).getTime();
+    if (dueMs < today) return 'overdue';
+    if (dueMs === today) return 'today';
+    if (dueMs <= today + 7 * 86400000) return 'week';   // days 1-7 after today
+    return null;
+  }
+  /** Follow-ups in the current Viewing scope (roster), dated, open. */
+  private fuInScope(): FollowUp[] {
+    const inScope = new Set(this.rosterIds());
+    const by = this.fuByProfile();
+    const out: FollowUp[] = [];
+    for (const pid of Object.keys(by)) if (inScope.has(pid)) for (const f of by[pid]) if (f.dueMs != null) out.push(f);
+    return out;
+  }
+  fuCounts(): { today: number; week: number; overdue: number } {
+    const c = { today: 0, week: 0, overdue: 0 };
+    for (const f of this.fuInScope()) { const b = this.fuBucketOf(f.dueMs!); if (b) c[b]++; }
+    return c;
+  }
+  fuBucket = signal<'all' | 'today' | 'week' | 'overdue'>('all');
+  setFuBucket(b: 'today' | 'week' | 'overdue'): void { this.fuBucket.set(this.fuBucket() === b ? 'all' : b); }
+  /** The Follow-ups list under the tiles: 'all' = overdue + today + next 7 days (the tiles' horizon). */
+  fuList(): { profileid: string; participant: string; note: string; dueMs: number; overdue: boolean }[] {
+    const sel = this.fuBucket();
+    return this.fuInScope()
+      .map(f => ({ f, b: this.fuBucketOf(f.dueMs!) }))
+      .filter(x => x.b != null && (sel === 'all' || x.b === sel))
+      .sort((a, b) => a.f.dueMs! - b.f.dueMs!)
+      .map(({ f, b }) => ({ profileid: f.profileid, participant: this.nameOf(f.profileid), note: f.note, dueMs: f.dueMs!, overdue: b === 'overdue' }));
+  }
+  /** Slide-over list for one participant (live: read through a callback on every check). */
+  private slideoverFollowUps(profileid: string): SlideoverFollowUp[] {
+    const today = this.startOfDay(new Date()).getTime();
+    return (this.fuByProfile()[profileid] ?? []).map(f => ({
+      id: f.id, dueDate: f.dueMs != null ? new Date(f.dueMs) : null, note: f.note, actorName: f.actorName,
+      overdue: f.dueMs != null && f.dueMs < today,
+    }));
+  }
+  /** Mark done: additive {type:'schedule_done', scheduleId} event; the follow-up leaves every list. */
+  async markFollowUpDone(profileid: string, scheduleId: string): Promise<void> {
+    try {
+      await this.logActivity(profileid, 'schedule_done', { scheduleId });
+      this.fuDone.update(m => ({ ...m, [scheduleId]: true }));
+      this.guard.openSnackBar('Follow-up marked done', 'Close');
+    } catch (e: any) {
+      console.error('markFollowUpDone failed', e);
+      this.guard.openSnackBar('Could not mark done: ' + (e?.message ?? 'permission denied'), 'Close', 5000);
+    }
+  }
+
 
   /** Scoped A&H love-letter / ask-A&H tags for a set of participants (doc item 5): batched
    *  where('profileid','in',chunk), one-shot getDocs; unresolved, NON-happy tags (critical /
@@ -2310,6 +2430,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       addressed: this.isAddressed(row),
       needsAttention: this.isNeedsAttention(row),
       onMarkAddressed: (next: boolean) => this.markAddressed(row, next),
+      followUps: () => this.slideoverFollowUps(row.profileid),
+      onFollowUpDone: (scheduleId: string) => this.markFollowUpDone(row.profileid, scheduleId),
       isDark: this.isDark,   // the slide-over + its composer render in CDK overlays outside .jchd-wrap
     };
     this.dialog.open(ParticipantSlideoverComponent, {
@@ -2553,7 +2675,11 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
    *  parallel write here. Keeps the slide-over's Schedule tab honest (it records, it does not fabricate). */
   async writeSchedule(row: PortfolioRow, dueDate: Date | null, note: string): Promise<void> {
     try {
-      await this.logActivity(row.profileid, 'schedule', { dueDate: dueDate ?? null, note });
+      const ref: any = await this.logActivity(row.profileid, 'schedule', { dueDate: dueDate ?? null, note });
+      // show it at once in the row chip, the slide-over list and the Schedule card (no reload)
+      if (ref?.id) this.fuSched.update(m => ({ ...m, [ref.id]: {
+        id: ref.id, profileid: row.profileid, dueMs: dueDate ? this.startOfDay(dueDate).getTime() : null,
+        note, actorName: this.coachName } }));
       this.guard.openSnackBar(`Scheduled follow-up logged for ${row.name}`, 'Close');
     } catch (e: any) {
       console.error('writeSchedule failed', e);
@@ -3615,6 +3741,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       await this.loadFullPortfolio();   // roster is in memory; this only re-scopes the joins
     }
     void this.ensureOvPlan();   // Overall plan grid follows Viewing as (no-op off Overall / for ALL)
+    void this.loadFollowUps();  // follow-ups for the new scope (cached per id / base-wide once)
   }
 
   /** Map a KPI card key to its lever. 'total' resets the board to 'all'. */
