@@ -1108,12 +1108,9 @@
     <app-journeycoach-dashboard [embedOnboarding]="true" data-testid="jx-onboarding-sales"></app-journeycoach-dashboard>
   </section>
 
-  <!-- ─── Ev. Preparation tab (placeholder — content to be defined) ─── -->
+  <!-- ─── Ev. Preparation tab: two kanban boards (New Participants / Attended 1 uP! and above) ─── -->
   <section class="jx-tab-panel" *ngIf="experienceTab === 'evprep'" data-testid="jx-panel-evprep">
-    <div class="jx-placeholder">
-      <h2>Ev. Preparation</h2>
-      <p>Evolution preparation — to be defined.</p>
-    </div>
+    <app-jc-evprep-board data-testid="jx-evprep-board"></app-jc-evprep-board>
   </section>
 
   <!-- ─── Overall Summary tab (placeholder — content to be defined) ─── -->

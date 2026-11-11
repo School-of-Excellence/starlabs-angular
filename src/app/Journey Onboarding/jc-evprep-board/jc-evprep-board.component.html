@@ -1,0 +1,90 @@
+<div class="evp-root" data-testid="evp-root">
+
+  <div class="evp-preview" data-testid="evp-preview">Design preview · sample participants · moves are not saved and reset on reload</div>
+
+  <ng-container>
+    <section class="evp-board" *ngFor="let b of boards" data-testid="evp-board" [attr.data-board]="b.key">
+      <div class="evp-board-head">
+        <div>
+          <div class="evp-eyebrow">{{ b.eyebrow }}</div>
+          <h2 class="evp-title">{{ b.title }}</h2>
+          <p class="evp-sub">{{ b.sub }}</p>
+        </div>
+        <span class="evp-total" data-testid="evp-board-total">Total {{ boardTotal(b) }}</span>
+      </div>
+
+      <div class="evp-cols" [class.evp-cols--5]="b.stages.length === 5" [class.evp-cols--4]="b.stages.length === 4" cdkDropListGroup>
+        <div class="evp-col" *ngFor="let s of b.stages; let si = index"
+             [style.--evp-accent]="s.accent"
+             data-testid="evp-col" [attr.data-stage]="s.key"
+             cdkDropList [id]="listId(b, s)" [cdkDropListData]="s.key" [cdkDropListConnectedTo]="connectedTo(b)"
+             (cdkDropListDropped)="onDrop(b, s, $event)">
+          <div class="evp-col-head">
+            <span class="evp-col-badge">{{ si + 1 }}</span>
+            <h3 class="evp-col-name">{{ s.label }}<small *ngIf="s.sub">{{ s.sub }}</small></h3>
+            <span class="evp-col-count" data-testid="evp-col-count">{{ cols[b.key][s.key].length }}</span>
+          </div>
+
+          <div class="evp-list">
+            <div class="evp-empty" *ngIf="cols[b.key][s.key].length === 0" data-testid="evp-empty">No participants in this stage.</div>
+
+            <article class="evp-card" *ngFor="let c of cols[b.key][s.key]"
+                     cdkDrag [cdkDragData]="c"
+                     [class.evp-card--moved]="lastMovedId === c.profileid"
+                     data-testid="evp-card" [attr.data-profile]="c.profileid">
+              <span class="evp-grip" aria-hidden="true">⋮⋮</span>
+              <div class="evp-card-top">
+                <span class="evp-av">{{ initials(c.name) }}</span>
+                <div class="evp-id">
+                  <h4 class="evp-name">{{ c.name }}</h4>
+                  <span class="evp-mail" *ngIf="c.email">{{ c.email }}</span>
+                </div>
+              </div>
+              <div class="evp-meta">
+                <span class="evp-chip evp-chip--st" *ngIf="c.journey">{{ c.journey }}</span>
+                <span class="evp-chip" *ngIf="c.coach">{{ c.coach }}</span>
+                <span class="evp-chip" [class.evp-chip--warn]="days(c) >= 7 && days(c) < 14" [class.evp-chip--bad]="days(c) >= 14"
+                      data-testid="evp-card-days"><span class="evp-chip-l">In stage</span>{{ days(c) }}d</span>
+              </div>
+              <div class="evp-acts">
+                <button type="button" class="evp-btn evp-btn--back" *ngIf="prev(b, c) as p"
+                        [title]="'Back to ' + p.label" (click)="askMove(b, c, p)" data-testid="evp-card-back">‹</button>
+                <button type="button" class="evp-btn evp-btn--next" *ngIf="next(b, c) as n"
+                        (click)="askMove(b, c, n)" data-testid="evp-card-next">{{ n.label }} ›</button>
+                <span class="evp-btn evp-btn--done" *ngIf="!next(b, c)">{{ s.label }}</span>
+              </div>
+            </article>
+          </div>
+        </div>
+      </div>
+    </section>
+    <p class="evp-hint">Drag a card to another column on its board, or use Next / back. Each move needs a note.</p>
+  </ng-container>
+
+  <!-- Move box: in-page overlay (no MatDialog), same note-on-move pattern as /onboarding-pipeline. -->
+  <div class="evp-ovl" *ngIf="pending as p" (click)="closeMove()" data-testid="evp-move">
+    <div class="evp-modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+      <h2 class="evp-modal-title">Move {{ p.card.name }}</h2>
+      <div class="evp-flow"><span>{{ p.from.label }}</span>›<span class="evp-flow-to">{{ p.to.label }}</span></div>
+
+      <div class="evp-past" *ngIf="pastNotes(p.card).length">
+        <div class="evp-label">Past notes</div>
+        <div class="evp-past-item" *ngFor="let n of pastNotes(p.card)">
+          <div class="evp-past-flow">{{ n.fromStage }} › {{ n.toStage }}<span> · {{ n.at | date:'d MMM y' }}</span></div>
+          <div class="evp-past-note">{{ n.note }}</div>
+        </div>
+      </div>
+
+      <label class="evp-label" for="evp-move-note">Add a note for this move</label>
+      <textarea id="evp-move-note" class="evp-note" [(ngModel)]="moveNote" [class.evp-note--err]="moveTouched && !moveNote.trim()"
+                placeholder="Required" data-testid="evp-move-note"></textarea>
+      <div class="evp-err" *ngIf="moveTouched && !moveNote.trim()">A note is required to move a card.</div>
+      <div class="evp-modal-row">
+        <button type="button" class="evp-mbtn" (click)="closeMove()" data-testid="evp-move-cancel">Cancel</button>
+        <button type="button" class="evp-mbtn evp-mbtn--pri" (click)="confirmMove()" data-testid="evp-move-save">
+          Save note &amp; move
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
