@@ -1,16 +1,16 @@
 # 2026-11-12 — Queue creation: forms missing from the "Select Form Template" dropdown
 
-Branch: `charan-release` · Status: **uncommitted**
+Branch: `charan-release` · Status: committed `07d55dca` (not pushed)
 
 ## CHANGE LOG & REVERT GUIDE
 
 | # | Scope | File(s) | Commit | Revert |
 |---|---|---|---|---|
-| 1 | Delete filter: hide only `delete === true` | `src/app/queue system/queue-creation-v3/queue-creation-v3.component.ts` (forms fetch, ~line 496) | uncommitted | `git checkout -- "src/app/queue system/queue-creation-v3/queue-creation-v3.component.ts"` (also reverts #2 TS half) |
-| 2 | Search box on the Action Type → Form dropdown | same `.ts` (`filterFormTemplate`, `returnFormTemplates()`) + `queue-creation-v3.component.html` (`qcv3-sel-35-i`, new search hook `qcv3-inp-35s-i`) | uncommitted | `git checkout -- "src/app/queue system/queue-creation-v3/queue-creation-v3.component.html"` + the `.ts` above |
-| 3 | Search box on "Forms To Display" (multi-select) | same `.ts` (`filterParticipantForm`; `returnFormTemplates()` now takes search text + one id or an array of ids) + `.html` (`qcv3-sel-47-i`, new search hook `qcv3-inp-47s-i`) | uncommitted | same two-file checkout as above |
+| 1 | Delete filter: hide only `delete === true` | `src/app/queue system/queue-creation-v3/queue-creation-v3.component.ts` (forms fetch, ~line 496) | 07d55dca | `git revert 07d55dca` (one commit: all three go together) |
+| 2 | Search box on the Action Type → Form dropdown | same `.ts` (`filterFormTemplate`, `returnFormTemplates()`) + `queue-creation-v3.component.html` (`qcv3-sel-35-i`, new search hook `qcv3-inp-35s-i`) | 07d55dca | `git revert 07d55dca` (one commit: all three go together) |
+| 3 | Search box on "Forms To Display" (multi-select) | same `.ts` (`filterParticipantForm`; `returnFormTemplates()` now takes search text + one id or an array of ids) + `.html` (`qcv3-sel-47-i`, new search hook `qcv3-inp-47s-i`) | 07d55dca | `git revert 07d55dca` (one commit: all three go together) |
 
-#1 and #2 share the `.ts` file; reverting it alone while keeping the `.html` breaks the build (`returnFormTemplates` / `filterFormTemplate` would be missing). Revert both files together.
+All three landed in one commit and share the `.ts` file. To undo only the search boxes while keeping the delete fix, revert the commit, then re-apply the one-line `templateData['delete'] !== true` change.
 
 ## Why
 
@@ -37,4 +37,4 @@ selected form is always kept in the filtered list so the select doesn't lose its
   login-gated, so the dialog wasn't opened.
 
 ## Pending
-- Commit (operator approval) and a UI check of both dropdowns against starlabs-test or the emulator.
+- Push (operator approval) and a UI check of both dropdowns against starlabs-test or the emulator.
