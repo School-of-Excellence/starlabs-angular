@@ -1,0 +1,178 @@
+<div class="wrap">
+  <h1>Journey Pipeline</h1>
+  <p class="sub">New participants from the sale (GSV) to Ready for SE.</p>
+
+  <!-- Journey filter -->
+  <div class="bar" role="group" aria-label="Journey">
+    <button class="ghost" [attr.aria-pressed]="selectedJourney === 'all'" (click)="selectJourney('all')">
+      All {{ validCount }}
+    </button>
+    <button class="ghost" *ngFor="let j of journeyButtons"
+            [attr.aria-pressed]="selectedJourney === j.id" (click)="selectJourney(j.id)">
+      {{ j.name }} {{ j.count }}
+    </button>
+  </div>
+
+  <div class="board">
+
+    <!-- Phase 1: Pre requisites -->
+    <div class="phase">
+      <div class="phh">
+        <span>Pre requisites</span>
+        <span class="badge">{{ visible(gsvList).length + visible(asvList).length }}</span>
+      </div>
+      <div class="cols">
+
+        <div class="col">
+          <div class="ch"><span>GSV</span><small>{{ visible(gsvList).length }}</small></div>
+          <div class="card" *ngFor="let card of visible(gsvList)">
+            <span class="card-name">{{ getName(card) }}</span>
+            <span class="ml">{{ getEmail(card) }}</span>
+            <div class="row">
+              <span>{{ getJourneyName(card) }}</span>
+              <span *ngIf="getPayLabel(card)">· {{ getPayLabel(card) }}</span>
+              <span *ngIf="getTimeHere(card)">· {{ getTimeHere(card) }}</span>
+            </div>
+          </div>
+          <div class="empty" *ngIf="visible(gsvList).length === 0">No participants</div>
+        </div>
+
+        <div class="col">
+          <div class="ch"><span>ASV (Ready for onboarding)</span><small>{{ visible(asvList).length }}</small></div>
+          <div class="card" *ngFor="let card of visible(asvList)">
+            <span class="card-name">{{ getName(card) }}</span>
+            <span class="ml">{{ getEmail(card) }}</span>
+            <div class="row">
+              <span>{{ getJourneyName(card) }}</span>
+              <span *ngIf="getPayLabel(card)">· {{ getPayLabel(card) }}</span>
+              <span *ngIf="getTimeHere(card)">· {{ getTimeHere(card) }}</span>
+            </div>
+          </div>
+          <div class="empty" *ngIf="visible(asvList).length === 0">No participants</div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Phase 2: Onboarding flow -->
+    <div class="phase">
+      <div class="phh">
+        <span>Onboarding flow</span>
+        <span class="badge">{{ visible(bookedList).length + visible(completedList).length }}</span>
+      </div>
+      <div class="cols">
+
+        <div class="col">
+          <div class="ch"><span>Booked for onboarding</span><small>{{ visible(bookedList).length }}</small></div>
+          <div class="card" *ngFor="let card of visible(bookedList)">
+            <span class="card-name">{{ getName(card) }}</span>
+            <span class="ml">{{ getEmail(card) }}</span>
+            <div class="row">
+              <span>{{ getJourneyName(card) }}</span>
+              <span *ngIf="getPayLabel(card)">· {{ getPayLabel(card) }}</span>
+            </div>
+            <div class="row" *ngIf="getScheduled(card)">Time: {{ getScheduled(card) }}</div>
+            <div class="row">Specialist: {{ card.specialist }}</div>
+          </div>
+          <div class="empty" *ngIf="visible(bookedList).length === 0">No participants</div>
+        </div>
+
+        <div class="col">
+          <div class="ch"><span>Onboarding completed</span><small>{{ visible(completedList).length }}</small></div>
+          <div class="card" *ngFor="let card of visible(completedList)">
+            <span class="card-name">{{ getName(card) }}</span>
+            <span class="ml">{{ getEmail(card) }}</span>
+            <div class="row">
+              <span>{{ getJourneyName(card) }}</span>
+              <span *ngIf="getPayLabel(card)">· {{ getPayLabel(card) }}</span>
+              <span *ngIf="getTimeHere(card)">· {{ getTimeHere(card) }}</span>
+            </div>
+            <button (click)="openDialog(card)">Initiate evolution prep</button>
+          </div>
+          <div class="empty" *ngIf="visible(completedList).length === 0">No participants</div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Phase 3: Evolution prep (one column per stage) -->
+    <div class="phase">
+      <div class="phh">
+        <span>Evolution prep</span>
+      </div>
+      <div class="cols">
+
+        <div class="col" *ngFor="let col of stageColumns">
+          <div class="ch"><span>{{ col.title }}</span><small>{{ visible(col.cards).length }}</small></div>
+          <div class="card" *ngFor="let card of visible(col.cards)">
+            <span class="card-name">{{ getName(card) }}</span>
+            <span class="ml">{{ getEmail(card) }}</span>
+            <div class="row">
+              <span>{{ getJourneyName(card) }}</span>
+              <span *ngIf="getTimeHere(card)">· {{ getTimeHere(card) }}</span>
+            </div>
+            <button class="ghost" *ngIf="card.currentstage !== 'AEL'" (click)="moveStage(card, -1)">← Previous</button>
+            <button (click)="moveStage(card, 1)">Next →</button>
+            <div class="row"><span>{{ getVariationName(card) }}</span></div>
+            <button class="danger" *ngIf="isDeveloper" (click)="cancel(card)">Cancel</button>
+          </div>
+          <div class="empty" *ngIf="visible(col.cards).length === 0">No participants</div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Phase 4: Completed list -->
+    <div class="phase">
+      <div class="phh">
+        <span>Completed list</span>
+        <span class="badge">{{ visible(readyForSeList).length }}</span>
+      </div>
+      <div class="cols">
+
+        <div class="col">
+          <div class="ch"><span>Ready for SE</span><small>{{ visible(readyForSeList).length }}</small></div>
+          <div class="card" *ngFor="let card of visible(readyForSeList)">
+            <span class="card-name">{{ getName(card) }}</span>
+            <span class="ml">{{ getEmail(card) }}</span>
+            <div class="row">
+              <span>{{ getJourneyName(card) }}</span>
+              <span *ngIf="getTimeHere(card)">· {{ getTimeHere(card) }}</span>
+            </div>
+            <div class="row"><span>{{ getVariationName(card) }}</span></div>
+          </div>
+          <div class="empty" *ngIf="visible(readyForSeList).length === 0">No participants</div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Initiate dialog -->
+<div class="dialog-overlay" *ngIf="showDialog">
+  <div class="dialog">
+    <h3>Initiate evolution prep</h3>
+
+    <div class="field">
+      <span class="field-label">Name</span>
+      <div class="field-value">{{ getName(dialogCard) }}</div>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="variation">Variation</label>
+      <select id="variation" [(ngModel)]="selectedId" (change)="onSelect()">
+        <option value="">Select variation</option>
+        <option *ngFor="let v of variations" [value]="v.variationid">{{ v.variationname }}</option>
+      </select>
+    </div>
+
+    <p class="error">{{ error }}</p>
+
+    <div class="dialog-actions">
+      <button class="ghost" (click)="closeDialog()">Close</button>
+      <button (click)="initiate()">Initiate</button>
+    </div>
+  </div>
+</div>
