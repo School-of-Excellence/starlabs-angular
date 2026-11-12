@@ -59,7 +59,8 @@ export interface Attachment {
 
 export interface Receipt { name: string; at: string; }
 
-export interface Seg { kind: 'text' | 'bold' | 'italic' | 'link' | 'mention'; text: string; href?: string; }
+/** `b` / `i`: the bold / italic the piece sits inside — both can be on ("*_word_*"). */
+export interface Seg { kind: 'text' | 'bold' | 'italic' | 'link' | 'mention'; text: string; href?: string; b?: boolean; i?: boolean; }
 /** `gap` is a deliberately blank line — it is what keeps paragraph spacing in a sent message. */
 export interface Block { type: 'p' | 'ul' | 'ol' | 'gap'; segs?: Seg[]; items?: Seg[][]; }
 export interface Cta { label: string; href: string; }
@@ -346,6 +347,8 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   msgSearchUser = 'all';
   showMsgSearch = false;
   confirmDelete: { group?: boolean; msgs?: ChatMessage[] } | null = null;
+  /** The participant whose Remove was clicked — asked about first, as the app does (QA, Nov 2026). */
+  confirmRemove: string | null = null;
   toastMsg: string | null = null;
   hoverId: string | null = null;
   pickerId: string | null = null;
@@ -1867,6 +1870,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     return (text || '')
       .replace(/\[([^\]\n]+)\]\(https?:\/\/[^\s)]+\)/g, '$1')
       .replace(/\*([^*\n]+)\*/g, '$1')
+      .replace(/(?<![A-Za-z0-9_])_([^_\n]+)_(?![A-Za-z0-9_])/g, '$1')
       .replace(/^\s*[-•]\s+/gm, '')
       .replace(/^\s*\d+[.)]\s+/gm, '');
   }
@@ -1891,23 +1895,27 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       'g');
   }
 
-  private renderInline(text: string, names: string[]): Seg[] {
+  /** A bold or italic run is read again inside, so the two stack: Bold then Italic on one word
+   *  ("*_word_*" or "_*word*_") comes out bold AND italic, not one style with the other's markers
+   *  left showing (QA, Nov 2026). Same in the app's MsgRichText. */
+  private renderInline(text: string, names: string[], b = false, i = false): Seg[] {
     const out: Seg[] = [];
     const src = text || '';
     const re = this.inlineTokenRe(names);
+    const fmt = { ...(b ? { b } : {}), ...(i ? { i } : {}) };
     let last = 0;
     for (const m of Array.from(src.matchAll(re))) {
       const idx = m.index ?? 0;
-      if (idx > last) out.push({ kind: 'text', text: src.slice(last, idx) });
+      if (idx > last) out.push({ kind: 'text', text: src.slice(last, idx), ...fmt });
       const [, label, href, bold, italic, url, mention] = m;
-      if (href) out.push({ kind: 'link', text: label, href });
-      else if (bold) out.push({ kind: 'bold', text: bold });
-      else if (italic) out.push({ kind: 'italic', text: italic });
-      else if (url) out.push({ kind: 'link', text: url, href: url });
-      else if (mention) out.push({ kind: 'mention', text: mention });
+      if (href) out.push({ kind: 'link', text: label, href, ...fmt });
+      else if (bold) out.push(...this.renderInline(bold, names, true, i));
+      else if (italic) out.push(...this.renderInline(italic, names, b, true));
+      else if (url) out.push({ kind: 'link', text: url, href: url, ...fmt });
+      else if (mention) out.push({ kind: 'mention', text: mention, ...fmt });
       last = idx + m[0].length;
     }
-    if (last < src.length) out.push({ kind: 'text', text: src.slice(last) });
+    if (last < src.length) out.push({ kind: 'text', text: src.slice(last), ...fmt });
     return out;
   }
 
@@ -4104,20 +4112,42 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     else { this.deleteMessages(this.confirmDelete.msgs || []); this.confirmDelete = null; }
   }
 
+  /** Why this person can't be removed, or null when they can. */
+  private removeBlocked(name: string): string | null {
+    const active = this.active;
+    if (!active) return '';
+    if (!this.canManageGroup) return 'Only an A&H member in this group can remove people';
+    if (!this.isLive(active)) return null;
+    const uid = (active.members || []).find(m => m.name === name)?.id;
+    if (!uid) return '';
+    // Only an A&H member inside the group can add people, so removing the last one would leave the
+    // group with nobody able to add anyone ever again.
+    const ahLeft = (active._memberUids || []).filter(u => u !== uid && this.isAhMemberUid(u));
+    if (this.isAhMemberUid(uid) && !ahLeft.length) return 'A group needs at least one A&H member';
+    return null;
+  }
+
+  /** The Remove button: says why not, or asks "Remove <name>?" before anything changes. */
+  askRemoveMember(name: string): void {
+    const blocked = this.removeBlocked(name);
+    if (blocked !== null) { if (blocked) this.notify(blocked); return; }
+    this.confirmRemove = name;
+  }
+
+  confirmRemoveNow(): void {
+    const name = this.confirmRemove;
+    this.confirmRemove = null;
+    if (name) this.removeMember(name);
+  }
+
   removeMember(name: string): void {
     const active = this.active;
     if (!active) return;
-    if (!this.canManageGroup) { this.notify('Only an A&H member in this group can remove people'); return; }
+    const blocked = this.removeBlocked(name);
+    if (blocked !== null) { if (blocked) this.notify(blocked); return; }
     if (this.isLive(active)) {
       const uid = (active.members || []).find(m => m.name === name)?.id;
       if (!uid) return;
-      // Only an A&H member inside the group can add people, so removing the last one would leave the
-      // group with nobody able to add anyone ever again.
-      const ahLeft = (active._memberUids || []).filter(u => u !== uid && this.isAhMemberUid(u));
-      if (this.isAhMemberUid(uid) && !ahLeft.length) {
-        this.notify('A group needs at least one A&H member');
-        return;
-      }
       updateDoc(active._ref, { members: arrayRemove(uid) })
         .catch(e => { console.error('remove member', e); this.notify('Error removing member'); });
       return;

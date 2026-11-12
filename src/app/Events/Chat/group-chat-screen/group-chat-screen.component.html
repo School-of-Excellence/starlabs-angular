@@ -1000,7 +1000,7 @@
                 </div>
                 <span class="wc-member-name">{{ mem.name }}</span>
               </div>
-              <button data-testid="gcs-info-team-remove" class="wc-remove-btn" *ngIf="canManageGroup" [matTooltip]="'Remove ' + mem.name" (click)="removeMember(mem.name)">
+              <button data-testid="gcs-info-team-remove" class="wc-remove-btn" *ngIf="canManageGroup" [matTooltip]="'Remove ' + mem.name" (click)="askRemoveMember(mem.name)">
                 <mat-icon>close</mat-icon>
               </button>
             </div>
@@ -1039,7 +1039,7 @@
                 <span class="wc-journey" *ngIf="journeyMeta(mem.journey) as jm"
                       [style.background]="jm.bg" [style.color]="jm.color">{{ jm.label }}</span>
               </div>
-              <button data-testid="gcs-info-participant-remove" class="wc-remove-btn" *ngIf="canManageGroup" [matTooltip]="'Remove ' + mem.name" (click)="removeMember(mem.name)">
+              <button data-testid="gcs-info-participant-remove" class="wc-remove-btn" *ngIf="canManageGroup" [matTooltip]="'Remove ' + mem.name" (click)="askRemoveMember(mem.name)">
                 <mat-icon>close</mat-icon>
               </button>
             </div>
@@ -1426,6 +1426,21 @@
     </div>
   </ng-container>
 
+  <!-- ── Remove participant confirmation (same words as the app's) ───── -->
+  <ng-container *ngIf="confirmRemove">
+    <div data-testid="gcs-remove-overlay" class="wc-overlay" (click)="confirmRemove = null"></div>
+    <div class="wc-dialog sm">
+      <div class="wc-dialog-title">Remove {{ confirmRemove }}?</div>
+      <div class="wc-dialog-text">
+        They stop getting this chat’s messages and it leaves their Chats list. You can add them back later.
+      </div>
+      <div class="wc-dialog-foot">
+        <button data-testid="gcs-remove-cancel" class="wc-ghost-btn grow" (click)="confirmRemove = null">Cancel</button>
+        <button data-testid="gcs-remove-confirm" class="wc-solid-danger grow" (click)="confirmRemoveNow()">Remove</button>
+      </div>
+    </div>
+  </ng-container>
+
   <!-- ── Create group / channel ─────────────────────────────────────── -->
   <ng-container *ngIf="createOpen">
     <!-- QA item 2: clicking outside no longer closes it — only Close / Cancel or a successful create. -->
@@ -1806,11 +1821,13 @@
 
 <ng-template #segs let-list let-light="light">
   <ng-container *ngFor="let s of list; trackBy: trackByIndex">
-    <span *ngIf="s.kind === 'text'">{{ s.text }}</span>
-    <strong *ngIf="s.kind === 'bold'">{{ s.text }}</strong>
-    <em *ngIf="s.kind === 'italic'">{{ s.text }}</em>
+    <span *ngIf="s.kind === 'text' && !s.b && !s.i">{{ s.text }}</span>
+    <strong *ngIf="s.kind === 'text' && s.b && !s.i">{{ s.text }}</strong>
+    <em *ngIf="s.kind === 'text' && !s.b && s.i">{{ s.text }}</em>
+    <strong *ngIf="s.kind === 'text' && s.b && s.i"><em>{{ s.text }}</em></strong>
     <a data-testid="gcs-richbody-link" *ngIf="s.kind === 'link'" class="wc-inline-link" [class.light]="light" [href]="s.href" target="_blank"
-       rel="noreferrer" [title]="s.href" (click)="$event.stopPropagation()">{{ s.text }}</a>
-    <span *ngIf="s.kind === 'mention'" class="wc-mention-tag" [class.light]="light">{{ s.text }}</span>
+       rel="noreferrer" [title]="s.href" [style.font-weight]="s.b ? 700 : null" [style.font-style]="s.i ? 'italic' : null"
+       (click)="$event.stopPropagation()">{{ s.text }}</a>
+    <span *ngIf="s.kind === 'mention'" class="wc-mention-tag" [class.light]="light" [style.font-style]="s.i ? 'italic' : null">{{ s.text }}</span>
   </ng-container>
 </ng-template>
