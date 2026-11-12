@@ -399,7 +399,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   }
 
   // Picking the option that is already active clears it, so two rows cover
-  // three states and the menu needs no "any" row.
+  // three states and the menu needs no "any" row
   setConvertedFilter(value: ConvertedFilter): void {
     this.convertedFilter = this.convertedFilter === value ? '' : value;
     this.updateDisplayedColumns();
