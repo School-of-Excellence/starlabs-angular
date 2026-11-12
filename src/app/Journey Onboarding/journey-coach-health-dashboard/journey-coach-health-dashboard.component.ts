@@ -264,9 +264,107 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     if (t === 'overall' || t === 'onboarding') this.jcdMounted = true;
     if (t === 'overall') void this.ensureOvPlan();
     // Ev. Prep stays mounted after its first visit: no reload + Firestore re-read on every switch (review F9).
-    if (t === 'evprep') this.evprepMounted = true;
+        if (t === 'evprep') this.evprepMounted = true;
   }
   evprepMounted = false;
+
+  // pipeline tab (GSV, ASV, booked, onboarding completed)
+  pipeCols: any[] = [];
+  journeyButtons: any[] = [];
+  validCount = 0;
+  selectedJourney = 'all';
+  pipeLoaded = false;
+
+  async loadPipeline() {
+    if (this.pipeLoaded) return;
+    const [salesSnap, pjpSnap, prepSnap, journeySnap] = await Promise.all([
+      getDocs(query(collection(this.firestore, 'salesleads'), where('journeytype', '==', 'new'))),
+      getDocs(query(collection(this.firestore, 'participantjourneyproduct'), where('journeytype', '==', 'new'))),
+      getDocs(collection(this.firestore, 'evolution prep')),
+      getDocs(collection(this.firestore, 'journey')),
+    ]);
+    if (!this.metaMap?.docdata) this.metaMap = await this.guard.getParticipantMetaMap();
+    const meta = this.metaMap.docdata;
+
+    const journeyNames: any = {};
+    journeySnap.forEach(d => journeyNames[d.id] = (d.data() as any).journey || d.id);
+
+    const pjpBySale: any = {};
+    pjpSnap.forEach(d => {
+      const p: any = d.data();
+      if (p.salesleadsref) pjpBySale[p.salesleadsref.id] = p;
+    });
+    const preps = prepSnap.docs.map(d => d.data() as any);
+
+    const sales = salesSnap.docs.map(d => ({ ...(d.data() as any), docid: d.id })).filter(s =>
+      s.status?.toLowerCase() !== 'rejected' &&
+      s.journey !== 'InLXMl7OBAqlDTZcXwK0' &&
+      !(s.journey === 'RXvsMYoK0g4SstvDDURZ' && s.email?.toLowerCase().includes('soexcellence.com')));
+
+    const card = (s: any) => {
+      const t = s.since || s.createdon;
+      return {
+        name: meta[s.profileid]?.name || s.name || s.profileid,
+        email: meta[s.profileid]?.email || s.email || '',
+        journey: journeyNames[s.journey] || s.journey || '',
+        journeyid: s.journey,
+        pay: !s.paymentplan ? '' : String(s.paymentplan).toLowerCase().includes('full') ? 'Paid in full' : 'EMI',
+        days: t ? Math.floor((Date.now() - t.toMillis()) / 86400000) : null,
+        scheduled: null,
+        specialist: ''
+      };
+    };
+
+    const gsv: any[] = [], asv: any[] = [], booked: any[] = [], completed: any[] = [];
+    const toCheck: any[] = [];
+    for (const s of sales) {
+      const c: any = card(s);
+      const pjp = pjpBySale[s.docid];
+      if (!s.paymentplan) {
+        gsv.push(c);
+      } else if (pjp?.onboarded === true) {
+        const onboardedAt = pjp.onboardedtime ? pjp.onboardedtime.toMillis() : 0;
+        const started = preps.some(p => p.profileid === s.profileid && p.createdon && p.createdon.toMillis() > onboardedAt);
+        if (!started) completed.push(c);
+      } else if (pjp?.onboardingscheduled && pjp?.appointmentid) {
+        c.scheduled = pjp.onboardingscheduled.toDate();
+        toCheck.push({ c, appointmentid: pjp.appointmentid });
+      } else {
+        asv.push(c);
+      }
+    }
+
+    // booked only if the appointment is still on, otherwise it goes back to ASV
+    await Promise.all(toCheck.map(async x => {
+      const appt: any = (await getDoc(doc(this.firestore, 'appointments', x.appointmentid))).data();
+      if (appt && appt.cancelled !== true && appt.attended !== true) {
+        const host = appt.hosts?.[0];
+        const hostId = host?.id || host;
+        x.c.specialist = meta[hostId]?.name || hostId;
+        booked.push(x.c);
+      } else {
+        x.c.scheduled = null;
+        asv.push(x.c);
+      }
+    }));
+
+    const counts: any = {};
+    sales.forEach(s => counts[s.journey] = (counts[s.journey] || 0) + 1);
+    this.validCount = sales.length;
+    this.journeyButtons = Object.keys(counts).map(id => ({ id, name: journeyNames[id] || id, count: counts[id] }));
+
+    this.pipeCols = [
+      { title: 'GSV', cards: gsv },
+      { title: 'ASV', cards: asv },
+      { title: 'Booked for onboarding', cards: booked },
+      { title: 'Onboarding completed', cards: completed }
+    ];
+    this.pipeLoaded = true;
+  }
+
+  visible(list: any[]) {
+    return this.selectedJourney === 'all' ? list : list.filter(c => c.journeyid === this.selectedJourney);
+  }
 
   // ═══ Overall Summary tab (operator spec 2026-11-11) ═══════════════════════════════════════════
   //  1 Sales by Journey + 2 Onboarding status read the shared embedded journeycoach-dashboard (org-wide,

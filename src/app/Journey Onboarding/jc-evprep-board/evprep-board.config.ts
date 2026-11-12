@@ -24,18 +24,18 @@ export const EVPREP_BOARDS: EvPrepBoard[] = [
       { key: 'readyforse', label: 'Ready for SE', accent: '#16A34A' },
     ],
   },
-  {
-    key: 'returning',
-    eyebrow: 'Ev. Preparation · Pipeline 2',
-    title: 'Attended 1 uP! and above',
-    sub: 'Returning participants preparing for their next Scope Enhancement.',
-    stages: [
-      { key: 'jcdone', label: 'JC Done', sub: 'Yet to start', accent: '#475569' },
-      { key: 'ael', label: 'AEL', accent: '#2563EB' },
-      { key: 'uplifereport', label: 'uP! life report', accent: '#7C3AED' },
-      { key: 'readyforse', label: 'Ready for SE', accent: '#16A34A' },
-    ],
-  },
+  // {
+  //   key: 'returning',
+  //   eyebrow: 'Ev. Preparation · Pipeline 2',
+  //   title: 'Attended 1 uP! and above',
+  //   sub: 'Returning participants preparing for their next Scope Enhancement.',
+  //   stages: [
+  //     { key: 'jcdone', label: 'JC Done', sub: 'Yet to start', accent: '#475569' },
+  //     { key: 'ael', label: 'AEL', accent: '#2563EB' },
+  //     { key: 'uplifereport', label: 'uP! life report', accent: '#7C3AED' },
+  //     { key: 'readyforse', label: 'Ready for SE', accent: '#16A34A' },
+  //   ],
+  // },
 ];
 
 export interface EvPrepNote { by: string; at: any; note: string; fromStage: string; toStage: string; }
