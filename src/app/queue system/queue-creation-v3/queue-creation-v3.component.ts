@@ -493,7 +493,8 @@ export class QueueCreationV3Component {
       for (let i = 0; i < form.docs.length; i++) {
         const template = form.docs[i];
         var templateData = template.data()
-        if ([null, undefined].includes(templateData['delete'])) {
+        // Hide only soft-deleted forms; `delete: false` means live (was hidden by the old null/undefined check).
+        if (templateData['delete'] !== true) {
           console.log(template.id, 'form docid');
 
           templateData["docid"] = template.id
@@ -625,6 +626,20 @@ export class QueueCreationV3Component {
     var data = []
     data = this.profilelist.filter(e => e["name"].toLowerCase().includes(this.filterprofile.toLowerCase()))
     return data
+  }
+
+  // Per-stage search text, keyed by stage index: "Select Form Template" and "Forms To Display".
+  filterFormTemplate: { [stageIndex: number]: string } = {}
+  filterParticipantForm: { [stageIndex: number]: string } = {}
+
+  // Forms matching the search text; currently selected form(s) are always kept
+  // so the select doesn't lose its label while a search is typed.
+  returnFormTemplates(searchText: string, selected: string | string[]): Array<any> {
+    const text = (searchText ?? '').trim().toLowerCase()
+    if (!text) return this.formTemplateList
+    const selectedIds = Array.isArray(selected) ? selected : [selected]
+    return this.formTemplateList.filter(e =>
+      selectedIds.includes(e.docid) || (e['formname'] ?? '').toLowerCase().includes(text))
   }
 
   returnPackageEligibility(): Array<any> {
