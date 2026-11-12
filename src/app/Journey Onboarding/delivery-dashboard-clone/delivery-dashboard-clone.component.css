@@ -18011,3 +18011,11 @@ i.seat-chip {
   background: #fff7ed;
   color: #c2703d;
 }
+
+/* Unknown waiting period: no onboarding date on record. Deliberately neutral --
+   it must not read as "fresh" (green) nor as "overdue" (red). */
+.pm-days-badge.days-unknown {
+    background: #f1f5f9;
+    color: #64748b;
+    letter-spacing: 0.08em;
+}
