@@ -59,7 +59,7 @@ check('OV9', 'Scheduled today / next 7 use the Planning Schedule predicates; til
             && /jcToday: this\.ovPending\(false, 'today'\)\.length/.test(body('ovSched'))
             && /this\.ovDone\(onboarding\) : this\.ovPending\(onboarding, what\)/.test(body('ovSchedDrill')); });
 check('OV10', 'JC completed and Onboarding completed are DISJOINT (attended onboarding calls split out of JC done)',
-  () => /if \(data\['onboarding'\] === true\) \{\s*\/\/[^\n]*\n[^\n]*\n\s*obDone\.push\(/.test(ts)
+  () => /if \(data\['onboarding'\] === true\) \{\s*\/\/[^\n]*\n[^\n]*\n\s*(acc\.)?obDone\.push\(/.test(ts)
      && /this\.obDoneEvents\.set\(obDone\);/.test(ts)
      && /\(onboarding \? this\.obDoneEvents\(\) : this\.jcDoneEvents\(\)\)/.test(pbody('ovDone')));
 check('OV11', 'Completed counts only the Overall date range, never the future',

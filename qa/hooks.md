@@ -159,3 +159,9 @@ Literal `data-testid` strings only — no `${interpolation}` (gate section 1.1 /
 | evp-move-error | Why a move is blocked / failed | jc-evprep-board |
 | evp-loading | Live board loading state | jc-evprep-board |
 | evp-error | Live board load error + Retry | jc-evprep-board |
+
+## jc-health-ux-review — shared theme + usability fixes
+| testid | element | contract |
+| --- | --- | --- |
+| jx-theme-toggle | Light/dark button at the end of the Journey Experience tab bar (all 4 tabs) | jc-health-theme-consistency |
+| jchd-diag-showing | Participants context line: filtered count when a filter is on | jc-health-ux-e2e |

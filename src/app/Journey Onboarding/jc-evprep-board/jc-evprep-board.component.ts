@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, HostListener, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
@@ -256,6 +256,8 @@ export class JcEvprepBoardComponent implements OnInit, OnDestroy {
     this.moveTouched = false;
     this.moveVariationId = '';
     this.moveError = '';
+    // Focus the note field once the box renders (keyboard users land where the required input is).
+    setTimeout(() => (document.getElementById('evp-move-note') as HTMLTextAreaElement | null)?.focus(), 0);
     if (this.pending.start) {
       if (to.key === LIVE_DONE) { this.moveError = 'Start the preparation first; it cannot jump to Ready for SE.'; }
     } else if (this.isLive(b)) {
@@ -276,6 +278,9 @@ export class JcEvprepBoardComponent implements OnInit, OnDestroy {
   private firstKey(v: EvPrepVariation): string { return v.stages.length ? stageKey(v.stages[0]) : ''; }
 
   closeMove(): void { if (!this.saving) this.pending = null; }
+  /** Escape closes the move box (jc-health-ux-review F10). */
+  @HostListener('document:keydown.escape')
+  onEscape(): void { if (this.pending) this.closeMove(); }
 
   async confirmMove(): Promise<void> {
     this.moveTouched = true;

@@ -2460,7 +2460,7 @@ td.mat-mdc-cell span {
 }
 .jchd-table.ios-grid-t .cell-person .cp-email {
   font-size: var(--fs-200);
-  color: rgba(60, 60, 67, 0.7);
+  color: var(--ink-2);
   margin-top: 1px;
   line-height: 1.25;
 }
@@ -3006,7 +3006,7 @@ td.mat-mdc-cell span {
   align-items: center;
   gap: 6px;
   font-size: var(--fs-300);
-  color: rgba(60, 60, 67, 0.7);
+  color: var(--ink-2);
 }
 .health-card .hl-item b {
   color: var(--ink);
@@ -3093,7 +3093,7 @@ td.mat-mdc-cell span {
 .jcp-p { font-size: var(--fs-300); color: var(--ink); font-weight: var(--fw-medium); }
 .jcp-c { font-size: var(--fs-200); color: var(--ink-2); }
 .jcp-when { font-size: var(--fs-200); color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.jcp-range { display: block; font-size: var(--fs-100); color: var(--ink-4); margin-top: 2px; font-variant-numeric: tabular-nums; }
+.jcp-range { display: block; font-size: var(--fs-100); color: var(--ink-3); margin-top: 2px; font-variant-numeric: tabular-nums; }
 
 /* Coach card: JC pipeline block + clickable coach name (doc item 9). */
 .coach-name-btn { border: none; background: none; font: inherit; padding: 0; cursor: pointer; text-align: left; color: inherit; }
@@ -3256,3 +3256,22 @@ td.mat-mdc-cell span {
 .ios-mini-summary .ios-mini-card .mc-trend:empty { display: none; }
 .ios-mini-summary .ios-mini-card .mc-dot.dot-purple { background: var(--sem-purple); }
 .jchd-table .jchd-data-row.jchd-row-new td.mat-mdc-cell { background: rgba(255,59,48,0.05); }
+
+/* ═══ Shared Journey Experience theme tokens (jc-health-ux-review T1) ═══
+   Resolved here for the current light/dark mode and inherited (through view encapsulation) by the embedded
+   journeycoach-dashboard and the Ev. Prep board, so every tab reads ONE palette. */
+.jchd-wrap {
+  --jx-canvas: var(--canvas); --jx-surface: var(--surface); --jx-surface-2: var(--surface-2);
+  --jx-tile: var(--tile); --jx-tile-hover: var(--tile-hover);
+  --jx-ink: var(--ink); --jx-ink-2: var(--ink-2); --jx-ink-3: var(--ink-3);
+  --jx-line: var(--hairline); --jx-line-2: var(--hairline-2); --jx-stripe: color-mix(in srgb, var(--ink) 2%, transparent);
+  --jx-blue: var(--blue); --jx-blue-soft: color-mix(in srgb, var(--blue) 14%, var(--surface));
+  --jx-green: var(--sem-green-fg); --jx-green-soft: color-mix(in srgb, var(--sem-green) 16%, var(--surface));
+  --jx-amber: var(--sem-orange-fg); --jx-amber-soft: color-mix(in srgb, var(--sem-orange) 16%, var(--surface));
+  --jx-red: var(--sem-red); --jx-red-soft: color-mix(in srgb, var(--sem-red-strong) 14%, var(--surface));
+  --jx-indigo: var(--sem-indigo-fg); --jx-indigo-soft: color-mix(in srgb, var(--sem-indigo) 14%, var(--surface));
+  --jx-teal: var(--sem-teal); --jx-teal-soft: color-mix(in srgb, var(--sem-teal) 14%, var(--surface));
+  --jx-radius: var(--card-radius); --jx-shadow: var(--card-shadow);
+}
+.jx-tabbar { align-items: center; }
+.jx-theme-toggle { margin-left: auto; }

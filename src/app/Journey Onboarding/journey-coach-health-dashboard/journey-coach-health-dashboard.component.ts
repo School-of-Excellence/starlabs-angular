@@ -189,6 +189,8 @@ interface AHSummary {
   askAH: AHFlagCounts;
   loveLetter: AHFlagCounts;
   liked: number; tagged: number; opportunity: number; critical: number; unflagged: number;
+  /** Docs that are critical OR tagged: the Critical + Attn tile (same predicate as its drill list). */
+  critAttn: number;
   resolvedTotal: number; resolvedLiked: number; resolvedTagged: number; resolvedOpportunity: number; resolvedCritical: number;
 }
 
@@ -261,7 +263,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     // Overall or Onboarding opens, then kept alive (hidden off its tab) so both tabs read the same load.
     if (t === 'overall' || t === 'onboarding') this.jcdMounted = true;
     if (t === 'overall') void this.ensureOvPlan();
+    // Ev. Prep stays mounted after its first visit: no reload + Firestore re-read on every switch (review F9).
+    if (t === 'evprep') this.evprepMounted = true;
   }
+  evprepMounted = false;
 
   // ═══ Overall Summary tab (operator spec 2026-11-11) ═══════════════════════════════════════════
   //  1 Sales by Journey + 2 Onboarding status read the shared embedded journeycoach-dashboard (org-wide,
@@ -405,7 +410,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       jcMonth: this.ovPending(false, 'month').length, jcDone: this.ovDone(false).length,
       obToday: this.ovPending(true, 'today').length, obWeek: this.ovPending(true, 'week').length,
       obMonth: this.ovPending(true, 'month').length, obDone: this.ovDone(true).length,
-      ready: this.contactDataLoaded(),
+      ready: this.contactDataLoaded() || this.contactEventsLoaded(),
     };
   }
   ovSchedDrill(onboarding: boolean, what: 'today' | 'week' | 'month' | 'done', title: string): void {
@@ -584,6 +589,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       resolvedTagged: docs.filter(d => d.tagged && d.resolved).length,
       resolvedOpportunity: docs.filter(d => d.opportunity && d.resolved).length,
       resolvedCritical: docs.filter(d => d.critical && d.resolved).length,
+      critAttn: docs.filter(d => d.critical || d.tagged).length,
     };
   }
   ovAhDrill(coll: 'ask' | 'love' | 'both',
@@ -644,6 +650,9 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   selectedMeta = new Map<string, string>();
   assignTargetCoachId = '';
   unassignedCount = 0;
+  /** The roster-based count disagrees with the Unassigned view's own query (it read 0 while the view listed
+   *  234), so the selector shows "…" until the Unassigned view has been loaded once (review F4). */
+  unassignedKnown = false;
   assigning = false;
 
   loading = true;
@@ -798,7 +807,15 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   private eventInfoCache: Record<string, { name: string; start: Date | null }> = {};
 
   @ViewChild(MatPaginator) paginator!: MatPaginator;
-  @ViewChild(MatSort) sort!: MatSort;
+  // The table renders behind *ngIf (Participants view), so the MatSort only exists after the user opens it.
+  // A setter binds it whenever it appears; reading it once in ngAfterViewInit left dataSource.sort undefined
+  // and the headers flipped arrows without reordering rows (jc-health-ux-review F1).
+  private sortRef?: MatSort;
+  @ViewChild(MatSort) set sort(s: MatSort | undefined) {
+    this.sortRef = s;
+    if (s && this.dataSource.sort !== s) this.dataSource.sort = s;
+  }
+  get sort(): MatSort { return this.sortRef as MatSort; }
   @ViewChild('searchInput') searchInput?: ElementRef<HTMLInputElement>;
 
   // Read-only keyboard navigation for the base table (power-user triage). -1 = no focused row.
@@ -860,7 +877,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
   ngAfterViewInit(): void {
     this.applyPaginatorBinding();
-    this.dataSource.sort = this.sort;
+    if (this.sortRef) this.dataSource.sort = this.sortRef;
     this.dataSource.sortingDataAccessor = (row: PortfolioRow, id: string): string | number => {
       switch (id) {
         case 'name': return (row.name ?? '').toLowerCase();
@@ -1112,7 +1129,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       if ((r.financialstatus ?? '').toLowerCase() === 'late') this.summary.missed++;
     }
     this.loadedRowCount = this.countedProfiles.size;
-    if (this.selectedCoachId === this.UNASSIGNED) this.unassignedCount = this.loadedRowCount;
+    if (this.selectedCoachId === this.UNASSIGNED) { this.unassignedCount = this.loadedRowCount; this.unassignedKnown = true; }
     // Open-tickets count: distinct participants with at least one OPEN ticket, from the lite index
     // (metadata's customersupporttickets / the clientissue open count). This used to prefer a
     // getCountFromServer over `clientissue` for the ALL view — that query went with the rest of the
@@ -1286,6 +1303,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
   private async loadContactEventsFor(profileIds: string[]): Promise<void> {
     if (!profileIds.length) return;
+    const scoped = { map: {} as Record<string, number>, events: [] as JcDoneEvent[], pending: [] as JcDoneEvent[], obDone: [] as JcDoneEvent[] };
+    await this.loadOnboardingApptTypes();
     try {
       for (const batch of this.chunk30(profileIds)) {
         // single-field 'in' on bookedby (refs) — auto-indexed; filter journeycoach/attended client-side
@@ -1298,7 +1317,16 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
           const pid = data['bookedby']?.id ?? (typeof data['profileid'] === 'string' ? data['profileid'] : null);
           const dt = this.toDate(data['starttime']) ?? this.toDate(data['date']);
           if (pid && dt) this.contactEventByProfile[pid] = Math.max(this.contactEventByProfile[pid] ?? 0, dt.getTime());
+          if (data['journeycoach'] === true) this.classifyJcAppt(data, scoped);
         });
+      }
+      // Coach (full) view never runs the base-wide loadContactEvents, so the Schedule / JC-pipeline cards
+      // had no events (zeros + "loading…"). Feed them this roster's appointments instead (review F3).
+      if (!this.pagedMode && !this.contactDataLoaded()) {
+        this.jcDoneEvents.update(a => [...a, ...scoped.events]);
+        this.jcPendingEvents.update(a => [...a, ...scoped.pending]);
+        this.obDoneEvents.update(a => [...a, ...scoped.obDone]);
+        this.contactEventsLoaded.set(true);
       }
     } catch (e) { console.warn('contact events (paged) failed', e); }
   }
@@ -1507,6 +1535,51 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
   /** Raw coach-contact events (attended journey-coach appointments) -> latest per participant.
    *  More reliable than the drift-prone lastjourneycoachdate field (per research/audit). */
+  /** One journey-coach appointment -> completed JC / pending-overdue / completed onboarding, shared by the
+   *  base-wide load and the roster-scoped coach load so both classify identically (review F3). */
+  private classifyJcAppt(data: any, acc: { map: Record<string, number>; events: JcDoneEvent[]; pending: JcDoneEvent[]; obDone: JcDoneEvent[] }): void {
+    const pid = data['bookedby']?.id ?? (typeof data['profileid'] === 'string' ? data['profileid'] : null);
+    const dt = this.toDate(data['starttime']) ?? this.toDate(data['date']);
+    if (!pid || !dt) return;
+    // CANCELLED JCs are excluded outright (operator directive, 2026-08-26). A doc can be
+    // attended AND cancelled — 5 of 54 attended JCs in the test base — and those must not
+    // count as a completed JC, nor as pending/overdue.
+    if (data['cancelled'] === true) return;
+    const hosts0: any[] = Array.isArray(data['hosts']) ? data['hosts'] : [];
+    const host = hosts0.map(h => (typeof h === 'string' ? h : h?.id)).find(Boolean) ?? null;
+    // Onboarding detection hardened (7023d94f): the schedule dialog sets onboarding===true AND a
+    // journeyid + participantjourneyproductid ONLY for onboarding calls. Legacy onboarding
+    // appointments missing all three markers are still caught by their appointment-type ref
+    // (onboardingApptTypeIds), the authoritative discriminator, so onboarding never leaks into
+    // the Journey-Coaching schedule.
+    const isOnboarding = this.isOnboardingAppt(data);
+    if (data['attended'] !== true) {
+      // booked and live: future = pending, past = overdue (the slot passed unattended).
+      acc.pending.push({ profileid: pid, coachId: host, ms: dt.getTime(), onboarding: isOnboarding });
+      return;
+    }
+    // ACTUAL journey coach only (doc item 6): onboarding calls are ALSO written
+    // journeycoach==true on `appointments` (schedule-dialog sets `onboarding: true` only for
+    // calltype 'onboarding'), so an attended ONBOARDING must not count as a completed JC or show
+    // in the JC-done list. Mirrors the journeycoach-dashboard rule ([null,undefined].includes(onboarding)).
+    // Pending/overdue above is intentionally left untouched — the JC-vs-Onboarding schedule split
+    // (doc item 1) is handled there separately.
+    if (data['onboarding'] === true) {
+      // Overall Summary: an attended onboarding call = a completed onboarding. Exactly the docs the
+      // JC-done rule drops here, so JC completed and Onboarding completed stay disjoint.
+      acc.obDone.push({ profileid: pid, coachId: host, ms: dt.getTime(), onboarding: true });
+      return;
+    }
+    acc.map[pid] = Math.max(acc.map[pid] ?? 0, dt.getTime());
+    // Keep each event as well — this query IS "JC done" (a journey-coach appointment that was
+    // attended), and the JC pipeline metrics need the individual occurrences, not just the
+    // latest per participant. `hosts[]` carries the coach who ran it (129/129 populated in the
+    // test base, and they resolve to real journeycoach ids), so it attributes per coach.
+    const hosts: any[] = Array.isArray(data['hosts']) ? data['hosts'] : [];
+    const coachId = hosts.map(h => (typeof h === 'string' ? h : h?.id)).find(Boolean) ?? null;
+    acc.events.push({ profileid: pid, coachId, ms: dt.getTime() });
+  }
+
   private async loadContactEvents(): Promise<void> {
     const map: Record<string, number> = {};
     const events: JcDoneEvent[] = [];
@@ -1521,49 +1594,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         collection(this.firestore, 'appointments'),
         where('journeycoach', '==', true),
       ));
-      snap.forEach(d => {
-        const data: any = d.data();
-        const pid = data['bookedby']?.id ?? (typeof data['profileid'] === 'string' ? data['profileid'] : null);
-        const dt = this.toDate(data['starttime']) ?? this.toDate(data['date']);
-        if (!pid || !dt) return;
-        // CANCELLED JCs are excluded outright (operator directive, 2026-08-26). A doc can be
-        // attended AND cancelled — 5 of 54 attended JCs in the test base — and those must not
-        // count as a completed JC, nor as pending/overdue.
-        if (data['cancelled'] === true) return;
-        const hosts0: any[] = Array.isArray(data['hosts']) ? data['hosts'] : [];
-        const host = hosts0.map(h => (typeof h === 'string' ? h : h?.id)).find(Boolean) ?? null;
-        // Onboarding detection hardened (7023d94f): the schedule dialog sets onboarding===true AND a
-        // journeyid + participantjourneyproductid ONLY for onboarding calls. Legacy onboarding
-        // appointments missing all three markers are still caught by their appointment-type ref
-        // (onboardingApptTypeIds), the authoritative discriminator, so onboarding never leaks into
-        // the Journey-Coaching schedule.
-        const isOnboarding = this.isOnboardingAppt(data);
-        if (data['attended'] !== true) {
-          // booked and live: future = pending, past = overdue (the slot passed unattended).
-          pending.push({ profileid: pid, coachId: host, ms: dt.getTime(), onboarding: isOnboarding });
-          return;
-        }
-        // ACTUAL journey coach only (doc item 6): onboarding calls are ALSO written
-        // journeycoach==true on `appointments` (schedule-dialog sets `onboarding: true` only for
-        // calltype 'onboarding'), so an attended ONBOARDING must not count as a completed JC or show
-        // in the JC-done list. Mirrors the journeycoach-dashboard rule ([null,undefined].includes(onboarding)).
-        // Pending/overdue above is intentionally left untouched — the JC-vs-Onboarding schedule split
-        // (doc item 1) is handled there separately.
-        if (data['onboarding'] === true) {
-          // Overall Summary: an attended onboarding call = a completed onboarding. Exactly the docs the
-          // JC-done rule drops here, so JC completed and Onboarding completed stay disjoint.
-          obDone.push({ profileid: pid, coachId: host, ms: dt.getTime(), onboarding: true });
-          return;
-        }
-        map[pid] = Math.max(map[pid] ?? 0, dt.getTime());
-        // Keep each event as well — this query IS "JC done" (a journey-coach appointment that was
-        // attended), and the JC pipeline metrics need the individual occurrences, not just the
-        // latest per participant. `hosts[]` carries the coach who ran it (129/129 populated in the
-        // test base, and they resolve to real journeycoach ids), so it attributes per coach.
-        const hosts: any[] = Array.isArray(data['hosts']) ? data['hosts'] : [];
-        const coachId = hosts.map(h => (typeof h === 'string' ? h : h?.id)).find(Boolean) ?? null;
-        events.push({ profileid: pid, coachId, ms: dt.getTime() });
-      });
+      const acc = { map, events, pending, obDone };
+      snap.forEach(d => this.classifyJcAppt(d.data(), acc));
     } catch (e) {
       if (this.isPermissionDenied(e)) this.scoreboardDataBlocked = true;
       console.warn('contact events load failed (non-fatal)', e);
@@ -1572,7 +1604,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.jcDoneEvents.set(events);
     this.jcPendingEvents.set(pending);
     this.obDoneEvents.set(obDone);
+    // Schedule cards are ready once the events are in, on the coach (full) path too (review F3).
+    this.contactEventsLoaded.set(true);
   }
+  private contactEventsLoaded = signal(false);
 
   // ---- JC pipeline metrics (doc item 8): JC Done Today / Last Week / Last Month ----
   /** Every completed JC (attended journey-coach appointment), from loadContactEvents. Signal so
@@ -1710,7 +1745,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
   jcPipeline = computed<{ today: number; week: number; month: number; ready: boolean }>(() => {
     const events = this.jcDoneEvents();
-    const ready = this.contactDataLoaded();
+    const ready = this.contactDataLoaded() || this.contactEventsLoaded();
     const now = Date.now();
     const dayMs = 86400000;
     const startToday = this.startOfDay(new Date()).getTime();
@@ -1733,7 +1768,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   //  contactDataLoaded). Replaces the old single "Coming up" card.
   /** Today / next-7-days / overdue counts for one schedule (JC when onboarding=false, else Onboarding). */
   private schedCounts(onboarding: boolean): { today: number; week: number; overdue: number; ready: boolean } {
-    const ready = this.contactDataLoaded();
+    const ready = this.contactDataLoaded() || this.contactEventsLoaded();
     const now = Date.now();
     const endToday = this.endOfDay(new Date()).getTime();
     const week7 = endToday + 7 * 86400000;
@@ -1976,6 +2011,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       resolvedTagged: all.filter(d => d['tagged'] && d['resolved']).length,
       resolvedOpportunity: all.filter(d => d['opportunity'] && d['resolved']).length,
       resolvedCritical: all.filter(d => d['critical'] && d['resolved']).length,
+      critAttn: all.filter(d => d['critical'] === true || d['tagged'] === true).length,
     });
   }
 

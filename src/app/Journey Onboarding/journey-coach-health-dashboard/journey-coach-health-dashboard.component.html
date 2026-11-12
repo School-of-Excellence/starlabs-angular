@@ -6,6 +6,11 @@
     <button type="button" class="jx-tab" role="tab" [class.on]="experienceTab==='onboarding'" [attr.aria-selected]="experienceTab==='onboarding'" (click)="setExperienceTab('onboarding')" data-testid="jx-tab-onboarding"><span class="jx-tab-step">2</span><span class="jx-tab-label">Onboarding</span></button>
     <button type="button" class="jx-tab" role="tab" [class.on]="experienceTab==='evprep'" [attr.aria-selected]="experienceTab==='evprep'" (click)="setExperienceTab('evprep')" data-testid="jx-tab-evprep"><span class="jx-tab-step">3</span><span class="jx-tab-label">Ev. Preparation</span></button>
     <button type="button" class="jx-tab" role="tab" [class.on]="experienceTab==='planning'" [attr.aria-selected]="experienceTab==='planning'" (click)="setExperienceTab('planning')" data-testid="jx-tab-planning"><span class="jx-tab-step">4</span><span class="jx-tab-label">Journey Planning</span></button>
+    <!-- One light/dark switch for all four tabs (jc-health-ux-review T3; moved from the Journey Planning header). -->
+    <button type="button" class="jchd-theme-toggle jx-theme-toggle" data-testid="jx-theme-toggle" (click)="toggleTheme()"
+      [attr.aria-label]="'Switch to ' + (isDark ? 'light' : 'dark') + ' mode'" matTooltip="Toggle dark mode">
+      <mat-icon>{{ isDark ? 'light_mode' : 'dark_mode' }}</mat-icon>
+    </button>
   </nav>
 
   <!-- ═══ Journey Planning tab = the existing coach-health screen (unchanged) ═══ -->
@@ -26,17 +31,12 @@
         <mat-button-toggle value="scoreboard">Coaches</mat-button-toggle>
       </mat-button-toggle-group>
 
-      <button type="button" class="jchd-theme-toggle" (click)="toggleTheme()"
-        [attr.aria-label]="'Switch to ' + (isDark ? 'light' : 'dark') + ' mode'" matTooltip="Toggle dark mode">
-        <mat-icon>{{ isDark ? 'light_mode' : 'dark_mode' }}</mat-icon>
-      </button>
-
       <label class="jchd-pill jchd-pill-select coach-pill" *ngIf="view === 'summary' || view === 'base'">
         <span class="jchd-pill-label"><span class="vk">Viewing</span>{{ selectedCoachName }}</span>
         <select data-testid="viewing-coach-select" [ngModel]="selectedCoachId" (ngModelChange)="onCoachChange($event)" aria-label="Viewing scope">
           <option [value]="ALL">All participants</option>
           <option *ngFor="let c of coaches" [value]="c.id">{{ c.name }}</option>
-          <option [value]="UNASSIGNED">Unassigned · no coach ({{ unassignedCount }})</option>
+          <option [value]="UNASSIGNED">Unassigned · no coach ({{ unassignedKnown ? unassignedCount : '…' }})</option>
         </select>
         <svg class="jchd-pill-chev" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
           stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
@@ -393,7 +393,7 @@
         <div class="ah-cards">
           <button type="button" class="ah-mini ah-mini-unflagged" (click)="openAhDrill('both', 'unflagged', false, 'Unflagged')"><span class="ah-mini-k">Unflagged</span><span class="ah-mini-n">{{ s.unflagged }}</span></button>
           <button type="button" class="ah-mini ah-mini-positive" (click)="openAhDrill('both', 'liked', false, 'Positive flags')"><span class="ah-mini-k">Positive flags</span><span class="ah-mini-n">{{ s.liked }}</span></button>
-          <button type="button" class="ah-mini ah-mini-critattn" (click)="openAhDrill('both', 'critattn', false, 'Critical + Attention')"><span class="ah-mini-k">Critical + Attn</span><span class="ah-mini-n">{{ s.critical + s.tagged }}</span></button>
+          <button type="button" class="ah-mini ah-mini-critattn" (click)="openAhDrill('both', 'critattn', false, 'Critical + Attention')"><span class="ah-mini-k">Critical + Attn</span><span class="ah-mini-n">{{ s.critAttn }}</span></button>
         </div>
       </section>
 
@@ -722,6 +722,7 @@
     <div class="jchd-diag" *ngIf="!pagedMode && selectedCoachId !== UNASSIGNED">
       {{ summary.total }} participant(s) for <strong>{{ selectedCoachName || 'selected coach' }}</strong>
       · matched {{ matchedCount }} of {{ scannedCount }} journey-product records · ranked by priority
+      <span *ngIf="hasActiveFilters" data-testid="jchd-diag-showing"> · showing {{ dataSource.filteredData.length }} with the current filter</span>
       <span *ngIf="matchedCount === 0"> — this coach has no participants assigned via <code>coachedby</code>. Pick another coach above, or assignment data may be sparse here.</span>
     </div>
     <!-- paged views (ALL / UNASSIGNED) — matched-set pagination; total = all matches across pages -->
@@ -1158,11 +1159,11 @@
     <!-- Sales counts, Onboarding by product, the 4-stage pipeline and the drill-down table all live in the
          embedded Journey Experience dashboard. The 5-bucket intake funnel (app-onboarding-pipeline) was replaced
          on this tab by operator decision 2026-11-11; /onboarding-pipeline is unchanged. -->
-    <app-journeycoach-dashboard [embedOnboarding]="true" data-testid="jx-onboarding-sales"></app-journeycoach-dashboard>
+    <app-journeycoach-dashboard [embedOnboarding]="true" [hostDark]="isDark" data-testid="jx-onboarding-sales"></app-journeycoach-dashboard>
   </section>
 
   <!-- ─── Ev. Preparation tab: two kanban boards (New Participants / Attended 1 uP! and above) ─── -->
-  <section class="jx-tab-panel" *ngIf="experienceTab === 'evprep'" data-testid="jx-panel-evprep">
+  <section class="jx-tab-panel" *ngIf="evprepMounted" [class.jx-offstage]="experienceTab !== 'evprep'" data-testid="jx-panel-evprep">
     <app-jc-evprep-board data-testid="jx-evprep-board"></app-jc-evprep-board>
   </section>
 
@@ -1192,7 +1193,7 @@
         <select data-testid="ov-viewing-select" [ngModel]="selectedCoachId" (ngModelChange)="onCoachChange($event)" aria-label="Viewing as">
           <option [value]="ALL">All participants</option>
           <option *ngFor="let c of coaches" [value]="c.id">{{ c.name }}</option>
-          <option [value]="UNASSIGNED">Unassigned · no coach ({{ unassignedCount }})</option>
+          <option [value]="UNASSIGNED">Unassigned · no coach ({{ unassignedKnown ? unassignedCount : '…' }})</option>
         </select>
       </label>
     </div>
@@ -1386,7 +1387,7 @@
         <div class="ah-cards">
           <button type="button" class="ah-mini ah-mini-unflagged" (click)="ovAhDrill('both', 'unflagged', false, 'Unflagged')"><span class="ah-mini-k">Unflagged</span><span class="ah-mini-n">{{ s.unflagged }}</span></button>
           <button type="button" class="ah-mini ah-mini-positive" (click)="ovAhDrill('both', 'liked', false, 'Positive flags')"><span class="ah-mini-k">Positive flags</span><span class="ah-mini-n">{{ s.liked }}</span></button>
-          <button type="button" class="ah-mini ah-mini-critattn" (click)="ovAhDrill('both', 'critattn', false, 'Critical + Attention')"><span class="ah-mini-k">Critical + Attn</span><span class="ah-mini-n">{{ s.critical + s.tagged }}</span></button>
+          <button type="button" class="ah-mini ah-mini-critattn" (click)="ovAhDrill('both', 'critattn', false, 'Critical + Attention')"><span class="ah-mini-k">Critical + Attn</span><span class="ah-mini-n">{{ s.critAttn }}</span></button>
         </div>
       </section>
 

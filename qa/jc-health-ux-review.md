@@ -1,6 +1,6 @@
 ---
 type: doc
-status: draft
+status: active
 tags: [jc-health, journey-coach-health, theme, dark-mode, e2e, usability]
 relatedTo: [qa/jc-health-dark-mode.md, qa/jc-health-tabs.md, qa/jc-health-onboarding-tab.md, qa/jc-evprep-board.md, qa/jc-overall-summary.md]
 ---
@@ -166,3 +166,65 @@ contains 2a955c02 so they do not collide with the sibling branch; the embed and 
 - Saves (move, log, mark done, schedule) were not executed, to leave starlabs-test data untouched; validation
   and cancel paths were tested.
 - Only the logged-in coach and two other coaches (0 participants each) were sampled in the Viewing select.
+
+## Fix pass (2026-11-12, operator sign-off "Yes, proceed"; toggle in tab bar only; default tab and optional log note unchanged)
+
+Base: origin/joshua-development @ 8793329c (includes the four-items work efa05ad1 and the Onboarding tab push).
+
+Implemented: T1-T10, F1-F10 as planned, plus one addition found during the fix pass:
+- F3 was deeper than a stale label: in a single-coach view the JC appointments were never loaded (only the All /
+  Unassigned path read them), so the Schedule card, the JC pipeline tiles and Overall "Scheduled & completed"
+  showed 0. The coach path now classifies its roster's appointments through the same classifier
+  (`classifyJcAppt`) as the base-wide load. Live: JC done last month 2 == list 2 (was 0); Overall Completed 1 == 1.
+- Ev. Prep count pills keep white text on stage accents (surface text failed contrast on slate accents); chip and
+  column badge text mix the accent with ink so it reads in both modes.
+
+Contract: `qa/jc-health-theme-consistency` + `qa/jc-health-ux-e2e`
+Surface: /journey-coach-health, all four tabs
+Env: starlabs-test (development config), never production
+App command: npx ng serve --configuration development --port 4301
+URL: http://localhost:4301/journey-coach-health
+
+### Invariants
+- One light/dark source: with host dark every tab and the embed are dark, with host light all are light, whatever
+  `jcdTheme` holds (stale `jcdTheme=dark` tested).
+- The theme toggle is in the tab bar and visible on all four tabs; exactly one toggle exists.
+- Dialogs follow the host: host light + stale jcdTheme dark -> slide-over surface white; host dark -> rgb(27,27,32).
+- Participants sort reorders rows (Participant asc/desc sorted; Renewal asc by date).
+- Critical + Attn tile == drill list (Planning 7 == 7, Overall 5 == 5).
+- Schedule cards leave "loading..." in coach view and their drills match.
+- Viewing coach select still changes the Participants table (TB / UX13).
+- Ev. Prep: Escape closes the move box, focus lands in the note; tab switch does not reload.
+
+### Banned
+- jcdTheme read or written in embed mode; `jcd-dark` left on the overlay container after the dashboard is destroyed
+- hard-coded light fills (#fef3c7, #dcfce7, #fef2f2, ...) in Ev. Prep; `rgba(60, 60, 67, 0.7)` text in the host
+- New MatDialog for any list; filter/transform/backdrop-filter on ancestors of position:fixed overlays
+- Production Firebase as a test target; ATC collections and src/app/ATC/**
+
+### Hooks
+- jx-theme-toggle -> tab-bar light/dark button
+- jchd-diag-showing -> Participants context line, filtered count
+
+### Live matrix (re-run after fixes, 1512px window)
+| Scenario | Overall | Onboarding | Ev. Prep | Planning |
+| --- | --- | --- | --- | --- |
+| OS dark, nothing stored | dark, 0 wrong-mode surfaces | dark (embed jcd-dark) , 0 | dark, 0 | dark, 0 |
+| Host light, stale jcdTheme=dark | light, 0, 0 low-contrast | light (embed not dark), 0 | light, 0 | light, 0 |
+| Toggle to dark from the tab bar | dark, 0 | dark, 0 | dark, 0 | dark, 0 |
+Functional re-runs: Pending chip 1 == 1; Open table after Pending -> 2 rows of 2 (no close); second click closes;
+empty column footer "Showing 0 of 0"; Overall plan grid non-zero cell 1 == 1; Next 30 days tiles 0 (no list);
+filter context "showing 18 with the current filter" == paginator 18; Unassigned option "(...)".
+
+### Proof
+- Spec paths: qa/checks/jc-health-theme-consistency.mjs, qa/checks/jc-health-ux-e2e.mjs
+- Command: node qa/checks/jc-health-theme-consistency.mjs && node qa/checks/jc-health-ux-e2e.mjs
+- Fail if reverted: yes (source reverted: 13 of 16 and 11 of 13 FAIL; remaining are brace-balance / invariant guards)
+- Last run: PASS (16/16, 13/13); all 22 qa/checks PASS (OV10, EB7, DM6, TB8 updated to the approved new structure)
+
+### Not verified
+- CDK drag preview (T6) by real drag; code-verified only.
+- Saves (move, log, mark done, schedule) not executed, to keep starlabs-test data unchanged.
+- 1024px layout re-check after the fixes (only re-run at 1512px; the fixes add no width).
+- JC pipeline in coach view now counts sessions of the coach's roster; a session the coach hosted for someone
+  outside their roster is not included there (the Coaches view still uses the base-wide load).

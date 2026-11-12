@@ -2565,3 +2565,44 @@ mat-dialog-actions,
   .jcd-root.jcd-embed .content > .card.span4,
   .jcd-root.jcd-embed .content > .card.span8 { grid-column: span 12; }
 }
+
+/* ═══ Embedded in Journey Coach Health: ONE theme source (jc-health-ux-review T1, T8, T9, T10) ═══
+   Both palettes of this dashboard (legacy :host set + redesign .jcd-root set, light and .jcd-dark) are
+   aliased to the host's --jx-* tokens, which .jchd-wrap resolves for the current light/dark mode. The
+   standalone dashboard never has .jcd-embed, so it keeps its own palette and toggle. */
+.jcd-root.jcd-embed, .jcd-root.jcd-embed.jcd-dark {
+  --bg: var(--jx-canvas, #f2f2f7); --card: var(--jx-surface, #fff); --panel: var(--jx-surface, #fff);
+  --soft: var(--jx-surface-2, #f7f7fa); --soft2: var(--jx-tile, #f2f2f7); --hover: var(--jx-tile-hover, #ebebf0);
+  --tblhead: var(--jx-surface-2, #f7f7fa); --stripe: var(--jx-stripe, rgba(0,0,0,.015));
+  --ink: var(--jx-ink, #1c1c1e); --text: var(--jx-ink, #1c1c1e);
+  --ink2: var(--jx-ink-2, #6e6e73); --text-secondary: var(--jx-ink-2, #6e6e73);
+  --mut: var(--jx-ink-3, #8e8e93); --text-muted: var(--jx-ink-3, #8e8e93);
+  --line: var(--jx-line, rgba(60,60,67,.12)); --line2: var(--jx-line-2, rgba(60,60,67,.08)); --border: var(--jx-line, rgba(60,60,67,.12));
+  --accent: var(--jx-blue, #007aff); --primary: var(--jx-blue, #007aff);
+  --accent-soft: var(--jx-blue-soft, #eaf2ff); --primary-light: var(--jx-blue-soft, #eaf2ff);
+  --green: var(--jx-green, #1f8a3b); --success: var(--jx-green, #1f8a3b);
+  --green-soft: var(--jx-green-soft, #e6f6ec); --success-light: var(--jx-green-soft, #e6f6ec);
+  --amber: var(--jx-amber, #c25e00); --warning: var(--jx-amber, #c25e00); --orange: var(--jx-amber, #c25e00);
+  --amber-soft: var(--jx-amber-soft, #fdf0dc); --warning-light: var(--jx-amber-soft, #fdf0dc);
+  --red: var(--jx-red, #d70015); --danger: var(--jx-red, #d70015);
+  --red-soft: var(--jx-red-soft, #fcebea); --danger-light: var(--jx-red-soft, #fcebea);
+  --indigo: var(--jx-indigo, #4a48b8); --purple: var(--jx-indigo, #4a48b8);
+  --indigo-soft: var(--jx-indigo-soft, #eeeefc); --purple-light: var(--jx-indigo-soft, #eeeefc);
+  --teal: var(--jx-teal, #30b0c7); --teal-soft: var(--jx-teal-soft, #e4f5f8); --teal-light: var(--jx-teal-soft, #e4f5f8);
+  --topbar: transparent; --shadow: var(--jx-shadow, none); --radius: var(--jx-radius, 18px);
+  color: var(--ink);
+}
+.jcd-root.jcd-embed.jcd-dark .card { background-image: none; }
+/* Card shell + title follow the host cards (T9): same radius, shadow, no border; title in the host type scale. */
+.jcd-root.jcd-embed .card { border: 0; border-radius: var(--jx-radius, 18px); box-shadow: var(--jx-shadow, none); padding: 16px; }
+.jcd-root.jcd-embed .ct { font-size: 16px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--ink); }
+/* Date toolbar sits on the canvas like the Overall date bar (T8). */
+.jcd-root.jcd-embed .top { background: transparent; border: 0; border-radius: 0; padding: 0 0 4px; min-height: 0; }
+.jcd-root.jcd-embed .seg, .jcd-root.jcd-embed .navmo, .jcd-root.jcd-embed .calbtn, .jcd-root.jcd-embed .daysin, .jcd-root.jcd-embed .monthin { border-radius: 999px; }
+.jcd-root.jcd-embed .navmo, .jcd-root.jcd-embed .calbtn { background: var(--panel); border-color: var(--line); }
+/* Solid count pills: text uses the surface colour so it reads on the light (dark mode) and dark (light mode) fills. */
+.jcd-root.jcd-embed .jcd-kcount { color: var(--panel); }
+.jcd-root.jcd-embed { color-scheme: light; }
+.jcd-root.jcd-embed.jcd-dark { color-scheme: dark; }
+.jcd-root.jcd-embed .dlg-av.dn { background: var(--red-soft); }
+.jcd-root.jcd-embed .dlg-av.nc { background: var(--indigo-soft); }

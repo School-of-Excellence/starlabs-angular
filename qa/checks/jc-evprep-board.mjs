@@ -53,8 +53,8 @@ check('EB5', 'columns are disjoint: every card sits in exactly one column of its
 check('EB6', 'tile == list: each column count is the length of the same array its cards render from',
   () => /data-testid="evp-col-count">\{\{ cols\[b\.key\]\[s\.key\]\.length \}\}/.test(chtml)
      && /\*ngFor="let c of cols\[b\.key\]\[s\.key\]"/.test(chtml));
-check('EB7', 'Ev. Prep panel renders the board (placeholder gone), gated by experienceTab',
-  () => /\*ngIf="experienceTab === 'evprep'" data-testid="jx-panel-evprep">\s*<app-jc-evprep-board data-testid="jx-evprep-board">/.test(hhtml)
+check('EB7', 'Ev. Prep panel renders the board (placeholder gone), mounted on first visit then kept (ux-review F9)',
+  () => /\*ngIf="evprepMounted" \[class\.jx-offstage\]="experienceTab !== 'evprep'" data-testid="jx-panel-evprep">\s*<app-jc-evprep-board data-testid="jx-evprep-board">/.test(hhtml)
      && !/Evolution preparation — to be defined/.test(hhtml)
      && /JourneycoachDashboardComponent, JcEvprepBoardComponent,/.test(hts));
 check('EB8', 'cards drag between columns of one board only (cdk drop lists connected per board, group per board)',

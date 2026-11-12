@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, Input, ViewChild, TemplateRef, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectorRef, Component, Input, ViewChild, TemplateRef, ChangeDetectionStrategy, DestroyRef, inject } from '@angular/core';
 import { and, collection, collectionData, Firestore, or, query, where, getDocs, getCountFromServer, doc, updateDoc, setDoc, getDoc, limit, writeBatch } from '@angular/fire/firestore';
 import { orderBy, Timestamp } from 'firebase/firestore';
 import { takeUntil, Subject, Subscription, take, combineLatest } from 'rxjs';
@@ -664,6 +664,16 @@ export class JourneycoachDashboardComponent {
    *  drill-down still works). Default false: the standalone dashboard is unchanged. */
   @Input() embedOnboarding = false;
 
+  /** Embedded mode only: the host's resolved light/dark. Journey Coach Health owns the theme, so the embed
+   *  never reads or writes its own jcdTheme key and the two can no longer disagree (jc-health-ux-review T1/T2). */
+  private hostDarkValue = false;
+  @Input() set hostDark(v: boolean) {
+    this.hostDarkValue = !!v;
+    if (this.embedOnboarding) { this.darkMode = this.hostDarkValue; this.syncOverlayTheme(); this.cdr.markForCheck(); }
+  }
+  get hostDark(): boolean { return this.hostDarkValue; }
+  private readonly destroyRef = inject(DestroyRef);
+
   constructor(
     public firestore: Firestore,
     private cdr: ChangeDetectorRef,
@@ -696,8 +706,11 @@ export class JourneycoachDashboardComponent {
 
   async ngOnInit() {
     this.isLoading = true;
-    try { this.darkMode = localStorage.getItem('jcdTheme') === 'dark'; } catch(e) {}
+    if (this.embedOnboarding) this.darkMode = this.hostDarkValue;
+    else { try { this.darkMode = localStorage.getItem('jcdTheme') === 'dark'; } catch(e) {} }
     this.syncOverlayTheme();
+    // Global overlay class must not outlive this dashboard (it restyled every dialog in the app after leaving).
+    this.destroyRef.onDestroy(() => { try { this.overlayContainer.getContainerElement().classList.remove('jcd-dark'); } catch(e) {} });
     this.setCurrentMonth();
 
     try {
@@ -948,6 +961,18 @@ export class JourneycoachDashboardComponent {
 
   // Embed Gross Sales "Pending approval" chip: open the gross sales table with only Status = Pending applied,
   // so the rows shown == getGrossPendingCount(). Keeps the table open if it already is (no toggle-close).
+  /** Embed "Open table" on Gross Sales: when the open table is the Pending-filtered one, show every Gross row
+   *  instead of closing it (jc-health-ux-review F6). Otherwise the usual open/close toggle. */
+  openGrossTable(event: Event) {
+    event.stopPropagation();
+    if (this.embedOnboarding && this.showTable && this.tableType === 'grossSales' && this.filterForm.value.status === 'Pending') {
+      this.filterForm.patchValue({ status: '' });
+      this.filterTableData(this.filterForm.value);
+      return;
+    }
+    this.onBoxClick('grossSales');
+  }
+
   openGrossPending(event: Event) {
     event.stopPropagation();
     if (!(this.showTable && this.tableType === 'grossSales')) this.onBoxClick('grossSales');
@@ -1299,7 +1324,7 @@ export class JourneycoachDashboardComponent {
       { key: 'journey', header: 'Journey', width: '7%', type: 'mapped', mapData: this.mapjourneyname },
       { key: 'totalpurchasevalue', header: 'Purchase Value', width: '7%', type: 'currency', prefix: '₹' },
       { key: 'installmentamount', header: 'payment plan', width: '7%', type: 'currency', prefix: '₹' },
-      { key: 'presalespersonname', header: 'Pre-Sales Perosn', width: '10%', type: 'text' },
+      { key: 'presalespersonname', header: 'Pre-Sales Person', width: '10%', type: 'text' },
       { key: 'salespersonname', header: 'Sales Person', width: '5%', type: 'text' },
       { key: 'notes', header: 'Sales Notes', width: '35%', type: 'text', substringStart: 0, substringEnd: 50 },
       { key: 'generalnotes', header: 'Notes', width: '25%', type: 'text', substringStart: 0, substringEnd: 50 },
@@ -1320,7 +1345,7 @@ export class JourneycoachDashboardComponent {
       { key: 'preinstallmentamount', header: 'Previous Payment Plan', width: '7%', type: 'currency', prefix: '₹' },
       { key: 'installmentamount', header: 'Current payment plan', width: '7%', type: 'currency', prefix: '₹' },
       { key: 'installmentdiff', header: 'payment plan diff', width: '7%', type: 'currency', prefix: '₹' },
-      { key: 'presalespersonname', header: 'Pre-Sales Perosn', width: '10%', type: 'text' },
+      { key: 'presalespersonname', header: 'Pre-Sales Person', width: '10%', type: 'text' },
       { key: 'salespersonname', header: 'Sales Person', width: '5%', type: 'text' },
       { key: 'notes', header: 'Sales Notes', width: '35%', type: 'text', substringStart: 0, substringEnd: 50 },
       { key: 'generalnotes', header: 'Notes', width: '25%', type: 'text', substringStart: 0, substringEnd: 50 },

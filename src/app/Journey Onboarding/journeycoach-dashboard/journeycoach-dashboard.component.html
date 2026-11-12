@@ -60,7 +60,7 @@
 <!-- ROW 1 -->
 <!-- GROSS SALES -->
 <div data-testid="jcd-div-012" class="card span4" (click)="onBoxClick('grossSales')" style="cursor:pointer">
-  <div class="ch"><span class="ct">Gross Sales</span><span class="clink" data-testid="jcd-lnk-gross-table" (click)="onBoxClick('grossSales');$event.stopPropagation()">Open table &rsaquo;</span></div>
+  <div class="ch"><span class="ct">Gross Sales</span><span class="clink" data-testid="jcd-lnk-gross-table" (click)="openGrossTable($event)">Open table &rsaquo;</span></div>
   <div class="cbody">
     <!-- Embedded in coach-health Onboarding tab: count only (operator 2026-11-11). Standalone keeps full detail. -->
     <div class="big jcd-embed-count" data-testid="jcd-embed-gross-count" *ngIf="embedOnboarding">{{originalData['grosssale'].count}}</div>
@@ -772,7 +772,8 @@
     <!-- Pagination -->
     <div class="jcd-pagination-bar">
       <div class="jcd-pagination-info">
-        Showing {{ (currentPage-1)*itemsPerPage+1 }}–{{ Math.min(currentPage*itemsPerPage, currentTableConfig?.data?.length || 0) }} of {{ currentTableConfig?.data?.length || 0 }}
+        <ng-container *ngIf="currentTableConfig?.data?.length; else jcdNoRows">Showing {{ (currentPage-1)*itemsPerPage+1 }}–{{ Math.min(currentPage*itemsPerPage, currentTableConfig?.data?.length || 0) }} of {{ currentTableConfig?.data?.length || 0 }}</ng-container>
+        <ng-template #jcdNoRows>Showing 0 of 0</ng-template>
       </div>
       <div class="jcd-pagination-btns">
         <button data-testid="jcd-btn-159" class="jcd-pg-btn" (click)="firstPage()" [disabled]="currentPage===1" title="First">

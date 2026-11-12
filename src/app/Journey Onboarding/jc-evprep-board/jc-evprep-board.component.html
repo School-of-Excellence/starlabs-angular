@@ -33,7 +33,7 @@
           <div class="evp-empty" *ngIf="cols[b.key][s.key].length === 0" data-testid="evp-empty">No participants in this stage.</div>
 
           <article class="evp-card" *ngFor="let c of cols[b.key][s.key]"
-                   cdkDrag [cdkDragData]="c"
+                   cdkDrag [cdkDragData]="c" cdkDragPreviewContainer="parent"
                    [class.evp-card--moved]="lastMovedId === c.id"
                    data-testid="evp-card" [attr.data-profile]="c.profileid">
             <span class="evp-grip" aria-hidden="true">⋮⋮</span>

@@ -30,8 +30,8 @@ check('DM4', 'the stored theme is restored in ngOnInit',
   () => /localStorage\.getItem\(this\.THEME_KEY\)/.test(ts));
 check('DM5', 'data-theme is bound on .jchd-wrap',
   () => /class="jchd-wrap"[^>]*\[attr\.data-theme\]="theme"/.test(html));
-check('DM6', 'header toggle present and labelled',
-  () => /class="jchd-theme-toggle"[\s\S]{0,160}\(click\)="toggleTheme\(\)"/.test(html)
+check('DM6', 'theme toggle present and labelled (in the tab bar since ux-review T3)',
+  () => /class="jchd-theme-toggle jx-theme-toggle"[\s\S]{0,160}\(click\)="toggleTheme\(\)"/.test(html)
      && /isDark \? 'light_mode' : 'dark_mode'/.test(html));
 
 // every CDK overlay must carry the dark panelClass — one per overlay that escapes .jchd-wrap

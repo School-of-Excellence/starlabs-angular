@@ -26,7 +26,8 @@ check('TB7', 'existing coach-health header is wrapped in the Journey Planning ta
 // Onboarding is mounted once (Overall Summary reads the same instance — operator 2026-11-11, option B)
 // and shown only on its own tab; Ev. Preparation / Overall are *ngIf-gated.
 check('TB8', 'Onboarding / Ev. Preparation / Overall panels are gated by experienceTab',
-  () => ['evprep', 'overall'].every(t => new RegExp(`\\*ngIf="experienceTab === '${t}'" data-testid="jx-panel-${t}"`).test(html))
+  () => new RegExp(`\\*ngIf="experienceTab === 'overall'" data-testid="jx-panel-overall"`).test(html)
+     && /\*ngIf="evprepMounted" \[class\.jx-offstage\]="experienceTab !== 'evprep'" data-testid="jx-panel-evprep"/.test(html)
      && /\*ngIf="jcdMounted" \[class\.jx-offstage\]="experienceTab !== 'onboarding'" data-testid="jx-panel-onboarding"/.test(html));
 // Completeness: the existing Summary / Participants / Coaches views are untouched.
 check('TB9', 'Summary / Participants / Coaches toggle still present',
