@@ -400,3 +400,24 @@ ever seeing this repo:
 It carries the contract, the four mistakes not to repeat (client-supplied duration, rounding
 the expiry, caching a failed header read, mistaking the fence for authorisation), and the
 measured Storage Rules behaviour.
+
+---
+
+## Addendum, 2026-11-12 — the operational runbook lives outside both repos
+
+The code contract is above. The *migration* — which collections hold media, what order the four
+steps run in, and what must be true before each one — is in:
+
+`/Users/m1/Documents/storage-signed-url-migration/14-atc-media-production-runbook.md`
+
+Read it before touching production ATC data. Two findings there that contradict what this journal
+originally assumed:
+
+- **It is not two collections.** A field census against the live database found ATC media in
+  **eight** collections plus the `revision` and `conflicts` subcollection groups — including
+  `atc_alpha.imagenotes`, which this repo writes at `edit-atc.component.ts:1727-1733` via
+  `notesMeta` and which the first migration pass missed.
+- **The e2e suite does not cover the read path.** Across all 137 ATC tests `getMediaUrls` was
+  invoked zero times (the seed carries no media, and the write-side specs assert against Firestore
+  and Storage directly). Green does not mean playback works; that is still manual-only, because V4
+  signing cannot work against the emulator at all.

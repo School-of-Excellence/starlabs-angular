@@ -5,6 +5,7 @@ import { environment } from './environments/environment';
 import { initializeFirestore, getFirestore, connectFirestoreEmulator } from '@angular/fire/firestore';
 import { getAuth, connectAuthEmulator } from '@angular/fire/auth';
 import { getStorage, connectStorageEmulator } from '@angular/fire/storage';
+import { getFunctions, connectFunctionsEmulator } from '@angular/fire/functions';
 import { initializeApp } from '@angular/fire/app';
 import { isDevMode } from '@angular/core';
 import { provideServiceWorker } from '@angular/service-worker';
@@ -33,7 +34,12 @@ if (emuEnv.useEmulators && emuEnv.emulators) {
   if (e.firestore) connectFirestoreEmulator(getFirestore(app, 'firestore-forms'), e.firestore.host, e.firestore.port);
   if (e.auth) connectAuthEmulator(getAuth(app), e.auth.url, { disableWarnings: true });
   if (e.storage) connectStorageEmulator(getStorage(app), e.storage.host, e.storage.port);
-  console.info('[emulator] Firestore/Auth/Storage connected to local emulator', e);
+  // Callables MUST be emulator-connected too. MediaUrlService builds its own region-pinned handle
+  // (`getFunctions(app, 'us-central1')`) to call getMediaUrls, and an unconnected handle posts to the
+  // REAL https://us-central1-<project>.cloudfunctions.net — a live network call from a run that is
+  // supposed to be hermetic. Connect the SAME region instance the service uses, or this is a no-op.
+  if (e.functions) connectFunctionsEmulator(getFunctions(app, 'us-central1'), e.functions.host, e.functions.port);
+  console.info('[emulator] Firestore/Auth/Storage/Functions connected to local emulator', e);
 } else {
   // Default DB: default transport (WebChannel streaming with v11 auto-detect
   // long-polling fallback). App-wide `experimentalForceLongPolling` was REMOVED
