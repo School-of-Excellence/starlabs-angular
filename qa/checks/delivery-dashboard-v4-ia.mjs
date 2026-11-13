@@ -104,6 +104,22 @@ check('IA34', 'Stages / Specialist Slots / Completion History untouched',
 check('IA35', 'the three outer tabs survive',
   () => /outerTabIndex = 0/.test(html) && /outerTabIndex = 1/.test(html) && /outerTabIndex = 2/.test(html));
 
+// --- set relationships: the layout must not assert containment it does not have ---
+// In delivery = status 'ongoing'. Stuck = 'initiated' OR 'ongoing', stalled.
+// Not-consuming = 'initiated' only, so it is DISJOINT from In delivery.
+// Live starlabs-test: Glimpse reads In delivery 0, Stuck 13, Not consuming 13.
+// Drawing the flags inside the In-delivery step would assert 13 inside 0.
+check('IA52', 'Stuck and Not-consuming are NOT nested inside the In-delivery step',
+  () => !/data-testid="dd-funnel-indelivery"[\s\S]*?data-testid="dd-funnel-stuck"[\s\S]*?<\/div>\s*<\/div>\s*<div class="dd-fnl-step"/.test(html)
+     && /class="dd-funnel-alerts"/.test(html));
+check('IA53', 'they sit in their own needs-attention row',
+  () => /dd-funnel-alerts[\s\S]{0,1400}data-testid="dd-funnel-stuck"/.test(html)
+     && /dd-funnel-alerts[\s\S]{0,2200}data-testid="dd-funnel-idle"/.test(html));
+check('IA54', 'the row says what population they span',
+  () => /spans Initiated and Ongoing/.test(html));
+check('IA55', 'the In-delivery step no longer contains a flag',
+  () => !/dd-fnl-step--delivery[\s\S]{0,900}dd-fnl-flag/.test(html));
+
 // --- stage mix: the pby bar re-homed into the Products row -----------------------
 check('IA36', 'stage-mix bar present in the product row',
   () => /class="dd-stagemix"[\s\S]{0,200}data-testid="dd-stagemix"/.test(html));

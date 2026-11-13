@@ -74,6 +74,31 @@ URL: http://localhost:4200/delivery-dashboard
   strip wiring), and removing selectProductFromStrip fails the Karma spec.
 - Last run: 2026-11-13 PASS — node check 51/51 ALL PASS (20+ FAIL on revert of the funnel/strip, 11 FAIL on revert of the stage mix); Karma strip spec 10/10 SUCCESS; npx ng build --configuration production -> BUILD_EXIT=0, 0 ERROR lines
 
+## Set relationships (settled by live data, 2026-11-13)
+v4 as mocked up drew Stuck and Not-consuming as flags INSIDE the In-delivery step,
+on the premise that they are "states of people already in delivery". That premise
+is false here:
+
+- In delivery  = funnelData.ongoing            -> status 'ongoing'
+- Stuck        = populateActionableCohorts     -> status 'initiated' OR 'ongoing', stalled 15d+
+- Not consuming= populateActionableCohorts     -> status 'initiated' ONLY
+
+Not-consuming is therefore DISJOINT from In delivery by construction, and Stuck
+merely overlaps it. Measured on starlabs-test at localhost:4200:
+
+| product | In delivery | Stuck | Not consuming |
+|---|---|---|---|
+| WiSH | 2 | 6 | 2 |
+| EI Custom Solutions | 5 | 6 | 5 |
+| Glimpse | 0 | 13 | 13 |
+
+Nesting them would have the board assert 13 people stuck inside a population of 0.
+They now sit in a "Needs attention" row beside the funnel, labelled "spans Initiated
+and Ongoing - not a slice of In delivery". No number and no drill-down changed.
+
+INVARIANT: no element carrying kpiStuck or kpiInitiatedNotConsuming may be nested
+inside the In-delivery step (IA52-IA55).
+
 ## Stage mix (the Products row)
 The bar from the deleted "Delivery Pipeline by Product" panel now lives in the
 Products row, as a full-width second line inside the Journey Funnel cell, beside

@@ -18050,6 +18050,13 @@ i.seat-chip {
 :host .dd-app .dd-fnl-step__spark .b {
   flex: 1 1 0;
   min-width: 0;
+  /* Floor every bar, not only the zero ones. The per-product spread is heavily
+     skewed in real data (51 against 2, 1 and 0), so without this the small
+     products render at 0.4-2.3px and read as dirt on the screen rather than as
+     a quantity. 3px is the same floor the empty state uses, so a 1 and a 0 are
+     told apart by colour, which is honest, instead of by a sub-pixel height,
+     which is not. */
+  min-height: 3px;
   background: var(--c-accent);
   opacity: 0.5;
   border-radius: 1px;
@@ -18511,5 +18518,40 @@ i.seat-chip {
 @media (max-width: 900px) {
   :host .dd-app .dd-mixleg {
     display: none;
+  }
+}
+
+/* Needs-attention row — Stuck and Not-consuming sit BESIDE the funnel, not inside
+   the In-delivery step. They are not a subset of it: In delivery is status
+   'ongoing', Stuck is 'initiated' OR 'ongoing' stalled, and Not-consuming is
+   'initiated' only, so it is disjoint from In delivery by construction. */
+:host .dd-app .dd-funnel-alerts {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--c-border-soft);
+}
+
+:host .dd-app .dd-funnel-alerts__lbl {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--c-text-muted);
+}
+
+:host .dd-app .dd-funnel-alerts__note {
+  font-size: 11px;
+  color: var(--c-text-muted);
+  margin-left: auto;
+}
+
+@media (max-width: 760px) {
+  :host .dd-app .dd-funnel-alerts__note {
+    margin-left: 0;
+    flex-basis: 100%;
   }
 }

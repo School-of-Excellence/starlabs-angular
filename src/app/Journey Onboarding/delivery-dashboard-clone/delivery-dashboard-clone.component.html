@@ -119,22 +119,6 @@
               <span class="dd-fnl-step__val">{{ kpiOngoingTotal | number }}</span>
               <span class="dd-fnl-step__sub">currently in progress</span>
             </button>
-            <div class="dd-fnl-flags">
-              <button class="dd-fnl-flag dd-fnl-flag--hot" type="button" data-testid="dd-funnel-stuck"
-                [class.is-zero]="kpiStuck === 0" (click)="navToAttention('stuck')">
-                <span class="dd-fnl-flag__n">{{ kpiStuck | number }}</span>
-                <span class="dd-fnl-flag__t">stuck 14d+</span>
-                <span class="dd-fnl-step__spark">
-                  <span class="b" *ngFor="let v of sparkStuck" [style.height.%]="(v / sparkMax(sparkStuck)) * 100"
-                    [class.empty]="v === 0"></span>
-                </span>
-              </button>
-              <button class="dd-fnl-flag" type="button" data-testid="dd-funnel-idle"
-                [class.is-zero]="kpiInitiatedNotConsuming === 0" (click)="navToAttention('idle')">
-                <span class="dd-fnl-flag__n">{{ kpiInitiatedNotConsuming | number }}</span>
-                <span class="dd-fnl-flag__t">not consuming</span>
-              </button>
-            </div>
           </div>
 
           <div class="dd-fnl-step" [class.is-zero]="kpiCompletedTotal === 0">
@@ -150,6 +134,32 @@
             </button>
           </div>
 
+        </div>
+
+        <!-- Stuck and Not-consuming are NOT a subset of In delivery, so they cannot be
+             drawn inside it. In delivery counts status 'ongoing'. Stuck counts anyone
+             'initiated' OR 'ongoing' who has stalled, and Not-consuming counts only
+             'initiated' — which makes it disjoint from In delivery by construction.
+             Live starlabs-test data: Glimpse reads In delivery 0, Stuck 13, Not
+             consuming 13. Nesting them would have the board assert 13 people stuck
+             inside a population of zero. They sit alongside the funnel instead. -->
+        <div class="dd-funnel-alerts">
+          <span class="dd-funnel-alerts__lbl">Needs attention</span>
+          <button class="dd-fnl-flag dd-fnl-flag--hot" type="button" data-testid="dd-funnel-stuck"
+            [class.is-zero]="kpiStuck === 0" (click)="navToAttention('stuck')">
+            <span class="dd-fnl-flag__n">{{ kpiStuck | number }}</span>
+            <span class="dd-fnl-flag__t">stuck 14d+</span>
+            <span class="dd-fnl-step__spark">
+              <span class="b" *ngFor="let v of sparkStuck" [style.height.%]="(v / sparkMax(sparkStuck)) * 100"
+                [class.empty]="v === 0"></span>
+            </span>
+          </button>
+          <button class="dd-fnl-flag" type="button" data-testid="dd-funnel-idle"
+            [class.is-zero]="kpiInitiatedNotConsuming === 0" (click)="navToAttention('idle')">
+            <span class="dd-fnl-flag__n">{{ kpiInitiatedNotConsuming | number }}</span>
+            <span class="dd-fnl-flag__t">not consuming</span>
+          </button>
+          <span class="dd-funnel-alerts__note">spans Initiated and Ongoing &mdash; not a slice of In delivery</span>
         </div>
 
         <p class="dd-funnel__note">Every number here counts the same population &mdash; all products matching the
