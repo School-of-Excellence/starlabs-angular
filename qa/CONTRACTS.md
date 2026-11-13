@@ -13,6 +13,7 @@ One line per live contract (gate section 1.1).
 
 | delivery-dashboard-days-waiting | /delivery-dashboard | src/app/Journey Onboarding/delivery-dashboard-clone/delivery-dashboard-days-waiting.spec.ts | 2026-09-28 PASS (10/10; 6 FAIL on revert) |
 | delivery-dashboard-hidden-scope | /delivery-dashboard | src/app/Journey Onboarding/delivery-dashboard-clone/delivery-dashboard-hidden-scope.spec.ts | 2026-11-13 PASS (3/3; 3 FAIL on revert) |
+| delivery-dashboard-stuck-appointments | /delivery-dashboard -> Stuck Cases | qa/checks/delivery-dashboard-stuck-appointments.mjs | 2026-11-13 PASS (24/24; 23 FAIL on revert) |
 | delivery-dashboard-v4-ia | /delivery-dashboard | qa/checks/delivery-dashboard-v4-ia.mjs + src/app/Journey Onboarding/delivery-dashboard-clone/delivery-dashboard-strip.spec.ts | 2026-11-13 PASS (63/63 + 10/10; red-on-revert verified for funnel, stage mix and ramp order) |
 
 > "Tested" here means the contract was run on the real app at

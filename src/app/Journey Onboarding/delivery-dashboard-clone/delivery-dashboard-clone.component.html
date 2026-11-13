@@ -1831,6 +1831,13 @@
                       getActiveFilterCount() }})</span></span>
                   <button class="pm-clear-filter-btn" (click)="clearActiveFilter()">✕ Clear Filter</button>
                 </div>
+                <!-- A missing composite index fails every chunk of the attended-appointment
+                     lookup. Say so: blank columns must not read as "no appointment". -->
+                <div *ngIf="stuckAppointmentsError" class="pm-data-warning"
+                  data-testid="pm-stuck-appointments-error">
+                  <span>{{ stuckAppointmentsError }} APPOINTMENT, APPOINTMENT DATE and DAYS STUCK fall back to
+                    status data below because the lookup failed, not because there is no appointment.</span>
+                </div>
                 <div class="pm-table-container">
                   <table class="pm-data-table">
                     <thead>
@@ -1869,6 +1876,15 @@
                       data-testid="pm-days-waiting"
                       [ngClass]="{'days-red': isKnownWait(participant[header.key]) && participant[header.key] >= 14, 'days-amber': isKnownWait(participant[header.key]) && participant[header.key] >= 7 && participant[header.key] < 14, 'days-green': isKnownWait(participant[header.key]) && participant[header.key] < 7, 'days-unknown': !isKnownWait(participant[header.key])}">{{
                       isKnownWait(participant[header.key]) ? participant[header.key] + ' DAYS' : '\u2014' }}</span>
+                    <span *ngIf="header.key === 'stuckdays'" class="pm-days-badge"
+                      data-testid="pm-stuck-days"
+                      [attr.data-basis]="participant['stuckdaysbasis']"
+                      [title]="participant['stuckdaysbasis'] === 'appointment'
+                        ? 'Days since this participant last attended an appointment'
+                        : 'No attended appointment on record \u2014 counting from the last status change'"
+                      [ngClass]="{'days-red': isKnownWait(participant['stuckdays']) && participant['stuckdays'] >= 14, 'days-amber': isKnownWait(participant['stuckdays']) && participant['stuckdays'] >= 7 && participant['stuckdays'] < 14, 'days-green': isKnownWait(participant['stuckdays']) && participant['stuckdays'] < 7, 'days-unknown': !isKnownWait(participant['stuckdays'])}">{{
+                      isKnownWait(participant['stuckdays']) ? participant['stuckdays'] + ' DAYS' : '\u2014'
+                      }}<span class="pm-days-basis" *ngIf="participant['stuckdaysbasis'] !== 'appointment'">*</span></span>
                     <span *ngIf="header.key === 'addnotes'">
                       <div (click)="addNotes(participant)"><mat-icon class="pm-edit-icon">edit_note</mat-icon></div>
                     </span>

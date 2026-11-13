@@ -183,3 +183,5 @@ Literal `data-testid` strings only — no `${interpolation}` (gate section 1.1 /
 | dd-kpi-avg-complete | avg days figure (pre-existing, re-homed into Delivery speed) |
 | dd-stagemix | per-product stage-mix bar in the Products row |
 | dd-stagemix-legend | Init/Await/Started/Ongoing/Done colour legend |
+| pm-stuck-days | DAYS STUCK badge in Stuck Cases (data-basis=appointment\|status) |
+| pm-stuck-appointments-error | attended-appointment lookup failure banner |

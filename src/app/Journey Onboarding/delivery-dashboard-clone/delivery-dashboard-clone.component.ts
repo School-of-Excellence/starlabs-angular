@@ -3894,7 +3894,7 @@ export class DeliveryDashboardCloneComponent {
                 { key: 'appointmentstatus', label: 'APPOINTMENT STATUS', type: 'text', width: '130px' },
                 { key: 'issuetype', label: 'ISSUE TYPE', width: '10%', type: 'text' },
                 { key: 'date', label: 'APPOINTMENT DATE', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
-                { key: 'waitingperiod', label: 'DAYS STUCK', width: '10%', type: 'number' },
+                { key: 'stuckdays', label: 'DAYS STUCK', width: '10%', type: 'number' },
                 { key: 'lastaction', label: 'LAST ACTION', width: '10%', type: 'text' },
                 { key: 'assignedto', label: 'ASSIGNED TO', width: '13%', type: 'text' },
                 { key: 'generalnotes', label: 'RESOLUTION', width: '10%' },
@@ -6839,13 +6839,23 @@ export class DeliveryDashboardCloneComponent {
                     profileid: profileId,
                     activejourney: journeyName,
                     product: productName || 'N/A',
-                    appointment: 'N/A',
-                    appointmentstatus: 'N/A',
+                    // The three appointment columns below were hardcoded 'N/A' / a status date.
+                    // getRecentAppointmentDetails() overwrites them from the participant's most
+                    // recent ATTENDED appointment; these are the values shown when there is none.
+                    appointment: 'No attended appointment',
+                    appointmentstatus: '—',
                     issuetype: status === 'ongoing' ? 'Stuck mid-flow' : 'Initiated · stalled',
-                    date: lastActivity,
-                    waitingperiod: days,
-                    lastaction: status,
+                    date: null,
                     assignedto: 'Unassigned',
+                    // waitingperiod stays the status-derived figure, unchanged, and is the
+                    // fallback basis for DAYS STUCK when no attendance is on record.
+                    waitingperiod: days,
+                    stuckdays: days,
+                    stuckdaysbasis: 'status',
+                    participantproductid: item?.docid || null,
+                    recentappointmentdate: null,
+                    actualstuckdays: null,
+                    lastaction: status,
                     escalationlevel: escalation,
                     generalnotes: [],
                 });
@@ -6863,9 +6873,99 @@ export class DeliveryDashboardCloneComponent {
         this.originalData['currentJourneyInitiated'].count = idle.length;
         this.originalData['stuckCases'].data = stuck;
         this.originalData['stuckCases'].count = stuck.length;
+        void this.getRecentAppointmentDetails(stuck);
 
         this.currentPage = 1;
         this.calculatePagination();
+    }
+
+    /**
+     * Stuck cases: fill the appointment columns from the participant's most recent
+     * ATTENDED appointment.
+     *
+     * Four columns in the Stuck Cases table were not telling the truth. APPOINTMENT and
+     * APPOINTMENT STATUS were hardcoded 'N/A'; APPOINTMENT DATE showed lastActivity,
+     * which is a status-change date, not an appointment; and DAYS STUCK counted from
+     * that same status field, so a coach who updated a status without the participant
+     * attending anything reset the clock.
+     *
+     * One roster-scoped query fixes those four. (ASSIGNED TO is wired here too but stays
+     * 'Unassigned' on current data — see the note at that line.) It is chunked at 30 (the Firestore 'in'
+     * limit) over the stuck set only - never a whole-collection read of appointments.
+     *
+     * Needs the composite index appointments(participantproductid ASC, attended ASC,
+     * endtime DESC). Without it EVERY chunk throws, which would leave the columns
+     * looking like "no appointment" rather than "lookup failed" - so the error is
+     * recorded and the UI says so instead.
+     */
+    stuckAppointmentsError: string | null = null;
+    private stuckLookupId = 0;
+
+    private async getRecentAppointmentDetails(stuckItems: any[]): Promise<void> {
+        const requestId = ++this.stuckLookupId;
+        this.stuckAppointmentsError = null;
+
+        const ids = Array.from(new Set(
+            stuckItems.map(i => i.participantproductid).filter(Boolean)
+        ));
+        if (ids.length === 0) return;
+
+        const latest = new Map<string, any>();
+        const CHUNK = 30;
+
+        for (let i = 0; i < ids.length; i += CHUNK) {
+            const chunk = ids.slice(i, i + CHUNK);
+            try {
+                const snap = await runInInjectionContext(this.injector, () =>
+                    getDocs(query(
+                        collection(this.firestore, 'appointments'),
+                        where('participantproductid', 'in', chunk),
+                        where('attended', '==', true),
+                        orderBy('endtime', 'desc')
+                    ))
+                );
+                // Ordered endtime desc, so the first row seen per product IS the latest.
+                for (const d of snap.docs) {
+                    const a = d.data();
+                    const pid = a['participantproductid'];
+                    if (pid && !latest.has(pid)) latest.set(pid, a);
+                }
+            } catch (err) {
+                console.error('Stuck cases: recent attended appointment lookup failed', err);
+                this.stuckAppointmentsError = 'Last appointment data is unavailable right now.';
+            }
+        }
+
+        // A newer refresh started while we were awaiting - its results win.
+        if (requestId !== this.stuckLookupId) return;
+
+        for (const item of stuckItems) {
+            const appt = latest.get(item.participantproductid);
+            if (!appt) continue;
+
+            const endtime = appt['endtime'] ?? null;
+            item.recentappointmentdate = endtime;
+            item.date = endtime;
+            item.appointment = this.resolveAppointmentType(appt) || 'Appointment';
+            // Every row here passed attended == true, so the status is not a guess.
+            item.appointmentstatus = 'Attended';
+            // Wired, but inert on starlabs-test: appt['assignedto'] was falsy for all 8
+            // rows that resolved, so ASSIGNED TO still reads 'Unassigned'. The coach is
+            // most likely in the appointment's `hosts` array (there are three indexes on
+            // it) rather than a flat field — resolving that is follow-up work, not this
+            // chunk. Left in place because it is correct if the field is ever populated.
+            item.assignedto = appt['assignedto'] || item.assignedto || 'Unassigned';
+
+            const since = this.daysSinceTs(endtime);
+            if (since !== null) {
+                item.actualstuckdays = since;
+                item.stuckdays = since;
+                item.stuckdaysbasis = 'appointment';
+            }
+        }
+
+        this.calculatePagination();
+        this.cdr.detectChanges();
     }
 
     openParticipant(profileId: string) {
