@@ -378,7 +378,6 @@ export class DeliveryDashboardNewComponent implements OnInit {
           getDocs(query(
             collection(this.firestore, 'participantsproduct'),
             where('productref', '==', p.ref),
-            where('status', 'not-in', this.REJECTED_STATUS)
           ))
         )
       );
@@ -687,7 +686,7 @@ export class DeliveryDashboardNewComponent implements OnInit {
   // Journey Funnel
   funnelMatch(r: DfuRow, metric: FunnelMetric): boolean {
     const eligible = this.isEligible(r);
-    const ongoing = eligible && r.status === 'ongoing';
+    const ongoing = this.ongoingParticipants.includes(r);
     const done = eligible && r.status === 'completed';
 
     switch (metric) {

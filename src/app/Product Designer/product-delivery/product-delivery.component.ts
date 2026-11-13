@@ -133,6 +133,19 @@ export class ProductDeliveryComponent {
       }
     })
 
+    // Videoask
+    const deliveryvideoaskRef = collection(this.firestore,"arenavideoask")
+    const deliveryvideoaskQuery = query(deliveryvideoaskRef,orderBy('title'))
+    collectionSnapshots(deliveryvideoaskQuery).pipe(takeUntil(this.subscription)).subscribe(videoask =>{
+      for (let i = 0; i < videoask.length; i++) {
+        const videoaskDoc = videoask[i];
+        this.mapDelivery[videoaskDoc.ref.path] = {
+          name: videoaskDoc.data()["title"],
+          type: "videoask"
+        }
+      }
+    })
+
   }
 
   ngOnInit(): void {

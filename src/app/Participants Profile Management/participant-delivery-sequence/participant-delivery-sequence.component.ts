@@ -215,6 +215,18 @@ export class ParticipantDeliverySequenceComponent {
       }
       this.sortDelivery()
     })
+    // videoask
+    getDocs(query(collection(this.firestore, "arenavideoask"), orderBy("title"))).then(videoask => {
+      for (let i = 0; i < videoask.docs.length; i++) {
+        const videoaskDoc = videoask.docs[i];
+        this.mapdeliveries[videoaskDoc.ref.path] = videoaskDoc.data()["title"]
+        this.deliveryList.push({
+          path: videoaskDoc.ref.path,
+          type: "videoask"
+        })
+      }
+      this.sortDelivery()
+    })
     // Fieldwork
     getDocs(query(collection(this.firestore, "delivery fieldwork"), orderBy("fieldworkname"))).then(fieldwork => {
       for (let i = 0; i < fieldwork.docs.length; i++) {
