@@ -3071,7 +3071,29 @@ export class DeliveryDashboardCloneComponent {
         return (parts[0][0] + parts[1][0] + parts[2][0]).toUpperCase();
     }
 
-    // Per-product pipeline total for the Action Center mini-funnel rows
+    /**
+     * Spoken form of a product's stage mix, for the bar's title and aria-label.
+     *
+     * The bar carries no text of its own, so without this the split is only available
+     * to someone who can see and hover five coloured segments. Order matches the legend
+     * and the segment order, which came across from the deleted
+     * "Delivery Pipeline by Product" panel.
+     */
+    stageMixLabel(cardId: string): string {
+        const f = this.getCardFunnel(cardId);
+        const parts: Array<[string, number]> = [
+            ['Init', f?.initiated?.length || 0],
+            ['Await', f?.awaiting?.length || 0],
+            ['Started', f?.started?.length || 0],
+            ['Ongoing', f?.ongoing?.length || 0],
+            ['Done', f?.completed?.length || 0],
+        ];
+        const total = parts.reduce((sum, [, n]) => sum + n, 0);
+        if (total === 0) return 'No participants in the pipeline yet';
+        return parts.map(([k, n]) => k + ' ' + n).join(', ') + ' (total ' + total + ')';
+    }
+
+    // Per-product pipeline total, also the stage-mix bar's "is there anything here" test
     getCardPipelineTotal(cardId: string): number {
         const f = this.getCardFunnel(cardId);
         return (f?.initiated?.length || 0)

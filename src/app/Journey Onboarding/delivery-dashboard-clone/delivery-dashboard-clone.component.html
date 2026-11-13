@@ -264,7 +264,15 @@
               </div>
             </div>
             <div class="dd-prow-colhead__cell dd-prow-colhead__cell--group">
-              <span class="dd-colhead__grp-lbl">Journey Funnel</span>
+              <span class="dd-colhead__grp-lbl">Journey Funnel
+                <span class="dd-mixleg" data-testid="dd-stagemix-legend">
+                  <span class="dd-mixleg__i"><i class="dd-bg-s1"></i>Init</span>
+                  <span class="dd-mixleg__i"><i class="dd-bg-s2"></i>Await</span>
+                  <span class="dd-mixleg__i"><i class="dd-bg-s3"></i>Started</span>
+                  <span class="dd-mixleg__i"><i class="dd-bg-s4"></i>Ongoing</span>
+                  <span class="dd-mixleg__i"><i class="dd-bg-s5"></i>Done</span>
+                </span>
+              </span>
               <div class="dd-colhead__grp-tags">
                 <span>Yet to Start</span><span>Init</span><span>Started</span><span>Ongoing</span><span>Done</span>
               </div>
@@ -352,6 +360,36 @@
                 <span class="dd-fstep__pill done" [class.empty]="getCardFunnel(cardId).completed.length === 0">{{
                   getCardFunnel(cardId).completed.length }}</span>
                 <span class="dd-fstep__lbl">Done</span>
+              </div>
+
+              <!-- Stage mix: the bar that used to live in the standalone "Delivery Pipeline
+                   by Product" panel, now beside the counts it describes. The numbers above
+                   stay — the bar adds the shape, it does not replace the figures. Each
+                   segment opens the same list its pill does. -->
+              <div class="dd-stagemix" data-testid="dd-stagemix" [attr.aria-label]="stageMixLabel(cardId)"
+                [title]="stageMixLabel(cardId)">
+                <button type="button" class="dd-stagemix__seg dd-bg-s1"
+                  *ngIf="getCardFunnel(cardId).initiated.length > 0"
+                  [style.flex]="getCardFunnel(cardId).initiated.length"
+                  (click)="openCardFunnelModal(cardId, 'initiated', $event)"></button>
+                <button type="button" class="dd-stagemix__seg dd-bg-s2"
+                  *ngIf="getCardFunnel(cardId).awaiting.length > 0"
+                  [style.flex]="getCardFunnel(cardId).awaiting.length"
+                  (click)="openCardFunnelModal(cardId, 'awaiting', $event)"></button>
+                <button type="button" class="dd-stagemix__seg dd-bg-s3"
+                  *ngIf="getCardFunnel(cardId).started.length > 0"
+                  [style.flex]="getCardFunnel(cardId).started.length"
+                  (click)="openCardFunnelModal(cardId, 'started', $event)"></button>
+                <button type="button" class="dd-stagemix__seg dd-bg-s4"
+                  *ngIf="(getCardFunnel(cardId).ongoing?.length || 0) > 0"
+                  [style.flex]="getCardFunnel(cardId).ongoing?.length || 0"
+                  (click)="openCardFunnelModal(cardId, 'ongoing', $event)"></button>
+                <button type="button" class="dd-stagemix__seg dd-bg-s5"
+                  *ngIf="getCardFunnel(cardId).completed.length > 0"
+                  [style.flex]="getCardFunnel(cardId).completed.length"
+                  (click)="openCardFunnelModal(cardId, 'completed', $event)"></button>
+                <span class="dd-stagemix__empty" *ngIf="getCardPipelineTotal(cardId) === 0">No participants in
+                  the pipeline yet</span>
               </div>
             </div>
 

@@ -104,5 +104,38 @@ check('IA34', 'Stages / Specialist Slots / Completion History untouched',
 check('IA35', 'the three outer tabs survive',
   () => /outerTabIndex = 0/.test(html) && /outerTabIndex = 1/.test(html) && /outerTabIndex = 2/.test(html));
 
+// --- stage mix: the pby bar re-homed into the Products row -----------------------
+check('IA36', 'stage-mix bar present in the product row',
+  () => /class="dd-stagemix"[\s\S]{0,200}data-testid="dd-stagemix"/.test(html));
+check('IA37', 'it is one bar per product row, not a second panel',
+  () => count(html, /class="dd-stagemix"/g) === 1 && !/dd-pby/.test(html));
+for (const [id, stage] of [
+  ['IA38', 'initiated'], ['IA39', 'awaiting'], ['IA40', 'started'],
+  ['IA41', 'ongoing'], ['IA42', 'completed'],
+]) {
+  check(id, `stage-mix '${stage}' segment opens its list`,
+    () => new RegExp(`dd-stagemix__seg[\\s\\S]{0,420}openCardFunnelModal\\(cardId, '${stage}'`).test(html));
+}
+check('IA43', 'all five segments are present',
+  () => count(html, /dd-stagemix__seg/g) === 5);
+
+// COMPLETENESS: the bar ADDS the shape, it must not have replaced the five figures.
+for (const [id, stage] of [
+  ['IA44', 'awaiting'], ['IA45', 'initiated'], ['IA46', 'started'],
+  ['IA47', 'ongoing'], ['IA48', 'completed'],
+]) {
+  check(id, `the numeric '${stage}' pill still renders in the row`,
+    () => new RegExp(`dd-fstep__pill[\\s\\S]{0,260}getCardFunnel\\(cardId\\)\\.${stage}`).test(html)
+       || new RegExp(`getCardFunnel\\(cardId\\)\\.${stage}\\??\\.length[\\s\\S]{0,120}dd-fstep__lbl`).test(html));
+}
+check('IA49', 'stage colours are legended',
+  () => /data-testid="dd-stagemix-legend"/.test(html)
+     && ['s1', 's2', 's3', 's4', 's5'].every(c => new RegExp(`dd-mixleg__i"><i class="dd-bg-${c}"`).test(html)));
+check('IA50', 'the bar is readable without sight or hover',
+  () => /\[attr\.aria-label\]="stageMixLabel\(cardId\)"/.test(html)
+     && /stageMixLabel\(cardId: string\): string \{/.test(ts));
+check('IA51', 'an empty pipeline says so instead of showing a blank track',
+  () => /dd-stagemix__empty[\s\S]{0,120}getCardPipelineTotal\(cardId\) === 0/.test(html));
+
 console.log(failed === 0 ? '\nALL PASS' : `\n${failed} FAILED`);
 process.exit(failed === 0 ? 0 : 1);

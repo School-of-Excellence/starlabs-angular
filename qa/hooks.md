@@ -181,3 +181,5 @@ Literal `data-testid` strings only — no `${interpolation}` (gate section 1.1 /
 | dd-strip-chip | each product chip |
 | dd-speed | Delivery speed panel |
 | dd-kpi-avg-complete | avg days figure (pre-existing, re-homed into Delivery speed) |
+| dd-stagemix | per-product stage-mix bar in the Products row |
+| dd-stagemix-legend | Init/Await/Started/Ongoing/Done colour legend |

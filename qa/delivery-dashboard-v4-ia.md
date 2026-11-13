@@ -61,6 +61,8 @@ URL: http://localhost:4200/delivery-dashboard
 - dd-strip-chip        -> each product chip
 - dd-speed             -> Delivery speed panel
 - dd-kpi-avg-complete  -> the avg figure (pre-existing hook, re-homed)
+- dd-stagemix          -> the per-product stage-mix bar
+- dd-stagemix-legend   -> the Init/Await/Started/Ongoing/Done colour legend
 
 ## Proof
 - Spec path: qa/checks/delivery-dashboard-v4-ia.mjs (template/IA invariants)
@@ -70,10 +72,24 @@ URL: http://localhost:4200/delivery-dashboard
 - Fail if reverted: yes - restoring the previous template fails 20+ of the 36 node
   checks (IA1/IA2/IA3 panel removal, the once-only counts, every new hook, and the
   strip wiring), and removing selectProductFromStrip fails the Karma spec.
-- Last run: 2026-11-13 PASS — node check 36/36 ALL PASS (20+ FAIL on revert); Karma strip spec 10/10 SUCCESS; prod build wrote dist/atctranscription (413 bundles, 13:30)
+- Last run: 2026-11-13 PASS — node check 51/51 ALL PASS (20+ FAIL on revert of the funnel/strip, 11 FAIL on revert of the stage mix); Karma strip spec 10/10 SUCCESS; npx ng build --configuration production -> BUILD_EXIT=0, 0 ERROR lines
+
+## Stage mix (the Products row)
+The bar from the deleted "Delivery Pipeline by Product" panel now lives in the
+Products row, as a full-width second line inside the Journey Funnel cell, beside
+the counts it describes.
+
+- The bar ADDS the shape; it does NOT replace the five numeric pills. Those are
+  five visible metrics and removing them was never asked for (IA44-IA48 pin them).
+- Each segment opens the same list its pill opens (openCardFunnelModal).
+- Segment and legend order is Init, Await, Started, Ongoing, Done - carried over
+  unchanged from the deleted panel, so the colours still mean what they meant.
+- The bar carries no text, so stageMixLabel() gives it a title and aria-label:
+  "Init 3, Await 1, Started 2, Ongoing 4, Done 0 (total 10)".
+- An empty pipeline says "No participants in the pipeline yet" rather than
+  rendering an unexplained blank track.
 
 ## Not covered here
-- The per-product stage split still renders as five numeric columns in the Products
-  table AND as bars in that table's own row block; folding those together is the next
-  chunk (commit 3), not this one.
-- No team-level cut. There is no teamref on the specialist profile in Firestore.
+- No team-level cut. There is no teamref on the specialist profile in Firestore,
+  so the board is still organised by product, which is not the cut the dashboard
+  ultimately wants.

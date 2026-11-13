@@ -13,7 +13,7 @@ One line per live contract (gate section 1.1).
 
 | delivery-dashboard-days-waiting | /delivery-dashboard | src/app/Journey Onboarding/delivery-dashboard-clone/delivery-dashboard-days-waiting.spec.ts | 2026-09-28 PASS (10/10; 6 FAIL on revert) |
 | delivery-dashboard-hidden-scope | /delivery-dashboard | src/app/Journey Onboarding/delivery-dashboard-clone/delivery-dashboard-hidden-scope.spec.ts | 2026-11-13 PASS (3/3; 3 FAIL on revert) |
-| delivery-dashboard-v4-ia | /delivery-dashboard | qa/checks/delivery-dashboard-v4-ia.mjs + src/app/Journey Onboarding/delivery-dashboard-clone/delivery-dashboard-strip.spec.ts | 2026-11-13 PASS (36/36 + 10/10; 20+ FAIL on revert) |
+| delivery-dashboard-v4-ia | /delivery-dashboard | qa/checks/delivery-dashboard-v4-ia.mjs + src/app/Journey Onboarding/delivery-dashboard-clone/delivery-dashboard-strip.spec.ts | 2026-11-13 PASS (51/51 + 10/10; 20+ FAIL on funnel revert, 11 on stage-mix revert) |
 
 > "Tested" here means the contract was run on the real app at
 > http://localhost:4200/journey-coach-health against the starlabs-test Firebase project,
