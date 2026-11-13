@@ -165,3 +165,19 @@ Literal `data-testid` strings only — no `${interpolation}` (gate section 1.1 /
 | --- | --- | --- |
 | jx-theme-toggle | Light/dark button at the end of the Journey Experience tab bar (all 4 tabs) | jc-health-theme-consistency |
 | jchd-diag-showing | Participants context line: filtered count when a filter is on | jc-health-ux-e2e |
+
+## delivery-dashboard (v4 information architecture)
+| testid | element |
+|---|---|
+| dd-funnel | funnel container |
+| dd-funnel-awaiting | Awaiting Initiation step body |
+| dd-funnel-ready | Ready to Start step body |
+| dd-funnel-indelivery | In delivery step body |
+| dd-funnel-stuck | Stuck flag inside In delivery |
+| dd-funnel-idle | Not-consuming flag inside In delivery |
+| dd-funnel-delivered | Delivered step body |
+| dd-strip | product strip container |
+| dd-strip-all | "All products" chip |
+| dd-strip-chip | each product chip |
+| dd-speed | Delivery speed panel |
+| dd-kpi-avg-complete | avg days figure (pre-existing, re-homed into Delivery speed) |

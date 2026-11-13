@@ -75,155 +75,144 @@
       </div>
     </header>
 
-    <!-- KPI BENTO (ported) =================================== -->
-    <section class="dd-kpi">
-      <div class="dd-hero">
-        <div class="dd-hero__head">
-          <span class="dd-hero__eyebrow">Active Delivery Pipeline</span>
-          <span class="dd-live"><span class="dd-live__dot"></span>Live</span>
-        </div>
-        <div class="dd-hero__row">
-          <span class="dd-hero__num">{{ kpiOngoingTotal | number }}</span>
-          <div class="dd-hero__meta">
-            <span class="dd-hero__delta-lbl">participants in progress</span>
+    <!-- DELIVERY FUNNEL ====================================== -->
+    <!-- The single home for every population count. The Key-metrics grid and the
+         "Needs Your Attention" tiles printed these same four numbers in different
+         clothes; their drill-downs moved here, onto the number itself. Stuck and
+         Not-consuming are flags on In delivery because that is what they are:
+         states of people already in delivery, not stages of their own. -->
+    <section class="dd-funnel-sec">
+      <div class="dd-funnel-hero">
+        <span class="dd-funnel__eyebrow">Delivery funnel</span>
+        <p class="dd-funnel__cap">{{ funnelScopeCaption }}</p>
+
+        <div class="dd-funnel" data-testid="dd-funnel">
+
+          <div class="dd-fnl-step" [class.is-zero]="kpiAwaitingTotal === 0">
+            <button class="dd-fnl-step__body" type="button" data-testid="dd-funnel-awaiting"
+              (click)="navToAttention('awaiting')">
+              <span class="dd-fnl-step__lbl">Awaiting Initiation</span>
+              <span class="dd-fnl-step__val">{{ kpiAwaitingTotal | number }}</span>
+              <span class="dd-fnl-step__sub">payment not confirmed</span>
+              <span class="dd-fnl-step__open">Open list</span>
+            </button>
           </div>
-        </div>
-        <span class="dd-hero__sub">Total participants currently going through delivery — across {{ visibleCardIds.length
-          }} active products</span>
-        <div class="dd-hero__funnel">
-          <div class="dd-khf" *ngFor="let cardId of visibleCardIds">
-            <span class="dd-khf__name">{{ getCardName(cardId) }}</span>
-            <div class="dd-khf__bar">
-              <div class="dd-khf__fill" [style.width.%]="ongoingPctOfMax(cardId)"></div>
+
+          <div class="dd-fnl-step" [class.is-zero]="kpiReadyToInitiate === 0">
+            <button class="dd-fnl-step__body" type="button" data-testid="dd-funnel-ready"
+              (click)="navToAttention('ready')">
+              <span class="dd-fnl-step__lbl">Ready to Start</span>
+              <span class="dd-fnl-step__val">{{ kpiReadyToInitiate | number }}</span>
+              <span class="dd-fnl-step__sub">payment confirmed &mdash; initiate now</span>
+              <span class="dd-fnl-step__spark">
+                <span class="b" *ngFor="let v of sparkReady" [style.height.%]="(v / sparkMax(sparkReady)) * 100"
+                  [class.empty]="v === 0"></span>
+              </span>
+              <span class="dd-fnl-step__open">Open list</span>
+            </button>
+          </div>
+
+          <div class="dd-fnl-step dd-fnl-step--delivery" [class.is-zero]="kpiOngoingTotal === 0">
+            <button class="dd-fnl-step__body" type="button" data-testid="dd-funnel-indelivery"
+              (click)="outerTabIndex = 0">
+              <span class="dd-fnl-step__lbl">In delivery</span>
+              <span class="dd-fnl-step__val">{{ kpiOngoingTotal | number }}</span>
+              <span class="dd-fnl-step__sub">currently in progress</span>
+            </button>
+            <div class="dd-fnl-flags">
+              <button class="dd-fnl-flag dd-fnl-flag--hot" type="button" data-testid="dd-funnel-stuck"
+                [class.is-zero]="kpiStuck === 0" (click)="navToAttention('stuck')">
+                <span class="dd-fnl-flag__n">{{ kpiStuck | number }}</span>
+                <span class="dd-fnl-flag__t">stuck 14d+</span>
+                <span class="dd-fnl-step__spark">
+                  <span class="b" *ngFor="let v of sparkStuck" [style.height.%]="(v / sparkMax(sparkStuck)) * 100"
+                    [class.empty]="v === 0"></span>
+                </span>
+              </button>
+              <button class="dd-fnl-flag" type="button" data-testid="dd-funnel-idle"
+                [class.is-zero]="kpiInitiatedNotConsuming === 0" (click)="navToAttention('idle')">
+                <span class="dd-fnl-flag__n">{{ kpiInitiatedNotConsuming | number }}</span>
+                <span class="dd-fnl-flag__t">not consuming</span>
+              </button>
             </div>
-            <span class="dd-khf__num">{{ ongoingByCard(cardId) }}</span>
           </div>
-        </div>
-      </div>
 
-      <div class="dd-kpi-grid">
-        <div class="dd-kcell dd-kcell--ready" [class.dd-kcell--empty]="kpiReadyToInitiate === 0"
-          (click)="navToAttention('ready')">
-          <span class="dd-kcell__label">Ready to Start</span>
-          <span class="dd-kcell__value">{{ kpiReadyToInitiate | number }}</span>
-          <span class="dd-kcell__delta">payment confirmed — not yet initiated</span>
-          <div class="dd-kcell__spark">
-            <div class="b" *ngFor="let v of sparkReady" [style.height.%]="(v / sparkMax(sparkReady)) * 100"
-              [class.empty]="v === 0"></div>
+          <div class="dd-fnl-step" [class.is-zero]="kpiCompletedTotal === 0">
+            <button class="dd-fnl-step__body" type="button" data-testid="dd-funnel-delivered"
+              (click)="outerTabIndex = 1">
+              <span class="dd-fnl-step__lbl">Delivered</span>
+              <span class="dd-fnl-step__val">{{ kpiCompletedTotal | number }}</span>
+              <span class="dd-fnl-step__sub">completed in this period</span>
+              <span class="dd-fnl-step__spark">
+                <span class="b" *ngFor="let v of sparkCompleted"
+                  [style.height.%]="(v / sparkMax(sparkCompleted)) * 100" [class.empty]="v === 0"></span>
+              </span>
+            </button>
           </div>
-        </div>
 
-        <div class="dd-kcell dd-kcell--stuck" [class.dd-kcell--alert]="kpiStuck > 0"
-          [class.dd-kcell--empty]="kpiStuck === 0" (click)="navToAttention('stuck')">
-          <span class="dd-kcell__label">Stuck Participants</span>
-          <span class="dd-kcell__value">{{ kpiStuck | number }}</span>
-          <span class="dd-kcell__delta">no progress in 14+ days — needs follow-up</span>
-          <div class="dd-kcell__spark">
-            <div class="b" *ngFor="let v of sparkStuck" [style.height.%]="(v / sparkMax(sparkStuck)) * 100"
-              [class.empty]="v === 0"></div>
-          </div>
         </div>
 
-        <div class="dd-kcell dd-kcell--done">
-          <span class="dd-kcell__label">Fully Delivered</span>
-          <span class="dd-kcell__value">{{ kpiCompletedTotal | number }}</span>
-          <span class="dd-kcell__delta">participants who completed delivery in selected period</span>
-          <div class="dd-kcell__spark">
-            <div class="b" *ngFor="let v of sparkCompleted" [style.height.%]="(v / sparkMax(sparkCompleted)) * 100"
-              [class.empty]="v === 0"></div>
-          </div>
-        </div>
-
-        <div class="dd-kcell dd-kcell--avg">
-          <span class="dd-kcell__label">Avg. Days to Complete</span>
-          <span class="dd-kcell__value" data-testid="dd-kpi-avg-complete">
-            <span *ngIf="!hasAvgCompleteData" class="dd-kcell__not-recorded">Not recorded</span>
-            <ng-container *ngIf="hasAvgCompleteData">{{ kpiAvgComplete }}<span
-                class="dd-kcell__unit">d</span></ng-container>
-          </span>
-          <div class="dd-kcell__gauge">
-            <div class="dd-gauge-track">
-              <div class="dd-gauge-fill" [style.width.%]="hasAvgCompleteData ? avgTimePct : 0"></div>
-              <div class="dd-gauge-target" [style.left.%]="100"></div>
-            </div>
-            <span class="dd-gauge-lbl">{{ hasAvgCompleteData ? 'target ' + avgTimeTarget + 'd to finish delivery' :
-              'no completions in this period to measure' }}</span>
-          </div>
-        </div>
+        <p class="dd-funnel__note">Every number here counts the same population &mdash; all products matching the
+          current filter, hidden ones included. Hiding a product changes which rows the Products table shows, not
+          these figures. Click any number or flag to open its list.</p>
       </div>
     </section>
 
-    <!-- ACTION CENTER (ported) =============================== -->
-    <section class="dd-action">
-      <div>
-        <div class="dd-section-head">
-          <span class="dd-section-title">Needs Your Attention</span>
-          <span class="dd-section-sub">Participants requiring immediate follow-up — act on these first. Click any number to see the participants behind it.</span>
-        </div>
-        <div class="dd-attention">
-          <button class="dd-tile dd-tile--alert" [class.dd-tile--empty]="kpiStuck === 0"
-            (click)="navToAttention('stuck')">
-            <span class="dd-tile__num">{{ kpiStuck | number }}</span>
-            <span class="dd-tile__label">Stuck</span>
-            <span class="dd-tile__hint">No updates for 14+ days — follow up now</span>
-            <span class="dd-tile__arr">&rarr;</span>
-          </button>
-          <button class="dd-tile" [class.dd-tile--empty]="kpiAwaitingTotal === 0" (click)="navToAttention('awaiting')">
-            <span class="dd-tile__num">{{ kpiAwaitingTotal | number }}</span>
-            <span class="dd-tile__label">Awaiting Initiation</span>
-            <span class="dd-tile__hint">Payment not confirmed — delivery hasn't started yet</span>
-            <span class="dd-tile__arr">&rarr;</span>
-          </button>
-          <button class="dd-tile dd-tile--ok" [class.dd-tile--empty]="kpiReadyToInitiate === 0"
-            (click)="navToAttention('ready')">
-            <span class="dd-tile__num">{{ kpiReadyToInitiate | number }}</span>
-            <span class="dd-tile__label">Ready to Start</span>
-            <span class="dd-tile__hint">Payment confirmed — initiate their delivery now</span>
-            <span class="dd-tile__arr">&rarr;</span>
-          </button>
-          <button class="dd-tile" [class.dd-tile--empty]="kpiInitiatedNotConsuming === 0"
-            (click)="navToAttention('idle')">
-            <span class="dd-tile__num">{{ kpiInitiatedNotConsuming | number }}</span>
-            <span class="dd-tile__label">Initiated – Not Consuming</span>
-            <span class="dd-tile__hint">Delivery started but participant hasn't been active</span>
-            <span class="dd-tile__arr">&rarr;</span>
-          </button>
-        </div>
+    <!-- ONGOING BY PRODUCT (strip) ============================ -->
+    <!-- A one-click view of the Products dropdown, not a second filter: both write and
+         read the same productFilterControl. The dropdown stays the way to pick several. -->
+    <section class="dd-strip-sec">
+      <div class="dd-strip-head">
+        <span class="dd-strip__title">Ongoing by product</span>
+        <span class="dd-strip__hint">Click a product to filter the whole screen</span>
       </div>
+      <div class="dd-strip" data-testid="dd-strip">
+        <button class="dd-pchip" type="button" data-testid="dd-strip-all" [class.is-sel]="isStripAllSelected"
+          (click)="selectProductFromStrip(null)">
+          <span class="dd-pchip__nm">All products</span>
+          <span class="dd-pchip__v">&mdash;</span>
+          <span class="dd-pchip__t"><i style="width:100%"></i></span>
+        </button>
+        <button class="dd-pchip" type="button" data-testid="dd-strip-chip"
+          *ngFor="let cardId of visibleCardIds; trackBy: trackByCardId" [class.is-sel]="isStripSelected(cardId)"
+          [class.is-zero]="ongoingByCard(cardId) === 0" [title]="getCardName(cardId)"
+          (click)="selectProductFromStrip(cardId)">
+          <span class="dd-pchip__nm">{{ getCardName(cardId) }}</span>
+          <span class="dd-pchip__v">{{ ongoingByCard(cardId) | number }}</span>
+          <span class="dd-pchip__t"><i [style.width.%]="ongoingPctOfMax(cardId)"></i></span>
+        </button>
+      </div>
+    </section>
 
-      <div>
-        <div class="dd-section-head">
-          <span class="dd-section-title">Delivery Pipeline by Product</span>
-          <span class="dd-section-sub">How participants are spread across each delivery stage — Init, Await, Started, Ongoing, Done. The number on the right is the product total.</span>
+    <!-- DELIVERY SPEED ======================================== -->
+    <!-- Its own section because it is the one measure the funnel does not carry:
+         every other headline figure is a headcount, this one is a duration. -->
+    <section class="dd-speed-sec">
+      <div class="dd-section-head">
+        <span class="dd-section-title">Delivery speed</span>
+        <span class="dd-section-sub">{{ speedScopeLabel }}</span>
+      </div>
+      <div class="dd-speed" data-testid="dd-speed">
+        <div class="dd-speed__figure">
+          <span class="dd-speed__lbl">Avg. days to complete</span>
+          <span class="dd-speed__val" data-testid="dd-kpi-avg-complete">
+            <span *ngIf="!hasAvgCompleteData" class="dd-speed__nr">Not recorded</span>
+            <ng-container *ngIf="hasAvgCompleteData">{{ kpiAvgComplete }}<span
+                class="dd-speed__unit">d</span></ng-container>
+          </span>
+          <span class="dd-speed__sub">{{ hasAvgCompleteData ? 'against a ' + avgTimeTarget + '-day target' : 'no
+            completions in this period to measure' }}</span>
         </div>
-        <div class="dd-pby">
-          <div class="dd-pby-legend">
-            <span class="dd-pby-legend__item"><span class="dd-pby-legend__sw dd-bg-s1"></span>Init</span>
-            <span class="dd-pby-legend__item"><span class="dd-pby-legend__sw dd-bg-s2"></span>Await</span>
-            <span class="dd-pby-legend__item"><span class="dd-pby-legend__sw dd-bg-s3"></span>Started</span>
-            <span class="dd-pby-legend__item"><span class="dd-pby-legend__sw dd-bg-s4"></span>Ongoing</span>
-            <span class="dd-pby-legend__item"><span class="dd-pby-legend__sw dd-bg-s5"></span>Done</span>
+        <div class="dd-speed__gauge">
+          <div class="dd-gauge-track">
+            <div class="dd-gauge-fill" [style.width.%]="hasAvgCompleteData ? avgGaugePct : 0"></div>
+            <div class="dd-gauge-target" [style.left.%]="avgTargetMarkPct"></div>
           </div>
-          <ng-container *ngFor="let cardId of visibleCardIds">
-            <ng-container *ngIf="getCardFunnel(cardId) as f">
-              <div class="dd-pby-row">
-                <span class="dd-pby-row__name" [title]="getCardName(cardId)">{{ getCardName(cardId) }}</span>
-                <div class="dd-pby-row__bar">
-                  <div class="dd-pby-row__seg dd-bg-s1" *ngIf="f.initiated.length > 0"
-                    [style.flex]="f.initiated.length"></div>
-                  <div class="dd-pby-row__seg dd-bg-s2" *ngIf="f.awaiting.length > 0" [style.flex]="f.awaiting.length">
-                  </div>
-                  <div class="dd-pby-row__seg dd-bg-s3" *ngIf="f.started.length > 0" [style.flex]="f.started.length">
-                  </div>
-                  <div class="dd-pby-row__seg dd-bg-s4" *ngIf="(f.ongoing?.length || 0) > 0"
-                    [style.flex]="f.ongoing?.length || 0"></div>
-                  <div class="dd-pby-row__seg dd-bg-s5" *ngIf="f.completed.length > 0"
-                    [style.flex]="f.completed.length"></div>
-                </div>
-                <span class="dd-pby-row__total">{{ getCardPipelineTotal(cardId) | number }}</span>
-              </div>
-            </ng-container>
-          </ng-container>
+          <div class="dd-gauge-marks">
+            <span>0d</span>
+            <span>{{ avgTimeTarget }}d target</span>
+            <span>{{ avgGaugeMaxDays }}d</span>
+          </div>
         </div>
       </div>
     </section>

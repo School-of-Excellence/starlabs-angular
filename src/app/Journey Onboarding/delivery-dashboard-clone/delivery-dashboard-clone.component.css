@@ -17857,3 +17857,576 @@ i.seat-chip {
     color: var(--amber, #a15c07);
     white-space: nowrap;
 }
+
+
+/* ============================================================================
+ * DELIVERY FUNNEL / PRODUCT STRIP / DELIVERY SPEED
+ * ----------------------------------------------------------------------------
+ * Appended block. Three new sections:
+ *   1. .dd-funnel-*  -- the funnel that replaces the old KPI grid (page centrepiece)
+ *   2. .dd-strip-*   -- the horizontally scrollable product chip strip
+ *   3. .dd-speed-*   -- average delivery speed (figure + gauge)
+ *
+ * House rules observed here:
+ *   - every selector is prefixed `:host .dd-app `
+ *   - only the tokens declared on :host (--ff-*, --c-*, --r-*, --shadow-*, --t-*)
+ *   - no new custom properties, no :root/:host block, no dark-mode rules
+ *   - figures are var(--ff-mono) + tabular-nums
+ *   - only transform/opacity are animated; no filter/backdrop-filter/perspective
+ *   - .dd-gauge-track / .dd-gauge-fill / .dd-gauge-target are REUSED from the
+ *     existing gauge rules above (~line 10988) and are NOT redefined here.
+ *   - .dd-section-head / .dd-section-title / .dd-section-sub are reused as-is.
+ * ========================================================================== */
+
+/* --- 1. FUNNEL ------------------------------------------------------------ */
+
+:host .dd-app .dd-funnel-sec {
+  margin: 0 0 22px;
+}
+
+:host .dd-app .dd-funnel-hero {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-2);
+  padding: 20px 22px 18px;
+}
+
+:host .dd-app .dd-funnel__eyebrow {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--c-text-muted);
+  margin-bottom: 2px;
+}
+
+:host .dd-app .dd-funnel__cap {
+  display: block;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--c-text-soft);
+  margin-bottom: 18px;
+  max-width: 62ch;
+}
+
+:host .dd-app .dd-funnel {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  align-items: stretch;
+}
+
+:host .dd-app .dd-fnl-step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-1);
+  transition: border-color var(--t-fast), box-shadow var(--t-fast);
+}
+
+:host .dd-app .dd-fnl-step:hover {
+  border-color: var(--c-accent);
+  box-shadow: var(--shadow-hover);
+}
+
+/* Left-to-right progression: a hairline chevron sitting in the grid gap.
+   Rotation lives on the pseudo-element only -- never on an ancestor of a
+   position:fixed overlay. */
+:host .dd-app .dd-fnl-step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 0;
+  width: 7px;
+  height: 7px;
+  border-top: 1.5px solid var(--c-border);
+  border-right: 1.5px solid var(--c-border);
+  transform: translate(calc(100% + 3px), -50%) rotate(45deg);
+  pointer-events: none;
+}
+
+:host .dd-app .dd-fnl-step--delivery {
+  border-color: var(--c-accent-soft);
+  background: var(--c-accent-tint);
+  box-shadow: var(--shadow-2);
+}
+
+/* The clickable surface: a button reset so it reads as a card, not a control. */
+:host .dd-app .dd-fnl-step__body {
+  appearance: none;
+  -webkit-appearance: none;
+  background: none;
+  border: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  padding: 16px 16px 14px;
+  color: inherit;
+  border-radius: var(--r-md);
+}
+
+:host .dd-app .dd-fnl-step__body:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+}
+
+:host .dd-app .dd-fnl-step__lbl {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--c-text-muted);
+}
+
+:host .dd-app .dd-fnl-step__val {
+  font-family: var(--ff-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 34px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--c-text);
+}
+
+:host .dd-app .dd-fnl-step__sub {
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--c-text-soft);
+}
+
+/* "Not recorded" -- an absence, not a number. Mirrors .dd-kcell__not-recorded
+   at the end of this file, but as a self-contained amber caption. */
+:host .dd-app .dd-fnl-step__nr {
+  align-self: flex-start;
+  font-family: var(--ff-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  color: var(--c-warn);
+  background: var(--c-warn-soft);
+  border-radius: var(--r-pill);
+  padding: 3px 9px;
+}
+
+:host .dd-app .dd-fnl-step__open {
+  margin-top: auto;
+  padding-top: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--c-accent);
+  opacity: 0.5;
+  transition: opacity var(--t-fast), transform var(--t-fast);
+}
+
+:host .dd-app .dd-fnl-step:hover .dd-fnl-step__open,
+:host .dd-app .dd-fnl-step__body:focus-visible .dd-fnl-step__open {
+  opacity: 1;
+  transform: translateX(2px);
+}
+
+:host .dd-app .dd-fnl-step__spark {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 20px;
+  margin-top: 2px;
+}
+
+:host .dd-app .dd-fnl-step__spark .b {
+  flex: 1 1 0;
+  min-width: 0;
+  background: var(--c-accent);
+  opacity: 0.5;
+  border-radius: 1px;
+}
+
+:host .dd-app .dd-fnl-step__spark .b.empty {
+  height: 3px !important;
+  background: var(--c-border);
+  opacity: 1;
+}
+
+/* Flags live beside the body button (never inside it -- no nested buttons). */
+:host .dd-app .dd-fnl-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 16px 14px;
+  margin-top: -4px;
+}
+
+:host .dd-app .dd-fnl-flag {
+  appearance: none;
+  -webkit-appearance: none;
+  background: none;
+  border: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  background: var(--c-surface-2);
+  border: 1px solid var(--c-border-soft);
+  color: var(--c-text-soft);
+  transition: opacity var(--t-fast), transform var(--t-fast);
+}
+
+:host .dd-app .dd-fnl-flag:hover {
+  transform: translateY(-1px);
+}
+
+:host .dd-app .dd-fnl-flag:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+}
+
+:host .dd-app .dd-fnl-flag--hot {
+  background: var(--c-danger-soft);
+  border-color: var(--c-danger-soft);
+  color: var(--c-danger);
+}
+
+:host .dd-app .dd-fnl-flag__n {
+  font-family: var(--ff-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--c-text);
+}
+
+:host .dd-app .dd-fnl-flag--hot .dd-fnl-flag__n {
+  color: var(--c-danger);
+}
+
+:host .dd-app .dd-fnl-flag__t {
+  font-size: 11px;
+  letter-spacing: 0.01em;
+}
+
+/* A step with nothing in it should not compete for attention. */
+:host .dd-app .dd-fnl-step.is-zero {
+  opacity: 0.55;
+  box-shadow: none;
+}
+
+:host .dd-app .dd-fnl-step.is-zero .dd-fnl-step__val {
+  color: var(--c-text-muted);
+}
+
+:host .dd-app .dd-funnel__note {
+  margin: 14px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--c-text-muted);
+}
+
+/* --- 2. PRODUCT STRIP ----------------------------------------------------- */
+
+:host .dd-app .dd-strip-sec {
+  margin: 0 0 22px;
+}
+
+:host .dd-app .dd-strip-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+:host .dd-app .dd-strip__title {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--c-text-soft);
+}
+
+:host .dd-app .dd-strip__hint {
+  font-size: 11px;
+  color: var(--c-text-muted);
+}
+
+:host .dd-app .dd-strip {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding-bottom: 2px;
+}
+
+:host .dd-app .dd-strip::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+:host .dd-app .dd-pchip {
+  appearance: none;
+  -webkit-appearance: none;
+  background: none;
+  border: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  flex: 0 0 auto;
+  min-width: 132px;
+  max-width: 200px;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 11px 13px 10px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-1);
+  color: var(--c-text);
+  transition: border-color var(--t-fast), box-shadow var(--t-fast), transform var(--t-fast);
+}
+
+:host .dd-app .dd-pchip:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-2);
+}
+
+:host .dd-app .dd-pchip:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+}
+
+:host .dd-app .dd-pchip.is-sel {
+  border-color: var(--c-accent);
+  background: var(--c-accent-tint);
+  box-shadow: var(--shadow-2);
+}
+
+:host .dd-app .dd-pchip.is-zero {
+  opacity: 0.5;
+  box-shadow: none;
+}
+
+:host .dd-app .dd-pchip__nm {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--c-text-soft);
+}
+
+:host .dd-app .dd-pchip.is-sel .dd-pchip__nm {
+  color: var(--c-text);
+}
+
+:host .dd-app .dd-pchip__v {
+  font-family: var(--ff-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 19px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--c-text);
+}
+
+:host .dd-app .dd-pchip__t {
+  height: 3px;
+  border-radius: var(--r-pill);
+  background: var(--c-surface-2);
+  overflow: hidden;
+}
+
+:host .dd-app .dd-pchip__t i {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: var(--c-accent);
+  opacity: 0.55;
+}
+
+:host .dd-app .dd-pchip.is-sel .dd-pchip__t i {
+  opacity: 1;
+}
+
+/* --- 3. DELIVERY SPEED ---------------------------------------------------- */
+
+:host .dd-app .dd-speed-sec {
+  margin: 0 0 22px;
+}
+
+:host .dd-app .dd-speed {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  gap: 24px;
+  align-items: center;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1);
+  padding: 18px 22px;
+}
+
+:host .dd-app .dd-speed__figure {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+:host .dd-app .dd-speed__lbl {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--c-text-muted);
+}
+
+:host .dd-app .dd-speed__val {
+  font-family: var(--ff-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 40px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.045em;
+  color: var(--c-text);
+}
+
+:host .dd-app .dd-speed__unit {
+  font-family: var(--ff-mono);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--c-text-muted);
+  margin-left: 3px;
+}
+
+/* Same amber absence treatment as .dd-fnl-step__nr. */
+:host .dd-app .dd-speed__nr {
+  align-self: flex-start;
+  font-family: var(--ff-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  color: var(--c-warn);
+  background: var(--c-warn-soft);
+  border-radius: var(--r-pill);
+  padding: 4px 10px;
+}
+
+:host .dd-app .dd-speed__sub {
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--c-text-soft);
+  max-width: 34ch;
+}
+
+/* Gauge column. The track/fill/target inside are the EXISTING
+   .dd-gauge-track / .dd-gauge-fill / .dd-gauge-target rules -- reused, untouched. */
+:host .dd-app .dd-speed__gauge {
+  min-width: 0;
+  padding-top: 2px;
+}
+
+:host .dd-app .dd-gauge-marks {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  font-family: var(--ff-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  color: var(--c-text-muted);
+}
+
+/* --- Responsive ----------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  :host .dd-app .dd-funnel {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  /* Progression arrows only make sense while the steps read left-to-right. */
+  :host .dd-app .dd-fnl-step:not(:last-child)::after {
+    display: none;
+  }
+
+  :host .dd-app .dd-funnel-hero {
+    padding: 18px 16px 16px;
+  }
+
+  :host .dd-app .dd-fnl-step__val {
+    font-size: 30px;
+  }
+}
+
+@media (max-width: 760px) {
+  :host .dd-app .dd-speed {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    align-items: stretch;
+    padding: 16px;
+  }
+
+  :host .dd-app .dd-speed__sub {
+    max-width: none;
+  }
+}
+
+@media (max-width: 600px) {
+
+  :host .dd-app .dd-funnel-sec,
+  :host .dd-app .dd-strip-sec,
+  :host .dd-app .dd-speed-sec {
+    margin-bottom: 18px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  :host .dd-app .dd-funnel-hero {
+    padding: 16px;
+    border-radius: var(--r-md);
+  }
+
+  :host .dd-app .dd-funnel__cap {
+    margin-bottom: 14px;
+  }
+
+  :host .dd-app .dd-pchip {
+    min-width: 124px;
+  }
+
+  :host .dd-app .dd-speed__val {
+    font-size: 34px;
+  }
+}

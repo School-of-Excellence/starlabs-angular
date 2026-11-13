@@ -3122,6 +3122,77 @@ export class DeliveryDashboardCloneComponent {
         return Math.min(150, Math.round((v / this.avgTimeTarget) * 100));
     }
 
+    // ===== v4 layout: product strip, funnel caption, delivery-speed gauge ==========
+    //
+    // The strip is a one-click VIEW of productFilterControl, not a second filter.
+    // Multi-select stays in the Products dropdown; both render from the same control,
+    // so they cannot disagree. Scoping itself still rides on itemPassesProductFilter
+    // (via allProductIdsFromRaw) and populateActionableCohorts' label check - no third
+    // mechanism is introduced here.
+
+    /**
+     * The multi-select label for a card id.
+     *
+     * Mirrors cardLabelForProductId, which is what availableCardLabels is built from and
+     * what populateActionableCohorts matches on, so a chip click resolves a product the
+     * same way every other part of the board does.
+     */
+    private cardFilterLabel(cardId: string): string {
+        if (cardId.startsWith('group:')) return cardId.slice('group:'.length);
+        return this.cardLabelForProductId(cardId);
+    }
+
+    /** True when the filter is narrowed to exactly this one product. */
+    isStripSelected(cardId: string): boolean {
+        if (!this.productFilterActive) return false;
+        const sel = (this.productFilterControl?.value as string[]) || [];
+        return sel.length === 1 && sel[0] === this.cardFilterLabel(cardId);
+    }
+
+    /** True when nothing is narrowed - the "All products" chip is the active one. */
+    get isStripAllSelected(): boolean {
+        return !this.productFilterActive;
+    }
+
+    /** Strip click -> write the product filter, then run the normal change path. */
+    async selectProductFromStrip(cardId: string | null): Promise<void> {
+        const next = cardId === null
+            ? [...this.availableCardLabels]
+            : [this.cardFilterLabel(cardId)].filter(Boolean);
+        this.productFilterControl?.setValue(next);
+        await this.onProductMultiFilterChange();
+    }
+
+    /**
+     * Delivery-speed gauge: a 0-90 day scale with the target marked inside it, rather
+     * than a bar where 100% IS the target. A 45-day average against a 30-day target reads
+     * as "past the mark, with road left", not as an uninterpretable 150%.
+     */
+    readonly avgGaugeMaxDays = 90;
+    get avgGaugePct(): number {
+        const v = this.kpiAvgComplete || 0;
+        return Math.max(0, Math.min(100, Math.round((v / this.avgGaugeMaxDays) * 100)));
+    }
+    get avgTargetMarkPct(): number {
+        return Math.round((this.avgTimeTarget / this.avgGaugeMaxDays) * 100);
+    }
+
+    /** Scope captions - say out loud what the numbers below are counting. */
+    get speedScopeLabel(): string {
+        if (!this.productFilterActive) return 'Across all products';
+        const sel = (this.productFilterControl?.value as string[]) || [];
+        return sel.length === 1 ? 'Scoped to ' + sel[0] : 'Scoped to ' + sel.length + ' products';
+    }
+    get funnelScopeCaption(): string {
+        if (this.productFilterActive) {
+            const sel = (this.productFilterControl?.value as string[]) || [];
+            const who = sel.length === 1 ? sel[0] + ' participants' : 'these participants';
+            return 'Where ' + who + ' currently sit, from payment through to delivered.';
+        }
+        return 'Where everyone currently sits, from payment through to delivered - across '
+            + this.visibleCardIds.length + ' active products.';
+    }
+
     // Live "last updated" stamp — stored string so Angular's double-check pass sees the same value.
     // Updated every 5 s outside the Angular zone to avoid NG0100.
     lastUpdated = new Date();
