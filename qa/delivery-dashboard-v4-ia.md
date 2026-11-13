@@ -72,7 +72,7 @@ URL: http://localhost:4200/delivery-dashboard
 - Fail if reverted: yes - restoring the previous template fails 20+ of the 36 node
   checks (IA1/IA2/IA3 panel removal, the once-only counts, every new hook, and the
   strip wiring), and removing selectProductFromStrip fails the Karma spec.
-- Last run: 2026-11-13 PASS — node check 51/51 ALL PASS (20+ FAIL on revert of the funnel/strip, 11 FAIL on revert of the stage mix); Karma strip spec 10/10 SUCCESS; npx ng build --configuration production -> BUILD_EXIT=0, 0 ERROR lines
+- Last run: 2026-11-13 PASS - node check 59/59 ALL PASS; Karma strip spec 10/10 SUCCESS; npx ng build --configuration production -> BUILD_EXIT=0, 0 ERROR lines; verified live at localhost:4200 on starlabs-test (0 spark nodes in DOM, stage ramp resolving to --dd-stage-*, chip sum 10 == In delivery 10)
 
 ## Set relationships (settled by live data, 2026-11-13)
 v4 as mocked up drew Stuck and Not-consuming as flags INSIDE the In-delivery step,
@@ -98,6 +98,36 @@ and Ongoing - not a slice of In delivery". No number and no drill-down changed.
 
 INVARIANT: no element carrying kpiStuck or kpiInitiatedNotConsuming may be nested
 inside the In-delivery step (IA52-IA55).
+
+## Stage colours (operator call, 2026-11-13)
+The five stages are an ORDERED sequence, so the ramp must descend monotonically in
+luminance - otherwise the bar reads backwards and the legend becomes mandatory.
+The inherited zinc ramp did not:
+
+| stop | zinc (was) | luminance | new | luminance |
+|---|---|---|---|---|
+| s1 Init    | #d4d4d8 | 0.660 | #ced5fe | 0.679 |
+| s2 Await   | #71717a | 0.167 | #939cf1 | 0.363 |
+| s3 Started | #3f3f46 | 0.051 | #646bbd | 0.169 |
+| s4 Ongoing | #09090b | 0.003 | #3d4179 | 0.062 |
+| s5 Done    | #4f46e5 | 0.117 | #1b1d32 | 0.013 |
+
+Zinc rose again at the final step (Done lighter than Ongoing) AND bunched the
+middle three into 0.167 / 0.051 / 0.003. The new ramp is built in OKLCH at hue 278
+(the --accent family), L 0.88 -> 0.24, with adjacent WCAG ratios 1.76 / 1.89 /
+1.96 / 1.76 - spread 0.20, against zinc's 1.36 - and the lightest stop still 1.32:1
+against the --c-surface-2 track. Defined as --dd-stage-1..5 on :host.
+
+INVARIANT: --dd-stage-1..5 must be defined and strictly descending in luminance,
+and .dd-bg-s1..s5 must resolve to them (IA31c, IA31d).
+
+## Sparklines removed (operator call, 2026-11-13)
+The three funnel sparklines drew the per-product spread UNLABELLED, directly above
+a product strip that draws the same spread WITH product names. The live spread is
+skewed enough (51 against 2, 1 and 0) that five of six bars sat on the 3px minimum
+floor, so the chart said "one product dominates" and nothing else. The strip says
+that better. sparkReady / sparkStuck / sparkCompleted / sparkMax / buildSparkData
+and their cache are deleted from the component; IA31 fails if any returns.
 
 ## Stage mix (the Products row)
 The bar from the deleted "Delivery Pipeline by Product" panel now lives in the

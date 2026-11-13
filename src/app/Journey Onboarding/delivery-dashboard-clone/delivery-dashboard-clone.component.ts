@@ -3103,39 +3103,6 @@ export class DeliveryDashboardCloneComponent {
             + (f?.completed?.length || 0);
     }
 
-    // Sparkline data: per-product counts for each KPI (cached per filter/visible set)
-    private _sparkCacheKey = '';
-    private _sparkCache: { ready: number[]; stuck: number[]; completed: number[] } = { ready: [], stuck: [], completed: [] };
-    private buildSparkData() {
-        const ids = this.visibleCardIds;
-        const key = ids.join('|') + ':' + this.selectedTimeFilter;
-        if (this._sparkCacheKey === key) return this._sparkCache;
-        const ready: number[] = [];
-        const stuck: number[] = [];
-        const completed: number[] = [];
-        const stuckByProfile = new Set((this.originalData?.['stuckCases']?.data || []).map((d: any) => d?.profileid));
-        const readyByProfile = new Set((this.originalData?.['readyForInitiation']?.data || []).map((d: any) => d?.profileid));
-        for (const id of ids) {
-            const pids = this.getCardProductIds(id);
-            const items = pids.flatMap(p => this.groupedFiltered?.[p] || []);
-            const profileSet = new Set(items.map((i: any) => i?.profileid));
-            let r = 0, s = 0;
-            profileSet.forEach((pid) => {
-                if (readyByProfile.has(pid)) r++;
-                if (stuckByProfile.has(pid)) s++;
-            });
-            ready.push(r);
-            stuck.push(s);
-            completed.push(this.getCardFunnel(id)?.completed?.length || 0);
-        }
-        this._sparkCache = { ready, stuck, completed };
-        this._sparkCacheKey = key;
-        return this._sparkCache;
-    }
-    get sparkReady(): number[] { return this.buildSparkData().ready; }
-    get sparkStuck(): number[] { return this.buildSparkData().stuck; }
-    get sparkCompleted(): number[] { return this.buildSparkData().completed; }
-    sparkMax(arr: number[]): number { return Math.max(1, ...arr); }
 
     // Avg-time gauge benchmark
     avgTimeTarget = 30;

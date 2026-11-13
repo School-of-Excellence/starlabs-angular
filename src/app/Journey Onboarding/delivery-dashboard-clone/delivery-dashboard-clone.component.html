@@ -104,10 +104,6 @@
               <span class="dd-fnl-step__lbl">Ready to Start</span>
               <span class="dd-fnl-step__val">{{ kpiReadyToInitiate | number }}</span>
               <span class="dd-fnl-step__sub">payment confirmed &mdash; initiate now</span>
-              <span class="dd-fnl-step__spark">
-                <span class="b" *ngFor="let v of sparkReady" [style.height.%]="(v / sparkMax(sparkReady)) * 100"
-                  [class.empty]="v === 0"></span>
-              </span>
               <span class="dd-fnl-step__open">Open list</span>
             </button>
           </div>
@@ -127,10 +123,6 @@
               <span class="dd-fnl-step__lbl">Delivered</span>
               <span class="dd-fnl-step__val">{{ kpiCompletedTotal | number }}</span>
               <span class="dd-fnl-step__sub">completed in this period</span>
-              <span class="dd-fnl-step__spark">
-                <span class="b" *ngFor="let v of sparkCompleted"
-                  [style.height.%]="(v / sparkMax(sparkCompleted)) * 100" [class.empty]="v === 0"></span>
-              </span>
             </button>
           </div>
 
@@ -149,10 +141,6 @@
             [class.is-zero]="kpiStuck === 0" (click)="navToAttention('stuck')">
             <span class="dd-fnl-flag__n">{{ kpiStuck | number }}</span>
             <span class="dd-fnl-flag__t">stuck 14d+</span>
-            <span class="dd-fnl-step__spark">
-              <span class="b" *ngFor="let v of sparkStuck" [style.height.%]="(v / sparkMax(sparkStuck)) * 100"
-                [class.empty]="v === 0"></span>
-            </span>
           </button>
           <button class="dd-fnl-flag" type="button" data-testid="dd-funnel-idle"
             [class.is-zero]="kpiInitiatedNotConsuming === 0" (click)="navToAttention('idle')">
@@ -276,6 +264,7 @@
             <div class="dd-prow-colhead__cell dd-prow-colhead__cell--group">
               <span class="dd-colhead__grp-lbl">Journey Funnel
                 <span class="dd-mixleg" data-testid="dd-stagemix-legend">
+                  <span class="dd-mixleg__for">bar:</span>
                   <span class="dd-mixleg__i"><i class="dd-bg-s1"></i>Init</span>
                   <span class="dd-mixleg__i"><i class="dd-bg-s2"></i>Await</span>
                   <span class="dd-mixleg__i"><i class="dd-bg-s3"></i>Started</span>

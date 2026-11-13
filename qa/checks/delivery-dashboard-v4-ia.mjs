@@ -13,6 +13,7 @@ import { readFileSync } from 'node:fs';
 const D = 'src/app/Journey Onboarding/delivery-dashboard-clone/';
 const html = readFileSync(D + 'delivery-dashboard-clone.component.html', 'utf8');
 const ts = readFileSync(D + 'delivery-dashboard-clone.component.ts', 'utf8');
+const css = readFileSync(D + 'delivery-dashboard-clone.component.css', 'utf8');
 
 let failed = 0;
 const check = (id, label, fn) => {
@@ -93,8 +94,38 @@ check('IA30', 'chips are clickable and bound to the strip handler',
      && /\(click\)="selectProductFromStrip\(null\)"/.test(html));
 
 // --- nothing silently lost ------------------------------------------------------
-check('IA31', 'all three sparklines still render',
-  () => /sparkReady/.test(html) && /sparkStuck/.test(html) && /sparkCompleted/.test(html));
+// Sparklines removed at the operator's instruction (2026-11-13). They drew the
+// per-product spread UNLABELLED, directly above the product strip that draws the
+// same spread WITH names — and the real spread is skewed enough (51 against 2, 1,
+// 0) that five of six bars sat on the minimum-height floor. The strip is the
+// labelled version of the same fact, so the sparkline carried no information the
+// row below it did not carry better.
+check('IA31', 'sparklines are gone from the template and their data from the component',
+  () => !/spark/i.test(html) && !/sparkReady|sparkStuck|sparkCompleted|buildSparkData|sparkMax/.test(ts));
+check('IA31b', 'the strip still carries the per-product spread they used to show',
+  () => /data-testid="dd-strip-chip"/.test(html)
+     && /ongoingByCard\(cardId\)/.test(html) && /ongoingPctOfMax\(cardId\)/.test(html));
+
+// Stage ramp must be ORDERED: the five stages are a sequence, so luminance has to
+// descend monotonically or the bar reads backwards. The zinc ramp it replaced ran
+// 0.660 -> 0.167 -> 0.051 -> 0.003 -> 0.117 — Done lighter than Ongoing.
+check('IA31c', 'stage classes point at the ramp tokens, not ad-hoc greys',
+  () => [1, 2, 3, 4, 5].every(n =>
+    new RegExp(`\\.dd-bg-s${n} \\{\\s*background: var\\(--dd-stage-${n}\\);`).test(css)));
+check('IA31d', 'the ramp is defined and strictly descending in luminance', () => {
+  const srgb = v => { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+  const lum = h => {
+    const m = h.replace('#', '').match(/.{2}/g).map(x => parseInt(x, 16));
+    return 0.2126 * srgb(m[0]) + 0.7152 * srgb(m[1]) + 0.0722 * srgb(m[2]);
+  };
+  const stops = [1, 2, 3, 4, 5].map(n => {
+    const m = css.match(new RegExp(`--dd-stage-${n}:\\s*(#[0-9a-fA-F]{6})`));
+    return m && m[1];
+  });
+  if (stops.some(x => !x)) return false;
+  const L = stops.map(lum);
+  return L.every((v, i) => i === 0 || L[i - 1] > v);
+});
 check('IA32', 'the avg gauge is a 0-90d scale with the target marked inside it',
   () => /readonly avgGaugeMaxDays = 90;/.test(ts) && /avgTargetMarkPct/.test(html));
 check('IA33', 'Not recorded still shown when there is nothing to average',
