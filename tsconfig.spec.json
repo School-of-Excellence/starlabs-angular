@@ -11,5 +11,12 @@
   "include": [
     "src/**/*.spec.ts",
     "src/**/*.d.ts"
+  ],
+  /* ATC is off-limits to CI and automated testing (CLAUDE.md, Critical Constraints):
+     never read, write or seed ATC Firestore collections, and keep src/app/ATC/**
+     out of the test pipeline. Excluding it here is what makes that rule real -
+     without it a broken ATC spec blocks the whole suite from compiling. */
+  "exclude": [
+    "src/app/ATC/**"
   ]
 }
