@@ -2929,6 +2929,17 @@ export class DeliveryDashboardCloneComponent {
     get kpiAvgComplete(): number {
         return this.getCompletionSummary().avgStartToDone;
     }
+
+    /**
+     * Is there actually an average to show?
+     *
+     * avgStartToDone falls back to 0 when nothing completed (see getCompletionSummary), and "0d"
+     * reads as "completes same-day" rather than "no completions to measure". Same fake-zero the
+     * DAYS WAITING fix removed; the tile says "Not recorded" instead.
+     */
+    get hasAvgCompleteData(): boolean {
+        return this.getCompletionSummary().totalCompleted > 0;
+    }
     get hasSpecialistData(): boolean {
         return (this.slotOverview?.totalSlots || 0) > 0;
     }

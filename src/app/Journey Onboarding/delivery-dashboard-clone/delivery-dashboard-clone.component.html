@@ -136,13 +136,18 @@
 
         <div class="dd-kcell dd-kcell--avg">
           <span class="dd-kcell__label">Avg. Days to Complete</span>
-          <span class="dd-kcell__value">{{ kpiAvgComplete }}<span class="dd-kcell__unit">d</span></span>
+          <span class="dd-kcell__value" data-testid="dd-kpi-avg-complete">
+            <span *ngIf="!hasAvgCompleteData" class="dd-kcell__not-recorded">Not recorded</span>
+            <ng-container *ngIf="hasAvgCompleteData">{{ kpiAvgComplete }}<span
+                class="dd-kcell__unit">d</span></ng-container>
+          </span>
           <div class="dd-kcell__gauge">
             <div class="dd-gauge-track">
-              <div class="dd-gauge-fill" [style.width.%]="avgTimePct"></div>
+              <div class="dd-gauge-fill" [style.width.%]="hasAvgCompleteData ? avgTimePct : 0"></div>
               <div class="dd-gauge-target" [style.left.%]="100"></div>
             </div>
-            <span class="dd-gauge-lbl">target {{ avgTimeTarget }}d to finish delivery</span>
+            <span class="dd-gauge-lbl">{{ hasAvgCompleteData ? 'target ' + avgTimeTarget + 'd to finish delivery' :
+              'no completions in this period to measure' }}</span>
           </div>
         </div>
       </div>
@@ -153,7 +158,7 @@
       <div>
         <div class="dd-section-head">
           <span class="dd-section-title">Needs Your Attention</span>
-          <span class="dd-section-sub">Participants requiring immediate follow-up — act on these first</span>
+          <span class="dd-section-sub">Participants requiring immediate follow-up — act on these first. Click any number to see the participants behind it.</span>
         </div>
         <div class="dd-attention">
           <button class="dd-tile dd-tile--alert" [class.dd-tile--empty]="kpiStuck === 0"
@@ -189,7 +194,7 @@
       <div>
         <div class="dd-section-head">
           <span class="dd-section-title">Delivery Pipeline by Product</span>
-          <span class="dd-section-sub">How participants are spread across each delivery stage</span>
+          <span class="dd-section-sub">How participants are spread across each delivery stage — Init, Await, Started, Ongoing, Done. The number on the right is the product total.</span>
         </div>
         <div class="dd-pby">
           <div class="dd-pby-legend">
