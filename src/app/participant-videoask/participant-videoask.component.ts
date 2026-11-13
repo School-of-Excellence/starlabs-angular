@@ -5,7 +5,7 @@ import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatTable, MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { AuthguardService } from '../authguard.service';
 import {
-  arrayRemove, arrayUnion, collection, collectionData, doc, DocumentReference,
+  arrayRemove, arrayUnion, collection, collectionData, doc, DocumentReference, documentId,
   Firestore, getDocs, limit, orderBy, query, setDoc, updateDoc, where
 } from '@angular/fire/firestore';
 import { Subject, takeUntil } from 'rxjs';
@@ -64,7 +64,7 @@ export class ParticipantVideoaskComponent {
   @ViewChild(MatSort, { static: true }) sort: MatSort;
   @ViewChild('table', { static: true }) table: MatTable<any>;
 
-  displayedColumns: string[] = ['profileid', 'videoaskid', 'event', 'fileurl', 'uploaded', 'addtohighlights', 'tag']
+  displayedColumns: string[] = ['profileid', 'videoaskid', 'event', 'product', 'fileurl', 'uploaded', 'addtohighlights', 'tag']
   dataSource = new MatTableDataSource()
 
   form: FormGroup
@@ -79,6 +79,11 @@ export class ParticipantVideoaskComponent {
   templateList = []
   templateMap = {}
   filteredTemplateList = []
+
+  // products
+  productList = []
+  productMap = {}
+  participantProductMap = {}
 
   // events, one normalised list per dimension
   liveEventList = []
@@ -131,6 +136,7 @@ export class ParticipantVideoaskComponent {
       live: [[],],
       queue: [[],],
       workshop: [[],],
+      product: [[],],
       range: new FormGroup({
         start: new FormControl(),
         end: new FormControl()
@@ -173,6 +179,7 @@ export class ParticipantVideoaskComponent {
       if (column === 'event') return (this.eventLabel(row) || '').toLowerCase()
       if (column === 'uploaded') return this.toMillis(row['uploaded'])
       if (column === 'addtohighlights') return row['addtohighlights'] ? 1 : 0
+      if (column === 'product') return (this.productMap[this.participantProductMap[row['participantproductid']]] || '').toLowerCase()
       return row[column]
     }
   }
@@ -206,13 +213,14 @@ export class ParticipantVideoaskComponent {
       .pipe(takeUntil(this.destroy$))
       .subscribe((tags: any[]) => this.videoAskTags = tags)
 
-    const [profiles, newProfiles, events, queues, workshops, templates] = await Promise.all([
+    const [profiles, newProfiles, events, queues, workshops, templates, products] = await Promise.all([
       this.guard.getProfileMap(),
       this.guard.getProfileMapNewUser(),
       getDocs(collection(this.firestore, 'event collection')),
       getDocs(collection(this.firestore, 'queue generation')),
       getDocs(collection(this.firestore, 'workshopconfiguration')),
-      getDocs(collection(this.firestore, 'arenavideoask'))
+      getDocs(collection(this.firestore, 'arenavideoask')),
+      getDocs(collection(this.firestore, 'products'))
     ])
 
     this.participantList = [...profiles.list, ...newProfiles.list]
@@ -233,6 +241,9 @@ export class ParticipantVideoaskComponent {
       .map(d => ({ docid: d.id, title: d.data()['title'] || d.id }))
       .sort((a, b) => a.title.localeCompare(b.title))
     this.filteredTemplateList = this.templateList
+
+    products.docs.forEach(d => this.productMap[d.id] = d.data()['product'])
+    this.productList = products.docs.map(d => ({ docid: d.id, title: d.data()['product'] || d.id })).sort((a, b) => a.title.localeCompare(b.title))
 
     this.bootstrapping = false
     this.loadDefault()
@@ -267,7 +278,9 @@ export class ParticipantVideoaskComponent {
       limit(DEFAULT_LIMIT)
     ))
     this.isDefaultView = true
-    this.setRows(snapshot.docs.map(d => this.toRow(d)))
+    const rows = snapshot.docs.map(d => this.toRow(d))
+    await this.resolveProducts(rows)
+    this.setRows(rows)
     this.fetching = false
   }
 
@@ -285,7 +298,7 @@ export class ParticipantVideoaskComponent {
 
     const f = this.form.value
     const hasEvent = f.live.length || f.queue.length || f.workshop.length
-    const hasAny = hasEvent || f.profileid.length || f.template.length || this.rangeSet(f.range)
+    const hasAny = hasEvent || f.profileid.length || f.template.length || f.product.length || this.rangeSet(f.range)
 
     if (!hasAny) return this.loadDefault()
 
@@ -309,6 +322,10 @@ export class ParticipantVideoaskComponent {
     } else if (f.template.length) {
       axis = 'template'
       this.chunk(f.template).forEach(c => queries.push(query(col, where('videoaskid', 'in', c))))
+    } else if (f.product.length) {
+      axis = 'product'
+      const ids = await this.participantProductIds(f.product)
+      this.chunk(ids).forEach(c => queries.push(query(col, where('participantproductid', 'in', c))))
     } else {
       axis = 'range'
       queries.push(query(col,
@@ -322,7 +339,9 @@ export class ParticipantVideoaskComponent {
     const merged = new Map<string, any>()
     snapshots.forEach(snapshot => snapshot.docs.forEach(d => merged.set(d.id, this.toRow(d))))
 
-    const rows = [...merged.values()].filter(row => this.residual(row, f, axis))
+    const found = [...merged.values()]
+    await this.resolveProducts(found)
+    const rows = found.filter(row => this.residual(row, f, axis))
     this.isDefaultView = false
     this.setRows(rows)
     this.fetching = false
@@ -332,6 +351,10 @@ export class ParticipantVideoaskComponent {
   private residual(row: any, f: any, axis: string): boolean {
     if (axis !== 'profileid' && f.profileid.length && !f.profileid.includes(row['profileid'])) return false
     if (axis !== 'template' && f.template.length && !f.template.includes(row['videoaskid'])) return false
+    if (axis !== 'product' && f.product.length) {
+      const rowProduct = this.participantProductMap[row['participantproductid']]
+      if (!f.product.includes(rowProduct)) return false
+    }
 
     if (axis !== 'range' && this.rangeSet(f.range)) {
       const uploaded = this.toMillis(row['uploaded'])
@@ -431,6 +454,26 @@ export class ParticipantVideoaskComponent {
     if (typeof uploaded.toDate === 'function') return uploaded.toDate().getTime()
     const parsed = new Date(uploaded).getTime()
     return isNaN(parsed) ? 0 : parsed
+  }
+
+  // helper functions for product filter
+  private async resolveProducts(rows: any[]) {
+    const ids = [...new Set(rows.map(r => r['participantproductid']))]
+      .filter(id => id && !(id in this.participantProductMap))
+    ids.forEach(id => this.participantProductMap[id] = '')
+
+    const snapshots = await Promise.all(this.chunk(ids).map(c =>
+      getDocs(query(collection(this.firestore, 'participantsproduct'), where(documentId(), 'in', c)))))
+    snapshots.forEach(snapshot => snapshot.docs.forEach(d =>
+      this.participantProductMap[d.id] = d.data()['productref']?.id))
+  }
+
+  private async participantProductIds(productids: string[]): Promise<string[]> {
+    const snapshots = await Promise.all(this.chunk(productids).map(c =>
+      getDocs(query(collection(this.firestore, 'participantsproduct'), where('productref', 'in', this.refs(c, 'products'))))))
+    const docs = snapshots.flatMap(snapshot => snapshot.docs)
+    docs.forEach(d => this.participantProductMap[d.id] = d.data()['productref']?.id)
+    return docs.map(d => d.id)
   }
 
   // --------------------------------------------------------------- row display
@@ -549,6 +592,10 @@ export class ParticipantVideoaskComponent {
     return this.templateMap[docid] || docid
   }
 
+  productTitle = (docid: string): string => {
+    return this.productMap[docid] || docid
+  }
+
   participantName = (profileid: string): string => {
     return this.participantMap[profileid] || profileid
   }
@@ -556,7 +603,7 @@ export class ParticipantVideoaskComponent {
   /** Total filters currently applied to the form, for the "Clear" affordance. */
   activeFilterCount(): number {
     const f = this.form.value
-    let count = f.profileid.length + f.template.length + f.live.length + f.queue.length + f.workshop.length
+    let count = f.profileid.length + f.template.length + f.product.length + f.live.length + f.queue.length + f.workshop.length
     if (this.rangeSet(f.range)) count = count + 1
     return count
   }
@@ -576,6 +623,7 @@ export class ParticipantVideoaskComponent {
     if (this.selectedCount('profileid')) pills.push({ control: 'profileid', label: `Participant: ${this.selectedLabel('profileid', this.participantName)}` })
     if (this.selectedCount('template')) pills.push({ control: 'template', label: `Template: ${this.selectedLabel('template', this.templateTitle)}` })
     if (this.rangeSet(this.form.get('range').value)) pills.push({ control: 'range', label: 'Date range' })
+    if (this.selectedCount('product')) pills.push({ control: 'product', label: `Product: ${this.selectedLabel('product', this.productTitle)}` })
     return pills
   }
 
@@ -599,6 +647,7 @@ export class ParticipantVideoaskComponent {
       live: [],
       queue: [],
       workshop: [],
+      product: [],
       range: { start: null, end: null }
     })
     this.searchText = { profileid: '', template: '', live: '', queue: '', workshop: '' }

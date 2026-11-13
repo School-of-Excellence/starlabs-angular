@@ -128,6 +128,17 @@
           </mat-form-field>
 
           <mat-form-field appearance="outline" class="filteritem" subscriptSizing="dynamic">
+          <mat-label>Product</mat-label>
+          <mat-select data-testid="pva-product" formControlName="product" multiple panelClass="filterpanel"
+                      placeholder="All products">
+            <mat-select-trigger *ngIf="selectedCount('product')">
+              {{selectedLabel('product', productTitle)}}
+            </mat-select-trigger>
+            <mat-option *ngFor="let option of productList" [value]="option.docid">{{option.title}}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+          <mat-form-field appearance="outline" class="filteritem" subscriptSizing="dynamic">
             <mat-label>Date range</mat-label>
             <mat-date-range-input formGroupName="range" [rangePicker]="picker">
               <input data-testid="pva-start" matStartDate formControlName="start" placeholder="Start date">
@@ -171,7 +182,7 @@
           </button>
           <button data-testid="pva-onsearch" mat-flat-button color="primary" type="button"
                   (click)="onSearch()" [disabled]="bootstrapping || fetching">
-            <mat-icon>search</mat-icon>&nbsp;Search
+            <mat-icon>search</mat-icon>&nbsp;Apply filters
           </button>
         </div>
         <div class="dirtyhint" *ngIf="filtersDirty">
@@ -255,6 +266,11 @@
           <span>{{eventLabel(row)}}</span>
           <span *ngIf="eventKind(row)" class="kindtag">&nbsp;({{eventKind(row)}})</span>
         </td>
+      </ng-container>
+
+      <ng-container matColumnDef="product">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Product</th>
+        <td mat-cell *matCellDef="let row">{{ productMap[participantProductMap[row.participantproductid]] || '-' }}</td>
       </ng-container>
 
       <ng-container matColumnDef="fileurl">
