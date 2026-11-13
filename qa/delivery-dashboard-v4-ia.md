@@ -72,7 +72,7 @@ URL: http://localhost:4200/delivery-dashboard
 - Fail if reverted: yes - restoring the previous template fails 20+ of the 36 node
   checks (IA1/IA2/IA3 panel removal, the once-only counts, every new hook, and the
   strip wiring), and removing selectProductFromStrip fails the Karma spec.
-- Last run: 2026-11-13 PASS - node check 59/59 ALL PASS; Karma strip spec 10/10 SUCCESS; npx ng build --configuration production -> BUILD_EXIT=0, 0 ERROR lines; verified live at localhost:4200 on starlabs-test (0 spark nodes in DOM, stage ramp resolving to --dd-stage-*, chip sum 10 == In delivery 10)
+- Last run: 2026-11-13 PASS - node check 63/63 ALL PASS; Karma strip spec 10/10 SUCCESS; npx ng build --configuration production -> BUILD_EXIT=0, 0 ERROR lines; verified live at localhost:4200 on starlabs-test (pill N and segment N identical computed colours; bar widths exactly proportional at 46px per participant; connector gradient resolving to the ramp)
 
 ## Set relationships (settled by live data, 2026-11-13)
 v4 as mocked up drew Stuck and Not-consuming as flags INSIDE the In-delivery step,
@@ -120,6 +120,30 @@ against the --c-surface-2 track. Defined as --dd-stage-1..5 on :host.
 
 INVARIANT: --dd-stage-1..5 must be defined and strictly descending in luminance,
 and .dd-bg-s1..s5 must resolve to them (IA31c, IA31d).
+
+## One colour system per row (operator call, 2026-11-13)
+The five numeric pills used amber / sky / indigo / emerald / blue - five unrelated
+hues for five ORDERED stages, which encodes them as unrelated categories - while the
+bar directly beneath them used the sequential ramp. Two encodings of the same five
+stages, disagreeing, in one cell. Pill N now takes --dd-stage-N.
+
+Settling that exposed an ORDER conflict. The pills read
+Yet to Start -> Init -> Started -> Ongoing -> Done. The bar and legend read
+Init -> Await -> ... , carried over from the deleted "Delivery Pipeline by Product"
+panel. The pills are right - a participant is awaiting before they are initiated - so
+the bar, the legend and stageMixLabel() were reordered to match, and s1 is now
+Awaiting rather than Initiated.
+
+Pill ink is the AA pairing: stages 1-2 take --dd-stage-5 as ink (11.49:1, 6.52:1),
+stages 3-5 take white (4.79:1, 9.41:1, 16.56:1).
+
+The pill connector hairline was a gradient of the same five old hues
+(#fbbf24, #38bdf8, #818cf8, #34d399, #2563eb) in two places - the Products row and
+the hidden-product card. Both now carry the ramp.
+
+INVARIANT: pill N, bar segment N and legend swatch N all mean the same stage, in
+journey order, and every one of those colours comes from --dd-stage-N (IA56, IA56b,
+IA56c, IA57, IA58, IA59, IA60). No stage colour is hard-coded.
 
 ## Sparklines removed (operator call, 2026-11-13)
 The three funnel sparklines drew the per-product spread UNLABELLED, directly above

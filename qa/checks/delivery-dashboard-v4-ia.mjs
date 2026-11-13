@@ -135,6 +135,58 @@ check('IA34', 'Stages / Specialist Slots / Completion History untouched',
 check('IA35', 'the three outer tabs survive',
   () => /outerTabIndex = 0/.test(html) && /outerTabIndex = 1/.test(html) && /outerTabIndex = 2/.test(html));
 
+// --- one colour system per row -----------------------------------------------
+// The pills used amber / sky / indigo / emerald / blue — five unrelated hues for
+// five ORDERED stages — while the bar in the same cell used the sequential ramp.
+// Two encodings of the same five stages, disagreeing, side by side.
+check('IA56', 'every pill colour comes from the stage ramp, none hard-coded',
+  () => [1, 2, 3, 4, 5].every(n =>
+    new RegExp(`nth-child\\(${n}\\) \\.dd-fstep__pill:not\\(\\.empty\\) \\{\\s*background: var\\(--dd-stage-${n}\\)`).test(css))
+     && !/dd-fstep__pill:not\(\.empty\) \{\s*background: #(fef3c7|e0f2fe|e0e7ff|d1fae5|2563eb)/.test(css));
+// Scoped to the connector rules themselves. #38bdf8 also appears in unrelated
+// components in this stylesheet (.acp-seg-ongoing, .kpi-gauge-fill), so a
+// file-wide ban on the old hues would fail on code this chunk never touched.
+// Two connectors draw the five stages left-to-right: the Products row and the
+// hidden-product card. Neither may use the old five-hue gradient; a plain
+// single-colour hairline is fine, a rainbow is not.
+check('IA56b', 'no stage connector uses the old five-hue gradient', () => {
+  const bodies = [...css.matchAll(/(?:dd-prow__funnel|funnel-bars)::before \{([\s\S]*?)\}/g)].map(m => m[1]);
+  if (bodies.length < 2) return false;
+  return bodies.every(b => !/#fbbf24|#38bdf8|#34d399|#818cf8/.test(b));
+});
+check('IA56c', 'the gradient connectors carry the ramp', () => {
+  const grads = [...css.matchAll(/(?:dd-prow__funnel|funnel-bars)::before \{([\s\S]*?)\}/g)]
+    .map(m => m[1]).filter(b => /linear-gradient/.test(b));
+  return grads.length === 2 && grads.every(b =>
+    /linear-gradient\(90deg, var\(--dd-stage-1\), var\(--dd-stage-2\), var\(--dd-stage-3\), var\(--dd-stage-4\), var\(--dd-stage-5\)\)/.test(b));
+});
+check('IA57', 'pill ink is the AA pairing: dark on stages 1-2, white on 3-5', () => {
+  const dark = [1, 2].every(n =>
+    new RegExp(`nth-child\\(${n}\\)[\\s\\S]{0,120}color: var\\(--dd-stage-5\\)`).test(css));
+  const light = [3, 4, 5].every(n =>
+    new RegExp(`nth-child\\(${n}\\)[\\s\\S]{0,120}color: #ffffff`).test(css));
+  return dark && light;
+});
+
+// Pill N, segment N and legend swatch N must all mean the SAME stage, in the order
+// a participant actually moves through. The deleted pipeline panel listed Init
+// before Await, which disagreed with the pills; the pills were right.
+const STAGE_ORDER = ['awaiting', 'initiated', 'started', 'ongoing', 'completed'];
+check('IA58', 'bar segments run in journey order, s1..s5', () => {
+  const segs = [...html.matchAll(/dd-stagemix__seg dd-bg-s(\d)[\s\S]{0,320}?openCardFunnelModal\(cardId, '(\w+)'/g)]
+    .map(m => [Number(m[1]), m[2]]);
+  if (segs.length !== 5) return false;
+  return segs.every(([n, stage]) => STAGE_ORDER[n - 1] === stage);
+});
+check('IA59', 'legend labels follow the same order', () => {
+  const leg = [...html.matchAll(/dd-mixleg__i"><i class="dd-bg-s(\d)"><\/i>([^<]+)</g)]
+    .map(m => [Number(m[1]), m[2].trim()]);
+  const want = ['Yet to Start', 'Init', 'Started', 'Ongoing', 'Done'];
+  return leg.length === 5 && leg.every(([n, label]) => want[n - 1] === label);
+});
+check('IA60', 'the spoken label follows it too',
+  () => /\['Yet to Start', f\?\.awaiting[\s\S]{0,60}\['Init', f\?\.initiated/.test(ts));
+
 // --- set relationships: the layout must not assert containment it does not have ---
 // In delivery = status 'ongoing'. Stuck = 'initiated' OR 'ongoing', stalled.
 // Not-consuming = 'initiated' only, so it is DISJOINT from In delivery.

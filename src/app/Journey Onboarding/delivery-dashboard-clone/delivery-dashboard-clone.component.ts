@@ -3082,8 +3082,8 @@ export class DeliveryDashboardCloneComponent {
     stageMixLabel(cardId: string): string {
         const f = this.getCardFunnel(cardId);
         const parts: Array<[string, number]> = [
+            ['Yet to Start', f?.awaiting?.length || 0],
             ['Init', f?.initiated?.length || 0],
-            ['Await', f?.awaiting?.length || 0],
             ['Started', f?.started?.length || 0],
             ['Ongoing', f?.ongoing?.length || 0],
             ['Done', f?.completed?.length || 0],

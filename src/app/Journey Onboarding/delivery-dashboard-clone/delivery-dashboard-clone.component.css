@@ -11473,10 +11473,13 @@ table.specialist-table tr:hover td {
   border-color: var(--border);
 }
 
+/* The Done pill also carries .done from the template. The nth-child(5) rule below
+   wins on !important either way; pointing this at the ramp as well keeps the two
+   rules from disagreeing about what Done looks like. */
 :host .dd-app .dd-fstep__pill.done {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--text-inv);
+  background: var(--dd-stage-5);
+  border-color: var(--dd-stage-5);
+  color: #ffffff;
 }
 
 :host .dd-app .dd-fstep__lbl {
@@ -14840,7 +14843,9 @@ table.specialist-table tr:hover td {
   right: 10% !important;
   top: 50% !important;
   height: 1px !important;
-  background: linear-gradient(90deg, #fbbf24, #38bdf8, #818cf8, #34d399, #2563eb) !important;
+  /* The connector reads left-to-right under the pills, so it carries the same
+     ramp they do. It was a gradient of the old five unrelated hues. */
+  background: linear-gradient(90deg, var(--dd-stage-1), var(--dd-stage-2), var(--dd-stage-3), var(--dd-stage-4), var(--dd-stage-5)) !important;
   z-index: 0 !important;
   opacity: 0.35 !important;
 }
@@ -14891,34 +14896,47 @@ table.specialist-table tr:hover td {
   color: #cbd5e1 !important;
 }
 
-/* Step 1: INIT — amber */
+/* Pills share the stage ramp with the bar beneath them.
+   They were amber / sky / indigo / emerald / blue — five unrelated hues for five
+   ORDERED stages, which encoded them as unrelated categories and disagreed with the
+   stage-mix bar in the same cell. Now pill N and segment N are the same colour, and
+   the row carries one colour system instead of two.
+
+   Pill order IS the journey order: Yet to Start -> Init -> Started -> Ongoing -> Done.
+   (The deleted "Delivery Pipeline by Product" panel listed Init before Await; the
+   pills were right and the panel was wrong, so the bar was reordered to match.)
+
+   Ink: stages 1-2 are light enough for the darkest ramp stop (11.49:1, 6.52:1),
+   stages 3-5 need white (4.79:1, 9.41:1, 16.56:1). All AA for bold 14px. */
+
+/* Step 1: YET TO START */
 :host .dd-app .dd-prow__funnel .dd-fstep:nth-child(1) .dd-fstep__pill:not(.empty) {
-  background: #fef3c7 !important;
-  color: #92400e !important;
+  background: var(--dd-stage-1) !important;
+  color: var(--dd-stage-5) !important;
 }
 
-/* Step 2: AWAIT — sky */
+/* Step 2: INIT */
 :host .dd-app .dd-prow__funnel .dd-fstep:nth-child(2) .dd-fstep__pill:not(.empty) {
-  background: #e0f2fe !important;
-  color: #075985 !important;
+  background: var(--dd-stage-2) !important;
+  color: var(--dd-stage-5) !important;
 }
 
-/* Step 3: STARTED — indigo */
+/* Step 3: STARTED */
 :host .dd-app .dd-prow__funnel .dd-fstep:nth-child(3) .dd-fstep__pill:not(.empty) {
-  background: #e0e7ff !important;
-  color: #3730a3 !important;
+  background: var(--dd-stage-3) !important;
+  color: #ffffff !important;
 }
 
-/* Step 4: ONGOING — emerald */
+/* Step 4: ONGOING */
 :host .dd-app .dd-prow__funnel .dd-fstep:nth-child(4) .dd-fstep__pill:not(.empty) {
-  background: #d1fae5 !important;
-  color: #065f46 !important;
+  background: var(--dd-stage-4) !important;
+  color: #ffffff !important;
 }
 
-/* Step 5: DONE — blue solid */
+/* Step 5: DONE */
 :host .dd-app .dd-prow__funnel .dd-fstep:nth-child(5) .dd-fstep__pill:not(.empty) {
-  background: #2563eb !important;
-  color: #fff !important;
+  background: var(--dd-stage-5) !important;
+  color: #ffffff !important;
 }
 
 :host .dd-app .dd-fstep__lbl {
@@ -15251,7 +15269,9 @@ table.specialist-table tr:hover td {
   right: 10% !important;
   top: 14px !important;
   height: 1px !important;
-  background: linear-gradient(90deg, #fbbf24, #38bdf8, #818cf8, #34d399, #2563eb) !important;
+  /* The connector reads left-to-right under the pills, so it carries the same
+     ramp they do. It was a gradient of the old five unrelated hues. */
+  background: linear-gradient(90deg, var(--dd-stage-1), var(--dd-stage-2), var(--dd-stage-3), var(--dd-stage-4), var(--dd-stage-5)) !important;
   z-index: 0 !important;
   opacity: 0.4 !important;
 }
