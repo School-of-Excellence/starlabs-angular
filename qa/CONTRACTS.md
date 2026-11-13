@@ -12,6 +12,7 @@ One line per live contract (gate section 1.1).
 | jc-health-na-reasons | /journey-coach-health | qa/checks/jc-health-na-reasons.mjs | 2026-09-24 PASS (browser-verified: 40/53 rows chipped) |
 
 | delivery-dashboard-days-waiting | /delivery-dashboard | src/app/Journey Onboarding/delivery-dashboard-clone/delivery-dashboard-days-waiting.spec.ts | 2026-09-28 PASS (10/10; 6 FAIL on revert) |
+| delivery-dashboard-hidden-scope | /delivery-dashboard | src/app/Journey Onboarding/delivery-dashboard-clone/delivery-dashboard-hidden-scope.spec.ts | 2026-11-13 PASS (3/3; 3 FAIL on revert) |
 
 > "Tested" here means the contract was run on the real app at
 > http://localhost:4200/journey-coach-health against the starlabs-test Firebase project,

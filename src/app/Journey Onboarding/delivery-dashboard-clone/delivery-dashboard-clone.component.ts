@@ -2901,9 +2901,22 @@ export class DeliveryDashboardCloneComponent {
             )
         );
     }
+    /**
+     * In-delivery headcount.
+     *
+     * Spans visible AND hidden products. Hiding a product is a Products-table display
+     * preference, not a filter on people: populateActionableCohorts (Awaiting / Ready /
+     * Stuck / Not-consuming) never consults hiddenProductIds, and getCompletionSummary
+     * already sums both lists. Iterating visibleCardIds alone made this the one funnel
+     * number computed over a smaller population than the ones beside it, so a participant
+     * in a hidden product could be counted as Stuck but not as In delivery.
+     *
+     * Product-filter scoping is unaffected: both visibleCardIds and hiddenCardIds are
+     * built from allProductIdsFromRaw, which applies itemPassesProductFilter.
+     */
     get kpiOngoingTotal(): number {
         return this.memoGet('kpiOG', () =>
-            this.visibleCardIds.reduce(
+            [...this.visibleCardIds, ...this.hiddenCardIds].reduce(
                 (sum, id) => sum + (this.getCardFunnel(id)?.ongoing?.length || 0), 0
             )
         );
