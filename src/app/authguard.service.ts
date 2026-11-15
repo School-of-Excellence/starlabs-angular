@@ -1863,12 +1863,28 @@ export class AuthguardService {
     participantid: string,
     title: string,
     metadata: {},
-    // Cloud hosting this room's cluster ('aws' | 'oci'). Instant meetings stamp it from
-    // the activeprovider doc; omitted = default (oci) resolved at join time.
+    // Cloud hosting this room's cluster ('aws' | 'oci'). Omitted → stamped here from the
+    // activeprovider doc (2026-11-14 plan item 1.1 / decision D1).
     mediaProvider?: string
   }){
-    const roomDoc = doc(this.firestore, "openviduroom", roomData["roomid"])
-    await setDoc(roomDoc, roomData, {merge: true})
+    // Every room records which cloud hosts it. The OCI 5-minute controller only counts rooms
+    // with mediaProvider == 'oci' as "in use"; unmarked rooms (appointment studio, participant
+    // studio, dynamic studios) were invisible to it, so it could stop the server while people
+    // were joining (prod, Thu 12 Nov 15:00 / 17:30). Same source as instant meetings.
+    const data = { ...roomData, mediaProvider: roomData.mediaProvider || await this.getActiveMediaProvider() }
+    const roomDoc = doc(this.firestore, "openviduroom", data.roomid)
+    await setDoc(roomDoc, data, {merge: true})
+  }
+
+  /** Active media cloud from `openvidu server/mediaprovider` ('aws' | 'oci'); 'oci' if unset or unreadable. */
+  async getActiveMediaProvider(): Promise<'aws' | 'oci'> {
+    try {
+      const snap = await getDoc(doc(this.firestore, "openvidu server", "mediaprovider"))
+      return snap.data()?.["activeprovider"] === "aws" ? "aws" : "oci"
+    } catch (e) {
+      console.log("Active media provider read failed, defaulting to oci", e)
+      return "oci"
+    }
   }
 
 }

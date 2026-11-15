@@ -2,7 +2,7 @@
 //
 // WHY UNIT RATHER THAN E2E: every decision this service makes is a pure function of four inputs
 // (CPU-pressure string, LiveKit ConnectionQuality, elapsed wall time, current tier). Reproducing a
-// "CPU is critical for three consecutive 8-second checks, but only after a 45s warm-up, and only if
+// "CPU is critical for three consecutive 8-second checks, but only after a 20s warm-up, and only if
 // we are not inside a 60s post-downgrade cooldown" scenario in a real browser call would take ~10
 // minutes of wall clock, needs a second participant, and cannot make the CPU actually saturate on
 // demand. Driving `stabilityCheck()` directly with hand-rolled doubles turns that into milliseconds
@@ -10,7 +10,7 @@
 // and no field-level `inject()`, so `new AdaptiveQualityService()` is enough — no TestBed.
 //
 // WHAT IT PROTECTS: the numbers. DOWNGRADE_CHECKS=3, UPGRADE_CHECKS=8, ULTRA_UPGRADE_CHECKS=15,
-// WARMUP_MS=45_000, DOWNGRADE_COOLDOWN_MS=60_000, CHECK_INTERVAL_MS=8_000 and the five TIER_CONFIG
+// WARMUP_MS=20_000 (was 45_000 until 2026-11-14), DOWNGRADE_COOLDOWN_MS=60_000, CHECK_INTERVAL_MS=8_000 and the five TIER_CONFIG
 // rows are all tuned constants with comments recording what they used to be. They are exactly the
 // sort of thing that gets "cleaned up" and silently reintroduces the tier-bouncing this tuning was
 // meant to stop. These tests also pin the tier ladder order, the per-tier capture/bitrate/simulcast
@@ -205,7 +205,7 @@ describe('SHU-26 getCameraConstraints tier mapping', () => {
   const expected: Record<QualityTier, [number, number, number]> = {
     ultra: [1280, 720, 30],
     high: [1280, 720, 24],
-    medium: [1280, 720, 20],
+    medium: [960, 540, 20], // was [1280, 720, 20] until 2026-11-14 (plan item 3.3)
     low: [640, 360, 15],
     minimal: [320, 240, 12],
   };
@@ -250,13 +250,12 @@ describe('SHU-27 getPublishOptions simulcast + encoding', () => {
   it('bitrate ladder is strictly decreasing ultra > high > medium > low > minimal', () => {
     const order: QualityTier[] = ['ultra', 'high', 'medium', 'low', 'minimal'];
     const br = order.map((t) => svc.getPublishOptions(t).videoEncoding!.maxBitrate!);
-    expect(br).toEqual([2_500_000, 1_500_000, 1_000_000, 400_000, 200_000]);
+    expect(br).toEqual([2_500_000, 1_500_000, 800_000, 400_000, 200_000]);
   });
 
-  it('high and medium share the standard [h180, h360, h720] layer set', () => {
-    const std = [VideoPresets.h180, VideoPresets.h360, VideoPresets.h720];
-    expect(svc.getPublishOptions('high').videoSimulcastLayers).toEqual(std);
-    expect(svc.getPublishOptions('medium').videoSimulcastLayers).toEqual(std);
+  it('high uses the standard [h180, h360, h720] layer set; medium tops out at h540 (2026-11-14)', () => {
+    expect(svc.getPublishOptions('high').videoSimulcastLayers).toEqual([VideoPresets.h180, VideoPresets.h360, VideoPresets.h720]);
+    expect(svc.getPublishOptions('medium').videoSimulcastLayers).toEqual([VideoPresets.h180, VideoPresets.h360, VideoPresets.h540]);
   });
 
   it('ultra tops out at h720 — capturing above the max simulcast layer would waste encoder CPU', () => {
@@ -443,8 +442,8 @@ describe('SHU-30 stabilityCheck downgrade', () => {
     expect(svc.currentTier()).toBe('minimal');
   });
 
-  it('suppresses downgrades during the 45s warm-up window', async () => {
-    (svc as any).monitoringStartTime = Date.now() - 44_000;
+  it('suppresses downgrades during the 20s warm-up window', async () => {
+    (svc as any).monitoringStartTime = Date.now() - 19_000;
     await checkN(svc, 5);
     expect(svc.currentTier()).toBe('high');
   });
@@ -452,15 +451,15 @@ describe('SHU-30 stabilityCheck downgrade', () => {
   // PINNING CURRENT BEHAVIOUR (looks wrong, kept as-is so a fix is reviewed):
   // The warm-up gate is checked AFTER `consecutiveBadChecks++`, and the counter is never reset while
   // warm-up is in force. So a session that is CPU-critical throughout warm-up accumulates a large bad
-  // streak and downgrades on the very FIRST check past the 45s mark, instead of needing 3 fresh bad
+  // streak and downgrades on the very FIRST check past the 20s mark, instead of needing 3 fresh bad
   // checks (~24s) after warm-up. The comment says warm-up exists so the blur startup spike does not
   // trigger a downgrade — but the spike's checks are still counted, they are only deferred.
   it('PINNED: bad checks accumulated during warm-up carry over and fire instantly once warm-up ends', async () => {
-    (svc as any).monitoringStartTime = Date.now() - 44_000;
+    (svc as any).monitoringStartTime = Date.now() - 19_000;
     await checkN(svc, 5); // all suppressed, but counted
     expect(svc.currentTier()).toBe('high');
     expect((svc as any).consecutiveBadChecks).toBe(5);
-    (svc as any).monitoringStartTime = Date.now() - 46_000; // warm-up now over
+    (svc as any).monitoringStartTime = Date.now() - 21_000; // warm-up now over
     await check(svc);
     expect(svc.currentTier()).toBe('medium'); // one check, not three
   });
