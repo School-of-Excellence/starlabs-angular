@@ -232,7 +232,7 @@ export class OpenviduRecordingComponent {
   async createNewRoom(){
     if(confirm("Sure, do you want to create a New Room?")){
       var RoomTitle = prompt("Enter Title for Room")
-      if(RoomTitle.trim().length > 0){
+      if(RoomTitle?.trim().length > 0){
         const collectionName = "openviduroom"
         const roomId = this.guard.generateId(this.firestore, collectionName)
 
@@ -258,24 +258,30 @@ export class OpenviduRecordingComponent {
           mediaProvider: activeProvider,
         })
 
-        // Wake the provider's server. A 400 means "already running" — that's success here.
+        // Straight into the room — the join screen shows the server wait. Navigate BEFORE the
+        // wake call: it cold-starts the function and calls Oracle (10+ s), and waiting for it
+        // looked like "nothing happened" after clicking create (test 2026-11-15).
+        this.router.navigate(['/joinroom', roomId])
+
+        // Wake the provider's server in the background. A 400 means "already running" — success.
         const startFn = activeProvider === 'oci' ? 'startOciMasterHTTP' : 'startMasterNodeHTTP'
-        try {
-          await lastValueFrom(this.httpClient.post(
-            `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/${startFn}`, {}
-          ))
-          console.log(`[Instant meeting] ${activeProvider} server starting`)
-        } catch (error: any) {
+        // OCI goes through the service so the call carries the sign-in token the function
+        // now requires (2026-11-14 plan item 1.3). AWS (standby) is unchanged.
+        lastValueFrom(activeProvider === 'oci'
+          ? this.infraService.startOciMaster()
+          : this.httpClient.post(`https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/${startFn}`, {})
+        ).then(() => console.log(`[Instant meeting] ${activeProvider} server starting`))
+         .catch((error: any) => {
           if (error?.status === 400) {
             console.log(`[Instant meeting] ${activeProvider} server already running`)
+          } else if (activeProvider === 'oci') {
+            // The 5-minute job wakes the server for a room opened in the last 30 min anyway.
+            console.error(`[Instant meeting] ${startFn} failed — the 5-minute job will start it:`, error)
           } else {
             console.error(`[Instant meeting] ${startFn} failed:`, error)
             alert("Room created, but the server could not be started. Check the monitor screen.")
           }
-        }
-
-        // Straight into the room — join screen gates on server readiness.
-        this.router.navigate(['/joinroom', roomId])
+        })
 
         // var roomData = {
         //   active: true,
