@@ -27,7 +27,10 @@ const TIER_CONFIG: Record<QualityTier, TierConfig> = {
   // Full native: medium now captures 720p so adaptiveStream can serve h720 to large tiles.
   // Bitrate kept at 1Mbps (below high's 1.5Mbps) to stay within moderate uplink budget.
   // medium was: { width: 640, height: 480, maxBitrate: 600_000, simulcastLayers: [h180, h360] }
-  medium:  { width: 1280, height: 720,  frameRate: 20, maxBitrate: 1_000_000, simulcastLayers: [VideoPresets.h180, VideoPresets.h360, VideoPresets.h720] },
+  // 2026-11-14 plan item 3.3: medium back down to 540p capture (was 1280×720) — lighter on the
+  // sender's CPU (blur + noise filter share it) and on the media node; top layer h540.
+  // medium was (until 2026-11-14): { width: 1280, height: 720, frameRate: 20, maxBitrate: 1_000_000, simulcastLayers: [h180, h360, h720] }
+  medium:  { width: 960,  height: 540,  frameRate: 20, maxBitrate: 800_000,   simulcastLayers: [VideoPresets.h180, VideoPresets.h360, VideoPresets.h540] },
   // low: 640×360 source — gives receivers up to 360p; [h180, h360] avoids 720p encode CPU overhead
   // low was: { width: 480, height: 360, simulcastLayers: [v126, h180] }
   low:     { width: 640,  height: 360,  frameRate: 15, maxBitrate: 400_000,   simulcastLayers: [VideoPresets.h180, VideoPresets.h360] },
@@ -59,7 +62,9 @@ export class AdaptiveQualityService {
   private consecutiveBadChecks = 0;
   private lastDowngradeTime = 0;
   private monitoringStartTime = 0;
-  private readonly WARMUP_MS = 45_000; // was 15s — extended to let Koala+blur stabilize before any tier change
+  // 2026-11-14 plan item 3.3: 20s (was 45s, set when Koala was in the pipeline — Koala is gone).
+  // Long enough for the blur start-up CPU spike; short enough that a struggling device steps down quickly.
+  private readonly WARMUP_MS = 20_000;
 
   // Monitoring handles
   private monitorInterval: ReturnType<typeof setInterval> | null = null;

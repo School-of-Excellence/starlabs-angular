@@ -52,10 +52,20 @@ async function ensureGzippedModel(buffer) {
  * Creates a worklet module URL from inline code string
  * This approach works with all bundlers without special configuration
  */
+// Contexts that already have the processor registered. Re-adding the module to the same
+// AudioContext throws "deepfilter-audio-processor is already registered" inside the worklet
+// (harmless — the first registration is used — but noisy). StarLabs fix D, 2026-11-15.
+const workletLoaded = new WeakSet();
 async function createWorkletModule(audioContext, workletCode) {
+    if (workletLoaded.has(audioContext)) return;
     const blob = new Blob([workletCode], { type: 'application/javascript' });
     const blobUrl = URL.createObjectURL(blob);
-    await audioContext.audioWorklet.addModule(blobUrl);
+    try {
+        await audioContext.audioWorklet.addModule(blobUrl);
+    } finally {
+        URL.revokeObjectURL(blobUrl);
+    }
+    workletLoaded.add(audioContext);
 }
 
 const WorkletMessageTypes = {
