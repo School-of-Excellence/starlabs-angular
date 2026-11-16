@@ -10,7 +10,7 @@
         <p>
           {{ mode === 'single' ? userName
              : (mode === 'bulk' ? (bulkCount + ' user' + (bulkCount === 1 ? '' : 's') + ' selected')
-             : 'Create tags & copy segments') }}
+             : 'Create and rename tags, copy segment links') }}
         </p>
       </div>
     </div>
@@ -27,11 +27,11 @@
     <mat-tab-group *ngIf="!loading" class="tags-tabs" [(selectedIndex)]="activeTab" animationDuration="150ms">
 
       <!-- ===== Tab 1: Assign ===== -->
-      <mat-tab label="Assign">
-        <div class="tab-pane">
+      <mat-tab [label]="mode === 'manage' ? 'Tags' : 'Assign'">
+        <div class="atd-pane">
           <div class="search-box">
             <mat-icon>search</mat-icon>
-            <input [(ngModel)]="search" placeholder="Search or create a tag…"
+            <input [(ngModel)]="search" placeholder="Search or create a tag…" aria-label="Search or create a tag"
               (keyup.enter)="canCreate() && createTag()" />
             <button data-testid="atd-search-2" *ngIf="search" class="clear-search" type="button" (click)="search = ''" aria-label="Clear">
               <mat-icon>close</mat-icon>
@@ -46,15 +46,41 @@
 
           <div class="section-label" *ngIf="filteredTags().length > 0">
             Tags <span class="muted" *ngIf="mode !== 'manage'">· tap to {{ selected.size ? 'toggle' : 'add' }}</span>
-            <span class="muted" *ngIf="mode === 'manage'">· existing tags</span>
+            <span class="muted" *ngIf="mode === 'manage'">· click a tag to rename it</span>
           </div>
 
           <div class="chip-cloud">
-            <button data-testid="atd-toggle-4" type="button" class="chip" *ngFor="let t of filteredTags()"
-              [class.selected]="isSelected(t.id)" (click)="toggle(t.id)">
-              <mat-icon class="chip-ic">{{ isSelected(t.id) ? 'check' : 'add' }}</mat-icon>
-              <span class="chip-name">{{ t.name }}</span>
-            </button>
+            <ng-container *ngFor="let t of filteredTags()">
+              <!-- Manage mode: the clicked tag turns into a name editor. Enter saves, Escape cancels. -->
+              <!-- Escape is caught on the whole editor, so it cancels from the buttons too, not just the input. -->
+              <div class="rename-box" *ngIf="mode === 'manage' && editingId === t.id; else tagChip"
+                (keydown.escape)="cancelRename($event)">
+                <input #renameInput data-testid="atd-rename-input" class="rename-input" [(ngModel)]="editName"
+                  maxlength="60" aria-label="New name for this tag" [disabled]="isRenaming"
+                  (ngModelChange)="renameError = ''"
+                  (keydown.enter)="saveRename()" />
+                <button data-testid="atd-rename-save" type="button" class="rename-act rename-save" (click)="saveRename()"
+                  [disabled]="isRenaming" aria-label="Save the new name" matTooltip="Save">
+                  <mat-spinner *ngIf="isRenaming" diameter="16"></mat-spinner>
+                  <mat-icon *ngIf="!isRenaming">check</mat-icon>
+                </button>
+                <button data-testid="atd-rename-cancel" type="button" class="rename-act" (click)="cancelRename($event)"
+                  [disabled]="isRenaming" aria-label="Cancel renaming" matTooltip="Cancel">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+              <ng-template #tagChip>
+                <button data-testid="atd-toggle-4" type="button" class="chip" [title]="t.name"
+                  [class.selected]="isSelected(t.id)" [attr.aria-pressed]="mode === 'manage' ? null : isSelected(t.id)"
+                  (click)="toggle(t.id)">
+                  <mat-icon class="chip-ic">{{ mode === 'manage' ? 'edit' : (isSelected(t.id) ? 'check' : 'add') }}</mat-icon>
+                  <span class="chip-name">{{ t.name }}</span>
+                </button>
+              </ng-template>
+            </ng-container>
+          </div>
+          <div class="rename-error" role="alert" data-testid="atd-rename-error" *ngIf="renameError">
+            <mat-icon>error_outline</mat-icon>{{ renameError }}
           </div>
 
           <div class="cloud-empty" *ngIf="filteredTags().length === 0 && !canCreate()">
@@ -65,8 +91,8 @@
       </mat-tab>
 
       <!-- ===== Tab 2: All Tags / Copy segment ===== -->
-      <mat-tab label="All Tags">
-        <div class="tab-pane">
+      <mat-tab [label]="mode === 'manage' ? 'Segment links' : 'All Tags'">
+        <div class="atd-pane">
           <div class="segment-hint">
             <mat-icon>link</mat-icon>
             <div class="hint-body">
