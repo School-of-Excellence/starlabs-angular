@@ -1060,6 +1060,25 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "//": "delivery-dashboard Stuck Cases: most recent ATTENDED appointment per participant product (getRecentAppointmentDetails). Without this every chunk throws and the table falls back to status data behind a warning banner.",
+      "collectionGroup": "appointments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "participantproductid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "attended",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "endtime",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

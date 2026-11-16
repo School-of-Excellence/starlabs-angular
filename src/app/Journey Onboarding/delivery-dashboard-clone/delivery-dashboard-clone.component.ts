@@ -2901,9 +2901,22 @@ export class DeliveryDashboardCloneComponent {
             )
         );
     }
+    /**
+     * In-delivery headcount.
+     *
+     * Spans visible AND hidden products. Hiding a product is a Products-table display
+     * preference, not a filter on people: populateActionableCohorts (Awaiting / Ready /
+     * Stuck / Not-consuming) never consults hiddenProductIds, and getCompletionSummary
+     * already sums both lists. Iterating visibleCardIds alone made this the one funnel
+     * number computed over a smaller population than the ones beside it, so a participant
+     * in a hidden product could be counted as Stuck but not as In delivery.
+     *
+     * Product-filter scoping is unaffected: both visibleCardIds and hiddenCardIds are
+     * built from allProductIdsFromRaw, which applies itemPassesProductFilter.
+     */
     get kpiOngoingTotal(): number {
         return this.memoGet('kpiOG', () =>
-            this.visibleCardIds.reduce(
+            [...this.visibleCardIds, ...this.hiddenCardIds].reduce(
                 (sum, id) => sum + (this.getCardFunnel(id)?.ongoing?.length || 0), 0
             )
         );
@@ -2928,6 +2941,17 @@ export class DeliveryDashboardCloneComponent {
     }
     get kpiAvgComplete(): number {
         return this.getCompletionSummary().avgStartToDone;
+    }
+
+    /**
+     * Is there actually an average to show?
+     *
+     * avgStartToDone falls back to 0 when nothing completed (see getCompletionSummary), and "0d"
+     * reads as "completes same-day" rather than "no completions to measure". Same fake-zero the
+     * DAYS WAITING fix removed; the tile says "Not recorded" instead.
+     */
+    get hasAvgCompleteData(): boolean {
+        return this.getCompletionSummary().totalCompleted > 0;
     }
     get hasSpecialistData(): boolean {
         return (this.slotOverview?.totalSlots || 0) > 0;
@@ -3047,7 +3071,29 @@ export class DeliveryDashboardCloneComponent {
         return (parts[0][0] + parts[1][0] + parts[2][0]).toUpperCase();
     }
 
-    // Per-product pipeline total for the Action Center mini-funnel rows
+    /**
+     * Spoken form of a product's stage mix, for the bar's title and aria-label.
+     *
+     * The bar carries no text of its own, so without this the split is only available
+     * to someone who can see and hover five coloured segments. Order matches the legend
+     * and the segment order, which came across from the deleted
+     * "Delivery Pipeline by Product" panel.
+     */
+    stageMixLabel(cardId: string): string {
+        const f = this.getCardFunnel(cardId);
+        const parts: Array<[string, number]> = [
+            ['Yet to Start', f?.awaiting?.length || 0],
+            ['Init', f?.initiated?.length || 0],
+            ['Started', f?.started?.length || 0],
+            ['Ongoing', f?.ongoing?.length || 0],
+            ['Done', f?.completed?.length || 0],
+        ];
+        const total = parts.reduce((sum, [, n]) => sum + n, 0);
+        if (total === 0) return 'No participants in the pipeline yet';
+        return parts.map(([k, n]) => k + ' ' + n).join(', ') + ' (total ' + total + ')';
+    }
+
+    // Per-product pipeline total, also the stage-mix bar's "is there anything here" test
     getCardPipelineTotal(cardId: string): number {
         const f = this.getCardFunnel(cardId);
         return (f?.initiated?.length || 0)
@@ -3057,45 +3103,83 @@ export class DeliveryDashboardCloneComponent {
             + (f?.completed?.length || 0);
     }
 
-    // Sparkline data: per-product counts for each KPI (cached per filter/visible set)
-    private _sparkCacheKey = '';
-    private _sparkCache: { ready: number[]; stuck: number[]; completed: number[] } = { ready: [], stuck: [], completed: [] };
-    private buildSparkData() {
-        const ids = this.visibleCardIds;
-        const key = ids.join('|') + ':' + this.selectedTimeFilter;
-        if (this._sparkCacheKey === key) return this._sparkCache;
-        const ready: number[] = [];
-        const stuck: number[] = [];
-        const completed: number[] = [];
-        const stuckByProfile = new Set((this.originalData?.['stuckCases']?.data || []).map((d: any) => d?.profileid));
-        const readyByProfile = new Set((this.originalData?.['readyForInitiation']?.data || []).map((d: any) => d?.profileid));
-        for (const id of ids) {
-            const pids = this.getCardProductIds(id);
-            const items = pids.flatMap(p => this.groupedFiltered?.[p] || []);
-            const profileSet = new Set(items.map((i: any) => i?.profileid));
-            let r = 0, s = 0;
-            profileSet.forEach((pid) => {
-                if (readyByProfile.has(pid)) r++;
-                if (stuckByProfile.has(pid)) s++;
-            });
-            ready.push(r);
-            stuck.push(s);
-            completed.push(this.getCardFunnel(id)?.completed?.length || 0);
-        }
-        this._sparkCache = { ready, stuck, completed };
-        this._sparkCacheKey = key;
-        return this._sparkCache;
-    }
-    get sparkReady(): number[] { return this.buildSparkData().ready; }
-    get sparkStuck(): number[] { return this.buildSparkData().stuck; }
-    get sparkCompleted(): number[] { return this.buildSparkData().completed; }
-    sparkMax(arr: number[]): number { return Math.max(1, ...arr); }
 
     // Avg-time gauge benchmark
     avgTimeTarget = 30;
     get avgTimePct(): number {
         const v = this.kpiAvgComplete || 0;
         return Math.min(150, Math.round((v / this.avgTimeTarget) * 100));
+    }
+
+    // ===== v4 layout: product strip, funnel caption, delivery-speed gauge ==========
+    //
+    // The strip is a one-click VIEW of productFilterControl, not a second filter.
+    // Multi-select stays in the Products dropdown; both render from the same control,
+    // so they cannot disagree. Scoping itself still rides on itemPassesProductFilter
+    // (via allProductIdsFromRaw) and populateActionableCohorts' label check - no third
+    // mechanism is introduced here.
+
+    /**
+     * The multi-select label for a card id.
+     *
+     * Mirrors cardLabelForProductId, which is what availableCardLabels is built from and
+     * what populateActionableCohorts matches on, so a chip click resolves a product the
+     * same way every other part of the board does.
+     */
+    private cardFilterLabel(cardId: string): string {
+        if (cardId.startsWith('group:')) return cardId.slice('group:'.length);
+        return this.cardLabelForProductId(cardId);
+    }
+
+    /** True when the filter is narrowed to exactly this one product. */
+    isStripSelected(cardId: string): boolean {
+        if (!this.productFilterActive) return false;
+        const sel = (this.productFilterControl?.value as string[]) || [];
+        return sel.length === 1 && sel[0] === this.cardFilterLabel(cardId);
+    }
+
+    /** True when nothing is narrowed - the "All products" chip is the active one. */
+    get isStripAllSelected(): boolean {
+        return !this.productFilterActive;
+    }
+
+    /** Strip click -> write the product filter, then run the normal change path. */
+    async selectProductFromStrip(cardId: string | null): Promise<void> {
+        const next = cardId === null
+            ? [...this.availableCardLabels]
+            : [this.cardFilterLabel(cardId)].filter(Boolean);
+        this.productFilterControl?.setValue(next);
+        await this.onProductMultiFilterChange();
+    }
+
+    /**
+     * Delivery-speed gauge: a 0-90 day scale with the target marked inside it, rather
+     * than a bar where 100% IS the target. A 45-day average against a 30-day target reads
+     * as "past the mark, with road left", not as an uninterpretable 150%.
+     */
+    readonly avgGaugeMaxDays = 90;
+    get avgGaugePct(): number {
+        const v = this.kpiAvgComplete || 0;
+        return Math.max(0, Math.min(100, Math.round((v / this.avgGaugeMaxDays) * 100)));
+    }
+    get avgTargetMarkPct(): number {
+        return Math.round((this.avgTimeTarget / this.avgGaugeMaxDays) * 100);
+    }
+
+    /** Scope captions - say out loud what the numbers below are counting. */
+    get speedScopeLabel(): string {
+        if (!this.productFilterActive) return 'Across all products';
+        const sel = (this.productFilterControl?.value as string[]) || [];
+        return sel.length === 1 ? 'Scoped to ' + sel[0] : 'Scoped to ' + sel.length + ' products';
+    }
+    get funnelScopeCaption(): string {
+        if (this.productFilterActive) {
+            const sel = (this.productFilterControl?.value as string[]) || [];
+            const who = sel.length === 1 ? sel[0] + ' participants' : 'these participants';
+            return 'Where ' + who + ' currently sit, from payment through to delivered.';
+        }
+        return 'Where everyone currently sits, from payment through to delivered - across '
+            + this.visibleCardIds.length + ' active products.';
     }
 
     // Live "last updated" stamp — stored string so Angular's double-check pass sees the same value.
@@ -3810,7 +3894,7 @@ export class DeliveryDashboardCloneComponent {
                 { key: 'appointmentstatus', label: 'APPOINTMENT STATUS', type: 'text', width: '130px' },
                 { key: 'issuetype', label: 'ISSUE TYPE', width: '10%', type: 'text' },
                 { key: 'date', label: 'APPOINTMENT DATE', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
-                { key: 'waitingperiod', label: 'DAYS STUCK', width: '10%', type: 'number' },
+                { key: 'stuckdays', label: 'DAYS STUCK', width: '10%', type: 'number' },
                 { key: 'lastaction', label: 'LAST ACTION', width: '10%', type: 'text' },
                 { key: 'assignedto', label: 'ASSIGNED TO', width: '13%', type: 'text' },
                 { key: 'generalnotes', label: 'RESOLUTION', width: '10%' },
@@ -6755,13 +6839,23 @@ export class DeliveryDashboardCloneComponent {
                     profileid: profileId,
                     activejourney: journeyName,
                     product: productName || 'N/A',
-                    appointment: 'N/A',
-                    appointmentstatus: 'N/A',
+                    // The three appointment columns below were hardcoded 'N/A' / a status date.
+                    // getRecentAppointmentDetails() overwrites them from the participant's most
+                    // recent ATTENDED appointment; these are the values shown when there is none.
+                    appointment: 'No attended appointment',
+                    appointmentstatus: '—',
                     issuetype: status === 'ongoing' ? 'Stuck mid-flow' : 'Initiated · stalled',
-                    date: lastActivity,
-                    waitingperiod: days,
-                    lastaction: status,
+                    date: null,
                     assignedto: 'Unassigned',
+                    // waitingperiod stays the status-derived figure, unchanged, and is the
+                    // fallback basis for DAYS STUCK when no attendance is on record.
+                    waitingperiod: days,
+                    stuckdays: days,
+                    stuckdaysbasis: 'status',
+                    participantproductid: item?.docid || null,
+                    recentappointmentdate: null,
+                    actualstuckdays: null,
+                    lastaction: status,
                     escalationlevel: escalation,
                     generalnotes: [],
                 });
@@ -6779,9 +6873,99 @@ export class DeliveryDashboardCloneComponent {
         this.originalData['currentJourneyInitiated'].count = idle.length;
         this.originalData['stuckCases'].data = stuck;
         this.originalData['stuckCases'].count = stuck.length;
+        void this.getRecentAppointmentDetails(stuck);
 
         this.currentPage = 1;
         this.calculatePagination();
+    }
+
+    /**
+     * Stuck cases: fill the appointment columns from the participant's most recent
+     * ATTENDED appointment.
+     *
+     * Four columns in the Stuck Cases table were not telling the truth. APPOINTMENT and
+     * APPOINTMENT STATUS were hardcoded 'N/A'; APPOINTMENT DATE showed lastActivity,
+     * which is a status-change date, not an appointment; and DAYS STUCK counted from
+     * that same status field, so a coach who updated a status without the participant
+     * attending anything reset the clock.
+     *
+     * One roster-scoped query fixes those four. (ASSIGNED TO is wired here too but stays
+     * 'Unassigned' on current data — see the note at that line.) It is chunked at 30 (the Firestore 'in'
+     * limit) over the stuck set only - never a whole-collection read of appointments.
+     *
+     * Needs the composite index appointments(participantproductid ASC, attended ASC,
+     * endtime DESC). Without it EVERY chunk throws, which would leave the columns
+     * looking like "no appointment" rather than "lookup failed" - so the error is
+     * recorded and the UI says so instead.
+     */
+    stuckAppointmentsError: string | null = null;
+    private stuckLookupId = 0;
+
+    private async getRecentAppointmentDetails(stuckItems: any[]): Promise<void> {
+        const requestId = ++this.stuckLookupId;
+        this.stuckAppointmentsError = null;
+
+        const ids = Array.from(new Set(
+            stuckItems.map(i => i.participantproductid).filter(Boolean)
+        ));
+        if (ids.length === 0) return;
+
+        const latest = new Map<string, any>();
+        const CHUNK = 30;
+
+        for (let i = 0; i < ids.length; i += CHUNK) {
+            const chunk = ids.slice(i, i + CHUNK);
+            try {
+                const snap = await runInInjectionContext(this.injector, () =>
+                    getDocs(query(
+                        collection(this.firestore, 'appointments'),
+                        where('participantproductid', 'in', chunk),
+                        where('attended', '==', true),
+                        orderBy('endtime', 'desc')
+                    ))
+                );
+                // Ordered endtime desc, so the first row seen per product IS the latest.
+                for (const d of snap.docs) {
+                    const a = d.data();
+                    const pid = a['participantproductid'];
+                    if (pid && !latest.has(pid)) latest.set(pid, a);
+                }
+            } catch (err) {
+                console.error('Stuck cases: recent attended appointment lookup failed', err);
+                this.stuckAppointmentsError = 'Last appointment data is unavailable right now.';
+            }
+        }
+
+        // A newer refresh started while we were awaiting - its results win.
+        if (requestId !== this.stuckLookupId) return;
+
+        for (const item of stuckItems) {
+            const appt = latest.get(item.participantproductid);
+            if (!appt) continue;
+
+            const endtime = appt['endtime'] ?? null;
+            item.recentappointmentdate = endtime;
+            item.date = endtime;
+            item.appointment = this.resolveAppointmentType(appt) || 'Appointment';
+            // Every row here passed attended == true, so the status is not a guess.
+            item.appointmentstatus = 'Attended';
+            // Wired, but inert on starlabs-test: appt['assignedto'] was falsy for all 8
+            // rows that resolved, so ASSIGNED TO still reads 'Unassigned'. The coach is
+            // most likely in the appointment's `hosts` array (there are three indexes on
+            // it) rather than a flat field — resolving that is follow-up work, not this
+            // chunk. Left in place because it is correct if the field is ever populated.
+            item.assignedto = appt['assignedto'] || item.assignedto || 'Unassigned';
+
+            const since = this.daysSinceTs(endtime);
+            if (since !== null) {
+                item.actualstuckdays = since;
+                item.stuckdays = since;
+                item.stuckdaysbasis = 'appointment';
+            }
+        }
+
+        this.calculatePagination();
+        this.cdr.detectChanges();
     }
 
     openParticipant(profileId: string) {

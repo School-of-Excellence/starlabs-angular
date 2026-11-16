@@ -1,49 +1,40 @@
-# PROGRESS — StarLabs (atctranscription)
-
-_Last updated: 2026-08-31 (queue slot/capacity flow — baseline before logic change)_
-· **New session? Read `specs/ORIENTATION.md` first**, then
-`specs/QUEUE-SLOT-BOOKING-FLOW.md` + `specs/journals/2026-08-31-queue-slot-flow-baseline.md`.
+# PROGRESS
 
 ## Current state
-- Branch `dynamic-studio-update` @ `65992247`. Working tree carries only
-  documentation added this session plus one pre-existing, unrelated
-  `group-chat-screen.component.css` edit. Nothing committed, nothing
-  pushed, nothing deployed — operator commits manually (standing directive).
-- **No queue code was changed.** The slot/capacity flow is documented and
-  frozen as a baseline so a planned logic change can be made and reverted
-  safely. `breakthroughs-flutter` @ `development` `8cc6b02` was read only.
+Branch `dd-copy-polish`, 5 commits ahead, nothing pushed. The Delivery Dashboard now
+runs the v4 information architecture: one funnel owning every population count, a
+"Needs attention" row, a product strip that drives the existing product filter, a
+Delivery-speed section, and stage-mix bars inside the Products table. Verified live
+at http://localhost:4200/delivery-dashboard against starlabs-test. Production build
+exits 0. The spec suite compiles for the first time.
 
-## Last session changes (2026-08-31)
-- Added `specs/QUEUE-SLOT-BOOKING-FLOW.md` — the cross-repo as-is flow:
-  the slot atom (`queue planning.planning[].segments[].slots[]`, no id,
-  identified by a 5-tuple on exact-ms equality), **7 write paths + 3 read
-  paths** across Angular `queue-planner` / `queue-planner-review` and the
-  three Flutter cards, three mermaid flowcharts, a **divergence register
-  D-01…D-10**, six invariants, and the change/revert protocol.
-- Added `specs/journals/2026-08-31-queue-slot-flow-baseline.md` — WHY, the
-  four surprises, an append-only change log (CL-000) and the per-screen +
-  data-side revert playbook.
-- Indexed both in `specs/ORIENTATION.md` doc map. Also published as a
-  rendered reference artifact for the operator.
-- **Headline finding (D-02):** `queue-planner.savePlanning()` assigns
-  `usedslot = matching-token count` and every planner mutation auto-saves,
-  so it overwrites the counter that the four transactional booking paths
-  maintain — erasing Flutter self-service bookings and B!G pre-placements
-  that have no `queue_token` yet. Paired with D-01 (review offers slots
-  from a *derived* count while the transaction gates on the *stored* one),
-  this is the double-booking root cause.
+## Last session changes
+- `test:` unblocked the spec suite. Five pre-existing compile errors (stray `console`
+  and `os` imports, two wrong-cased component imports in specs) meant `ng test` failed
+  before a single assertion. The sixth is in `src/app/ATC/**`, which CLAUDE.md puts
+  off-limits, so `tsconfig.spec.json` now excludes it - the constraint was never
+  actually enforced anywhere. `tsconfig.spec.scoped.json` deleted, no longer needed.
+  CONSEQUENCE TO WATCH: specs now run, so the ~398 empty CLI stubs now run AND FAIL.
+  `delivery-dashboard-clone.component.spec.ts` fails on "No provider for Firestore".
+  Repo-wide `ng test` is red for that reason; contract specs are green in isolation.
+- `fix:` In delivery now spans hidden products, like every other funnel number.
+- `feat:` the funnel became the single home for all six populations; KPI bento,
+  Needs-Your-Attention tiles and the standalone pipeline panel deleted, their
+  drill-downs re-homed.
+- `feat:` stage-mix bar moved into the Products row, beneath the five numeric pills
+  rather than replacing them.
+- `fix:` Stuck and Not-consuming promoted OUT of the In-delivery step. Found by
+  rendering: Glimpse reads In delivery 0, Stuck 13, Not consuming 13, so nesting
+  asserted 13 inside 0. Not-consuming is 'initiated'-only and therefore disjoint
+  from In delivery by construction.
+
+Root cause worth remembering: my Gate 2 analysis claimed `visibleCardIds` was not
+product-filtered. It is - via `itemPassesProductFilter` inside `allProductIdsFromRaw`.
+Reading one level deeper would have saved a getter and a signature change.
 
 ## Pending
-- **The logic change itself is unspecified** — awaiting the operator's
-  statement of the new rule. Recommended first target: D-02 + D-01
-  (one agreed source of truth for capacity). Follow §7 of the flow doc:
-  delta vs the register → check the six invariants → name the blast radius
-  across W1–W7 / R1–R3 → Angular and Flutter as separately revertable commits.
-- Before any write-shape change: export the affected `queue planning`
-  doc(s) to `specs/journals/2026-08-31-queue-slot-flow-artifacts/`; array
-  fields have no history. First run against `starlabs-test` only.
-- Carried from 2026-08-27: operator visual pass of the redesigned
-  `/eiflixhomeconfig` tab 1 and of `/videodashboard[/upload]`; EiFlix
-  consumers to wire; newusertags backfill; `eiflixcampaign` rules
-  unverified; eiflix register backfill + `/eiflixoperationsdashboard`
-  route guard; episode-delete gaps.
+- Nothing pushed. Three decisions open for the operator: the grey stage-colour ramp,
+  whether the funnel sparklines earn their place next to the labelled strip, and
+  whether to carry these commits to origin/joshua-development.
+- No team-level view; `teamref` does not exist in Firestore.
+- Repo-wide `ng test` is red on pre-existing CLI stubs now that the suite compiles.
