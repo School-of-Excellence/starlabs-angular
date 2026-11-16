@@ -94,8 +94,11 @@
                 </ng-container>
 
                 <ng-container matColumnDef="confirmed">
-                  <th mat-header-cell *matHeaderCellDef mat-sort-header>Confirmed</th>
-                  <td mat-cell *matCellDef="let w">{{ w.confirmed != null ? w.confirmed : 0 }}</td>
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header
+                      matTooltip="People who tapped Notify Me: the same people View lists">Confirmed</th>
+                  <td mat-cell *matCellDef="let w">
+                    <span data-testid="upc-confirmed-count">{{ responseCount(w) ?? (countsLoading ? '…' : '—') }}</span>
+                  </td>
                 </ng-container>
 
                 <ng-container matColumnDef="showconfirmedseat">

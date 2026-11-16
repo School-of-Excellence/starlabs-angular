@@ -41,6 +41,7 @@ describe('WorkshopDashboard — Exist Users Enrolled', () => {
     c.selectedCategoryFilters = [];
     c.selectedEnrollmentStatusFilters = [];
     c.selectedNotStartedTypeFilters = [];
+    c.selectedTagFilters = [];
     c.selectedSubscriberCode = [];
     c.showReferredOnly = false;
     c.workshopData = { categorybased: false };
@@ -311,7 +312,7 @@ describe('WorkshopDashboard — Enrolled via <platform> opens the side panel', (
     c.participantWorkshopCategoryMap = new Map(); c.participantCohortMap = new Map(); c.categoryNamesMap = new Map();
     c.workshopData = { categorybased: false };
     c.selectedTierFilters = []; c.selectedCategoryFilters = []; c.selectedEnrollmentStatusFilters = [];
-    c.selectedNotStartedTypeFilters = []; c.selectedSubscriberCode = []; c.showReferredOnly = false;
+    c.selectedNotStartedTypeFilters = []; c.selectedTagFilters = []; c.selectedSubscriberCode = []; c.showReferredOnly = false;
     c.JourneyMap = {}; c.filteredParticipants = []; c.mapProfileNew = {};
     c.showParticipantPanel = false;
     return c;

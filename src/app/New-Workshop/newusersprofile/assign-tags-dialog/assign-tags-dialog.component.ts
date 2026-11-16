@@ -1,4 +1,4 @@
-import { Component, Inject, OnInit } from '@angular/core';
+import { Component, ElementRef, Inject, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
@@ -19,6 +19,7 @@ import {
   collection,
   collectionData,
   doc,
+  getDocs,
   query,
   setDoc,
   updateDoc,
@@ -67,6 +68,15 @@ export class AssignTagsDialogComponent implements OnInit {
   private userId = '';
   // Bulk mode: tags shared by ALL selected users at open time (pre-checked).
   private initialSelected = new Set<string>();
+
+  // ---- Manage mode: rename an existing tag (operator 2026-11-12) ----
+  // Only the tag's name changes. Every reader keys tags by id, so users, enrolments and shared
+  // segment links keep pointing at the same tag and simply show the new name.
+  editingId: string | null = null;
+  editName = '';
+  renameError = '';
+  isRenaming = false;
+  @ViewChild('renameInput') private renameInput?: ElementRef<HTMLInputElement>;
 
   // ---- Tab 2: All Tags / copy segment ----
   activeTab = 0;
@@ -143,9 +153,65 @@ export class AssignTagsDialogComponent implements OnInit {
   }
 
   toggle(id: string): void {
-    if (this.mode === 'manage') return; // no user to assign to in manage mode
+    // Manage mode has no user to assign to: clicking a tag renames it instead.
+    if (this.mode === 'manage') { this.startRename(id); return; }
     if (this.selected.has(id)) this.selected.delete(id);
     else this.selected.add(id);
+  }
+
+  startRename(id: string): void {
+    if (this.isRenaming) return;   // one save at a time; a second editor would be closed when the first lands
+    this.editingId = id;
+    this.editName = this.tagName(id);
+    this.renameError = '';
+    setTimeout(() => { this.renameInput?.nativeElement.focus(); this.renameInput?.nativeElement.select(); });
+  }
+
+  /** Escape must stop here: the dialog itself closes on Escape and would throw the edit away. */
+  cancelRename(event?: Event): void {
+    event?.stopPropagation();
+    event?.preventDefault();
+    this.editingId = null;
+    this.editName = '';
+    this.renameError = '';
+  }
+
+  /** Why the typed name can't be saved, or '' when it can. Checked against the tags on screen. */
+  private renameProblem(id: string, name: string, others: Tag[]): string {
+    if (!name) return 'Enter a name for the tag.';
+    if (others.some(t => t.id !== id && t.name.trim().toLowerCase() === name.toLowerCase())) {
+      return 'Another tag already has this name.';
+    }
+    return '';
+  }
+
+  async saveRename(): Promise<void> {
+    const id = this.editingId;
+    if (!id || this.isRenaming) return;
+    const name = this.editName.trim();
+    if (name === this.tagName(id)) { this.cancelRename(); return; }   // nothing changed
+    this.renameError = this.renameProblem(id, name, this.tags);
+    if (this.renameError) return;
+    this.isRenaming = true;
+    try {
+      // Re-check against the stored tags just before writing: someone may have added one since this opened.
+      const snap = await getDocs(query(collection(this.firestore, 'newusertags'), where('type', '==', 'newusersegments')));
+      const stored: Tag[] = snap.docs.map(d => ({ id: d.id, name: (d.data()?.['name'] || '').toString() }));
+      this.renameError = this.renameProblem(id, name, stored);
+      if (this.renameError) return;
+      // Only the name: the tag keeps its id and every other stored field.
+      await updateDoc(doc(this.firestore, 'newusertags', id), { name });
+      this.tags = this.tags.map(t => (t.id === id ? { ...t, name } : t)).sort((a, b) => a.name.localeCompare(b.name));
+      this.snackBar.open('Tag renamed.', 'Close', { duration: 2000 });
+      if (this.editingId === id) this.cancelRename();
+    } catch (err) {
+      console.error('Error renaming tag:', err);
+      this.renameError = 'Could not rename the tag. Please try again.';
+    } finally {
+      this.isRenaming = false;
+      // Still editing (a refusal or a failed write): give the input its focus back, it was disabled while saving.
+      if (this.editingId === id) setTimeout(() => this.renameInput?.nativeElement.focus());
+    }
   }
 
   // Footer visibility: assign actions only when assigning to user(s).
@@ -174,7 +240,7 @@ export class AssignTagsDialogComponent implements OnInit {
       // Stamped silently so this dialog's tags stay within the newusersegments type; not shown in the UI.
       await setDoc(ref, { id: ref.id, name, type: 'newusersegments', created: serverTimestamp() });
       this.tags = [...this.tags, { id: ref.id, name }].sort((a, b) => a.name.localeCompare(b.name));
-      this.selected.add(ref.id);   // auto-assign the freshly created tag
+      if (this.mode !== 'manage') this.selected.add(ref.id);   // auto-assign it when assigning to someone
       this.search = '';
     } catch (err) {
       console.error('Error creating tag:', err);
