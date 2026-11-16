@@ -190,6 +190,7 @@
     <div class="jcd-kchips">
       <span class="jcd-kchip" *ngIf="stage === 'na' || stage === 'ready'">Purchased {{ row['purchasedate']?.toDate() | date:'mediumDate' }} · {{ daysSince(row['purchasedate']) }}d ago</span>
       <span class="jcd-kchip" *ngIf="stage === 'sched'" [class.dan]="isPast(row['onboardingscheduled'])">Call {{ row['onboardingscheduled']?.toDate() | date:'mediumDate' }}{{ isPast(row['onboardingscheduled']) ? ' · passed' : '' }}</span>
+      <span class="jcd-kchip" *ngIf="stage === 'sched' && row['specialist']">Specialist: {{ row['specialist'] }}</span>
       <span class="jcd-kchip ok" *ngIf="stage === 'ob'">Onboarded {{ row['onboardedtime']?.toDate() | date:'mediumDate' }}</span>
     </div>
     <div class="jcd-kacts">

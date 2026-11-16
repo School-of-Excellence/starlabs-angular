@@ -233,7 +233,7 @@ export class JourneycoachDashboardComponent {
   monthyear;
   daysInput: number | null = null;
 
-  // Object declarations 
+  // Object declarations
   mapjourneyname: any = {};
   journeyTypeMap: { [key: string]: string } = {};
   modeMap: any = {};
@@ -290,7 +290,7 @@ export class JourneycoachDashboardComponent {
 
     allParticipants: { count: 0, data: [] },
 
-    // Sales 
+    // Sales
     grosssale: { count: 0, data: [] },
     assuredsale: { count: 0, data: [] },
     grossnewsale: { count: 0, data: [] },
@@ -306,20 +306,20 @@ export class JourneycoachDashboardComponent {
     assureddowngradetooldsale: { count: 0, data: [] },
     assureddowngradetonewsale: { count: 0, data: [] },
 
-    // Subscription 
+    // Subscription
     nextMonth: { count: 0, data: [] },
     lastMonth: { count: 0, data: [] },
     currentMonth: { count: 0, data: [] },
     totalMonth: { count: 0, data: [] },
 
-    // AR Health 
+    // AR Health
     regularstatus: { count: 0, data: [] },
     missedstatus: { count: 0, data: [] },
     defaultedstatus: { count: 0, data: [] },
     lockedstatus: { count: 0, data: [] },
     fullypaidstatus: { count: 0, data: [] },
 
-    // Onboarding 
+    // Onboarding
     notassured: { count: 0, data: [] },
     all: { count: 0, data: [] },
     last7DaysnotOnboarded: { count: 0, data: [] },
@@ -332,7 +332,7 @@ export class JourneycoachDashboardComponent {
     pipeScheduled: { count: 0, data: [] },
     pipeOnboarded: { count: 0, data: [] },
 
-    // Product Initiation 
+    // Product Initiation
     alljourneynotstarted: { count: 0, data: [] },
     lessthan30daysjourneynotstarted: { count: 0, data: [] },
     morethan30daysjourneynotstarted: { count: 0, data: [] },
@@ -348,7 +348,7 @@ export class JourneycoachDashboardComponent {
     discontinued: { count: 0, data: [] },
     overallParticipants: { count: 0, data: [] },
 
-    // Customer Support 
+    // Customer Support
     eventtickets: { count: 0, data: [] },
     eventticketnew: { count: 0, data: [] },
     eventticketresponded: { count: 0, data: [] },
@@ -374,7 +374,7 @@ export class JourneycoachDashboardComponent {
     referralticketresponded: { count: 0, data: [], avg: 0 },
     referralticketsclosed: { count: 0, data: [], avg: 0 },
 
-    // CURA 
+    // CURA
     continuitySales: { count: 0, data: [] },
     upgradeSales: { count: 0, data: [] },
     referralSales: { count: 0, data: [] },
@@ -783,7 +783,7 @@ export class JourneycoachDashboardComponent {
     }
   };
 
-  // Function to set current month date 
+  // Function to set current month date
   setCurrentMonth() {
     const now = new Date();
     this.startDate = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -791,7 +791,7 @@ export class JourneycoachDashboardComponent {
     this.monthyear = new Date().getFullYear() + "-" + String(new Date().getMonth() + 1).padStart(2, '0');
   }
 
-  // Function to toggle date filter 
+  // Function to toggle date filter
   toggleDate() {
     this.pickerMode = this.pickerMode == 'month' ? 'range' : 'month';
     this.setCurrentMonth();
@@ -843,28 +843,24 @@ export class JourneycoachDashboardComponent {
   // call booked; Scheduled = call booked, not onboarded; Onboarded = marked onboarded.
   pipelineJourney: string = 'all';
   pipelineJourneys: { id: string; name: string }[] = [];
+  // GSV / ASV / booked / onboarded, built by loadPipeline() from the sales flow
+  pipeBuckets: any = { na: [], ready: [], sched: [], ob: [] };
+  pipeBusy = false;
+  pipeAgain = false;
 
   recomputePipeline() {
     if (!this.embedOnboarding) return;
-    const ist = (330 * 60 * 1000);
-    const start = new Date(this.startDate); start.setHours(0, 0, 0, 0); start.setTime(start.getTime() + ist);
-    const end = new Date(this.endDate); end.setHours(23, 59, 59, 999); end.setTime(end.getTime() + ist);
-    const inRange = (r: any) => { const d = r?.['purchasedate']?.toDate?.(); return !!d && d >= start && d <= end; };
-    const jid = (r: any) => r?.['journeyref']?.id || 'unassigned';
 
     // Needs-a-call first: no call booked, then call time passed (ready to mark onboarded), then upcoming.
     this.sortNeedsSchedulingFirst(this.originalData['all'].data);
     this.sortNeedsSchedulingFirst(this.originalData['last7DaysnotOnboarded'].data);
     this.sortNeedsSchedulingFirst(this.originalData['last15daysnotOnboarded'].data);
 
-    const notAssured = (this.originalData['notassured'].data || []).filter(inRange);
-    const open = (this.originalData['all'].data || []).filter(inRange);
-    const ready = open.filter((r: any) => !r['onboardingscheduled']);
-    const scheduled = open.filter((r: any) => !!r['onboardingscheduled']);
-    const onboarded = this.originalData['onboarded'].data || [];
+    const jid = (r: any) => r?.['journeyref']?.id || 'unassigned';
+    const { na, ready, sched, ob } = this.pipeBuckets;
 
     const names = new Map<string, string>();
-    [...notAssured, ...open, ...onboarded].forEach((r: any) => {
+    [...na, ...ready, ...sched, ...ob].forEach((r: any) => {
       const id = jid(r);
       names.set(id, id === 'unassigned' ? 'Unassigned' : (this.mapjourneyname?.[id] || id));
     });
@@ -873,12 +869,83 @@ export class JourneycoachDashboardComponent {
 
     const pick = (rows: any[]) => rows.filter((r: any) => this.pipelineJourney === 'all' || jid(r) === this.pipelineJourney);
     const put = (key: string, rows: any[]) => { const d = pick(rows); this.originalData[key] = { count: d.length, data: d }; };
-    put('pipeNotAssured', notAssured);
+    put('pipeNotAssured', na);
     put('pipeReady', ready);
-    put('pipeScheduled', scheduled);
-    put('pipeOnboarded', onboarded);
+    put('pipeScheduled', sched);
+    put('pipeOnboarded', ob);
     this.updateTableDataIfOpen(this.tableType);
     this.cdr.markForCheck();
+  }
+
+  async loadPipeline() {
+    if (!this.embedOnboarding) return;
+    if (this.pipeBusy) { this.pipeAgain = true; return; }
+    this.pipeBusy = true;
+    try {
+      // selected / loaded date range: same window as the Gross and Assured Sales cards
+      const start = new Date(this.startDate); start.setHours(0, 0, 0, 0);
+      const end = new Date(this.endDate); end.setHours(23, 59, 59, 999);
+
+      // single-field range queries on purchasedate (no composite index); journey type is filtered below
+      const [salesSnap, pjpSnap] = await Promise.all([
+        getDocs(query(collection(this.firestore, 'salesleads'),
+          where('purchasedate', '>=', start), where('purchasedate', '<=', end))),
+        getDocs(query(collection(this.firestore, 'participantjourneyproduct'),
+          where('purchasedate', '>=', start), where('purchasedate', '<=', end))),
+      ]);
+
+      const pjpBySale: any = {};
+      pjpSnap.forEach(d => {
+        const p: any = { ...d.data(), docid: d.data()['docid'] || d.id };
+        if (p.journeytype === 'new' && p.salesleadsref) pjpBySale[p.salesleadsref.id] = p;
+      });
+
+      // remove rejected sales, so excellence and the excluded journey
+      const sales = salesSnap.docs.map(d => ({ ...(d.data() as any), docid: d.id })).filter(s =>
+        s.journeytype === 'new' &&
+        s.status?.toLowerCase() !== 'rejected' &&
+        s.journey !== 'InLXMl7OBAqlDTZcXwK0' &&
+        !(s.journey === 'RXvsMYoK0g4SstvDDURZ' && s.email?.toLowerCase().includes('soexcellence.com')));
+
+      const na: any[] = [], ready: any[] = [], sched: any[] = [];
+      const toCheck: any[] = [];
+      for (const s of sales) {
+        const pjp = pjpBySale[s.docid];
+        // the cards read pjp fields, so a sale with no pjp doc is shown from the sale itself
+        const row = pjp || { ...s, journeyref: { id: s.journey }, purchasedate: s.since || s.createdon };
+
+        if (!s.paymentplan) {
+          na.push(row);
+        } else if (pjp?.onboarded === true) {
+          // the Onboarded column below is the date-scoped 'onboarded' set (by onboarded date)
+        } else if (pjp?.onboardingscheduled && pjp?.appointmentid) {
+          toCheck.push({ row, appointmentid: pjp.appointmentid });
+        } else {
+          ready.push(row);
+        }
+      }
+
+      // read the appointment: cancelled != true and attended != true -> booked, else back to ASV
+      await Promise.all(toCheck.map(async x => {
+        const appt: any = (await getDoc(doc(this.firestore, 'appointments', x.appointmentid))).data();
+        if (appt && appt.cancelled !== true && appt.attended !== true) {
+          const host = appt.hosts?.[0];
+          const hostId = host?.id || host;
+          x.row.specialist = this.mapMetaData[hostId]?.['name'] || hostId;
+          sched.push(x.row);
+        } else {
+          ready.push(x.row);
+        }
+      }));
+
+      sched.sort((a, b) => (a.onboardingscheduled?.toMillis() || 0) - (b.onboardingscheduled?.toMillis() || 0));
+      const ob = [...(this.originalData['onboarded'].data || [])];
+      this.pipeBuckets = { na, ready, sched, ob };
+      this.recomputePipeline();
+    } finally {
+      this.pipeBusy = false;
+      if (this.pipeAgain) { this.pipeAgain = false; this.loadPipeline(); }
+    }
   }
 
   // ─── Pipeline card board (embed only; operator 2026-11-11) ───
@@ -1159,7 +1226,7 @@ export class JourneycoachDashboardComponent {
     }
   }
 
-  // Update date based on month selection 
+  // Update date based on month selection
   updateDate() {
     let year = parseInt(this.monthyear.split('-')[0]);
     let month = parseInt(this.monthyear.split('-')[1]);
@@ -1170,7 +1237,7 @@ export class JourneycoachDashboardComponent {
     this.fetchData();
   }
 
-  // Function to toggle date of today and last 7 days 
+  // Function to toggle date of today and last 7 days
   onDateFilterClick(filterType: string): void {
     this.selectedDateFilter = filterType;
 
@@ -1205,8 +1272,8 @@ export class JourneycoachDashboardComponent {
       this.daysInput = 60;
     }
   }
-  
-  // move to next month 
+
+  // move to next month
   forwardMonth() {
     let year = parseInt(this.monthyear.split('-')[0]);
     let month = parseInt(this.monthyear.split('-')[1]);
@@ -1219,7 +1286,7 @@ export class JourneycoachDashboardComponent {
     this.fetchData();
   }
 
-  // move to previous month 
+  // move to previous month
   backwardMonth() {
     let year = parseInt(this.monthyear.split('-')[0]);
     let month = parseInt(this.monthyear.split('-')[1]);
@@ -1232,7 +1299,7 @@ export class JourneycoachDashboardComponent {
     this.fetchData();
   }
 
-  // Function to check if all data is loaded 
+  // Function to check if all data is loaded
   private checkAllDataLoaded(): void {
     const allLoaded = Object.values(this.loadingStates).every(state => state === true);
     const loadedCount = Object.values(this.loadingStates).filter(s => s === true).length;
@@ -1247,7 +1314,7 @@ export class JourneycoachDashboardComponent {
     }
   }
 
-  // Function to call all data 
+  // Function to call all data
   fetchData() {
     this.ngOnDestroy();
     this.isLoading = true
@@ -1312,7 +1379,7 @@ export class JourneycoachDashboardComponent {
     });
   }
 
-  // Function to initialize columns for each column 
+  // Function to initialize columns for each column
   initializeColumns() {
     this.salesLeadsColumns = [
       { key: 'name', header: 'Name', width: '10%', type: 'text' },
@@ -1331,7 +1398,7 @@ export class JourneycoachDashboardComponent {
       { key: 'addnotes', header: '+', width: '25%', type: 'text', substringStart: 0, substringEnd: 50 }
     ]
 
-    //For upgrade sale payment plan details 
+    //For upgrade sale payment plan details
 
     this.upgradeSalesColumns = [
       { key: 'name', header: 'Name', width: '10%', type: 'text' },
@@ -1487,7 +1554,7 @@ export class JourneycoachDashboardComponent {
     this.loadTableConfig();
   }
 
-  // Function to load table config 
+  // Function to load table config
   loadTableConfig() {
     this.tableConfigs = {
       grossSales: {
@@ -1846,7 +1913,7 @@ export class JourneycoachDashboardComponent {
       { key: 'journeyref', header: 'Journey', type: 'custom', mapper: (ref) => this.mapjourneyname[ref?.['id']] ?? '-' },
       { key: 'coachingScheduled', header: 'Scheduled Date', type: 'text' },
     ]
-    
+
     const modesColumns: ColumnConfig[] = [
       { key: 'name', header: 'Name', type: 'text' },
     ];
@@ -1922,7 +1989,7 @@ export class JourneycoachDashboardComponent {
     }
   }
 
-  // Function to load sales leads data for current month 
+  // Function to load sales leads data for current month
   loadCurrentSalesLeads() {
     const currentMonthStart = new Date(this.startDate);
     currentMonthStart.setHours(0, 0, 0, 0);
@@ -1989,7 +2056,7 @@ export class JourneycoachDashboardComponent {
             const salesLeadsData = salesData[i];
 
             // if (salesLeadsData['journey'] === 'RXvsMYoK0g4SstvDDURZ' && salesLeadsData['email']?.toLowerCase().includes('soexcellence.com')) {
-            //   continue; 
+            //   continue;
             // }
 
             salesLeadsData['generalnotes'] = [null, undefined, ''].includes(this.mapMetaData[salesLeadsData['profileid']]) ? [] : (this.mapMetaData[salesLeadsData['profileid']]['generalnotes'] ?? [])
@@ -2095,7 +2162,7 @@ export class JourneycoachDashboardComponent {
               this.approvedGrossSales = grossData.filter(sale => sale['status'] && sale['status'].toLowerCase() === 'approved').length;
               this.pendingGrossSales = grossData.filter(sale => !sale['status'] || sale['status'] === null || sale['status'] === undefined || sale['status'] === '').length;
 
-              // Love Factor Calculation 
+              // Love Factor Calculation
               this.originalData['continuitySales'].data = tempContinuitySales;
               this.originalData['continuitySales'].count = tempContinuitySales.length;
 
@@ -2287,7 +2354,7 @@ export class JourneycoachDashboardComponent {
               this.originalData['assureddowngradetooldsale'].count = assuredDowngradeToOldData.length;
               this.originalData['assureddowngradetonewsale'].count = assuredDowngradeToNewData.length;
 
-    
+
               this.updateTableDataIfOpen(this.tableType);
               this.loadingStates.salesLeads = true;
               this.checkAllDataLoaded();
@@ -2306,10 +2373,10 @@ export class JourneycoachDashboardComponent {
     })
   }
 
-  // Function to fetch data from participant metadata 
+  // Function to fetch data from participant metadata
   loadParticipantMetadata() {
     this.subscriptions['metadata'] = collectionData(query(collection(this.firestore, "participant metadata"), orderBy("name", "asc"))).subscribe((metadata) => {
-      // Subscription declarations 
+      // Subscription declarations
       let currentMonthEnd = [];
       let lastMonthEnd = [];
       let nextMonthEnd = [];
@@ -2318,7 +2385,7 @@ export class JourneycoachDashboardComponent {
       //Mode map declarations
       let tempModeMap = {};
 
-      // AR Health declarations 
+      // AR Health declarations
       let fullyPaid = [];
       let regular = [];
       let defaulted = [];
@@ -2341,7 +2408,7 @@ export class JourneycoachDashboardComponent {
       let tempActiveJourney: Record<string, Record<string, { status: string; profiles: any[] }>> = {};
       let tempNullStatusProfiles: any[] = [];
 
-      // Journey Engagement declarations 
+      // Journey Engagement declarations
       let journeyMap = {
         1: [],
         2: [],
@@ -2389,7 +2456,7 @@ export class JourneycoachDashboardComponent {
             this.mapprofile[metaData['profileid']] = metaData['name']
             this.mapMetaData[metaData['profileid']] = metaData;
 
-            // Subscription Status Processing 
+            // Subscription Status Processing
             const subscriptionEndDate = ![null, undefined, ''].includes(metaData['subscriptionend']) ? metaData['subscriptionend'] : [null, undefined, ""].includes(metaData['lastsubscriptionend']) ? null : metaData['lastsubscriptionend'];
 
             if (subscriptionEndDate != null) {
@@ -2405,7 +2472,7 @@ export class JourneycoachDashboardComponent {
               }
             }
 
-            // AR Health Processing 
+            // AR Health Processing
             if (metaData['activejourney'] != 'InLXMl7OBAqlDTZcXwK0') {
               if (metaData['financedata'] && typeof metaData['financedata'] === 'object' && ['newpayment', 'schedule'].includes(metaData['financedata']['status']) && ![null, undefined, 0].includes(metaData['financedata']?.['computedamount'])) {
 
@@ -2624,7 +2691,7 @@ export class JourneycoachDashboardComponent {
     return null;
   }
 
-  // Function to fetch data from Participant Journey Product 
+  // Function to fetch data from Participant Journey Product
   loadParticipantJourneyProduct() {
     const now = new Date();
     const currentMonthStart = new Date(this.startDate);
@@ -2708,7 +2775,7 @@ export class JourneycoachDashboardComponent {
 
       this.subscriptions['journeyproduct2'] = collectionData(query(collection(this.firestore, "participantjourneyproduct"), where("paymentplan", "!=", null))).subscribe((onboarded) => {
         if (onboarded.length != 0) {
-          // last 30days 
+          // last 30days
           let last30days = new Date();
           last30days.setDate(currentDate.getDate() - 30);
 
@@ -2779,7 +2846,7 @@ export class JourneycoachDashboardComponent {
 
               this.originalData['onboarded'].data = tempArray4;
               this.originalData['onboarded'].count = tempArray4.length;
-              this.recomputePipeline();
+              this.loadPipeline();
 
               this.originalData['lessthan30daysjourneynotstarted'].data = tempArray5;
               this.originalData['lessthan30daysjourneynotstarted'].count = tempArray5.length;
@@ -2833,7 +2900,7 @@ export class JourneycoachDashboardComponent {
     }
   }
 
-  // Function to load customer support tickets 
+  // Function to load customer support tickets
   // async loadCustomerSupport() {
   //   this.subscriptions['clientissue'] = collectionData(query(collection(this.firestore, "clientissue"), where("category", "in", ['Events & Process', 'Journey Related', 'Downgrade, Cancellation & Exceptions', 'Finance & Accounts', 'Referrals & Upgrades']))).subscribe((tickets) => {
   //     if (tickets.length != 0) {
@@ -3045,7 +3112,7 @@ export class JourneycoachDashboardComponent {
 
   // }
 
-  // Function to load modes from participant products 
+  // Function to load modes from participant products
   async loadModes() {
     const now = new Date();
 
@@ -3140,12 +3207,12 @@ export class JourneycoachDashboardComponent {
     }
   }
 
-  // Function to call column class based on schedule condition 
+  // Function to call column class based on schedule condition
   getColumnClass(tentativeStart: Date): string {
     return engine.columnClassFor(tentativeStart);
   }
 
-  // Function to naviagte to journey support screen 
+  // Function to naviagte to journey support screen
   navigatejourneyplan(element: any) {
     const profileId = element['profileid'];
     const docId = element['docid'];
@@ -3153,7 +3220,7 @@ export class JourneycoachDashboardComponent {
     window.open(url, '_blank');
   }
 
-  // Function to filter table 
+  // Function to filter table
   filterTableData(value) {
     if (!this.currentTableConfig || !this.filteredTableData) {
       return;
@@ -3309,7 +3376,7 @@ export class JourneycoachDashboardComponent {
     this.calculatePagination();
   }
 
-  // Function to check onboarding marked 
+  // Function to check onboarding marked
   checkMarkOnboarding(element) {
     let disabled = false;
 
@@ -3322,7 +3389,7 @@ export class JourneycoachDashboardComponent {
     return disabled;
   }
 
-  // Function to mark onbaorded 
+  // Function to mark onbaorded
   markOnboarded(element) {
     element['markonboard'] = true
     element['mapProfile'] = this.mapprofile;
@@ -3399,7 +3466,7 @@ export class JourneycoachDashboardComponent {
     })
   }
 
-  // Function to view notes 
+  // Function to view notes
   viewNotes(element, key) {
     element['viewnotes'] = true;
     element['mapProfile'] = this.mapprofile;
@@ -3464,7 +3531,7 @@ export class JourneycoachDashboardComponent {
     });
   }
 
-  // Function to show popup 
+  // Function to show popup
   showPopup(row: any, event: MouseEvent, container: HTMLElement) {
     if (this.hideTimeout) {
       clearTimeout(this.hideTimeout);
@@ -3505,14 +3572,14 @@ export class JourneycoachDashboardComponent {
 
   }
 
-  // Hide popup with delay 
+  // Hide popup with delay
   hidePopupWithDelay() {
     this.hideTimeout = setTimeout(() => {
       this.popupData = null;
     }, 200);
   }
 
-  // Function to clear hdie timeout 
+  // Function to clear hdie timeout
   clearHideTimeout() {
     if (this.hideTimeout) {
       clearTimeout(this.hideTimeout);
@@ -3529,7 +3596,7 @@ export class JourneycoachDashboardComponent {
     }
   }
 
-  // Function to refresh filter 
+  // Function to refresh filter
   refreshFilter() {
     this.filterForm.controls['search'].setValue('');
     this.filterForm.controls['journey'].setValue('');
@@ -3544,18 +3611,18 @@ export class JourneycoachDashboardComponent {
     this.filterTableData(this.filterForm.value);
   }
 
-  // Function to view loading progress of the screen 
+  // Function to view loading progress of the screen
   getLoadingProgress(): number {
     this.cdr.markForCheck();
     return engine.loadingProgressPercent(this.loadingStates);
   }
 
-  // Function to get total loaded count 
+  // Function to get total loaded count
   getLoadedCount(): number {
     return engine.loadedCount(this.loadingStates);
   }
 
-  // Function to open schedule dialog 
+  // Function to open schedule dialog
   openSchedule(element, type) {
     if (type == 'coach') {
       element['isReschedule'] = ![null, undefined].includes(this.mapCoachAppointments[element['profileid']]) && !this.mapCoachAppointments[element['profileid']][0]['attended'] ? true : false;
@@ -3576,7 +3643,7 @@ export class JourneycoachDashboardComponent {
     });
   }
 
-  // Function to mark Journey Coach Complete 
+  // Function to mark Journey Coach Complete
   async markJCcomplete(profile, schedule) {
     if (![null, undefined, ""].includes(schedule)) {
       if (![null, undefined, ''].includes(schedule['docid'])) {
@@ -3628,7 +3695,7 @@ export class JourneycoachDashboardComponent {
     this.getSelectedDateSchedules();
   }
 
-  //Function to get onboarding scheduled data 
+  //Function to get onboarding scheduled data
   getAllScheduledTableData() {
     if (this.originalData['all'] && this.originalData['all'].data) {
       return this.originalData['all'].data.filter(row =>
@@ -3638,7 +3705,7 @@ export class JourneycoachDashboardComponent {
     return [];
   }
 
-  // Function to get schedules 
+  // Function to get schedules
   async getSelectedDateSchedules() {
 
     if (!this.selectedCalendarDate) {
@@ -3783,7 +3850,7 @@ export class JourneycoachDashboardComponent {
     this.onBoxClick(boxType);
   }
 
-  // Function to update table data 
+  // Function to update table data
   updateTable(boxType: string) {
     let configData = this.tableConfigs[boxType];
     configData['data'] = this.originalData[configData['dataKey']].data;
@@ -3795,7 +3862,7 @@ export class JourneycoachDashboardComponent {
     this.calculatePagination();
   }
 
-  // Function to update config data 
+  // Function to update config data
   updateConfigData(configData: any) {
     this.journeyList = [];
     let tempJourney = [];
@@ -4005,7 +4072,7 @@ export class JourneycoachDashboardComponent {
     return engine.dateDifferenceCategoryCode(date);
   }
 
-  // Function to format each cell value in table 
+  // Function to format each cell value in table
   formatCellValue(row: any, column: ColumnConfig): string {
     const value = row[column.key];
 
@@ -4152,7 +4219,7 @@ export class JourneycoachDashboardComponent {
     return this.selectedRows.some(selectedRow => this.getRowIdentifier(selectedRow) === this.getRowIdentifier(row));
   }
 
-  // Method to get unique identifier for a row 
+  // Method to get unique identifier for a row
   getRowIdentifier(row: any, index?: number): any {
     return row.id || row.profileId || row.email || `row_${index}`;
   }
@@ -4223,7 +4290,7 @@ export class JourneycoachDashboardComponent {
     });
   }
 
-  // Function to open dialog to view participants data for ecosystem data 
+  // Function to open dialog to view participants data for ecosystem data
   openEcoDialog(element: any, head: any, subHead: any = null, profileIdWiseCount: any = null, metrics: any = null, prevMetric: any = null, metricsection: any = null) {
     let dialogData = {};
     if (['Total ATC', 'Unvalidated ATC', 'Completed ATC', 'Total Adjustment'].includes(head)) {
@@ -4266,7 +4333,7 @@ export class JourneycoachDashboardComponent {
     }
   }
 
-  // Function to navigate to profile 
+  // Function to navigate to profile
   profileNavigation(profileId: string) {
     const profileid = profileId;
     if (profileId.length < 10) {
@@ -4278,7 +4345,7 @@ export class JourneycoachDashboardComponent {
     }
   }
 
-  // Function to navigate screen to customer support 
+  // Function to navigate screen to customer support
   navigateToCustomerSupport() {
     if (window.location.port.includes('4200')) {
       window.open(`http://localhost:4200/customersupportdashboard`, '_blank');
@@ -4310,7 +4377,7 @@ export class JourneycoachDashboardComponent {
     }
   }
 
-  // Function to highlight row based on status 
+  // Function to highlight row based on status
   highlightRow(row: any) {
     if (this.tableType === 'grossSales' || this.tableType === 'grossDowngradeSales' || this.tableType === 'grossCancelledSales') {
       if ([null, undefined, "", "pending"].includes(row['status']?.toLowerCase())) {
@@ -4334,7 +4401,7 @@ export class JourneycoachDashboardComponent {
     return ''
   }
 
-  // Function to get count of pending sales 
+  // Function to get count of pending sales
   getPendingCount() {
     return engine.countPending(this.currentTableConfig.data);
   }
@@ -4371,12 +4438,12 @@ export class JourneycoachDashboardComponent {
   //   return this.tableType === 'grossSales';
   // }
 
-  // Function to calculate gross waiting period 
+  // Function to calculate gross waiting period
   calculateGrossWaitingPeriod(purchaseDate: Date): number {
     return engine.waitingPeriodDays(purchaseDate, new Date());
   }
 
-  // Function to calculate assured waiting period 
+  // Function to calculate assured waiting period
   calculateAssuredWaitingPeriod(purchaseDate: Date, comparisonDate: Date): number {
     return engine.waitingPeriodDays(purchaseDate, comparisonDate);
   }
@@ -4443,7 +4510,7 @@ export class JourneycoachDashboardComponent {
     });
   }
 
-  // Function to get atc alpha data 
+  // Function to get atc alpha data
   getAtcAlpha() {
     let atcQuery: any;
     let unvalidatedATCQuery: any;
@@ -4674,7 +4741,7 @@ export class JourneycoachDashboardComponent {
 
       this.cdr.markForCheck();
       this.buildDisplayLists();
-      this.cdr.markForCheck(); 
+      this.cdr.markForCheck();
     });
   }
 
@@ -4691,7 +4758,7 @@ export class JourneycoachDashboardComponent {
     });
   }
 
-  // Function to calculate evolution process percentage 
+  // Function to calculate evolution process percentage
   processEvolutionProgressFromMap(keyProfileMap: Record<string, { profileId: string; sum: number; docTotal: number }[]>): void {
     // Percentage + banding rules live in journeycoach.engine.ts.
     this.evolutionProgressData = engine.buildEvolutionProgress(keyProfileMap, this.mapprofile);
@@ -4714,7 +4781,7 @@ export class JourneycoachDashboardComponent {
     this.cdr.markForCheck();
   }
 
-  // Function to open the cross over metrics dialog 
+  // Function to open the cross over metrics dialog
   openCrossoverMetricsDialog() {
     const currentMonthStart = new Date(this.startDate);
     currentMonthStart.setHours(0, 0, 0, 0);
