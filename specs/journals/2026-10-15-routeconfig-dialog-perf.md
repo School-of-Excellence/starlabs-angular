@@ -65,3 +65,18 @@ children field by field.
 - No e2e change: no new `data-testid` hooks were added; the existing `rxd-*` and `rcx-*` hooks are unchanged.
 - Trade-off: on a closed icon select, arrow keys no longer cycle through icons, because only the
   selected icon is rendered.
+
+## 2026-11-06 — follow-up fix: icon dropdown never opened
+**Symptom:** in the Create/Edit Route dialog, the "Select Icon" and "Child Icon" dropdowns didn't load any icons.
+**Root cause:** while closed, `IconOptionsPipe` returned `[]` when no icon was selected (Create Route,
+a new child) or when the saved icon wasn't in `iconList`. Angular Material 19's `MatSelect._canOpen()`
+needs `options.length > 0`, so the panel never opened, `(opened)` never fired, and the full list never
+rendered. The profile selects weren't affected because an open search still renders the matches.
+**Fix (`option-pipes.ts`):** a closed select now renders the selected icon, even one outside
+`iconList`, or `icons[0]` when nothing is selected. An open select puts an unknown saved icon at the
+front of the full list so its value doesn't disappear.
+**Verified:** `tsc -p tsconfig.app.json` is clean, and the pipe was checked in Node for 6 cases
+(create, valid, and unknown icon × closed/open). Not yet clicked through in the running app, which
+needs a login.
+**Revert only this fix:** `git checkout 9380a2e5 -- src/app/route-configuration-duplicate/createroutedialog/option-pipes.ts`.
+No data change.

@@ -1,7 +1,8 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Firestore, doc, docData, setDoc, Timestamp } from '@angular/fire/firestore';
-import { Observable } from 'rxjs';
+import { getAuth } from '@angular/fire/auth';
+import { Observable, from, switchMap } from 'rxjs';
 import { environment } from '../environments/environment';
 
 
@@ -116,25 +117,36 @@ export class InstanceStatusService {
   }
 
   // ---- OCI twins (separate functions — same contracts as the AWS ones) ----
+  // These start / stop / resize paid servers, so the functions require a signed-in user
+  // (2026-11-14 plan item 1.3): every call carries the Firebase ID token.
 
   startOciMaster(): Observable<any> {
-    return this.http.post(`${this.baseUrl}/startOciMasterHTTP`, {});
+    return this.postWithAuth(`${this.baseUrl}/startOciMasterHTTP`, {});
   }
 
   stopOciMaster(): Observable<any> {
-    return this.http.post(`${this.baseUrl}/stopOciMasterHTTP`, {});
+    return this.postWithAuth(`${this.baseUrl}/stopOciMasterHTTP`, {});
   }
 
   scaleOciUp(): Observable<any> {
-    return this.http.post(`${this.baseUrl}/scaleOciMediaNodes`, {
+    return this.postWithAuth(`${this.baseUrl}/scaleOciMediaNodes`, {
       action: 'scale-up'
     });
   }
 
   scaleOciDown(): Observable<any> {
-    return this.http.post(`${this.baseUrl}/scaleOciMediaNodes`, {
+    return this.postWithAuth(`${this.baseUrl}/scaleOciMediaNodes`, {
       action: 'scale-down'
     });
+  }
+
+  private postWithAuth(url: string, body: any): Observable<any> {
+    return from(this.authHeaders()).pipe(switchMap(headers => this.http.post(url, body, { headers })));
+  }
+
+  private async authHeaders(): Promise<Record<string, string>> {
+    const token = await getAuth().currentUser?.getIdToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
   }
 
 }

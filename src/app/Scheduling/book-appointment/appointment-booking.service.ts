@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import {
-  arrayUnion, collection, doc, Firestore, getDoc, getDocs, limit, query, serverTimestamp, updateDoc, where, writeBatch,
+arrayUnion, collection, doc, Firestore, getCountFromServer, getDoc, getDocs, limit, query, serverTimestamp, updateDoc, where, writeBatch,
 } from '@angular/fire/firestore';
 
 /* A free slot of one specialist (availability/{docid}[typeId][index]). */
@@ -159,16 +159,32 @@ export class AppointmentBookingService {
     const { slot, typeId, plan, participantId, target } = p;
     const batch = writeBatch(this.firestore);
     const hosts: string[] = [], free: boolean[] = [], docs: Record<string, any> = {};
+    const typeRef = doc(this.firestore, 'appointmenttype/' + typeId);
+    const typeData = (await getDoc(typeRef)).data();
+    const isGroup = typeData?.['groupappointment'] == true;
+    const maxBooking = typeData?.['maxbooking'] ;
     for (const d of slot.docdata) {
       const snap = await getDoc(doc(this.firestore, 'availability/' + d.id));
       const data: any = snap.data();
       docs[snap.id] = data;
       if (data?.[typeId] != null) {
         hosts.push(data['profileref'].path);
-        free.push(data[typeId][d.index]?.booked === false && data[typeId][d.index]?.available === true);
+        free.push(data[typeId][d.index]?.available === true && (isGroup || data[typeId][d.index]?.booked === false));
       }
     }
     if (!free.length || free.includes(false)) return 'unavailable';
+
+    const slotFull: Record<string, boolean> = {};
+    if (isGroup) {
+      for (const d of slot.docdata) {
+        const countQuery = query(collection(this.firestore, 'appointments'),
+          where('slotdata', 'array-contains', { id: d.id, index: d.index }),
+          where('appointment', '==', typeRef),
+          where('cancelled', '==', false));
+        const countSnap = await getCountFromServer(countQuery);
+        slotFull[d.id] = countSnap.data().count + 1 >= maxBooking;
+      }
+    }
 
     const hostRole: Record<string, any[]> = {};
     for (const role of plan.roles) {
@@ -189,7 +205,10 @@ export class AppointmentBookingService {
           const ss = s.slotstart.toDate(), se = s.slotend.toDate();
           if ((ss >= slot.start && ss < slot.end) || (se > slot.start && se < slot.end) || (slot.start >= ss && slot.start < se)) {
             if (!s.booked) s.available = false;
-            if (ref.id === typeId && d.index === k && minuteOf(ss) === minuteOf(slot.start) && minuteOf(se) === minuteOf(slot.end)) s.booked = true;
+            if (ref.id === typeId && d.index === k && minuteOf(ss) === minuteOf(slot.start) && minuteOf(se) === minuteOf(slot.end)) {
+              s.booked = true;
+              s.available = isGroup && !slotFull[d.id];
+            }
           }
         });
       }

@@ -403,7 +403,21 @@
                         <mat-form-field class="ml-4" style="margin-right: 10px;" *ngIf="stagePropertyArray.controls[i].get('actiontype').value == 'form'" appearance="outline">
                           <mat-label>Select Form Template</mat-label>
                           <mat-select [attr.data-testid]="'qcv3-sel-35-' + i" formControlName="actionresource">
-                            <mat-option *ngFor="let form of formTemplateList" [value]="form.docid">{{form.formname}}</mat-option>
+                            <mat-option>
+                              <ngx-mat-select-search [(ngModel)]="filterFormTemplate[i]"
+                                                     [ngModelOptions]="{standalone: true}"
+                                                     [attr.data-testid]="'qcv3-inp-35s-' + i"
+                                                     placeholderLabel="Search forms"
+                                                     noEntriesFoundLabel="No matching forms found">
+                              </ngx-mat-select-search>
+                            </mat-option>
+                            <mat-option *ngFor="let form of returnFormTemplates(filterFormTemplate[i], stagePropertyArray.controls[i].get('actionresource').value)" [value]="form.docid">{{form.formname}}</mat-option>
+                          </mat-select>
+                        </mat-form-field>
+                        <mat-form-field class="ml-4" style="margin-right: 10px;" *ngIf="stagePropertyArray.controls[i].get('actiontype').value == 'appointment'" appearance="outline">
+                          <mat-label>Select Appointment Type</mat-label>
+                          <mat-select formControlName="actionresource">
+                            <mat-option *ngFor="let appt of appointmentTypeList" [value]="appt.docid">{{appt.appointmenttype}}</mat-option>
                           </mat-select>
                         </mat-form-field>
                         <button [attr.data-testid]="'qcv3-btn-36-' + i" class="ml-3"  style="margin-right: 10px;"
@@ -498,7 +512,15 @@
                         <mat-form-field class="ml-3" style="margin-right: 10px;" appearance="outline">
                           <mat-label>Forms To Display</mat-label>
                           <mat-select [attr.data-testid]="'qcv3-sel-47-' + i" formControlName="participantform" multiple>
-                            <mat-option *ngFor="let form of formTemplateList" [value]="form.docid">{{form.formname}}</mat-option>
+                            <mat-option>
+                              <ngx-mat-select-search [(ngModel)]="filterParticipantForm[i]"
+                                                     [ngModelOptions]="{standalone: true}"
+                                                     [attr.data-testid]="'qcv3-inp-47s-' + i"
+                                                     placeholderLabel="Search forms"
+                                                     noEntriesFoundLabel="No matching forms found">
+                              </ngx-mat-select-search>
+                            </mat-option>
+                            <mat-option *ngFor="let form of returnFormTemplates(filterParticipantForm[i], stagePropertyArray.controls[i].get('participantform').value)" [value]="form.docid">{{form.formname}}</mat-option>
                           </mat-select>
                         </mat-form-field>
                         <!-- New Studio Property -->

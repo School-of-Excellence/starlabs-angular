@@ -1,7 +1,7 @@
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { ENTER, COMMA } from '@angular/cdk/keycodes';
 import { Component, ElementRef, Inject, OnInit, TemplateRef, ViewChild } from '@angular/core';
-import { collection, deleteDoc, doc, Firestore, getDoc, getDocs, orderBy, query, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
+import { collection, deleteDoc, doc, Firestore, getDoc, getDocs, or, orderBy, query, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
 import { FormGroup, Validators, FormBuilder, FormControl, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { MatChipInputEvent, MatChipsModule } from '@angular/material/chips';
 import { MatDialogRef, MAT_DIALOG_DATA, MatDialog } from '@angular/material/dialog';
@@ -85,8 +85,9 @@ export class QueueCreationV3Component {
   filterprofile = ""
   filterpackageeligibility = ""
   venueList: any[] = []
-  stageActionTypes = ["Form", "Link", "VideoAsk", "EvolutionMapping"]
+  stageActionTypes = ["Form", "Link", "VideoAsk", "EvolutionMapping","Appointment"]
   formTemplateList = []
+  appointmentTypeList=[]
   videoAskList = []
   // newly added
   mapProductToDeliverySequence: any = {}
@@ -329,7 +330,7 @@ export class QueueCreationV3Component {
           var property = data["stageproperty"][stage]
 
           var actionResources: any;
-          if (property["actiontype"] == "form") {
+          if (property["actiontype"] == "form" || property["actiontype"]== "appointment") {
             actionResources = property["actionresource"]?.id;
           } else if (property["actiontype"] == "videoask") {
 
@@ -492,7 +493,8 @@ export class QueueCreationV3Component {
       for (let i = 0; i < form.docs.length; i++) {
         const template = form.docs[i];
         var templateData = template.data()
-        if ([null, undefined].includes(templateData['delete'])) {
+        // Hide only soft-deleted forms; `delete: false` means live (was hidden by the old null/undefined check).
+        if (templateData['delete'] !== true) {
           console.log(template.id, 'form docid');
 
           templateData["docid"] = template.id
@@ -531,8 +533,12 @@ export class QueueCreationV3Component {
           })
         })
       }
-      console.log(this.mapProductToMode)
+      console.log(this.mapProductToMode) 
       console.log(this.mapProductToDeliverySequence, 'this.mapProductToDeliverySequence')
+    })
+    getDocs(query(collection(this.firestore, 'appointmenttype'),or(where('queueappointment', '==', true), where('groupappointment', '==', true)),orderBy('appointmenttype')))
+      .then(snap => {
+      this.appointmentTypeList = snap.docs.map(e => ({ ...e.data(), docid: e.id }))
     })
     //get delivery events forms queue
     // getDocs(collection(this.firestore, 'delivery events')).then((snap) => {
@@ -620,6 +626,20 @@ export class QueueCreationV3Component {
     var data = []
     data = this.profilelist.filter(e => e["name"].toLowerCase().includes(this.filterprofile.toLowerCase()))
     return data
+  }
+
+  // Per-stage search text, keyed by stage index: "Select Form Template" and "Forms To Display".
+  filterFormTemplate: { [stageIndex: number]: string } = {}
+  filterParticipantForm: { [stageIndex: number]: string } = {}
+
+  // Forms matching the search text; currently selected form(s) are always kept
+  // so the select doesn't lose its label while a search is typed.
+  returnFormTemplates(searchText: string, selected: string | string[]): Array<any> {
+    const text = (searchText ?? '').trim().toLowerCase()
+    if (!text) return this.formTemplateList
+    const selectedIds = Array.isArray(selected) ? selected : [selected]
+    return this.formTemplateList.filter(e =>
+      selectedIds.includes(e.docid) || (e['formname'] ?? '').toLowerCase().includes(text))
   }
 
   returnPackageEligibility(): Array<any> {
@@ -1061,6 +1081,9 @@ addNextStage(mainIndex: number) {
           }
           if (property["actiontype"] == "form") {
             metadata["stageproperty"][property["stage"]]["actionresource"] = doc(this.firestore, "delivery forms", property["actionresource"])
+          }
+          else if (property["actiontype"] == "appointment") {
+            metadata["stageproperty"][property["stage"]]["actionresource"] = doc(this.firestore, "appointmenttype", property["actionresource"])
           }
           else if (property["actiontype"] == "videoask") {
 

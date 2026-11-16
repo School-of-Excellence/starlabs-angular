@@ -47,11 +47,19 @@ export class ProfileOptionsPipe implements PipeTransform {
   }
 }
 
-/** Icon options: the full ~1000-icon list only while the panel is (or has been) open. */
+/**
+ * Icon options: the full ~1000-icon list only while the panel is (or has been) open.
+ *
+ * Never return [] while closed: mat-select's _canOpen() refuses to open with zero
+ * options, so (opened) never fires and the full list never loads (empty icon on
+ * Create Route / new child). A saved icon outside iconList is kept so it still shows.
+ */
 @Pipe({ name: 'iconOptions', standalone: true })
 export class IconOptionsPipe implements PipeTransform {
   transform(icons: string[], selected: string | null | undefined, open: boolean): string[] {
-    if (open) return icons;
-    return selected && icons.includes(selected) ? [selected] : [];
+    const known = !!selected && icons.includes(selected);
+    if (open) return selected && !known ? [selected, ...icons] : icons;
+    if (selected) return [selected];
+    return icons.slice(0, 1);
   }
 }
