@@ -246,3 +246,127 @@ describe('WorkshopDashboard — Total Enrolled opens newest-first', () => {
     expect(c.sideSort).toBe('');
   });
 });
+
+/** Operator 2026-11-16: Total / Exist Users / New Users Enrolled filter by enrollment date. */
+describe('WorkshopDashboard — enrollment date range', () => {
+  const at = (y: number, m: number, d: number, h = 9) => ({ toMillis: () => new Date(y, m - 1, d, h).getTime() });
+  function make(status = 'totalEnrolled'): any {
+    const c: any = Object.create(WorkshopDashboardComponent.prototype);
+    c.selectedStatusInfo = { status };
+    c.selectedParticipants = [{ profileid: 'a', name: 'A' }, { profileid: 'b', name: 'B' }, { profileid: 'c', name: 'C' }, { profileid: 'n', name: 'N' }];
+    c.enrolledParticipants = [
+      { profileid: 'a', enrollmentdate: at(2026, 11, 1) },
+      { profileid: 'b', enrollmentdate: at(2026, 11, 5, 23) },    // late evening: still 5 Nov
+      { profileid: 'c', enrollmentdate: at(2026, 11, 9) },
+      { profileid: 'n' },                                         // no date
+    ];
+    c.mapProfile = {}; c.mapProfileNew = {};
+    c.filterOption = 'all'; c.sideSearch = '';
+    c.selectedJourneyFilters = []; c.selectedCustomerStatusFilters = []; c.selectedTierFilters = [];
+    c.selectedCategoryFilters = []; c.selectedEnrollmentStatusFilters = []; c.selectedNotStartedTypeFilters = [];
+    c.selectedTagFilters = []; c.enrolledTagNames = {}; c.sideSort = '';
+    c.selectedSubscriberCode = []; c.showReferredOnly = false;
+    c.enrolledFrom = ''; c.enrolledTo = '';
+    return c;
+  }
+  const ids = (c: any) => c.filteredParticipants.map((p: any) => p.profileid);
+
+  it('no range keeps everyone, including people without a date', () => {
+    const c = make(); c.applyFilterSide();
+    expect(ids(c)).toEqual(['a', 'b', 'c', 'n']);
+  });
+  it('whole days on both ends; a person without a date is left out once a range is set', () => {
+    const c = make();
+    c.enrolledFrom = '2026-11-05'; c.enrolledTo = '2026-11-09'; c.applyFilterSide();
+    expect(ids(c)).toEqual(['b', 'c']);
+  });
+  it('either end alone works', () => {
+    const c = make();
+    c.enrolledFrom = '2026-11-02'; c.applyFilterSide();
+    expect(ids(c)).toEqual(['b', 'c']);
+    c.enrolledFrom = ''; c.enrolledTo = '2026-11-05'; c.applyFilterSide();
+    expect(ids(c)).toEqual(['a', 'b']);
+  });
+  it('ends typed the wrong way round mean the same window; Clear brings everyone back', () => {
+    const c = make();
+    c.enrolledFrom = '2026-11-09'; c.enrolledTo = '2026-11-05'; c.applyFilterSide();
+    expect(ids(c)).toEqual(['b', 'c']);
+    c.clearEnrolledRange();
+    expect(ids(c)).toEqual(['a', 'b', 'c', 'n']);
+  });
+  it('applies on Exist Users and New Users Enrolled too, but not on other panels', () => {
+    for (const s of ['existUsersEnrolled', 'totalNewUsers']) {
+      const c = make(s); c.enrolledFrom = '2026-11-09'; c.applyFilterSide();
+      expect(ids(c)).withContext(s).toEqual(['c']);
+    }
+    const other = make('totalStarted'); other.enrolledFrom = '2026-11-09'; other.applyFilterSide();
+    expect(ids(other)).toEqual(['a', 'b', 'c', 'n']);
+  });
+  it('New Users Enrolled: still applies after the Referred filter rebuilds the list', () => {
+    const c = make('totalNewUsers');
+    c.isNewUserProfile = () => true;
+    c.mapProfileNew = { a: { name: 'A', refferedby: 'X' }, c: { name: 'C', refferedby: 'Y' } };
+    c.showReferredOnly = true;
+    c.enrolledFrom = '2026-11-09'; c.applyFilterSide();
+    expect(ids(c)).toEqual(['c']);
+  });
+  it('opening a panel clears the range', () => {
+    const c: any = Object.create(WorkshopDashboardComponent.prototype);
+    c.metrics = new Map([['totalEnrolled', []]]); c.statusDisplayMap = new Map();
+    c.buildParticipantEntry = (id: string) => ({ profileid: id }); c.applyFilterSide = () => {};
+    c.loadEnrolledTagNames = async () => {};
+    c.enrolledFrom = '2026-11-01'; c.enrolledTo = '2026-11-30';
+    c.onMetricClick('totalEnrolled');
+    expect([c.enrolledFrom, c.enrolledTo]).toEqual(['', '']);
+  });
+});
+
+/** Operator 2026-11-16: the Tag filter also on Exist Users Enrolled and New Users Enrolled. */
+describe('WorkshopDashboard — Tag filter on Exist Users / New Users Enrolled', () => {
+  function make(status: string): any {
+    const c: any = Object.create(WorkshopDashboardComponent.prototype);
+    c.selectedStatusInfo = { status };
+    c.selectedParticipants = [{ profileid: 'a', name: 'A' }, { profileid: 'b', name: 'B' }, { profileid: 'c', name: 'C' }];
+    c.enrolledParticipants = [{ profileid: 'a' }, { profileid: 'b' }, { profileid: 'c' }];
+    c.mapProfile = {}; c.mapProfileNew = {};
+    c.filterOption = 'all'; c.sideSearch = '';
+    c.selectedJourneyFilters = []; c.selectedCustomerStatusFilters = []; c.selectedTierFilters = [];
+    c.selectedCategoryFilters = []; c.selectedEnrollmentStatusFilters = []; c.selectedNotStartedTypeFilters = [];
+    c.selectedSubscriberCode = []; c.showReferredOnly = false; c.sideSort = ''; c.enrolledFrom = ''; c.enrolledTo = '';
+    c.enrolledTagNames = { a: ['Gold'], b: ['Silver'] };
+    c.selectedTagFilters = ['Gold'];
+    return c;
+  }
+  const ids = (c: any) => c.filteredParticipants.map((p: any) => p.profileid);
+
+  it('filters Exist Users Enrolled and New Users Enrolled; not New Users Not Enrolled', () => {
+    for (const s of ['existUsersEnrolled', 'totalNewUsers']) {
+      const c = make(s); c.applyFilterSide();
+      expect(ids(c)).withContext(s).toEqual(['a']);
+    }
+    const notEnrolled = make('totalNewUsersNotEnrolled'); notEnrolled.applyFilterSide();
+    expect(ids(notEnrolled)).toEqual(['a', 'b', 'c']);
+  });
+  it('New Users Enrolled: still applies after the Referred filter rebuilds the list', () => {
+    const c = make('totalNewUsers');
+    c.isNewUserProfile = () => true;
+    c.mapProfileNew = { a: { name: 'A', refferedby: 'X' }, b: { name: 'B', refferedby: 'Y' } };
+    c.showReferredOnly = true; c.applyFilterSide();
+    expect(ids(c)).toEqual(['a']);
+  });
+  it('opening any of the three panels clears ticked tags and reads tag names', () => {
+    const c: any = Object.create(WorkshopDashboardComponent.prototype);
+    c.metrics = new Map([['totalEnrolled', []]]); c.statusDisplayMap = new Map();
+    c.enrolledParticipants = []; c.mapProfileNew = {};
+    c.isNewUserProfile = () => false; c.buildParticipantEntry = (id: string) => ({ profileid: id });
+    c.applyFilterSide = () => {};
+    let loads = 0; c.loadEnrolledTagNames = async () => { loads++; };
+    for (const m of ['totalEnrolled', 'existUsersEnrolled', 'totalNewUsers']) {
+      c.selectedTagFilters = ['Gold']; c.enrolledTagOptions = ['Gold'];
+      c.onMetricClick(m);
+      expect(c.selectedTagFilters).withContext(m).toEqual([]);
+      expect(c.enrolledTagOptions).withContext(m).toEqual([]);
+    }
+    expect(loads).toBe(3);
+  });
+});

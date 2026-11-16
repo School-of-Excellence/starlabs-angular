@@ -727,6 +727,12 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   enrolledTagOptions: string[] = [];
   /** Ticked tag names; a person matches when they carry any of them. */
   selectedTagFilters: string[] = [];
+  /** The panels with a Tag filter: everyone in them is enrolled, so each has an enrolled doc to read tags from. */
+  private static readonly TAG_FILTER_PANELS = ['totalEnrolled', 'existUsersEnrolled', 'totalNewUsers'];
+
+  get showTagFilter(): boolean {
+    return WorkshopDashboardComponent.TAG_FILTER_PANELS.includes(this.selectedStatusInfo?.status);
+  }
 
   /** First enrolled doc per person, the same one buildParticipantEntry reads. */
   private firstEnrolledDocs(): Map<string, any> {
@@ -1666,6 +1672,11 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   }
 
   onMetricClick(metricType: string) {
+    // Every panel opens without an enrollment-date range or ticked tags (operator 2026-11-16).
+    this.enrolledFrom = '';
+    this.enrolledTo = '';
+    this.selectedTagFilters = [];
+    this.enrolledTagOptions = [];   // the previous panel's options must not show while this one's load
     if (metricType === 'existUsersEnrolled') {
       // Everyone enrolled who is not a new user — people moved out of new_user_data
       // belong here, which is why the check goes through isNewUserProfile().
@@ -1849,8 +1860,9 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       // Total Enrolled opens with the most recent enrollments first (operator 2026-11-13).
       this.sideSort = metricType === 'totalEnrolled' ? 'enrolledNew' : '';
       this.applyFilterSide();
-      if (metricType === 'totalEnrolled') void this.loadEnrolledTagNames();
     }
+    // Total / Exist Users / New Users Enrolled: read the tag names for the Tag filter (and the Total Enrolled cards).
+    if (WorkshopDashboardComponent.TAG_FILTER_PANELS.includes(metricType)) void this.loadEnrolledTagNames();
   }
 
   // Opens the shared side panel with the participants currently in the given evergreen day bucket.
@@ -2461,10 +2473,6 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       });
     }
 
-    // Tag filter (operator 2026-11-12): keep people whose enrolled doc carries any ticked tag.
-    if (this.selectedStatusInfo?.status === 'totalEnrolled' && this.selectedTagFilters.length > 0) {
-      base = base.filter(p => (this.enrolledTagNames[p.profileid] || []).some(t => this.selectedTagFilters.includes(t)));
-    }
 
     if (this.selectedStatusInfo?.status === 'totalEnrolled' &&
       this.selectedEnrollmentStatusFilters.length > 0) {
@@ -2552,6 +2560,15 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
           metadata: p
         }));
     }
+    // Tag filter (Total Enrolled 2026-11-12; Exist Users / New Users Enrolled 2026-11-16): keep people whose
+    // enrolled doc carries any ticked tag. After the new-user filters above, which rebuild the list.
+    if (this.showTagFilter && this.selectedTagFilters.length > 0) {
+      base = base.filter(p => (this.enrolledTagNames[p.profileid] || []).some(t => this.selectedTagFilters.includes(t)));
+    }
+    // Enrollment-date range (operator 2026-11-16). After the new-user filters above, which rebuild the list.
+    if (this.showEnrolledRange) {
+      base = this.filterByEnrollmentDate(base);
+    }
     // Sale Achieved date range: only the purchases bought in it, totals recomputed (operator 2026-11-02).
     if (this.selectedStatusInfo?.status === 'saleAchieved') {
       base = saleBuyersInRange(base, this.saleFrom, this.saleTo);
@@ -2566,6 +2583,52 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     if (this.selectedStatusInfo?.status === 'totalEnrolled' && this.sideSort) {
       this.filteredParticipants = this.sortEnrolledPanel(this.filteredParticipants, this.sideSort);
     }
+  }
+
+  /**
+   * Enrollment-date range on Total Enrolled, Exist Users Enrolled and New Users Enrolled (operator 2026-11-16).
+   * 'yyyy-mm-dd' or ''; either end alone is fine. Both ends are whole local days. Cleared whenever a panel opens.
+   */
+  enrolledFrom = '';
+  enrolledTo = '';
+  private static readonly ENROLLED_RANGE_PANELS = ['totalEnrolled', 'existUsersEnrolled', 'totalNewUsers'];
+
+  get showEnrolledRange(): boolean {
+    return WorkshopDashboardComponent.ENROLLED_RANGE_PANELS.includes(this.selectedStatusInfo?.status);
+  }
+
+  clearEnrolledRange(): void {
+    this.enrolledFrom = '';
+    this.enrolledTo = '';
+    this.applyFilterSide();
+  }
+
+  /** Start or end of a local 'yyyy-mm-dd' day in ms, or NaN when the value is empty or not a date. */
+  private dayEdgeMs(v: string, edge: 'start' | 'end'): number {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || '');
+    if (!m) return NaN;
+    const d = edge === 'start'
+      ? new Date(+m[1], +m[2] - 1, +m[3], 0, 0, 0, 0)
+      : new Date(+m[1], +m[2] - 1, +m[3], 23, 59, 59, 999);
+    return d.getTime();
+  }
+
+  /**
+   * Keeps people whose enrollment date (first enrolled doc, as the cards and export use) falls in the range.
+   * With a range set, people without a date are left out. Ends typed the wrong way round mean the same window.
+   */
+  private filterByEnrollmentDate(list: any[]): any[] {
+    let from = this.enrolledFrom, to = this.enrolledTo;
+    if (from && to && from > to) [from, to] = [to, from];
+    const lo = this.dayEdgeMs(from, 'start');
+    const hi = this.dayEdgeMs(to, 'end');
+    if (Number.isNaN(lo) && Number.isNaN(hi)) return list;
+    const docs = this.firstEnrolledDocs();
+    return list.filter(p => {
+      const t = this.enrolledMillis(docs.get(p?.profileid)?.enrollmentdate);
+      if (Number.isNaN(t)) return false;
+      return (Number.isNaN(lo) || t >= lo) && (Number.isNaN(hi) || t <= hi);
+    });
   }
 
   /** Total Enrolled panel sort; '' keeps the list in its unsorted order. Each time the panel opens it starts on

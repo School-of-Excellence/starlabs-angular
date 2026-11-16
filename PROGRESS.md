@@ -2,17 +2,30 @@
 
 ## Current state
 - **starlabs-angular `nanda-development`**: HEAD `f1124b66`. Everything since 2026-11-12 is **local and
-  uncommitted**: 17 modified files and 9 new ones (2 unit specs, 1 plan, 6 journals). Not merged, not deployed.
+  uncommitted**: 20 modified files and 11 new ones (2 unit specs, 1 plan, 8 journals). Not merged, not deployed.
 - **starlabs-e2e-tests `main`**: pushed through `69bd71c`. The full workshops suite ran first: 169 passed /
-  0 failed / 33 skipped. The new spec files are gated on hooks that ship with the uncommitted app changes, so
+  0 failed / 33 skipped. Three newer commits are **local**: `16f2134` (WNE-08), `664cda6` (UCC-03) and the WNE-09 commit. The new spec files are gated on hooks that ship with the uncommitted app changes, so
   CI skips them until those land.
 - Unit tests:
-  - `workshop-dashboard.export.spec.ts` 15/15, `newusersprofile.columns.spec.ts` 5/5,
+  - `workshop-dashboard.export.spec.ts` 25/25, `newusersprofile.columns.spec.ts` 5/5,
     `workshop-access.model.spec.ts` 7/7.
   - The dashboard folder has 197 passing and 1 failing; the failure is the old empty "should create" stub.
 - The test servers are stopped and the cloud-function `functions/package.json` is restored.
 
 ## Last session changes (2026-11-12 → 11-16)
+- **New Users full redesign, design only** (2026-11-16). No app code changed.
+  - Files: `specs/journals/2026-11-16-new-users-redesign/new-users-ui.html` and `new-users-states.html` (54
+    frames).
+  - Three designs were judged; Heritage Ledger won (85, against 77 and 75). The best ideas from the other two
+    were merged in, and the result was checked against the global sheets.
+  - A read-only investigation found why the screen loads slowly. The ranked fixes are in journal
+    `2026-11-16-new-users-redesign`.
+- **Tag filter on Exist Users and New Users Enrolled too** (2026-11-16): one shared section in both filter menus.
+- **Enrollment date filter** (2026-11-16) on Total, Exist Users and New Users Enrolled. Whole days; either end
+  works alone; cleared each time a panel opens.
+- **EiFlix Responses dialog** (2026-11-16): header, table and footer line up; the workshop title is centred and
+  bold; Export downloads a CSV of what's listed, search applied. Journal:
+  `2026-11-16-enrolled-date-range-and-responses-dialog`.
 - **Workshop dashboard, Total Enrolled.**
   - The export adds Enrollment Date (with time) and Tags.
   - The side filter is All / New / Exist. People in `movedtoexist` count as Exist everywhere, which also fixes
@@ -50,24 +63,32 @@
 
 ## Pending
 1. **Operator: commit all the angular files above together.** The pushed hub specs key on their hooks.
+   Then push the hub's WNE-08, UCC-03 and WNE-09 on "push", after a full workshops suite.
 2. **Before deploying to production:**
    - put the right profile ids in `static meta data/Workshop Admin.clearworkshop` (full-access people lose
      Clear on deploy);
    - confirm the Firestore rules allow **updating** `newusertags`, or renames will fail with "Could not
      rename the tag".
-3. **EiFlix Confirmed**: the stored `confirmed` can still differ from the real responses. Option 3, a one-off
+3. **New Users redesign: waiting on operator sign-off.**
+   - Then port it. Keep every hook; hub NUS-01..11 and WS-22/23 key on them.
+   - Then fix load time, biggest first:
+     - the whole `participant metadata` read, for a hidden column;
+     - the sequential guard and role checks (shared guard: full regression);
+     - nothing renders before all of `new_user_data`.
+   - Add performance marks before changing anything.
+4. **EiFlix Confirmed**: the stored `confirmed` can still differ from the real responses. Option 3, a one-off
    repair, is not done; it needs approval and an approved way into production.
-4. **New Users audit, not done:**
+5. **New Users audit, not done** (most are covered by the redesign):
    - three-state chips in bulk tag edit;
    - search inside the filter menus;
    - debounced search;
    - a load-error state;
    - collapsing the filters on narrow screens.
-5. **Known, left as is:**
+6. **Known, left as is:**
    - a full-access person's hidden per-workshop Clear tick still grants Clear;
    - a failed admin-lists read can let the editor save empty lists.
-6. `graphify` isn't installed here, so the graph-rebuild step was skipped.
-7. Carried over:
+7. `graphify` isn't installed here, so the graph-rebuild step was skipped.
+8. Carried over:
    - `/engagementdashboardv2` needs a route-config entry and `authGuard`;
    - EiFlix consumers must read `showtext`, and the learner app `allowedit`.
    - Older ATC slider items: see `specs/journals/2026-11-03-participant-view-and-slider-contract.md`.

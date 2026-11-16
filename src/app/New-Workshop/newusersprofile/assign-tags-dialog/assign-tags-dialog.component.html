@@ -1,174 +1,261 @@
-<div class="tags-wrap">
-  <div class="tags-head">
-    <div class="tags-head-text">
-      <div class="avatar">
-        <mat-icon *ngIf="mode !== 'single'">sell</mat-icon>
-        <ng-container *ngIf="mode === 'single'">{{ (userName || 'U').charAt(0) | uppercase }}</ng-container>
-      </div>
-      <div>
-        <h2>{{ mode === 'single' ? 'Assign Tags' : (mode === 'bulk' ? 'Manage Tags' : 'Tags') }}</h2>
-        <p>
-          {{ mode === 'single' ? userName
-             : (mode === 'bulk' ? (bulkCount + ' user' + (bulkCount === 1 ? '' : 's') + ' selected')
-             : 'Create and rename tags, copy segment links') }}
-        </p>
-      </div>
+<!--
+  Tag dialogs (design 2026-11-16, section 5): Manage tags, Assign tags (one person), Edit tags (N people).
+  Hooks: atd-* only, literal. Icons are inline SVG (no sprite <use href>: the app's base href breaks them).
+-->
+<div class="nx-root nx-dialog atd-root">
+
+  <header class="nx-dialog-head">
+    <span class="nx-dialog-mark" aria-hidden="true" *ngIf="mode !== 'single'">
+      <svg class="nx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.8 12.6V5a1.2 1.2 0 0 1 1.2-1.2h7.6a1.2 1.2 0 0 1 .85.35l7.3 7.3a1.2 1.2 0 0 1 0 1.7l-7.6 7.6a1.2 1.2 0 0 1-1.7 0l-7.3-7.3a1.2 1.2 0 0 1-.35-.85z"/><circle cx="8.3" cy="8.3" r="1.3"/></svg>
+    </span>
+    <span class="nx-mono" aria-hidden="true" *ngIf="mode === 'single'">{{ initials }}</span>
+    <div class="nx-dialog-titles">
+      <h3 class="nx-dialog-title" id="atd-dialog-title" data-testid="atd-dialog-title">{{ title }}</h3>
+      <p class="nx-dialog-sub" data-testid="atd-dialog-sub">{{ subtitle }}</p>
     </div>
-    <button data-testid="atd-cancel-1" mat-icon-button type="button" (click)="cancel()" aria-label="Close">
-      <mat-icon>close</mat-icon>
+    <button class="nx-iconbtn" data-testid="atd-cancel-1" type="button" aria-label="Close" (click)="cancel()">
+      <svg class="nx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg>
     </button>
+  </header>
+
+  <!-- Manage tags only: two tabs. Arrow keys move between them. -->
+  <div class="nx-tabs" role="tablist" aria-label="Manage tags" *ngIf="mode === 'manage'"
+    (keydown.arrowleft)="selectTab(0, true)" (keydown.arrowright)="selectTab(1, true)">
+    <button class="nx-tabbtn" id="atd-tab-0" data-testid="atd-tab-tags" role="tab" type="button" aria-controls="atd-tabpanel"
+      [class.is-on]="activeTab === 0" [attr.aria-selected]="activeTab === 0" [attr.tabindex]="activeTab === 0 ? 0 : -1"
+      (click)="selectTab(0)">Tags</button>
+    <button class="nx-tabbtn" id="atd-tab-1" data-testid="atd-tab-links" role="tab" type="button" aria-controls="atd-tabpanel"
+      [class.is-on]="activeTab === 1" [attr.aria-selected]="activeTab === 1" [attr.tabindex]="activeTab === 1 ? 0 : -1"
+      (click)="selectTab(1)">Segment links</button>
   </div>
 
-  <mat-dialog-content class="tags-body">
-    <div class="loading" *ngIf="loading">
-      <mat-spinner diameter="30"></mat-spinner>
+  <div class="nx-dialog-body" id="atd-tabpanel"
+    [attr.role]="mode === 'manage' ? 'tabpanel' : null"
+    [attr.aria-labelledby]="mode === 'manage' ? (activeTab === 0 ? 'atd-tab-0' : 'atd-tab-1') : null">
+
+    <div class="atd-loading" role="status" data-testid="atd-loading" *ngIf="loading">
+      <span class="nx-spin" aria-hidden="true"></span>Loading tags…
     </div>
 
-    <mat-tab-group *ngIf="!loading" class="tags-tabs" [(selectedIndex)]="activeTab" animationDuration="150ms">
+    <ng-container *ngIf="!loading">
 
-      <!-- ===== Tab 1: Assign ===== -->
-      <mat-tab [label]="mode === 'manage' ? 'Tags' : 'Assign'">
-        <div class="atd-pane">
-          <div class="search-box">
-            <mat-icon>search</mat-icon>
-            <input [(ngModel)]="search" placeholder="Search or create a tag…" aria-label="Search or create a tag"
-              (keyup.enter)="canCreate() && createTag()" />
-            <button data-testid="atd-search-2" *ngIf="search" class="clear-search" type="button" (click)="search = ''" aria-label="Clear">
-              <mat-icon>close</mat-icon>
+      <!-- ===== Search or create (every mode, except the Segment links tab) ===== -->
+      <ng-container *ngIf="mode !== 'manage' || activeTab === 0">
+        <div class="nx-input">
+          <svg class="nx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg>
+          <input data-testid="atd-search-input" type="search" placeholder="Search or create a tag" aria-label="Search or create a tag"
+            autocomplete="off" [(ngModel)]="search" (keyup.enter)="canCreate() && createTag()" />
+          <button class="nx-iconbtn" data-testid="atd-search-2" type="button" aria-label="Clear" *ngIf="search" (click)="search = ''">
+            <svg class="nx-ic nx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg>
+          </button>
+        </div>
+
+        <button class="nx-create" data-testid="atd-create-tag-3" type="button" *ngIf="canCreate()" [disabled]="isCreating" (click)="createTag()">
+          <svg class="nx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5.5v13M5.5 12h13"/></svg>
+          <span class="nx-create-text">Create <b>“{{ search.trim() }}”</b></span>
+          <span class="nx-kbd" aria-hidden="true" *ngIf="!isCreating">Enter</span>
+          <span class="nx-spin" aria-hidden="true" *ngIf="isCreating"></span>
+        </button>
+
+        <ng-container *ngIf="similarTags().length">
+          <div class="nx-cloudlabel"><span class="nx-eyebrow">Similar tags</span><span>Already exist</span></div>
+          <div class="nx-cloud">
+            <button class="nx-tchip nx-tchip--sm" data-testid="atd-similar-tag" type="button"
+              *ngFor="let t of similarTags(); trackBy: trackTag" (click)="pickSimilar(t)">
+              <svg class="nx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5.5v13M5.5 12h13"/></svg>
+              <span class="nx-tchip-name">{{ t.name }}</span>
             </button>
           </div>
+        </ng-container>
 
-          <button data-testid="atd-create-tag-3" class="create-chip" type="button" *ngIf="canCreate()" (click)="createTag()" [disabled]="isCreating">
-            <mat-icon>add</mat-icon>
-            <span>Create <strong>"{{ search.trim() }}"</strong></span>
-            <mat-spinner *ngIf="isCreating" diameter="16"></mat-spinner>
-          </button>
+        <div class="atd-empty" data-testid="atd-empty" *ngIf="filteredTags().length === 0 && !canCreate()">
+          <svg class="nx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.8 12.6V5a1.2 1.2 0 0 1 1.2-1.2h7.6a1.2 1.2 0 0 1 .85.35l7.3 7.3a1.2 1.2 0 0 1 0 1.7l-7.6 7.6a1.2 1.2 0 0 1-1.7 0l-7.3-7.3a1.2 1.2 0 0 1-.35-.85z"/><circle cx="8.3" cy="8.3" r="1.3"/></svg>
+          <p>No tags yet — type a name above to create your first one.</p>
+        </div>
+      </ng-container>
 
-          <div class="section-label" *ngIf="filteredTags().length > 0">
-            Tags <span class="muted" *ngIf="mode !== 'manage'">· tap to {{ selected.size ? 'toggle' : 'add' }}</span>
-            <span class="muted" *ngIf="mode === 'manage'">· click a tag to rename it</span>
-          </div>
-
-          <div class="chip-cloud">
-            <ng-container *ngFor="let t of filteredTags()">
-              <!-- Manage mode: the clicked tag turns into a name editor. Enter saves, Escape cancels. -->
-              <!-- Escape is caught on the whole editor, so it cancels from the buttons too, not just the input. -->
-              <div class="rename-box" *ngIf="mode === 'manage' && editingId === t.id; else tagChip"
-                (keydown.escape)="cancelRename($event)">
-                <input #renameInput data-testid="atd-rename-input" class="rename-input" [(ngModel)]="editName"
-                  maxlength="60" aria-label="New name for this tag" [disabled]="isRenaming"
+      <!-- ===== Manage tags · Tags: the ledger. Clicking a row renames the tag in place. ===== -->
+      <ng-container *ngIf="mode === 'manage' && activeTab === 0">
+        <div class="nx-cloudlabel" *ngIf="tags.length">
+          <span class="nx-eyebrow" data-testid="atd-tags-total">{{ search.trim() ? 'Matching · ' + filteredTags().length : 'All tags · ' + tags.length }}</span>
+          <span>Click a tag to rename it</span>
+        </div>
+        <div class="nx-ledger" data-testid="atd-ledger" *ngIf="filteredTags().length">
+          <ng-container *ngFor="let t of filteredTags(); trackBy: trackTag">
+            <!-- The clicked tag turns into a name editor. Enter saves, Escape cancels. -->
+            <!-- Escape is caught on the whole editor, so it cancels from the buttons too, not just the input. -->
+            <div class="nx-ledger-row is-editing rename-box" *ngIf="editingId === t.id; else ledgerRow"
+              [class.is-ok]="!renameError" (keydown.escape)="cancelRename($event)">
+              <label class="nx-rename"><span class="nx-sr">New name for {{ t.name }}</span>
+                <input #renameInput data-testid="atd-rename-input" type="text" placeholder="Tag name" maxlength="60"
+                  autocomplete="off" [(ngModel)]="editName" [disabled]="isRenaming"
+                  [attr.aria-invalid]="renameError ? 'true' : null"
+                  [attr.aria-describedby]="renameError ? 'atd-rename-err' : null"
                   (ngModelChange)="renameError = ''"
                   (keydown.enter)="saveRename()" />
-                <button data-testid="atd-rename-save" type="button" class="rename-act rename-save" (click)="saveRename()"
-                  [disabled]="isRenaming" aria-label="Save the new name" matTooltip="Save">
-                  <mat-spinner *ngIf="isRenaming" diameter="16"></mat-spinner>
-                  <mat-icon *ngIf="!isRenaming">check</mat-icon>
-                </button>
-                <button data-testid="atd-rename-cancel" type="button" class="rename-act" (click)="cancelRename($event)"
-                  [disabled]="isRenaming" aria-label="Cancel renaming" matTooltip="Cancel">
-                  <mat-icon>close</mat-icon>
-                </button>
-              </div>
-              <ng-template #tagChip>
-                <button data-testid="atd-toggle-4" type="button" class="chip" [title]="t.name"
-                  [class.selected]="isSelected(t.id)" [attr.aria-pressed]="mode === 'manage' ? null : isSelected(t.id)"
-                  (click)="toggle(t.id)">
-                  <mat-icon class="chip-ic">{{ mode === 'manage' ? 'edit' : (isSelected(t.id) ? 'check' : 'add') }}</mat-icon>
-                  <span class="chip-name">{{ t.name }}</span>
-                </button>
-              </ng-template>
-            </ng-container>
-          </div>
-          <div class="rename-error" role="alert" data-testid="atd-rename-error" *ngIf="renameError">
-            <mat-icon>error_outline</mat-icon>{{ renameError }}
-          </div>
-
-          <div class="cloud-empty" *ngIf="filteredTags().length === 0 && !canCreate()">
-            <mat-icon>sell</mat-icon>
-            <p>No tags yet — type a name above to create your first one.</p>
-          </div>
-        </div>
-      </mat-tab>
-
-      <!-- ===== Tab 2: All Tags / Copy segment ===== -->
-      <mat-tab [label]="mode === 'manage' ? 'Segment links' : 'All Tags'">
-        <div class="atd-pane">
-          <div class="segment-hint">
-            <mat-icon>link</mat-icon>
-            <div class="hint-body">
-              <span class="hint-title">Segment link example</span>
-              <code class="hint-url">{{ segmentHint }}</code>
+              </label>
+              <!-- After a refused name ✓ looks off but stays focusable (aria-disabled); it is truly disabled only while saving. -->
+              <button class="nx-rename-ok" data-testid="atd-rename-save" type="button" aria-label="Save the new name"
+                [disabled]="isRenaming" [attr.aria-disabled]="renameError ? 'true' : null" [class.is-off]="!!renameError"
+                (click)="saveRename()">
+                <span class="nx-spin" aria-hidden="true" *ngIf="isRenaming"></span>
+                <svg class="nx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false" *ngIf="!isRenaming"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+              </button>
+              <button class="nx-iconbtn" data-testid="atd-rename-cancel" type="button" aria-label="Cancel renaming"
+                [disabled]="isRenaming" (click)="cancelRename($event)">
+                <svg class="nx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg>
+              </button>
+              <p class="nx-fielderr" id="atd-rename-err" data-testid="atd-rename-error" role="alert" *ngIf="renameError">
+                <svg class="nx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5.5M12 16.3v.2"/></svg>{{ renameError }}
+              </p>
             </div>
-          </div>
+            <ng-template #ledgerRow>
+              <button class="nx-ledger-row nx-ledger-btn" data-testid="atd-toggle-4" type="button" [attr.data-tag]="t.id" (click)="toggle(t.id)">
+                <span class="nx-sr">Rename </span><span class="nx-ledger-name">{{ t.name }}</span>
+                <span class="nx-ledger-n" data-testid="atd-tag-count" *ngIf="tagCounts">{{ countOf(t.id) | number }} {{ countOf(t.id) === 1 ? 'person' : 'people' }}</span>
+                <span class="nx-ledger-pen" aria-hidden="true">
+                  <svg class="nx-ic nx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4.5 19.5l1-4L15.8 5.2a2 2 0 0 1 2.8 0l.2.2a2 2 0 0 1 0 2.8L8.5 18.5z"/><path d="M14 7l3 3"/></svg>
+                </span>
+              </button>
+            </ng-template>
+          </ng-container>
+        </div>
+      </ng-container>
 
-          <div class="segment-toolbar">
-            <span class="seg-count">{{ copySelection.selected.length }} selected</span>
-            <button data-testid="atd-copy-selected-segments-5" mat-flat-button color="primary" type="button" (click)="copySelectedSegments()"
-              [disabled]="copySelection.selected.length === 0">
-              <mat-icon>content_copy</mat-icon> Copy selected segment
-            </button>
-          </div>
+      <!-- ===== Manage tags · Segment links ===== -->
+      <ng-container *ngIf="mode === 'manage' && activeTab === 1">
+        <div class="nx-linkbox" data-testid="atd-link-example">
+          <svg class="nx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>
+          <div class="nx-linkbox-text"><b>How a segment link looks</b><span class="nx-url">{{ segmentHintBase }}<span class="nx-url-hl">{{ segmentHintIds }}</span></span></div>
+        </div>
 
-          <div class="segment-table-wrap">
-            <table mat-table [dataSource]="tags" class="segment-table">
-              <ng-container matColumnDef="select">
-                <th mat-header-cell *matHeaderCellDef class="seg-select-col">
-                  <mat-checkbox data-testid="atd-change-master-toggle-tags-6" (change)="masterToggleTags()" [checked]="isAllTagsSelected()"
-                    [indeterminate]="someTagsSelected()"></mat-checkbox>
+        <div class="nx-segbar">
+          <span class="nx-count" data-testid="atd-seg-selected-count"><strong>{{ copySelection.selected.length }}</strong> selected</span>
+          <button class="nx-primary" data-testid="atd-copy-selected-segments-5" type="button"
+            [disabled]="!copySelection.hasValue()" (click)="copySelectedSegments()">
+            <svg class="nx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="8.5" y="8.5" width="11" height="11" rx="1.5"/><path d="M15.5 8.5V6A1.5 1.5 0 0 0 14 4.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/></svg>
+            Copy selected link
+          </button>
+        </div>
+
+        <div class="nx-segwrap">
+          <table class="nx-segtable" data-testid="atd-seg-table">
+            <thead>
+              <tr>
+                <th class="nx-c-select" scope="col">
+                  <label class="nx-cbhit">
+                    <input type="checkbox" class="nx-cb" data-testid="atd-change-master-toggle-tags-6" aria-label="Select all tags"
+                      [checked]="isAllTagsSelected()" [indeterminate]="someTagsSelected()" [class.is-mixed]="someTagsSelected()"
+                      [disabled]="!tags.length" (change)="masterToggleTags()" />
+                  </label>
                 </th>
-                <td mat-cell *matCellDef="let t" class="seg-select-col">
-                  <mat-checkbox data-testid="atd-change-copy-selection-7" (change)="copySelection.toggle(t.id)"
-                    [checked]="copySelection.isSelected(t.id)"></mat-checkbox>
+                <th scope="col">Tag</th>
+                <th scope="col">Segment ID</th>
+                <th scope="col" class="nx-c-copy"><span class="nx-sr">Copy</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let t of tags; trackBy: trackTag" [class.is-picked]="copySelection.isSelected(t.id)">
+                <td class="nx-c-select">
+                  <label class="nx-cbhit">
+                    <input type="checkbox" class="nx-cb" data-testid="atd-change-copy-selection-7" [attr.aria-label]="'Select ' + t.name"
+                      [checked]="copySelection.isSelected(t.id)" (change)="copySelection.toggle(t.id)" />
+                  </label>
                 </td>
-              </ng-container>
-
-              <ng-container matColumnDef="name">
-                <th mat-header-cell *matHeaderCellDef>Tag</th>
-                <td mat-cell *matCellDef="let t"><span class="seg-name">{{ t.name }}</span></td>
-              </ng-container>
-
-              <ng-container matColumnDef="id">
-                <th mat-header-cell *matHeaderCellDef>Segment ID</th>
-                <td mat-cell *matCellDef="let t"><code class="id-code">{{ t.id }}</code></td>
-              </ng-container>
-
-              <ng-container matColumnDef="copy">
-                <th mat-header-cell *matHeaderCellDef class="seg-copy-col">Copy Segment</th>
-                <td mat-cell *matCellDef="let t" class="seg-copy-col">
-                  <button data-testid="atd-copy-segment-8" mat-icon-button type="button" class="seg-copy-btn" (click)="copySegment(t.id)"
-                    matTooltip="Copy ?segment={{ t.id }}">
-                    <mat-icon>content_copy</mat-icon>
+                <td class="nx-c-name">{{ t.name }}</td>
+                <td><span class="nx-code">{{ t.id }}</span></td>
+                <td class="nx-c-copy">
+                  <button class="nx-iconbtn" data-testid="atd-copy-segment-8" type="button" [attr.aria-label]="'Copy the link for ' + t.name"
+                    [attr.title]="'Copy ?segment=' + t.id" (click)="copySegment(t.id)">
+                    <svg class="nx-ic nx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="8.5" y="8.5" width="11" height="11" rx="1.5"/><path d="M15.5 8.5V6A1.5 1.5 0 0 0 14 4.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/></svg>
                   </button>
                 </td>
-              </ng-container>
-
-              <tr mat-header-row *matHeaderRowDef="segmentColumns"></tr>
-              <tr mat-row *matRowDef="let row; columns: segmentColumns"></tr>
-            </table>
-
-            <div class="seg-empty" *ngIf="tags.length === 0">No tags available.</div>
-          </div>
+              </tr>
+            </tbody>
+          </table>
+          <p class="atd-segempty" *ngIf="!tags.length">No tags available.</p>
         </div>
-      </mat-tab>
-    </mat-tab-group>
-  </mat-dialog-content>
+      </ng-container>
 
-  <!-- Assign footer (tab 1, when assigning to user(s)) -->
-  <mat-dialog-actions class="tags-actions" *ngIf="showAssignFooter">
-    <span class="count">
-      <mat-icon>sell</mat-icon>{{ selected.size }} selected
+      <!-- ===== Assign tags · one person: their tags apart from the rest ===== -->
+      <ng-container *ngIf="mode === 'single'">
+        <ng-container *ngIf="onTags().length">
+          <div class="nx-cloudlabel"><span class="nx-eyebrow">On {{ firstName }} · {{ onCount() }}</span><span>Tap to remove</span></div>
+          <div class="nx-cloud" data-testid="atd-cloud-on">
+            <ng-container *ngFor="let t of onTags(); trackBy: trackTag">
+              <ng-container *ngTemplateOutlet="chipTpl; context: { $implicit: t }"></ng-container>
+            </ng-container>
+          </div>
+        </ng-container>
+        <ng-container *ngIf="moreTags().length">
+          <div class="nx-cloudlabel"><span class="nx-eyebrow">{{ onTags().length ? 'More tags' : 'Tags' }}</span><span>Tap to add</span></div>
+          <div class="nx-cloud" data-testid="atd-cloud-more">
+            <ng-container *ngFor="let t of moreTags(); trackBy: trackTag">
+              <ng-container *ngTemplateOutlet="chipTpl; context: { $implicit: t }"></ng-container>
+            </ng-container>
+          </div>
+        </ng-container>
+      </ng-container>
+
+      <!-- ===== Edit tags · N people: all / some / none per tag ===== -->
+      <ng-container *ngIf="mode === 'bulk'">
+        <ng-container *ngIf="filteredTags().length">
+          <div class="nx-cloudlabel"><span class="nx-eyebrow">Tags</span><span>Tap to give to all, again to remove from all</span></div>
+          <div class="nx-cloud" data-testid="atd-cloud-all">
+            <ng-container *ngFor="let t of filteredTags(); trackBy: trackTag">
+              <ng-container *ngTemplateOutlet="chipTpl; context: { $implicit: t }"></ng-container>
+            </ng-container>
+          </div>
+        </ng-container>
+        <div class="nx-key" data-testid="atd-key" *ngIf="tags.length">
+          <span><span class="nx-dot nx-dot--on"><svg class="nx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>All of them</span>
+          <span><span class="nx-dot nx-dot--part"><svg class="nx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 12h12"/></svg></span>Some of them</span>
+          <span><span class="nx-dot"><svg class="nx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5.5v13M5.5 12h13"/></svg></span>None of them</span>
+          <span><span class="nx-dot nx-dot--changed"></span>Changed, not yet applied</span>
+        </div>
+      </ng-container>
+    </ng-container>
+  </div>
+
+  <!-- Manage tags footer (both tabs): what is happening, then Close -->
+  <footer class="nx-dialog-foot" *ngIf="showCloseFooter">
+    <span class="nx-grow" data-testid="atd-footer-status" role="status" aria-live="polite">
+      <ng-container *ngIf="editingId; else noticeTpl">Renaming “{{ tagName(editingId) }}”</ng-container>
+      <ng-template #noticeTpl>
+        <span class="nx-confirm" *ngIf="notice">
+          <svg class="nx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>{{ notice }}
+        </span>
+      </ng-template>
     </span>
-    <span class="spacer"></span>
-    <button data-testid="atd-cancel-9" mat-stroked-button type="button" (click)="cancel()" [disabled]="isSaving">Cancel</button>
-    <button data-testid="atd-save-10" mat-flat-button color="primary" type="button" (click)="save()" [disabled]="isSaving">
-      <mat-spinner *ngIf="isSaving" diameter="20"></mat-spinner>
-      <span *ngIf="!isSaving">{{ mode === 'bulk' ? 'Apply' : 'Save' }}</span>
-    </button>
-  </mat-dialog-actions>
+    <button class="nx-quiet" data-testid="atd-cancel-11" type="button" (click)="cancel()">Close</button>
+  </footer>
 
-  <!-- Close footer (All Tags tab, or manage mode) -->
-  <mat-dialog-actions class="tags-actions" *ngIf="showCloseFooter">
-    <span class="spacer"></span>
-    <button data-testid="atd-cancel-11" mat-stroked-button type="button" (click)="cancel()">Close</button>
-  </mat-dialog-actions>
+  <!-- Assign / Edit footer: exactly what Save or Apply will do -->
+  <footer class="nx-dialog-foot" *ngIf="showAssignFooter">
+    <span class="nx-grow nx-change" id="atd-summary-text" data-testid="atd-summary" aria-live="polite">
+      <span *ngFor="let l of summaryLines(); trackBy: trackLine"><ng-container *ngIf="l.names">{{ l.verb }} <b>{{ l.names }}</b>{{ l.more ? ' ' + l.more : '' }} </ng-container>{{ l.tail }}</span>
+      <span *ngIf="!hasChanges()">No changes yet</span>
+    </span>
+    <button class="nx-quiet" data-testid="atd-cancel-9" type="button" [disabled]="isSaving" (click)="cancel()">Cancel</button>
+    <button class="nx-primary" data-testid="atd-save-10" type="button" [disabled]="isSaving || !hasChanges()" (click)="save()">
+      <span class="nx-spin" aria-hidden="true" *ngIf="isSaving"></span>
+      <span>{{ mode === 'bulk' ? 'Apply' : 'Save' }}</span>
+    </button>
+  </footer>
 </div>
+
+<!-- One chip, shared by Assign tags and Edit tags -->
+<ng-template #chipTpl let-t>
+  <button class="nx-tchip" data-testid="atd-toggle-4" type="button" [attr.data-tag]="t.id"
+    [class.is-on]="stateOf(t.id) === 'all'" [class.is-part]="stateOf(t.id) === 'some'"
+    [class.is-off]="isChanged(t.id) && stateOf(t.id) === 'none'" [class.is-changed]="isChanged(t.id)"
+    [attr.aria-pressed]="stateOf(t.id) === 'some' ? 'mixed' : (stateOf(t.id) === 'all' ? 'true' : 'false')"
+    [attr.aria-describedby]="isChanged(t.id) ? 'atd-summary-text' : null"
+    (click)="toggle(t.id)">
+    <svg class="nx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false" *ngIf="stateOf(t.id) === 'all'"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+    <svg class="nx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false" *ngIf="stateOf(t.id) === 'some'"><path d="M6 12h12"/></svg>
+    <svg class="nx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false" *ngIf="stateOf(t.id) === 'none'"><path d="M12 5.5v13M5.5 12h13"/></svg>
+    <span class="nx-tchip-name">{{ t.name }}</span>
+    <span class="nx-tchip-n" data-testid="atd-chip-count" *ngIf="chipCount(t.id)">{{ chipCount(t.id) }}</span>
+  </button>
+</ng-template>

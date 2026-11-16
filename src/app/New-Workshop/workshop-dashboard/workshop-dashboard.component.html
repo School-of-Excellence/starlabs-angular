@@ -1743,11 +1743,26 @@
           <button type="button" data-testid="wdash-sale-sort-recent" [class.on]="saleSort === 'recent'"
                   [attr.aria-pressed]="saleSort === 'recent'" (click)="setSaleSort('recent')">Recent purchase</button>
         </div>
+        <!-- The Tag filter, shared by two menus: Total / Exist Users Enrolled (the filter menu) and New Users Enrolled
+             (its own menu). Filter by the tags on each person's enrolment; ticking keeps the menu open. -->
+        <ng-template #tagFilterSection>
+          <div class="side-tag-filter" data-testid="wd-side-tag-filter"
+               *ngIf="showTagFilter && enrolledTagOptions.length > 0"
+               (click)="$event.stopPropagation()">
+            <div class="side-tag-filter-head">
+              <span>Tags</span>
+              <button type="button" class="side-tag-filter-clear" data-testid="wd-side-tag-clear"
+                      *ngIf="selectedTagFilters.length > 0" (click)="clearTagFilters()">Clear</button>
+            </div>
+            <mat-checkbox data-testid="wd-side-tag-option" *ngFor="let tag of enrolledTagOptions"
+                          [checked]="selectedTagFilters.includes(tag)" (change)="toggleTagFilter(tag)">{{ tag }}</mat-checkbox>
+          </div>
+        </ng-template>
         <ng-container *ngIf="selectedStatusInfo?.status !== 'totalNewUsers' &&
                             selectedStatusInfo?.status !== 'totalNewUsersNotEnrolled' &&
                             selectedStatusInfo?.status !== 'saleAchieved'">
           <button data-testid="wd-button-63" mat-icon-button [matMenuTriggerFor]="filterMenu" aria-label="Filter participants"
-                  [color]="selectedStatusInfo?.status === 'totalEnrolled' && selectedTagFilters.length > 0 ? 'accent' : ''">
+                  [color]="showTagFilter && selectedTagFilters.length > 0 ? 'accent' : ''">
             <mat-icon>filter_list</mat-icon>
           </button>
           <mat-menu #filterMenu="matMenu">
@@ -1756,23 +1771,13 @@
               <mat-radio-button data-testid="wd-side-filter-new" value="new">New</mat-radio-button><br />
               <mat-radio-button data-testid="wd-side-filter-exist" value="exist">Exist</mat-radio-button>
             </mat-radio-group>
-            <!-- Total Enrolled: filter by the tags on each person's enrolment. Ticking keeps the menu open. -->
-            <div class="side-tag-filter" data-testid="wd-side-tag-filter"
-                 *ngIf="selectedStatusInfo?.status === 'totalEnrolled' && enrolledTagOptions.length > 0"
-                 (click)="$event.stopPropagation()">
-              <div class="side-tag-filter-head">
-                <span>Tags</span>
-                <button type="button" class="side-tag-filter-clear" data-testid="wd-side-tag-clear"
-                        *ngIf="selectedTagFilters.length > 0" (click)="clearTagFilters()">Clear</button>
-              </div>
-              <mat-checkbox data-testid="wd-side-tag-option" *ngFor="let tag of enrolledTagOptions"
-                            [checked]="selectedTagFilters.includes(tag)" (change)="toggleTagFilter(tag)">{{ tag }}</mat-checkbox>
-            </div>
+            <ng-container *ngTemplateOutlet="tagFilterSection"></ng-container>
           </mat-menu>
           <!-- Total Enrolled: sort by enrollment date or name. Picking the active option again turns it off. -->
           <ng-container *ngIf="selectedStatusInfo?.status === 'totalEnrolled'">
             <button data-testid="wd-side-sort-btn" mat-icon-button [matMenuTriggerFor]="sideSortMenu"
-                    aria-label="Sort participants" matTooltip="Sort" [color]="sideSort ? 'accent' : ''">
+                    aria-label="Sort participants" matTooltip="Sort"
+                    [color]="sideSort && sideSort !== 'enrolledNew' ? 'accent' : ''">
               <mat-icon>swap_vert</mat-icon>
             </button>
             <mat-menu #sideSortMenu="matMenu" class="side-sort-menu">
@@ -1802,7 +1807,7 @@
 
     <ng-container *ngIf="selectedStatusInfo?.status === 'totalNewUsers' || selectedStatusInfo?.status === 'totalNewUsersNotEnrolled'">
           <button data-testid="wd-button-65" mat-icon-button [matMenuTriggerFor]="newUserFilterMenu" aria-label="Filter new users"
-            [color]="selectedSubscriberCode.length > 0 || showReferredOnly ? 'accent' : ''">
+            [color]="selectedSubscriberCode.length > 0 || showReferredOnly || (showTagFilter && selectedTagFilters.length > 0) ? 'accent' : ''">
             <mat-icon>filter_list</mat-icon>
           </button>
 
@@ -1840,6 +1845,7 @@
                 Referred (not subscribed)
               </mat-checkbox>
             </div>
+            <ng-container *ngTemplateOutlet="tagFilterSection"></ng-container>
           </div>
         </mat-menu>
 
@@ -2184,6 +2190,25 @@
             </mat-menu>
           </ng-container> -->
           </div>
+        </div>
+        <!-- Total / Exist Users / New Users Enrolled: filter by enrollment date. Either end alone works. -->
+        <div class="sale-range enrolled-range" role="group" aria-label="Enrollment date range"
+             data-testid="wd-side-enrolled-range" *ngIf="showEnrolledRange">
+          <label class="sale-range-field">
+            <span>Enrolled from</span>
+            <input type="date" data-testid="wd-side-enrolled-from" [(ngModel)]="enrolledFrom" (ngModelChange)="applyFilterSide()"
+                   [ngModelOptions]="{standalone: true}" [attr.max]="enrolledTo || null" aria-label="Enrolled from">
+          </label>
+          <label class="sale-range-field">
+            <span>To</span>
+            <input type="date" data-testid="wd-side-enrolled-to" [(ngModel)]="enrolledTo" (ngModelChange)="applyFilterSide()"
+                   [ngModelOptions]="{standalone: true}" [attr.min]="enrolledFrom || null" aria-label="Enrolled to">
+          </label>
+          <button type="button" class="sale-range-clear" data-testid="wd-side-enrolled-clear"
+                  *ngIf="enrolledFrom || enrolledTo" (click)="clearEnrolledRange()" aria-label="Clear the enrollment dates"
+                  matTooltip="Clear dates">
+            <mat-icon>close</mat-icon>
+          </button>
         </div>
         <!-- Sale Achieved: purchase date range inside the window, then the total of the buyers listed. -->
         <ng-container *ngIf="selectedStatusInfo?.status === 'saleAchieved'">

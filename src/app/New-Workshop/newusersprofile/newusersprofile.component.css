@@ -1,1028 +1,781 @@
-.page {
-  padding: 24px clamp(16px, 3vw, 40px);
-  width: 100%;
-  max-width: 1400px;
-  margin: 0 auto;
-  background: #f7f9fc;
-  min-height: 100%;
-  box-sizing: border-box;
-}
-
-.page-head {
-  margin-bottom: 16px;
-}
-
-:host {
-  display: block;
-  font-family: Roboto, "Helvetica Neue", sans-serif;
-  line-height: 1.4;
-  letter-spacing: normal;
-  /* Material's button labels are widely tracked by default; keep them like the rest of the text. */
-  --mdc-outlined-button-label-text-tracking: 0.01em;
-  --mdc-filled-button-label-text-tracking: 0.01em;
-  --mdc-text-button-label-text-tracking: 0.01em;
-  --mat-outlined-button-label-text-tracking: 0.01em;
-  --mat-filled-button-label-text-tracking: 0.01em;
-  --mat-text-button-label-text-tracking: 0.01em;
-  /* One outline and one label colour for every filter control, buttons and the date field alike. */
-  --nu-filter-border: #d5d9e2;
-  --nu-filter-text: #1f2937;
-}
-
-.tag-select-btn,
-.tags-manage-btn {
-  --mdc-outlined-button-outline-color: var(--nu-filter-border);
-  --mat-outlined-button-outline-color: var(--nu-filter-border);
-  --mdc-outlined-button-label-text-color: var(--nu-filter-text);
-  --mat-outlined-button-label-text-color: var(--nu-filter-text);
-}
-
-.page-head-text h1 {
-  margin: 0;
-  font-family: inherit;
-  font-size: 1.5rem;
-  line-height: 1.3;
-  letter-spacing: normal;
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.page-head-text p {
-  margin: 4px 0 0 0;
-  color: #6b7280;
-  font-size: 0.9rem;
-}
-
-.loading {
-  display: flex;
-  justify-content: center;
-  padding: 60px 0;
-}
-
-.empty-state {
-  text-align: center;
-  padding: 60px 20px;
-  background: #ffffff;
-  border: 1px solid #eceff4;
-  border-radius: 14px;
-  color: #6b7280;
-}
-
-.empty-state mat-icon {
-  font-size: 48px;
-  height: 48px;
-  width: 48px;
-  color: #c4cbd7;
-}
-
-.empty-state h3 {
-  margin: 12px 0 4px 0;
-  font-family: inherit;
-  font-size: 1.05rem;
-  line-height: 1.4;
-  color: #374151;
-  font-weight: 600;
-}
-
-.empty-state p {
-  margin: 0;
-  font-size: 0.88rem;
-}
-
-/* ---- layout: table card, then the selection bar under it ---- */
-.nu-layout {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.nu-spacer {
-  flex: 1 1 auto;
-}
-
-/* Sticks to the bottom of the screen while the table scrolls; grows upward when Export or Send opens. */
-.nu-selbar {
-  position: sticky;
-  bottom: 12px;
-  z-index: 20;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 10px 12px;
-  background: #ffffff;
-  border: 1px solid #c7d2fe;
-  border-radius: 14px;
-  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.12);
-}
-
-.nu-selbar-main {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.nu-selbar-pop {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.nu-selbar-pop .export-panel,
-.nu-selbar-pop .comm-panel {
-  width: 100%;
-  max-width: 560px;
-}
-
-.sp-count {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  color: #374151;
-  font-size: 0.9rem;
-}
-
-.sp-hidden {
-  color: #b45309;
-  font-size: 0.82rem;
-  cursor: help;
-}
-
-.sp-num {
-  font-size: 1.3rem;
-  font-weight: 700;
-  color: #4f46e5;
-}
-
-.sp-clear {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: #9aa2b1;
-  cursor: pointer;
-}
-
-.sp-clear:hover {
-  background: #f1f3f6;
-  color: #4b5563;
-}
-
-.sp-action {
-  height: 38px;
-  border-radius: 10px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.sp-action.sp-open {
-  background: #eef2ff;
-  border-color: #c7d2fe;
-}
-
-.sp-action mat-icon {
-  vertical-align: middle;
-  margin-right: 4px;
-}
-
-.sp-caret {
-  margin-left: 2px;
-  margin-right: 0 !important;
-  color: #6b7280;
-}
-
-.export-panel {
-  border: 1px solid #eef1f6;
-  border-radius: 12px;
-  background: #f9fafc;
-  padding: 12px;
-}
-
-.export-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.export-label {
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #6b7280;
-}
-
-.export-all {
-  border: none;
-  background: transparent;
-  color: #4f46e5;
-  font-size: 0.78rem;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 2px 4px;
-}
-
-.export-chips {
-  margin-bottom: 12px;
-}
-
-.download-btn {
-  width: 100%;
-  height: 40px;
-  border-radius: 10px;
-  font-weight: 600;
-}
-
-.download-btn mat-icon {
-  vertical-align: middle;
-  margin-right: 4px;
-}
-
-.export-hint {
-  margin: 8px 0 0 0;
-  font-size: 0.78rem;
-  line-height: 1.4;
-  color: #6b7280;
-  text-align: center;
-}
-
-/* Not `.table-card`: another screen's stylesheet restyles `.table-card` globally. */
-.nu-table-card {
-  background: #ffffff;
-  border: 1px solid #eceff4;
-  border-radius: 14px;
-  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.04);
-  overflow: clip;
-}
-
-.nu-toolbar {
-  border-bottom: 1px solid #f0f2f6;
-}
-
-/* Row 1: search and result count on the left; columns, tag management and file selection on the right. */
-.nu-toolbar-top {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  padding: 14px 14px 10px 14px;
-}
-
-/* Row 2: every filter, in one line under its own label. */
-.nu-toolbar-filters {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 10px 14px 12px 14px;
-  background: #fafbfd;
-  border-top: 1px solid #f0f2f6;
-}
-
-.nu-filters-label {
-  margin-right: 4px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: #6b7280;
-}
-
-.nu-count {
-  color: #6b7280;
-  font-size: 0.88rem;
-  white-space: nowrap;
-}
-
-.nu-count strong {
-  color: #1f2937;
-  font-weight: 700;
-}
-
-.tag-select-btn {
-  height: 40px;
-  border-radius: 10px;
-  font-weight: 600;
-  color: #4f46e5;
-  white-space: nowrap;
-  display: inline-flex;
-  align-items: center;
-}
-
-.tag-select-btn mat-icon {
-  vertical-align: middle;
-}
-
-.tag-select-btn .trail {
-  margin-left: 2px;
-}
-
-.tag-select-btn.filter-on {
-  background: #eef2ff;
-  border-color: #c7d2fe;
-}
-
-.tag-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
-  margin: 0 2px;
-  border-radius: 999px;
-  background: #4f46e5;
-  color: #ffffff;
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-
-/* ---- tag filter menu (rendered in an overlay -> ::ng-deep) ---- */
-/* The column chooser shares these styles; its seven fixed rows must all be visible. */
-::ng-deep .tag-filter-menu .tfm-list.tfm-columns {
-  max-height: none;
-}
-
-::ng-deep .tag-filter-menu .mat-mdc-menu-content {
-  padding: 0 !important;
-}
-
-::ng-deep .tag-filter-menu.mat-mdc-menu-panel {
-  min-width: 280px;
-  max-width: 320px;
-  border-radius: 14px;
-  overflow: hidden;
-}
-
-::ng-deep .tag-filter-menu .tfm {
-  display: flex;
-  flex-direction: column;
-}
-
-::ng-deep .tag-filter-menu .tfm-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 14px 8px 14px;
-}
-
-::ng-deep .tag-filter-menu .tfm-title {
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #6b7280;
-}
-
-::ng-deep .tag-filter-menu .tfm-clear {
-  border: none;
-  background: transparent;
-  color: #4f46e5;
-  font-size: 0.78rem;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 2px 4px;
-}
-
-::ng-deep .tag-filter-menu .tfm-modes {
-  display: flex;
-  gap: 8px;
-  padding: 0 14px 10px 14px;
-}
-
-::ng-deep .tag-filter-menu .tfm-mode {
-  flex: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: 34px;
-  border: 1px solid #e4e7ee;
-  border-radius: 9px;
-  background: #ffffff;
-  color: #6b7280;
-  font-size: 0.82rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 120ms;
-}
-
-::ng-deep .tag-filter-menu .tfm-mode mat-icon {
-  font-size: 17px;
-  height: 17px;
-  width: 17px;
-}
-
-::ng-deep .tag-filter-menu .tfm-mode:hover {
-  background: #f5f7ff;
-}
-
-::ng-deep .tag-filter-menu .tfm-mode.on {
-  border-color: #6366f1;
-  background: #6366f1;
-  color: #ffffff;
-}
-
-::ng-deep .tag-filter-menu .tfm-list {
-  max-height: 240px;
-  overflow-y: auto;
-  border-top: 1px solid #f0f2f6;
-  padding: 6px;
-}
-
-::ng-deep .tag-filter-menu .tfm-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 8px 10px;
-  border: none;
-  border-radius: 9px;
-  background: transparent;
-  color: #374151;
-  font-size: 0.88rem;
-  cursor: pointer;
-  text-align: left;
-  transition: background 120ms;
-}
-
-::ng-deep .tag-filter-menu .tfm-item:hover {
-  background: #f8fafc;
-}
-
-::ng-deep .tag-filter-menu .tfm-item.sel {
-  background: #eef2ff;
-  color: #3730a3;
-  font-weight: 600;
-}
-
-::ng-deep .tag-filter-menu .tfm-check {
-  color: #b3b9c6;
-  font-size: 20px;
-  height: 20px;
-  width: 20px;
-}
-
-::ng-deep .tag-filter-menu .tfm-item.sel .tfm-check {
-  color: #4f46e5;
-}
-
-::ng-deep .tag-filter-menu .tfm-name {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-::ng-deep .tag-filter-menu .tfm-empty {
-  padding: 20px 10px;
-  text-align: center;
-  color: #9ca3af;
-  font-size: 0.84rem;
-}
-
-::ng-deep .tag-filter-menu .tfm-foot {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 14px;
-  border-top: 1px solid #f0f2f6;
-  background: #f9fafc;
-  font-size: 0.78rem;
-  color: #6b7280;
-}
-
-::ng-deep .tag-filter-menu .tfm-foot mat-icon {
-  font-size: 16px;
-  height: 16px;
-  width: 16px;
-  color: #9aa2b1;
-}
-
-/* ---- created-date range filter ----
-   A real range input sits in the toolbar (both bounds visible and typable),
-   compressed to the 44px height of the filter pills beside it. */
-/* Styled as one more filter button: same outline, radius, height, leading icon and label weight. */
-.created-range-field {
-  width: 270px;
-  max-width: 100%;
-  --mdc-outlined-text-field-outline-color: var(--nu-filter-border);
-  --mdc-outlined-text-field-hover-outline-color: #b6bcc8;
-  --mdc-outlined-text-field-focus-outline-color: #6366f1;
-  --mdc-outlined-text-field-outline-width: 1px;
-  --mdc-outlined-text-field-focus-outline-width: 1px;
-  --mdc-outlined-text-field-container-shape: 10px;
-  --mdc-outlined-text-field-input-text-color: var(--nu-filter-text);
-  --mdc-outlined-text-field-input-text-placeholder-color: var(--nu-filter-text);
-  --mat-form-field-container-text-size: 14px;
-  --mat-form-field-container-text-weight: 600;
-  --mat-form-field-container-text-tracking: 0.01em;
-}
-
-.created-range-field ::ng-deep .mat-mdc-text-field-wrapper {
-  border-radius: 10px;
-  background: #ffffff;
-  padding-left: 12px;
-}
-
-.created-range-field ::ng-deep .mat-mdc-form-field-icon-prefix {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 6px 0 0;
-}
-
-.created-range-field .df-lead {
-  font-size: 20px;
-  height: 20px;
-  width: 20px;
-  padding: 0;
-  color: var(--nu-filter-text);
-}
-
-/* Placeholders read like the other filter labels, not like faded hint text. */
-.created-range-field ::ng-deep .mat-date-range-input-inner {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--nu-filter-text);
-}
-
-.created-range-field ::ng-deep .mat-date-range-input-inner::placeholder {
-  color: var(--nu-filter-text);
-  opacity: 1;
-  font-weight: 600;
-}
-
-.created-range-field ::ng-deep .mat-date-range-input-separator {
-  color: #6b7280;
-  font-weight: 600;
-}
-
-/* Material's outline infix is 56px tall by default; 44px + 11px padding keeps
-   the 20px line box centred and the field level with the buttons. */
-.created-range-field ::ng-deep .mat-mdc-form-field-infix {
-  min-height: 40px;
-  padding-top: 9px;
-  padding-bottom: 9px;
-}
-
-/* Same indigo tint the other filters use once they are narrowing the table. */
-.created-range-field.filter-on ::ng-deep .mat-mdc-text-field-wrapper {
-  background: #eef2ff;
-}
-
-.created-range-field.filter-on ::ng-deep .mdc-notched-outline__leading,
-.created-range-field.filter-on ::ng-deep .mdc-notched-outline__notch,
-.created-range-field.filter-on ::ng-deep .mdc-notched-outline__trailing {
-  border-color: #c7d2fe;
-}
-
-/* The calendar and clear buttons are 48px by default, which made this field taller than the filters. */
-.created-range-field ::ng-deep .mat-mdc-form-field-icon-suffix {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 4px 0 0;
-}
-
-.created-range-field ::ng-deep .mat-mdc-form-field-icon-suffix .mat-mdc-icon-button {
-  --mdc-icon-button-state-layer-size: 32px;
-  width: 32px;
-  height: 32px;
-  padding: 4px;
-}
-
-.created-range-field ::ng-deep .mat-mdc-form-field-icon-suffix .mat-mdc-icon-button .mat-mdc-button-touch-target {
-  width: 32px;
-  height: 32px;
-}
-
-.created-range-field ::ng-deep .mat-date-range-input-separator {
-  margin: 0 2px;
-}
-
-/* The clear (x) shown on the date range and on the conversion button. */
-.df-clear {
-  margin-left: 4px;
-  font-size: 18px;
-  height: 18px;
-  width: 18px;
-  color: #9aa2b1;
-  border-radius: 50%;
-  cursor: pointer;
-}
-
-.df-clear:hover {
-  color: #d76060;
-  background: #f6e7e7;
-}
-
-/* ---- conversion filter (two-option menu) ---- */
-.converted-filter-btn {
-  gap: 2px;
-}
-
-::ng-deep .converted-filter-menu .mat-mdc-menu-item.on {
-  background: #eef2ff;
-  color: #4f46e5;
-}
-
-::ng-deep .converted-filter-menu .mat-mdc-menu-item.on .mat-icon {
-  color: #4f46e5;
-}
-
-.clear-filters-btn {
-  height: 40px;
-  border-radius: 10px;
-  font-weight: 600;
-  color: #b42318;
-  --mdc-text-button-label-text-color: #b42318;
-  --mat-text-button-label-text-color: #b42318;
-}
-
-.clear-filters-btn mat-icon {
-  font-size: 18px;
-  height: 18px;
-  width: 18px;
-  vertical-align: middle;
-  margin-right: 2px;
-}
-
-.search-field {
-  flex: 1 1 280px;
-  max-width: 440px;
-  --mdc-outlined-text-field-outline-color: var(--nu-filter-border);
-  --mdc-outlined-text-field-hover-outline-color: #b6bcc8;
-  --mdc-outlined-text-field-focus-outline-color: #6366f1;
-  --mdc-outlined-text-field-container-shape: 10px;
-}
-
-.search-field ::ng-deep .mat-mdc-text-field-wrapper {
-  border-radius: 10px;
-}
-
-.search-field ::ng-deep .mat-mdc-form-field-infix {
-  min-height: 40px;
-  padding-top: 9px;
-  padding-bottom: 9px;
-}
-
-.search-field ::ng-deep .mat-mdc-form-field-icon-suffix .mat-mdc-icon-button {
-  width: 32px;
-  height: 32px;
-  padding: 4px;
-}
-
-/* ---- workshop filter (toolbar) ---- */
-.tag-select-btn .wf-spinner {
-  display: inline-block;
-  margin: 0 4px;
-  vertical-align: middle;
-}
-
-/* Workshop menu: Funnel-only slide toggle row above the Include/Exclude modes. */
-::ng-deep .tag-filter-menu .tfm-toggle-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 8px 12px 4px 12px;
-}
-
-::ng-deep .tag-filter-menu .tfm-toggle-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #374151;
-}
-
-::ng-deep .tag-filter-menu .tfm-toggle-label mat-icon {
-  font-size: 18px;
-  width: 18px;
-  height: 18px;
-  color: #4f46e5;
-}
-
-/* Workshop column pills — same shape as tag pills, indigo tint. */
-.workshop-pill {
-  background: #eef2ff;
-  color: #4f46e5;
-}
-
-@media (max-width: 820px) {
-  .search-field {
-    flex-basis: 100%;
-    max-width: none;
-  }
-  .nu-spacer {
-    display: none;
-  }
-}
-
-/* ---- communication bar (matches the app blue action bar) ---- */
-.comm-panel {
-  border: 1px solid #eef1f6;
-  border-radius: 12px;
-  background: #f9fafc;
-  padding: 12px;
-}
-
-.comm-bar {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.comm-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  height: 42px;
-  padding: 0 10px;
-  border: 1px solid #c7d2fe;
-  border-radius: 10px;
-  background: #ffffff;
-  color: #3730a3;
-  font: inherit;
-  font-size: 0.86rem;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: background 120ms, border-color 120ms;
-}
-
-.comm-btn:hover {
-  background: #eef2ff;
-  border-color: #a5b4fc;
-}
-
-.comm-btn mat-icon,
-.comm-btn i {
-  color: #4f46e5;
-  font-size: 18px;
-  height: 18px;
-  width: 18px;
-}
-
-@media (max-width: 640px) {
-  .comm-bar {
-    grid-template-columns: 1fr;
-  }
-}
-
-.search-field mat-icon[matPrefix] {
-  color: #9ca3af;
-  margin-right: 6px;
-}
-
-/* Scrolls inside the card so the header and paginator stay put. ~400px = app bar, page head, the two toolbar
-   rows, paginator and padding. `isolation` keeps the sticky header's z-index (100) inside the table, so it
-   can't paint over the selection bar. */
-.table-scroll {
-  max-height: calc(100vh - 400px);
-  min-height: 240px;
-  overflow: auto;
-  isolation: isolate;
-}
-
-.select-col {
-  width: 48px;
-  padding-left: 8px !important;
-  padding-right: 0 !important;
-}
-
-/* ---- bulk action bar ---- */
-.bulk-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 10px 14px;
-  padding: 8px 10px 8px 8px;
-  border: 1px solid #dfe4fb;
-  border-radius: 12px;
-  background: #eef2ff;
-}
-
-.bulk-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.bulk-clear {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: #4f46e5;
-  cursor: pointer;
-}
-
-.bulk-clear:hover {
-  background: #e0e7ff;
-}
-
-.bulk-clear mat-icon {
-  font-size: 20px;
-  height: 20px;
-  width: 20px;
-}
-
-.bulk-count {
-  font-weight: 600;
-  color: #3730a3;
-  font-size: 0.9rem;
-}
-
-.bulk-add {
-  border-radius: 9px;
-  height: 38px;
-  font-weight: 600;
-}
-
-.bulk-add mat-icon {
-  font-size: 18px;
-  height: 18px;
-  width: 18px;
-  vertical-align: middle;
-  margin-right: 2px;
-}
-
-.users-table {
-  width: 100%;
-  background: transparent;
-}
-
-.users-table th.mat-mdc-header-cell {
-  background: #f6f7fa;
-  color: #6b7280;
-  font-weight: 600;
-  font-size: 0.74rem;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-  padding: 10px 12px;
-  box-shadow: inset 0 -1px 0 #eceff4;
-}
-
-.users-table td.mat-mdc-cell {
-  color: #374151;
-  font-size: 0.9rem;
-  border-bottom-color: #f0f2f6;
-  padding: 10px 12px;
-}
-
-.users-table tr.mat-mdc-row:hover {
-  background: #f8fafc;
-}
-
-.cell-strong {
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.email-cell {
-  color: #3f51b5;
-}
-
-/* One line per address; the full address is in the hover title. */
-.email-text {
-  display: block;
-  max-width: 260px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.nowrap-cell {
-  white-space: nowrap;
-}
-
-.chip {
-  display: inline-block;
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-size: 0.76rem;
-  font-weight: 600;
-}
-
-.chip-on {
-  background: #e7f6ee;
-  color: #1a8f5b;
-}
-
-.chip-off {
-  background: #f1f3f6;
-  color: #98a2b3;
-}
-
-.chip-sub {
-  background: #eef2ff;
-  color: #4f46e5;
-}
-
-.tags-cell {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-/* Full tag names (operator 2026-11-12): no cut-off; the cell wraps pills onto more lines instead. */
-.tag-pill {
-  display: inline-block;
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-size: 0.74rem;
-  font-weight: 600;
-  background: #eef2ff;
-  color: #4338ca;
-  white-space: nowrap;
-}
-
-.tag-pill.tag-more {
-  background: #f1f3f6;
-  color: #4b5563;
-  cursor: help;
-}
-
-.tag-edit-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  border-radius: 6px;
-  cursor: pointer;
-  color: #9aa2b1;
-  transition: color 120ms, background 120ms;
-}
-
-.tag-edit-btn:hover {
-  color: #4f46e5;
-  background: #eef2ff;
-}
-
-.tag-edit-btn mat-icon {
-  font-size: 18px;
-  height: 18px;
-  width: 18px;
-  line-height: 18px;
-}
-
-/* toolbar tags manager button */
-.tags-manage-btn {
-  height: 40px;
-  border-radius: 10px;
-  font-weight: 600;
-  color: #4f46e5;
-  white-space: nowrap;
-}
-
-.tags-manage-btn mat-icon {
-  vertical-align: middle;
-  margin-right: 2px;
-}
-
-.no-match-cell {
-  padding: 36px 14px;
-  text-align: center;
-  color: #6b7280;
-  font-size: 0.9rem;
-}
-
-.no-match-body {
-  display: inline-flex;
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 10px;
-}
-
-.no-match-body mat-icon {
-  color: #9aa2b1;
-}
-
-mat-paginator {
-  background: transparent;
-  border-top: 1px solid #f0f2f6;
-}
-
-@media (max-width: 640px) {
-  .page {
-    padding: 16px;
-  }
-}
+/* ==========================================================================
+   New Users · Heritage Ledger — design 2026-11-16, ported to Angular.
+   ViewEncapsulation.None: once loaded this sheet is global, so every rule is
+   rooted in an nx- class (no other nx- class exists in src) and the tokens live
+   on .nx-root (the screen root and every overlay root), never :root or :host.
+   Sources, verbatim and in their order:
+     redesign/final/src/shared.css 14–327 (tokens through the 480px container query);
+     redesign/final/src/states.css 36, 43–62, 64–75, 77–85, 87–133, 135–144, 146–170,
+     185–186, 197–210, 255–269, 275–291, 293–301, 325–346.
+   Port edits in place are marked "port:". Port additions follow at the end.
+   The hook-only classes the e2e hub reads (users-table, select-col, nowrap-cell,
+   tag-pill, workshop-pill, nu-table-card, sel) carry NO rules here: .tag-pill is
+   styled in other (emulated) components and must not leak.
+   ========================================================================== */
+
+app-newusersprofile{display:block}
+
+/* ======================= shared.css 14–327 ======================= */
+/* ---------- tokens ---------- */
+.nx-root{
+  --primary:#1a3c5e; --primary-light:#2a5a8e; --primary-deep:#14304b; --primary-tint:#eef3f9; --primary-line:#b8c7d9;
+  --accent:#c8a96e; --accent-ink:#7d5f26; --accent-tint:#fbf7ee; --accent-line:#e6d6b2; --accent-on-navy:#dcc391;
+  --bg:#f4f6f9; --surface:#fff; --head:#fafbfc; --hover:#fafbfd; --picked:#f4f7fb;
+  --border:#dde3ec; --border-light:#edf0f5; --border-strong:#c4cdd9;
+  --t1:#1a2535; --t2:#56647b; --t3:#617086;
+  --success:#2e7d52; --success-bg:#e8f5ed; --success-line:#bfe0cb;
+  --danger:#c0392b; --danger-bg:#fdecea; --danger-line:#f1c4be;
+  --warn:#a8630f; --warn-ink:#8a510b; --warn-bg:#fff4e0; --warn-line:#f0d7ab;
+  --ring:0 0 0 3px rgba(42,90,142,.2);
+  --shadow-sheet:0 1px 2px rgba(26,37,53,.04),0 10px 30px -20px rgba(26,37,53,.22);
+  --shadow-pop:0 24px 48px -20px rgba(26,37,53,.34),0 2px 6px rgba(26,37,53,.06);
+  font:400 14px/1.45 'DM Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  color:var(--t1);letter-spacing:normal;text-align:left;
+  font-variant-numeric:lining-nums tabular-nums;
+}
+
+/* ---------- hardening against the global sheets ----------
+   zero-specificity resets first, then a doubled class so `.mat-typography h1/p`
+   and the reboot's p/h margins can never restyle the screen. */
+:where(.nx-root),:where(.nx-root) *,:where(.nx-root) *::before,:where(.nx-root) *::after{box-sizing:border-box}
+:where(.nx-root) :where(button,input,select,textarea){font:inherit;color:inherit;letter-spacing:inherit;margin:0}
+:where(.nx-root) :where(button){cursor:pointer;-webkit-appearance:none;appearance:none;background:none;border:0;padding:0;text-transform:none}
+:where(.nx-root) :where(button:disabled){cursor:not-allowed}
+.nx-root table{border-collapse:separate;border-spacing:0;caption-side:top}
+.nx-root :is(th,td){text-align:left}
+.nx-root.nx-root :is(h1,h2,h3,h4,h5,h6,p,figure,figcaption){margin:0;letter-spacing:normal}
+/* classed paragraphs that need a margin use the same doubled class, e.g. .nx-root.nx-root .nx-msg-text */
+.nx-root label{white-space:normal}
+.nx-root :focus-visible{outline:2px solid var(--primary-light);outline-offset:2px}
+
+/* ---------- icons + helpers ---------- */
+.nx-ic{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;vertical-align:middle}
+.nx-ic--sm{width:15px;height:15px}
+.nx-ic--xs{width:13px;height:13px}
+.nx-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.nx-vr{width:1px;height:24px;background:var(--border);flex:none}
+.nx-lbl-short{display:none}
+
+/* ---------- page shell ---------- */
+.nx-shell{container-type:inline-size;container-name:nx;background:var(--bg);min-height:100%} /* port: min-height */
+.nx-page{max-width:1440px;margin:0 auto;padding:36px 40px 40px}
+
+/* ---------- header ---------- */
+.nx-head{display:flex;align-items:flex-end;justify-content:space-between;gap:32px;margin-bottom:24px}
+.nx-root .nx-title{font:500 38px/1.1 'Playfair Display',Georgia,serif;color:var(--primary)}
+.nx-root.nx-root .nx-title{letter-spacing:-.005em}
+.nx-rule{display:block;width:40px;height:0;border-top:1.5px solid var(--accent);margin:14px 0 12px}
+.nx-root .nx-lede{color:var(--t2);font-size:14.5px;max-width:62ch}
+.nx-head-aside{display:flex;align-items:center;gap:12px}
+.nx-figure{display:flex;flex-direction:column;align-items:flex-end;padding-right:20px;margin-right:6px;border-right:1px solid var(--border)}
+.nx-figure-num{font:600 28px/1 'DM Sans',sans-serif;color:var(--t1);letter-spacing:-.01em;font-variant-numeric:lining-nums tabular-nums}
+.nx-figure-label{margin-top:7px;font:600 11px/1 'DM Sans',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--t3)}
+
+/* quiet outlined tool button */
+.nx-tool{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 15px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:var(--t1);font-size:13.5px;font-weight:500;white-space:nowrap;transition:border-color .15s,background-color .15s}
+.nx-tool .nx-ic{color:var(--t2)}
+.nx-tool:hover{border-color:var(--primary-line);background:#fbfcfe}
+.nx-tool--sm{height:38px;padding:0 13px;font-size:13px}
+.nx-tool-note{color:var(--t3);font-weight:400}
+.nx-tool.is-open{border-color:var(--primary-line);background:var(--primary-tint);color:var(--primary)}
+.nx-tool:disabled{color:var(--t2);cursor:progress}
+
+/* ---------- the sheet ---------- */
+.nx-sheet{background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-sheet)}
+
+/* toolbar: search · filter pills · columns */
+.nx-bar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:14px 16px}
+.nx-search{position:relative;display:block;flex:1 1 280px;max-width:360px;min-width:240px}
+.nx-search > .nx-ic{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--t3);pointer-events:none}
+.nx-search input{display:block;width:100%;height:40px;padding:0 40px 0 38px;border:1px solid var(--border);border-radius:9px;background:var(--surface);font-size:14px;-webkit-appearance:none;appearance:none;outline-offset:0;transition:border-color .15s,box-shadow .15s}
+.nx-search input::placeholder{color:var(--t3);opacity:1}
+.nx-search input:focus,.nx-search input.is-focus{outline:none;border-color:var(--primary-light);box-shadow:var(--ring)}
+.nx-search-x{position:absolute;right:2px;top:2px;display:grid;place-items:center;width:36px;height:36px;border-radius:7px;color:var(--t2)}
+.nx-search-x:hover{background:var(--border-light);color:var(--t1)}
+.nx-bar > .nx-vr{margin:0 6px}
+.nx-pills{display:flex;flex-wrap:wrap;gap:8px}
+.nx-fpill{display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 12px 0 14px;border:1px solid var(--border);border-radius:999px;background:var(--surface);color:var(--t2);font-size:13.5px;font-weight:500;white-space:nowrap;transition:border-color .15s,background-color .15s}
+.nx-fpill:hover{border-color:var(--primary-line);color:var(--t1)}
+.nx-fpill .nx-ic{color:var(--t3)}
+.nx-fpill .nx-chev{width:14px;height:14px;margin-left:1px}
+.nx-fpill.is-set{background:var(--primary-tint);border-color:var(--primary-line);color:var(--primary);font-weight:600}
+.nx-fpill.is-set .nx-ic{color:var(--primary)}
+.nx-fpill.is-open{border-color:var(--primary-light);box-shadow:var(--ring)}
+.nx-fcount{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--primary);color:#fff;font:600 11.5px/1 'DM Sans',sans-serif}
+.nx-fdot{width:7px;height:7px;border-radius:50%;background:var(--primary);box-shadow:0 0 0 2px #fff}
+.nx-filters-btn{display:none}
+.nx-bar-end{margin-left:auto;display:flex;align-items:center;gap:8px}
+
+/* readout: the single place that spells out what is applied */
+.nx-readout{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;min-height:56px;padding:8px 16px 10px;border-top:1px solid var(--border-light)}
+.nx-readout > .nx-vr{height:18px;margin:0 4px}
+.nx-root .nx-count{color:var(--t2);font-size:13.5px;white-space:nowrap}
+.nx-count strong{color:var(--t1);font-weight:700}
+.nx-count-wait{display:inline-flex;align-items:center;gap:7px;color:var(--t3)}
+.nx-eyebrow{font:600 11px/1.2 'DM Sans',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--t3)}
+.nx-chip{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 2px 0 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);font-size:13px;color:var(--t1);white-space:nowrap}
+.nx-chip-k{color:var(--t2)}
+.nx-chip b{font-weight:600}
+.nx-chip-n{color:var(--t3);font-size:12.5px}
+.nx-chip-x{position:relative;display:inline-grid;place-items:center;width:32px;height:32px;border-radius:6px;color:var(--t2)}
+.nx-chip-x::before{content:"";position:absolute;inset:-2px}
+.nx-chip-x:hover{background:var(--danger-bg);color:var(--danger)}
+.nx-link{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 8px;border-radius:7px;color:var(--primary-light);font-size:13.5px;font-weight:600;text-decoration:underline;text-decoration-color:rgba(42,90,142,.35);text-underline-offset:3px;white-space:nowrap}
+.nx-link:hover{text-decoration-color:currentColor;background:var(--primary-tint)}
+.nx-hint{color:var(--t3);font-size:13px}
+
+/* ---------- ledger table ---------- */
+/* In the app the wrap may also take max-height:calc(100vh - 260px) + overflow:auto,
+   so the header pins inside the sheet; here it pins to the page scroller. */
+.nx-tablewrap{position:relative}
+.nx-table{width:100%;border-collapse:separate;border-spacing:0}
+.nx-table th{position:sticky;top:0;z-index:3;height:46px;padding:0 14px;background:var(--head);border-top:1px solid var(--border);border-bottom:1px solid var(--border);text-align:left;vertical-align:middle;font:600 11.5px/1.2 'DM Sans',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--t2);white-space:nowrap}
+.nx-th-sort{display:inline-flex;align-items:center;gap:6px;height:36px;margin-left:-8px;padding:0 8px;border-radius:7px;font:inherit;letter-spacing:inherit;text-transform:inherit;color:inherit}
+.nx-th-sort .nx-ic{width:13px;height:13px;opacity:.45}
+.nx-th-sort:hover{background:var(--border-light);color:var(--t1)}
+.nx-th-sort:hover .nx-ic{opacity:.85}
+.nx-th-sort.is-sorted{color:var(--t1)}
+.nx-th-sort.is-sorted .nx-ic{opacity:1;color:var(--primary)}
+.nx-table td{padding:12px 14px;border-bottom:1px solid var(--border-light);vertical-align:middle;font-size:13.5px;color:var(--t1);background:var(--surface);transition:background-color .12s}
+.nx-table tbody tr:hover td{background:var(--hover)}
+.nx-table tbody tr.is-picked td{background:var(--picked)}
+.nx-table tbody tr.is-picked td:first-child{box-shadow:inset 3px 0 0 var(--primary)}
+.nx-table tbody tr:last-child td{border-bottom:0}
+.nx-table .nx-c-select{width:56px;padding-left:12px;padding-right:0}
+
+.nx-cbhit{display:inline-grid;place-items:center;width:36px;height:36px;border-radius:8px;cursor:pointer;vertical-align:middle}
+.nx-cbhit:hover{background:var(--border-light)}
+.nx-cb{-webkit-appearance:none;appearance:none;display:block;width:18px;height:18px;margin:0;border:1.5px solid #7c8a9e;border-radius:4px;background:#fff center/13px no-repeat;cursor:pointer;transition:background-color .12s,border-color .12s}
+.nx-cb:checked,.nx-cb.is-mixed{background-color:var(--primary);border-color:var(--primary)}
+.nx-cb:checked{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E")}
+.nx-cb.is-mixed{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round'%3E%3Cpath d='M6 12h12'/%3E%3C/svg%3E")}
+.nx-cb:disabled{opacity:.45;cursor:not-allowed}
+.nx-cb:focus-visible{outline:2px solid var(--primary-light);outline-offset:2px}
+
+.nx-person{display:flex;align-items:center;gap:12px;min-width:170px}
+.nx-mono{flex:none;display:grid;place-items:center;width:34px;height:34px;border-radius:50%;border:1px solid var(--border);background:#f5f7fa;color:var(--primary);font:600 11.5px/1 'DM Sans',sans-serif;letter-spacing:.06em}
+.nx-name{font-weight:600;line-height:1.3;color:var(--t1)}
+.nx-phone{white-space:nowrap}
+.nx-cc{color:var(--t3);margin-right:5px}
+/* emails never lose their domain: a <wbr> sits before the @, so a long
+   address breaks into "local part" / "@domain" and nothing is cut */
+.nx-email{display:inline-block;max-width:270px;color:var(--t2);overflow-wrap:normal;word-break:normal;line-height:1.4}
+.nx-date{white-space:nowrap}
+.nx-time{display:block;margin-top:2px;color:var(--t3);font-size:12.5px}
+.nx-status{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;font-weight:500;white-space:nowrap}
+.nx-status::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--dot)}
+.nx-status--on{color:var(--t1);--dot:var(--success)}
+.nx-status--off{color:var(--danger);--dot:var(--danger)}
+.nx-sub{display:inline-flex;align-items:center;height:24px;padding:0 9px;border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-tint);color:var(--accent-ink);font-size:12.5px;font-weight:600;white-space:nowrap}
+.nx-nil{color:var(--t3)}
+.nx-c-ref{min-width:130px}
+
+/* tags: full names, never cut; up to three, then a focusable "+N",
+   then the edit button sits right after them */
+.nx-c-tags{min-width:300px}
+.nx-table td.nx-c-email{min-width:262px}
+.nx-tags{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+/* the last pill, the +N and the edit button travel together, so the button never sits alone on a line */
+.nx-tags-end{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.nx-tag{display:inline-flex;align-items:center;height:26px;padding:0 10px;border:1px solid var(--border);border-radius:999px;background:var(--surface);color:var(--t1);font-size:12.5px;font-weight:500;line-height:1;white-space:nowrap}
+.nx-tag--ws{border-color:#cfdae7;background:var(--primary-tint);color:var(--primary)}
+.nx-more{position:relative;display:inline-flex;align-items:center;height:26px;padding:0 9px;border:1px dashed var(--border-strong);border-radius:999px;background:var(--bg);color:var(--t2);font-size:12.5px;font-weight:600;line-height:1;cursor:default}
+.nx-more::before{content:"";position:absolute;inset:-5px -2px}
+.nx-more:hover,.nx-more:focus-visible{border-color:var(--primary-line);color:var(--primary)}
+.nx-more[data-tip]:hover::after,.nx-more[data-tip]:focus-visible::after,.nx-more.is-tip::after{content:attr(data-tip);position:absolute;z-index:6;left:50%;bottom:calc(100% + 9px);transform:translateX(-50%);width:max-content;max-width:260px;padding:7px 11px;border-radius:7px;background:var(--t1);color:#fff;font-size:12.5px;font-weight:500;line-height:1.4;white-space:normal;text-align:left;box-shadow:0 8px 20px -8px rgba(0,0,0,.4);pointer-events:none}
+.nx-tagedit{position:relative;display:inline-grid;place-items:center;flex:none;width:32px;height:32px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--t2);transition:border-color .15s,color .15s,background-color .15s}
+.nx-tagedit::before{content:"";position:absolute;inset:-2px}
+.nx-tagedit:hover{border-color:var(--primary-line);color:var(--primary);background:var(--primary-tint)}
+.nx-addtag{position:relative;display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px 0 9px;border:1px dashed var(--primary-line);border-radius:999px;background:var(--surface);color:var(--primary-light);font-size:13px;font-weight:600;white-space:nowrap}
+.nx-addtag::before{content:"";position:absolute;inset:-2px}
+.nx-addtag .nx-ic{width:14px;height:14px}
+.nx-addtag:hover{border-style:solid;background:var(--primary-tint)}
+
+/* pagination */
+.nx-foot{display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px;padding:10px 16px;border-top:1px solid var(--border);color:var(--t2);font-size:13.5px}
+.nx-selectbox{position:relative;display:inline-flex;align-items:center}
+.nx-selectbox select{height:36px;padding:0 32px 0 12px;border:1px solid var(--border);border-radius:8px;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2356647b' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.5 9.5L12 15l5.5-5.5'/%3E%3C/svg%3E") right 9px center/15px no-repeat;color:var(--t1);font-size:13.5px;font-weight:600;-webkit-appearance:none;appearance:none;cursor:pointer}
+.nx-selectbox select:hover{border-color:var(--primary-line)}
+.nx-foot-range{margin-left:auto;color:var(--t1)}
+.nx-pager{display:flex;gap:2px}
+.nx-iconbtn{display:inline-grid;place-items:center;flex:none;width:36px;height:36px;border:1px solid transparent;border-radius:8px;color:var(--t2);transition:border-color .15s,color .15s,background-color .15s}
+.nx-iconbtn:hover{border-color:var(--border);background:var(--surface);color:var(--primary)}
+.nx-iconbtn:disabled{opacity:.38}
+.nx-iconbtn:disabled:hover{border-color:transparent;background:none;color:var(--t2)}
+.nx-iconbtn--boxed{border-color:var(--border);background:var(--surface)}
+
+/* card-mode controls (shown below 900px) */
+.nx-cardbar{display:none}
+
+/* ---------- selection dock ----------
+   Sticky inside the content scroller: it rides 20px above the bottom edge
+   while rows scroll under it, and comes to rest in flow below the sheet, so
+   the space it needs is reserved and the last row is never covered.
+   It slides up (translateY 16px -> 0, 200ms ease-out) when the first person is ticked. */
+.nx-dock{position:sticky;bottom:20px;z-index:30;display:flex;align-items:center;gap:10px;width:max-content;max-width:100%;margin:20px auto 0;padding:10px 10px 10px 22px;border-radius:14px;background:var(--primary);color:#fff;box-shadow:0 22px 46px -14px rgba(14,32,52,.55),0 2px 6px rgba(14,32,52,.2)}
+.nx-dock-count{display:flex;align-items:center;gap:10px;padding-right:16px;margin-right:4px;border-right:1px solid rgba(255,255,255,.16);white-space:nowrap}
+.nx-dock-num{font:600 22px/1 'DM Sans',sans-serif;letter-spacing:-.01em;font-variant-numeric:lining-nums tabular-nums}
+.nx-dock-label{color:#cdd7e4;font-size:13.5px}
+.nx-dock-label b{color:#fff;font-weight:600}
+.nx-dock-link{display:inline-flex;align-items:center;min-height:36px;padding:0 8px;border-radius:7px;color:var(--accent-on-navy);font-size:13.5px;font-weight:600;text-decoration:underline;text-decoration-color:rgba(220,195,145,.5);text-underline-offset:3px;white-space:nowrap}
+.nx-dock-link:hover{background:rgba(255,255,255,.08);text-decoration-color:currentColor}
+.nx-dock-hidden{position:relative;display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border:1px solid rgba(220,195,145,.45);border-radius:999px;color:var(--accent-on-navy);font-size:12.5px;font-weight:500}
+.nx-dock-hidden .nx-ic{width:14px;height:14px}
+.nx-dock-hidden::before{content:"";position:absolute;inset:-4px 0}
+.nx-dbtn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 15px;border:1px solid rgba(200,169,110,.6);border-radius:9px;color:#fff;font-size:13.5px;font-weight:500;white-space:nowrap;transition:background-color .15s,border-color .15s}
+.nx-dbtn .nx-ic{color:var(--accent-on-navy)}
+.nx-dbtn:hover{background:rgba(200,169,110,.12);border-color:var(--accent)}
+.nx-dbtn--primary{background:#fff;color:var(--primary);border-color:#fff;font-weight:600}
+.nx-dbtn--primary .nx-ic{color:var(--accent-ink)}
+.nx-dbtn--primary:hover{background:var(--accent-tint);border-color:var(--accent-tint)}
+.nx-dbtn.is-open{background:rgba(255,255,255,.1);border-color:var(--accent)}
+.nx-dbtn .nx-chev{width:14px;height:14px;opacity:.85}
+.nx-dbtn:disabled{border-color:rgba(255,255,255,.14);color:rgba(255,255,255,.5);background:none}
+.nx-dbtn:disabled .nx-ic{color:rgba(255,255,255,.4)}
+.nx-dbtn--primary:disabled{background:rgba(255,255,255,.14);border-color:transparent}
+.nx-dclear{display:inline-grid;place-items:center;width:40px;height:40px;margin-left:2px;border:1px solid rgba(255,255,255,.2);border-radius:9px;color:#cdd7e4}
+.nx-dclear:hover{border-color:rgba(255,255,255,.45);color:#fff}
+.nx-dock :focus-visible{outline-color:var(--accent-on-navy)}
+
+/* ==========================================================================
+   Laptop (container narrower than 1320px): tighter ledger, same columns
+   ========================================================================== */
+@container nx (max-width:1320px){
+  .nx-page{padding:30px 28px 36px}
+  .nx-table th{padding:0 11px}
+  .nx-table td{padding:12px 11px}
+  .nx-table .nx-c-select{width:50px;padding-left:8px;padding-right:0}
+  .nx-person{min-width:150px;gap:10px}
+  .nx-mono{width:32px;height:32px}
+  .nx-email{max-width:225px}
+  .nx-table td.nx-c-email{min-width:0}
+  .nx-c-ref{white-space:normal;min-width:120px}
+  .nx-c-tags{min-width:270px}
+}
+
+/* ==========================================================================
+   Below 900px: pills fold into one Filters button, rows become dense cards,
+   a Sort select replaces the column headers, the dock spans the width
+   ========================================================================== */
+@container nx (max-width:899px){
+  .nx-page{padding:22px 16px 28px}
+  .nx-head{flex-direction:column;align-items:stretch;gap:16px;margin-bottom:18px}
+  .nx-root .nx-title{font-size:32px}
+  .nx-rule{margin:12px 0 10px}
+  .nx-head-aside{flex-wrap:wrap}
+  .nx-figure{flex-direction:row;align-items:baseline;gap:8px;margin-right:auto;padding-right:0;border-right:0}
+  .nx-figure-num{font-size:24px}
+  .nx-figure-label{margin-top:0}
+  .nx-bar{padding:12px}
+  .nx-search{flex:1 1 200px;max-width:none;min-width:0}
+  .nx-bar > .nx-vr,.nx-pills{display:none}
+  .nx-filters-btn{display:inline-flex}
+  .nx-bar-end{margin-left:0}
+  .nx-readout{padding:8px 12px 10px}
+  .nx-readout > .nx-vr{display:none}
+  .nx-readout .nx-count{flex:1 1 100%;order:-1;padding:4px 0 2px}
+  .nx-readout .nx-eyebrow{display:none}
+
+  .nx-cardbar{display:flex;align-items:center;gap:8px;min-height:52px;padding:6px 12px 6px 8px;border-top:1px solid var(--border);background:var(--head);color:var(--t2);font-size:13.5px;font-weight:600}
+  .nx-cardbar-sort{margin-left:auto;display:flex;align-items:center;gap:8px;font-weight:500}
+
+  .nx-table thead{display:none}
+  .nx-table,.nx-table tbody{display:block}
+  .nx-table tbody tr{position:relative;display:grid;grid-template-columns:44px 204px minmax(0,1fr) auto;grid-template-areas:"sel name name status" "sel phone email email" "sel created ref ref" "sel ws ws ws" "sel moved moved moved" "sel tags tags tags";column-gap:16px;padding:12px 14px 14px 8px;border-top:1px solid var(--border-light);background:var(--surface)}
+  .nx-table tbody tr:first-child{border-top:1px solid var(--border)}
+  .nx-table tbody tr.is-picked{background:var(--picked);box-shadow:inset 3px 0 0 var(--primary)}
+  .nx-table tbody tr.is-picked td,.nx-table tbody tr:hover td{background:transparent}
+  .nx-table tbody tr.is-picked td:first-child{box-shadow:none}
+  .nx-table td{display:block;min-width:0;padding:0;border:0;background:transparent;font-size:13.5px}
+  .nx-table td.nx-c-select{grid-area:sel;width:auto;padding:0;margin-top:-6px}
+  .nx-table td.nx-c-name{grid-area:name;align-self:center}
+  .nx-table td.nx-c-status{grid-area:status;align-self:center;justify-self:end}
+  .nx-table td.nx-c-phone{grid-area:phone;margin-top:4px}
+  .nx-table td.nx-c-email{grid-area:email;margin-top:4px}
+  .nx-table td.nx-c-created{grid-area:created;margin-top:3px}
+  .nx-table td.nx-c-ref{grid-area:ref;margin-top:3px;white-space:normal;min-width:0}
+  .nx-table td.nx-c-ws{grid-area:ws;margin-top:6px}
+  .nx-table td.nx-c-moved{grid-area:moved;margin-top:3px}
+  .nx-table td.nx-c-tags{grid-area:tags;margin-top:10px;min-width:0}
+  .nx-table td.is-empty{display:none}
+  .nx-table td[data-label]::before{content:attr(data-label) " ";color:var(--t3)}
+  .nx-person{min-width:0}
+  .nx-person .nx-mono{display:none}
+  .nx-name{font-size:15px}
+  .nx-email{max-width:none;color:var(--t2)}
+  .nx-time{display:inline;margin:0;font-size:inherit;color:var(--t1)}
+  /* port: .nx-time::before{content:", "} is replaced by the in-DOM .nx-time-sep (see the port additions) */
+  .nx-date{white-space:normal}
+  .nx-status{font-size:13px}
+
+  .nx-foot{padding:10px 12px}
+  .nx-dock{flex-wrap:wrap;width:auto;margin:16px 0 0;bottom:12px;padding:10px 10px 10px 16px;gap:8px}
+  .nx-dock-count{flex:1 1 calc(100% - 56px);padding:0;margin:0;border-right:0;flex-wrap:wrap;row-gap:0}
+  .nx-dclear{order:1}
+  .nx-dbtn{order:2;flex:1 1 0;padding:0 10px}
+}
+@container nx (max-width:620px){
+  .nx-search{flex:1 1 0}
+  .nx-table tbody tr{grid-template-columns:44px minmax(0,1fr) auto;grid-template-areas:"sel name status" "sel phone phone" "sel email email" "sel created created" "sel ref ref" "sel ws ws" "sel moved moved" "sel tags tags";column-gap:10px}
+  .nx-table td.nx-c-email{margin-top:1px}
+  .nx-lbl-long{display:none}
+  .nx-lbl-short{display:inline}
+  .nx-tool-hide{display:none}
+  .nx-head-aside .nx-tool{padding:0 12px}
+  .nx-foot > span:first-child{display:none}
+  .nx-dbtn{padding:0 8px;gap:6px}
+  .nx-dbtn .nx-chev{display:none}
+}
+@container nx (max-width:480px){
+  .nx-search{flex:1 1 100%}
+  .nx-filters-btn{flex:1}
+}
+
+/* ======================= states.css (screen parts only) ======================= */
+/* ---- states.css 36 ---- */
+.nx-flex{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+/* ---- states.css 43–62 ---- */
+/* ---------- skeletons, spinners, progress ---------- */
+.nx-skel{display:inline-block;vertical-align:middle;height:10px;border-radius:4px;background:#e1e7ef;animation:nx-pulse 1.4s ease-in-out infinite}
+.nx-skel--circle{width:34px;height:34px;border-radius:50%}
+.nx-skel--pill{height:24px;border-radius:999px}
+.nx-skel--box{display:block;width:18px;height:18px;margin-left:9px;border-radius:4px}
+.nx-skel--thin{height:8px}
+.nx-skel-row td{height:62px}
+.nx-skel-stack{display:flex;flex-direction:column;gap:7px}
+@keyframes nx-pulse{50%{opacity:.5}}
+.nx-spin{display:inline-block;flex:none;width:16px;height:16px;border:2px solid #d3dde9;border-top-color:var(--primary);border-radius:50%;animation:nx-rot .8s linear infinite;vertical-align:-3px}
+.nx-spin--light{border-color:rgba(255,255,255,.28);border-top-color:#fff}
+@keyframes nx-rot{to{transform:rotate(360deg)}}
+.nx-progress{position:relative;height:2px;background:var(--primary-tint);overflow:hidden}
+.nx-progress::after{content:"";position:absolute;top:0;bottom:0;left:18%;width:34%;background:var(--primary)}
+@media (prefers-reduced-motion:reduce){.nx-skel,.nx-spin{animation:none}}
+.nx-statusrow{display:flex;align-items:center;gap:10px;padding:12px 16px;border-top:1px solid var(--border-light);background:#fbfcfd;color:var(--t2);font-size:13.5px}
+.nx-ghost{opacity:.55;pointer-events:none}
+.nx-checking{display:flex;flex-direction:column;align-items:center;gap:10px;padding:64px 24px 72px;text-align:center}
+.nx-root .nx-checking p{color:var(--t2);font-size:13.5px}
+.nx-checking-title{display:flex;align-items:center;gap:10px;font-weight:600;color:var(--t1);font-size:14.5px}
+/* ---- states.css 64–75 ---- */
+/* ---------- message blocks: no access, empty, error, no match ---------- */
+.nx-msg{display:flex;flex-direction:column;align-items:center;max-width:520px;margin:0 auto;padding:52px 24px 56px;text-align:center}
+.nx-msg-ic{display:grid;place-items:center;width:56px;height:56px;margin-bottom:20px;border:1px solid var(--border);border-radius:50%;background:#f7f9fb;color:var(--primary);box-shadow:0 0 0 6px #fff,0 0 0 7px var(--accent-line)}
+.nx-msg-ic .nx-ic{width:24px;height:24px}
+.nx-msg-ic--danger{background:var(--danger-bg);border-color:var(--danger-line);color:var(--danger)}
+.nx-root .nx-msg-title{font:500 22px/1.25 'Playfair Display',Georgia,serif;color:var(--t1)}
+.nx-root.nx-root .nx-msg-text{margin-top:8px;color:var(--t2);font-size:14px}
+.nx-msg-actions{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:10px;margin-top:22px}
+.nx-why{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:16px}
+.nx-why .nx-chip{background:var(--head)}
+.nx-chip-zero{color:var(--danger);font-weight:600}
+.nx-msgcell{padding:0!important;border-bottom:0!important}
+/* ---- states.css 77–85 ---- */
+/* ---------- buttons ---------- */
+.nx-primary{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 18px;border:1px solid var(--primary);border-radius:9px;background:var(--primary);color:#fff;font-size:13.5px;font-weight:600;white-space:nowrap}
+.nx-primary:hover{background:var(--primary-deep)}
+.nx-primary .nx-ic{color:var(--accent-on-navy)}
+.nx-primary:disabled{background:#e9edf3;border-color:var(--border);color:#6f7d90}
+.nx-primary:disabled .nx-ic{color:#6f7d90}
+.nx-quiet{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:38px;padding:0 15px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--t1);font-size:13.5px;font-weight:600;white-space:nowrap}
+.nx-quiet:hover{border-color:var(--primary-line)}
+.nx-quiet .nx-ic{color:var(--t2)}
+/* ---- states.css 87–133 ---- */
+/* ---------- popovers / menus ---------- */
+.nx-pop{width:360px;max-width:100%;background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-pop)}
+.nx-pop--wide{width:400px}
+.nx-pop-head{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;padding:6px 8px 2px 16px}
+.nx-pop-title{font-weight:600;font-size:14px;color:var(--t1)}
+.nx-pop-sec{padding:6px 16px}
+.nx-pop-sec > .nx-eyebrow{display:block;margin-bottom:7px}
+.nx-root .nx-pop-text{padding:2px 16px 10px;color:var(--t2);font-size:13.5px}
+.nx-seg{display:grid;grid-template-columns:1fr 1fr;gap:3px;padding:3px;border:1px solid var(--border);border-radius:10px;background:var(--bg)}
+.nx-seg button{display:inline-flex;align-items:center;justify-content:center;height:36px;border:1px solid transparent;border-radius:7px;color:var(--t2);font-size:13.5px;font-weight:500}
+.nx-seg button.is-on{background:#fff;border-color:var(--border);color:var(--primary);font-weight:600;box-shadow:0 1px 2px rgba(26,37,53,.07)}
+.nx-root.nx-root .nx-ruleline{display:flex;gap:9px;align-items:flex-start;margin:6px 16px 4px;padding:9px 12px;border:1px solid var(--border-light);border-left:2px solid var(--accent);border-radius:4px 8px 8px 4px;background:var(--head);color:var(--t2);font-size:13px;line-height:1.45}
+.nx-ruleline b{color:var(--t1);font-weight:600}
+.nx-find{position:relative;display:block;margin:8px 16px 4px}
+.nx-find .nx-ic{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--t3)}
+.nx-find input{display:block;width:100%;height:38px;padding:0 12px 0 34px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:13.5px}
+.nx-find input::placeholder{color:var(--t3);opacity:1}
+.nx-optlist{padding:4px 8px 8px}
+.nx-opt{display:flex;align-items:center;gap:11px;width:100%;min-height:40px;padding:0 10px;border-radius:7px;text-align:left;font-size:13.5px;color:var(--t1)}
+.nx-opt:hover{background:var(--bg)}
+.nx-opt.is-on{font-weight:600;color:var(--primary)}
+.nx-opt-n{margin-left:auto;color:var(--t3);font-size:12.5px;font-weight:400}
+.nx-opt-desc{display:block;margin-top:1px;color:var(--t2);font-size:12.5px;font-weight:400}
+.nx-opt--tall{align-items:flex-start;padding:9px 10px}
+.nx-opt--tall .nx-radio{margin-top:1px}
+.nx-opt-sep{display:block;height:1px;margin:6px 10px;background:var(--border)}
+.nx-box{flex:none;display:grid;place-items:center;width:18px;height:18px;border:1.5px solid #7c8a9e;border-radius:4px;background:#fff;color:#fff}
+.nx-box .nx-ic{width:12px;height:12px;stroke-width:3.2}
+.nx-box.is-on{background:var(--primary);border-color:var(--primary)}
+.nx-radio{flex:none;width:18px;height:18px;border:1.5px solid #7c8a9e;border-radius:50%;background:#fff}
+.nx-radio.is-on{border-color:var(--primary);background:var(--primary);box-shadow:inset 0 0 0 3.5px #fff}
+.nx-pop-note{display:flex;gap:8px;margin:2px 16px 12px;padding:9px 11px;border:1px solid var(--border-light);border-radius:8px;background:var(--head);color:var(--t2);font-size:12.5px;line-height:1.45}
+.nx-pop-note .nx-ic{width:15px;height:15px;margin-top:1px;color:var(--t3)}
+.nx-pop-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 8px 8px 16px;border-top:1px solid var(--border-light);background:var(--head);border-radius:0 0 12px 12px;color:var(--t2);font-size:13px}
+.nx-pop-foot strong{color:var(--t1)}
+.nx-switchrow{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:52px;padding:4px 16px}
+.nx-switchrow b{display:block;font-weight:600;font-size:13.5px;color:var(--t1)}
+.nx-switchrow small{display:block;color:var(--t2);font-size:12.5px}
+.nx-switch{position:relative;flex:none;width:42px;height:24px;border-radius:999px;background:#b7c1ce}
+.nx-switch::before{content:"";position:absolute;inset:-6px -2px}
+.nx-switch::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.22)}
+.nx-switch.is-on{background:var(--primary)}
+.nx-switch.is-on::after{left:21px}
+.nx-pop-empty{display:flex;flex-direction:column;align-items:center;gap:6px;padding:22px 20px 20px;text-align:center}
+.nx-root .nx-pop-empty b{font-weight:600;color:var(--t1);font-size:14px}
+.nx-root .nx-pop-empty p{color:var(--t2);font-size:13px;max-width:280px}
+.nx-pop-empty .nx-quiet{margin-top:8px}
+/* ---- states.css 135–144 ---- */
+/* search suggestions */
+.nx-suggest{width:100%;max-width:520px}
+.nx-sug{display:flex;align-items:center;gap:11px;width:100%;min-height:44px;padding:0 10px;border-radius:8px;text-align:left;font-size:13.5px;color:var(--t1)}
+.nx-sug.is-active{background:var(--primary-tint)}
+.nx-sug-ic{display:grid;place-items:center;flex:none;width:28px;height:28px;border:1px solid var(--border);border-radius:7px;background:#fff;color:var(--primary)}
+.nx-sug-ic .nx-ic{width:15px;height:15px}
+.nx-sug-k{color:var(--t2)}
+.nx-sug mark{background:none;color:inherit;font-weight:700;padding:0}
+.nx-sug-n{margin-left:auto;color:var(--t3);font-size:12.5px}
+.nx-kbd{display:inline-grid;place-items:center;min-width:22px;height:20px;padding:0 5px;border:1px solid var(--border);border-bottom-width:2px;border-radius:5px;background:#fff;font:500 11px 'DM Mono',monospace;color:var(--t2)}
+/* ---- states.css 146–170 ---- */
+/* date range */
+.nx-dfields{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:6px 16px 4px}
+.nx-dfield{display:block}
+.nx-dfield > .nx-eyebrow{display:block;margin-bottom:6px}
+.nx-dfield-in{position:relative;display:block}
+.nx-dfield-in input{display:block;width:100%;height:40px;padding:0 34px 0 12px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:13.5px}
+.nx-dfield-in .nx-ic{position:absolute;right:10px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--t3)}
+.nx-dfield-in input.is-focus{border-color:var(--primary-light);box-shadow:var(--ring);outline:none}
+.nx-presets{display:flex;flex-wrap:wrap;gap:6px;padding:10px 16px 4px}
+.nx-preset{position:relative;height:32px;padding:0 12px;border:1px solid var(--border);border-radius:999px;background:#fff;color:var(--t2);font-size:12.5px;font-weight:500}
+.nx-preset::before{content:"";position:absolute;inset:-3px -1px}
+.nx-preset:hover{border-color:var(--primary-line);color:var(--primary)}
+.nx-cal{padding:4px 16px 12px}
+.nx-cal-head{display:flex;align-items:center;justify-content:space-between;height:44px}
+.nx-cal-month{font:600 14.5px 'DM Sans',sans-serif;color:var(--t1)}
+.nx-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);row-gap:2px}
+.nx-dow{display:grid;place-items:center;height:28px;font:600 11px 'DM Sans',sans-serif;letter-spacing:.06em;color:var(--t3)}
+.nx-day{display:grid;place-items:center;height:38px;font-size:13px;color:var(--t1)}
+.nx-day span{display:grid;place-items:center;width:36px;height:36px;border-radius:50%}
+.nx-day:hover span{background:var(--border-light)}
+.nx-day.in-range{background:var(--primary-tint)}
+.nx-day.is-start{background:linear-gradient(90deg,transparent 50%,var(--primary-tint) 50%)}
+.nx-day.is-end{background:linear-gradient(90deg,var(--primary-tint) 50%,transparent 50%)}
+.nx-day.is-start span,.nx-day.is-end span{background:var(--primary);color:#fff;font-weight:600}
+.nx-day.is-today span{box-shadow:inset 0 0 0 1.5px var(--accent);color:var(--accent-ink);font-weight:600}
+/* ---- states.css 185–186 ---- */
+.nx-grow{flex:1;min-width:0;color:var(--t2);font-size:13px}
+.nx-grow strong{color:var(--t1);font-weight:600}
+/* ---- states.css 197–210 ---- */
+.nx-cloud{display:flex;flex-wrap:wrap;gap:8px}
+.nx-tchip{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 14px 0 11px;border:1px solid var(--border);border-radius:999px;background:#fff;color:var(--t1);font-size:13px;font-weight:500;white-space:nowrap}
+.nx-tchip .nx-ic{width:14px;height:14px;color:var(--t3)}
+.nx-tchip:hover{border-color:var(--primary-line)}
+.nx-tchip.is-on{background:var(--primary);border-color:var(--primary);color:#fff}
+.nx-tchip.is-on .nx-ic{color:var(--accent-on-navy);stroke-width:2.4}
+.nx-tchip.is-part{background:var(--primary-tint);border-color:var(--primary-line);color:var(--primary)}
+.nx-tchip.is-part .nx-ic{color:var(--primary);stroke-width:2.4}
+.nx-tchip.is-changed{box-shadow:0 0 0 2px #fff,0 0 0 3.5px var(--accent)}
+.nx-tchip-n{display:inline-block;color:var(--t2);font-size:12px;font-weight:500}
+.nx-tchip.is-on .nx-tchip-n{color:#cdd7e4}
+.nx-tchip--sm{height:36px;padding:0 12px 0 10px;font-size:12.5px}
+.nx-tchip.is-off{color:var(--t2)}
+.nx-tchip.is-off .nx-tchip-name{text-decoration:line-through;text-decoration-color:var(--t3)}
+/* ---- states.css 255–269 ---- */
+/* ---------- panels that open upward from the dock ---------- */
+.nx-panel{width:660px;max-width:100%;background:#fff;border:1px solid var(--border);border-radius:14px;box-shadow:0 26px 50px -22px rgba(14,32,52,.42),0 2px 6px rgba(14,32,52,.08)}
+.nx-panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:16px 14px 8px 20px}
+.nx-root .nx-panel-title{font:600 16px/1.3 'DM Sans',sans-serif;color:var(--t1)}
+.nx-root.nx-root .nx-panel-sub{margin-top:2px;display:flex;align-items:center;gap:6px;color:var(--warn-ink);font-size:13px;font-weight:500}
+.nx-panel-sub .nx-ic{width:14px;height:14px}
+.nx-panel-body{padding:6px 20px 18px}
+.nx-panel-foot{display:flex;align-items:center;gap:12px;padding:12px 14px 12px 20px;border-top:1px solid var(--border-light);background:var(--head);border-radius:0 0 14px 14px;color:var(--t2);font-size:13px}
+.nx-warnline{display:inline-flex;align-items:center;gap:6px;color:var(--warn-ink);font-weight:500}
+.nx-channels{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.nx-channel{display:flex;flex-direction:column;align-items:flex-start;gap:12px;padding:16px;border:1px solid var(--border);border-radius:11px;background:#fff;text-align:left}
+.nx-channel:hover{border-color:var(--primary-line);background:#fbfcfe}
+.nx-channel-ic{display:grid;place-items:center;width:38px;height:38px;border-radius:10px;border:1px solid #d6e0ec;background:var(--primary-tint);color:var(--primary)}
+.nx-channel strong{display:block;font-size:14px;font-weight:600;color:var(--t1)}
+.nx-channel small{display:block;margin-top:3px;font-size:13px;color:var(--t2);line-height:1.4}
+/* ---- states.css 275–291 ---- */
+/* ---------- banners (cross-page selection, file results) ---------- */
+.nx-banner{display:flex;align-items:flex-start;gap:12px;padding:12px 8px 12px 16px;border:1px solid var(--border);border-radius:10px;background:#fff}
+.nx-banner > .nx-ic{margin-top:1px}
+.nx-banner-body{flex:1;min-width:0}
+.nx-banner-title{font-weight:600;color:var(--t1);font-size:13.5px}
+.nx-banner-meta{display:flex;flex-wrap:wrap;gap:2px 16px;margin-top:3px;color:var(--t2);font-size:13px}
+.nx-banner-meta b{color:var(--t1);font-weight:600}
+.nx-banner-actions{display:flex;align-items:center;gap:4px;margin-top:-4px}
+.nx-banner--ok{background:#f6fbf8;border-color:var(--success-line)}
+.nx-banner--ok > .nx-ic{color:var(--success)}
+.nx-banner--warn{background:#fffaf1;border-color:var(--warn-line)}
+.nx-banner--warn > .nx-ic{color:var(--warn)}
+.nx-banner--danger{background:#fff8f7;border-color:var(--danger-line)}
+.nx-banner--danger > .nx-ic{color:var(--danger)}
+.nx-xpage{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:4px 10px;min-height:48px;padding:6px 16px;border-top:1px solid var(--border);background:var(--primary-tint);color:var(--t1);font-size:13.5px;text-align:center}
+.nx-xpage b{font-weight:600}
+.nx-inline-banner{padding:10px 12px;border-top:1px solid var(--border-light)}
+/* ---- states.css 293–301 ---- */
+/* mini spreadsheet */
+.nx-xls{margin:4px 16px 12px;border:1px solid var(--border);border-radius:8px;overflow:clip;font:400 12px/1 'DM Mono',monospace}
+.nx-xls-row{display:grid;grid-template-columns:30px 1fr 64px}
+.nx-xls-row > span{display:flex;align-items:center;height:28px;padding:0 9px;border-bottom:1px solid var(--border-light);border-right:1px solid var(--border-light);color:var(--t1);overflow:hidden;white-space:nowrap}
+.nx-xls-row > span:first-child{justify-content:center;padding:0;background:var(--head);color:var(--t3)}
+.nx-xls-row > span:last-child{border-right:0}
+.nx-xls-row:last-child > span{border-bottom:0}
+.nx-xls-row--h > span{justify-content:center;background:var(--head);color:var(--t3)}
+.nx-xls-row--title > span:nth-child(2){font-weight:500;color:var(--accent-ink);background:var(--accent-tint)}
+/* ---- states.css 325–346 ---- */
+.nx-bsheet{position:absolute;left:0;right:0;bottom:0;z-index:41;display:flex;flex-direction:column;max-height:94%;background:#fff;border-radius:20px 20px 0 0;box-shadow:0 -14px 40px -12px rgba(16,28,44,.4)}
+.nx-grab{width:40px;height:4px;margin:8px auto 2px;border-radius:999px;background:#cfd6e0}
+.nx-bsheet-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 8px 10px 18px;border-bottom:1px solid var(--border-light)}
+.nx-root .nx-bsheet-title{font:500 21px/1.2 'Playfair Display',Georgia,serif;color:var(--primary)}
+.nx-root.nx-root .nx-bsheet-sub{margin-top:3px;color:var(--warn-ink);font-size:13px;font-weight:500}
+.nx-bsheet-body{padding:4px 18px 10px;overflow:hidden}
+.nx-bgroup{padding:8px 0;border-bottom:1px solid var(--border-light)}
+.nx-bgroup:last-child{border-bottom:0}
+.nx-bgroup-h{display:flex;align-items:center;justify-content:space-between;min-height:28px;margin-bottom:8px}
+.nx-bgroup-h b{font-size:14px;font-weight:600;color:var(--t1)}
+.nx-bgroup .nx-seg{margin-top:6px}
+.nx-root.nx-root .nx-bgroup .nx-ruleline{margin:6px 0 0}
+.nx-bgroup .nx-tchip{height:36px}
+.nx-pickrow{display:flex;align-items:center;justify-content:space-between;width:100%;height:42px;padding:0 12px;border:1px solid var(--border);border-radius:9px;background:#fff;font-size:13.5px;color:var(--t1);text-align:left}
+.nx-pickrow > span{color:var(--t2)}
+.nx-radios{display:flex;flex-direction:column;border:1px solid var(--border);border-radius:10px;overflow:clip}
+.nx-radios .nx-opt{min-height:40px;border-radius:0;border-top:1px solid var(--border-light)}
+.nx-radios .nx-opt:first-child{border-top:0}
+.nx-bsheet-foot{display:flex;gap:10px;padding:12px 18px 18px;border-top:1px solid var(--border-light)}
+.nx-bsheet-foot .nx-primary{flex:1;height:46px}
+.nx-chanlist{display:flex;flex-direction:column;gap:8px;padding:12px 0 6px}
+.nx-chanlist .nx-channel{flex-direction:row;align-items:center;gap:14px;padding:12px 14px}
+
+/* ==========================================================================
+   PORT ADDITIONS (Angular app, not in the mockup)
+   ========================================================================== */
+
+/* ---------- type: Playfair Display is linked at 600 only (index.html), so display headings use 600 ---------- */
+.nx-root{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+.nx-root .nx-title,.nx-root .nx-msg-title,.nx-root .nx-bsheet-title{font-weight:600}
+
+/* ---------- the content scroller keeps its scrollbar gutter while this screen is shown, so the sheet
+   never narrows when the dock first makes the page overflow (NUS-05 measures .nu-table-card) ---------- */
+.mat-drawer-content:has(.nx-shell){scrollbar-gutter:stable;background-color:#f4f6f9}
+
+/* ---------- global-sheet hardening ---------- */
+.nx-root .nx-search input::-webkit-search-cancel-button{-webkit-appearance:none;display:none}
+.nx-root .nx-opt:disabled{opacity:.5;cursor:not-allowed}
+
+/* ---------- Material table: neutralise the azure-blue (M3) and indigo-pink (M2) tokens ---------- */
+.nx-root .nx-table{
+  --mat-table-background-color:transparent;
+  --mat-table-header-container-height:46px;
+  --mat-table-row-item-container-height:auto;
+  --mat-table-row-item-outline-color:var(--border-light);
+  --mat-table-row-item-outline-width:1px;
+  --mat-table-header-headline-color:var(--t2);
+  --mat-table-header-headline-font:'DM Sans',sans-serif; --mat-table-header-headline-size:11.5px;
+  --mat-table-header-headline-weight:600; --mat-table-header-headline-tracking:.1em; --mat-table-header-headline-line-height:1.2;
+  --mat-table-row-item-label-text-color:var(--t1);
+  --mat-table-row-item-label-text-font:'DM Sans',sans-serif; --mat-table-row-item-label-text-size:13.5px;
+  --mat-table-row-item-label-text-weight:400; --mat-table-row-item-label-text-tracking:normal; --mat-table-row-item-label-text-line-height:1.45;
+  --mat-sort-arrow-color:transparent;
+}
+/* `.mat-mdc-table .mat-mdc-header-cell{background:inherit}` outranks `.nx-table th`; the sticky header needs its fill */
+.nx-root .nx-table th{background:var(--head)}
+/* Material clips cells (overflow:hidden), which would cut focus rings and the ::before hit areas */
+.nx-root .nx-table :is(th,td){overflow:visible}
+.nx-root .nx-table tr.mat-mdc-row{height:auto}
+/* CdkTable writes an inline z-index:100 on the sticky header cells: keep it inside the wrapper */
+.nx-tablewrap{isolation:isolate}
+@container nx (min-width:900px){
+  /* the header pins inside the sheet; sideways overflow stays inside the wrapper */
+  .nx-tablewrap{max-height:calc(100vh - 260px);min-height:240px;overflow:auto}
+}
+.nx-tablewrap.is-scrolled .nx-table th{box-shadow:0 6px 10px -8px rgba(26,37,53,.35)}
+/* the no-data row (workshop read in progress / no match) is a message, not a person */
+.nx-root .nx-table tbody tr.nx-nodata td,.nx-root .nx-table tbody tr.nx-nodata:hover td{background:var(--surface)}
+.nx-msg--wide{max-width:760px}
+
+/* ---------- mat-sort-header skinned as .nx-th-sort; Material's arrow is hidden, ours is projected ---------- */
+.nx-root .nx-table .mat-sort-header-arrow{display:none}
+.nx-root .nx-table .mat-sort-header-container{height:36px;margin-left:-8px;padding:0 8px;border-radius:7px;letter-spacing:inherit;text-transform:inherit;transition:background-color .15s,color .15s}
+.nx-root .nx-table .mat-sort-header-content{gap:6px;letter-spacing:inherit;text-transform:inherit}
+.nx-root .nx-table [mat-sort-header].cdk-keyboard-focused .mat-sort-header-container,
+.nx-root .nx-table [mat-sort-header].cdk-program-focused .mat-sort-header-container{border-bottom:0}
+.nx-root .nx-table .nx-sort-ic{width:13px;height:13px;opacity:.45}
+.nx-root .nx-table th.mat-sort-header:not(.mat-sort-header-disabled):hover .mat-sort-header-container{background:var(--border-light);color:var(--t1)}
+.nx-root .nx-table th.mat-sort-header:not(.mat-sort-header-disabled):hover .nx-sort-ic{opacity:.85}
+.nx-root .nx-table th.is-sorted{color:var(--t1)}
+.nx-root .nx-table th.is-sorted .nx-sort-ic{opacity:1;color:var(--primary)}
+.nx-root .nx-table th.mat-sort-header-disabled{color:var(--t2)}
+.nx-root .nx-table th.mat-sort-header-disabled .nx-sort-ic{opacity:.3;color:inherit}
+
+/* ---------- mat-checkbox skinned as .nx-cb (the hub selects `mat-checkbox`) ---------- */
+.nx-root .nx-mcb.nx-mcb{
+  --mdc-checkbox-state-layer-size:36px;
+  --mat-checkbox-touch-target-display:none;
+  --mdc-checkbox-selected-icon-color:var(--primary); --mdc-checkbox-selected-hover-icon-color:var(--primary);
+  --mdc-checkbox-selected-focus-icon-color:var(--primary); --mdc-checkbox-selected-pressed-icon-color:var(--primary);
+  --mdc-checkbox-unselected-icon-color:#7c8a9e; --mdc-checkbox-unselected-hover-icon-color:#7c8a9e;
+  --mdc-checkbox-unselected-focus-icon-color:#7c8a9e; --mdc-checkbox-unselected-pressed-icon-color:#7c8a9e;
+  --mdc-checkbox-selected-checkmark-color:#fff;
+  --mdc-checkbox-disabled-selected-icon-color:rgba(124,138,158,.45); --mdc-checkbox-disabled-unselected-icon-color:rgba(124,138,158,.45);
+}
+.nx-root .nx-mcb .mdc-checkbox{border-radius:8px;transition:background-color .15s}
+.nx-root .nx-mcb:not(.mat-mdc-checkbox-disabled) .mdc-checkbox:hover{background:var(--border-light)}
+.nx-root .nx-mcb .mdc-checkbox__background{border-width:1.5px;border-radius:4px}
+.nx-root .nx-mcb .mat-mdc-checkbox-ripple,.nx-root .nx-mcb .mdc-checkbox__ripple{display:none}
+.nx-root .nx-mcb .mdc-checkbox__native-control:focus-visible ~ .mdc-checkbox__background{box-shadow:0 0 0 2px #fff,0 0 0 4px var(--primary-light)}
+.nx-root .nx-mcb .mdc-label:empty{display:none}
+
+/* ---------- table cells: the Created / Moved On separator is in the DOM (textContent 'd MMM y, h:mm a')
+   but hidden while the time sits on its own line; card mode shows it (see the 899px block) ---------- */
+.nx-time-sep{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+/* ---------- loading: skeleton rows are plain divs laid out as a table (never a <table> or a mat-row) ---------- */
+.nx-skeltable{display:table;width:100%;border-collapse:separate;border-spacing:0}
+.nx-skeltable > .nx-skel-head,.nx-skeltable > .nx-skel-row{display:table-row}
+.nx-skel-c{display:table-cell;vertical-align:middle;padding:12px 14px;border-bottom:1px solid var(--border-light);background:var(--surface)}
+.nx-skel-head > .nx-skel-c{height:46px;padding:0 14px;background:var(--head);border-top:1px solid var(--border);border-bottom:1px solid var(--border);font:600 11.5px/1.2 'DM Sans',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--t2);white-space:nowrap}
+.nx-skeltable > .nx-skel-row > .nx-skel-c{height:62px}
+.nx-skeltable > .nx-skel-row:last-child > .nx-skel-c{border-bottom:0}
+.nx-skel-c.nx-c-select{width:56px;padding-left:12px;padding-right:0}
+.nx-skel-c .nx-tags{flex-wrap:nowrap}
+.nx-skel--figure{width:86px;height:24px}
+/* the 2.5 rows inside the one no-data cell */
+.nx-skel-line{display:flex;align-items:center;gap:28px;height:62px;padding:0 16px 0 12px;border-bottom:1px solid var(--border-light)}
+.nx-skel-line:last-child{border-bottom:0}
+.nx-skel-line .nx-person{min-width:0}
+@container nx (max-width:1320px){
+  .nx-skel-c,.nx-skel-head > .nx-skel-c{padding-left:11px;padding-right:11px}
+  .nx-skel-c.nx-c-select{width:50px;padding-left:8px;padding-right:0}
+}
+
+/* ---------- motion: the hairline runs, the dock and its panels rise ---------- */
+@keyframes nx-slide{from{left:-34%}to{left:100%}}
+.nx-progress--run::after{animation:nx-slide 1.3s ease-in-out infinite}
+/* the hairline along the top of the sheet follows its rounded corners */
+.nx-sheet > .nx-progress:first-child{border-radius:11px 11px 0 0}
+@keyframes nx-rise{from{transform:translateY(16px);opacity:0}to{transform:none;opacity:1}}
+.nx-dock{animation:nx-rise .2s ease-out}
+
+/* ---------- dock panels (Export / Send): inside the sticky dock, above it; not overlays, not modal ---------- */
+.nx-dock > .nx-dock-panel{position:absolute;left:50%;bottom:calc(100% + 12px);translate:-50% 0;z-index:1;width:660px;max-width:calc(100cqw - 32px);color:var(--t1);white-space:normal;text-align:left;animation:nx-rise .16s ease-out}
+.nx-dock .nx-dock-panel :focus-visible{outline-color:var(--primary-light)}
+@media (prefers-reduced-motion:reduce){.nx-progress--run::after,.nx-dock,.nx-dock > .nx-dock-panel{animation:none}}
+
+/* ---------- small helpers ---------- */
+.nx-spin--sm{width:14px;height:14px}
+.nx-flex--tight{gap:6px;flex-wrap:nowrap}
+.nx-banner-more{margin-top:10px}
+.nx-unmatched{display:flex;flex-wrap:wrap;gap:4px 8px;max-height:160px;overflow:auto;margin:10px 0 0;padding:0;list-style:none}
+.nx-unmatched li{padding:2px 8px;border:1px solid var(--border);border-radius:6px;background:#fff;font:400 12px/1.5 'DM Mono',monospace;color:var(--t2)}
+
+/* ---------- overlay roots (suggestions, panels, sheets) carry .nx-root themselves ---------- */
+.nx-root.nx-pop.nx-suggest{width:360px;max-width:calc(100vw - 24px)}
+.nx-bsheet{position:relative;max-height:94vh}
+
+/* ---------- chrome owned by Material / CDK in the overlay container ---------- */
+.mat-mdc-tooltip.nx-tipbox{
+  --mdc-plain-tooltip-container-color:#1a2535; --mdc-plain-tooltip-supporting-text-color:#fff;
+  --mdc-plain-tooltip-container-shape:8px; --mdc-plain-tooltip-supporting-text-font:'DM Sans',sans-serif;
+  --mdc-plain-tooltip-supporting-text-size:12.5px; --mdc-plain-tooltip-supporting-text-weight:500;
+  --mdc-plain-tooltip-supporting-text-line-height:1.45; --mdc-plain-tooltip-supporting-text-tracking:normal;
+}
+.mat-mdc-tooltip.nx-tipbox .mat-mdc-tooltip-surface{max-width:300px;padding:7px 11px;text-align:left;word-break:normal;overflow-wrap:anywhere}
+.cdk-overlay-backdrop.nx-scrim-backdrop{background:rgba(16,28,44,.42)}
+
+/* ---------- card mode bits the port needs (the narrow layout itself is the shared 899px block above) ---------- */
+@container nx (max-width:899px){
+  /* the separator replaces the mockup's .nx-time::before{content:", "} */
+  .nx-time-sep{position:static;width:auto;height:auto;margin:0;overflow:visible;clip:auto;white-space:normal}
+  .nx-root .nx-table tbody tr.nx-nodata{display:block;padding:0}
+  .nx-tablewrap{max-height:none;overflow:visible}
+}
+
+/* ==========================================================================
+   OVERLAYS AND NARROW LAYOUT (port stage 3)
+   Every overlay root carries .nx-root itself (the overlay container sits outside the screen), so rules for
+   its own classes are compound (.nx-root.nx-pop), never descendant (.nx-root .nx-pop).
+   ========================================================================== */
+
+/* ---------- pill panels, Columns, Select from file: CDK places them (no backdrop); a short viewport
+   gives them a bounded box (flexible dimensions) and they scroll inside it ---------- */
+@keyframes nx-pop-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.nx-root.nx-pop{max-width:calc(100vw - 24px);overflow:auto;overscroll-behavior:contain;animation:nx-pop-in .12s ease-out}
+.nx-root.nx-pop:focus{outline:none}
+.nx-root.nx-pop--menu{width:320px}
+.nx-root.nx-pop--columns{width:300px}
+.nx-root.nx-pop--import{width:330px}
+.nx-optlist--menu{padding-top:8px}
+.nx-optlist--scroll{max-height:288px;overflow:auto;overscroll-behavior:contain}
+.nx-opt-label{min-width:0;overflow-wrap:anywhere}
+.nx-root .nx-opt-empty{padding:10px 10px 6px;color:var(--t2);font-size:13px}
+.nx-root .nx-find input::-webkit-search-cancel-button{-webkit-appearance:none;display:none}
+.nx-find input:focus,.nx-dfield-in input:focus{outline:none;border-color:var(--primary-light);box-shadow:var(--ring)}
+.nx-primary--sm{height:38px;padding:0 14px}
+.nx-msg-ic--sm{width:44px;height:44px;margin-bottom:10px;box-shadow:none}
+.nx-preset.is-on{background:var(--primary-tint);border-color:var(--primary-line);color:var(--primary);font-weight:600}
+.nx-day:focus-visible{outline-offset:-2px}
+
+/* ---------- Funnel only: the mat-slide-toggle (NUS-11 needs its one <button>) skinned as the design's .nx-switch:
+   a 42×24 track, an 18px white handle 3px in from each end, no icons, ripple or outline ---------- */
+.nx-root .nx-mswitch.nx-mswitch{
+  --mdc-switch-track-width:42px; --mdc-switch-track-height:24px; --mdc-switch-track-shape:999px;
+  --mdc-switch-handle-width:24px; --mdc-switch-handle-height:18px; --mdc-switch-handle-shape:50%;
+  --mat-switch-unselected-handle-size:18px; --mat-switch-selected-handle-size:18px; --mat-switch-pressed-handle-size:18px;
+  --mat-switch-unselected-handle-horizontal-margin:0 3px; --mat-switch-selected-handle-horizontal-margin:0 3px;
+  --mat-switch-unselected-pressed-handle-horizontal-margin:0 3px; --mat-switch-selected-pressed-handle-horizontal-margin:0 3px;
+  --mat-switch-track-outline-width:0; --mat-switch-selected-track-outline-width:0; --mat-switch-disabled-unselected-track-outline-width:0;
+  --mat-switch-track-outline-color:transparent; --mat-switch-selected-track-outline-color:transparent;
+  --mat-switch-visible-track-opacity:1; --mat-switch-hidden-track-opacity:0;
+  --mdc-switch-unselected-track-color:#b7c1ce; --mdc-switch-unselected-hover-track-color:#a8b4c4;
+  --mdc-switch-unselected-focus-track-color:#a8b4c4; --mdc-switch-unselected-pressed-track-color:#a8b4c4;
+  --mdc-switch-selected-track-color:var(--primary); --mdc-switch-selected-hover-track-color:var(--primary-deep);
+  --mdc-switch-selected-focus-track-color:var(--primary-deep); --mdc-switch-selected-pressed-track-color:var(--primary-deep);
+  --mdc-switch-unselected-handle-color:#fff; --mdc-switch-unselected-hover-handle-color:#fff;
+  --mdc-switch-unselected-focus-handle-color:#fff; --mdc-switch-unselected-pressed-handle-color:#fff;
+  --mdc-switch-selected-handle-color:#fff; --mdc-switch-selected-hover-handle-color:#fff;
+  --mdc-switch-selected-focus-handle-color:#fff; --mdc-switch-selected-pressed-handle-color:#fff;
+  --mdc-switch-handle-elevation-shadow:0 1px 2px rgba(0,0,0,.22);
+  --mdc-switch-state-layer-size:0px;
+  flex:none;
+}
+.nx-root .nx-mswitch .mdc-switch{position:relative}
+.nx-root .nx-mswitch .mdc-switch::before{content:"";position:absolute;inset:-10px -4px}
+.nx-root .nx-mswitch .mdc-switch__ripple{display:none}
+.nx-root .nx-mswitch .mdc-label{display:none}
+.nx-root .nx-mswitch .mdc-switch:focus-visible{outline:2px solid var(--primary-light);outline-offset:2px;border-radius:999px}
+
+/* ---------- below 900px: the Filters button and the card bar exist only in the narrow layout (DOM swap),
+   so the button needs no CSS gate of its own ---------- */
+.nx-root .nx-bar > .nx-filters-btn{display:inline-flex}
+.nx-cardbar .nx-mcb{margin-right:-2px}
+
+/* ---------- bottom sheets (Filters; Export and Send on phones): a CDK overlay pane at the bottom of the
+   viewport, at most 640px wide and centred, over .nx-scrim-backdrop ---------- */
+@keyframes nx-sheet-up{from{transform:translateY(32px);opacity:.4}to{transform:none;opacity:1}}
+/* min-width:0: the pane is a flex row, and the date inputs' intrinsic width would otherwise widen the sheet past a phone */
+.nx-root.nx-bsheet{position:relative;left:auto;right:auto;bottom:auto;width:100%;min-width:0;max-height:94vh;animation:nx-sheet-up .2s ease-out}
+.nx-dfields{grid-template-columns:repeat(2,minmax(0,1fr))}
+.nx-dfield-in input{min-width:0}
+.nx-root.nx-bsheet:focus{outline:none}
+.nx-root .nx-bsheet-body{flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain}
+.nx-bsheet-head .nx-iconbtn{margin-left:-4px}
+.nx-find--flush{margin:10px 0 4px}
+.nx-optlist--flush{padding:4px 0 8px}
+.nx-dfields--flush{padding:0}
+.nx-root.nx-root .nx-ruleline--flush{margin:8px 0 0}
+.nx-bsheet-body > .nx-seg{margin-top:10px}
+.nx-bgroup-switch{gap:10px;flex-wrap:nowrap;font-size:13px;color:var(--t2)}
+.nx-bgroup .nx-cloud{margin-bottom:2px}
+.nx-quiet--wide{flex:1;height:44px}
+/* the shared Export / Send bodies inside a phone sheet (8.3) */
+.nx-root.nx-bsheet--panel .nx-panel-head{align-items:center;padding:6px 8px 10px 18px;border-bottom:1px solid var(--border-light)}
+.nx-root.nx-bsheet--panel .nx-panel-title{font:600 21px/1.2 'Playfair Display',Georgia,serif;color:var(--primary)}
+.nx-root.nx-bsheet--panel .nx-panel-body{flex:1 1 auto;min-height:0;overflow:auto;padding:12px 18px 14px}
+.nx-root.nx-bsheet--panel .nx-panel-foot{flex-wrap:wrap;padding:12px 18px 18px;border-radius:0}
+.nx-root.nx-bsheet--panel .nx-channels{display:flex;flex-direction:column;gap:8px}
+.nx-root.nx-bsheet--panel .nx-channel{flex-direction:row;align-items:center;gap:14px;padding:12px 14px}
+
+@media (prefers-reduced-motion:reduce){.nx-root.nx-pop,.nx-root.nx-bsheet{animation:none}}
