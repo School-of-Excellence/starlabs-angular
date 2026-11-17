@@ -14,7 +14,7 @@ Each component was 3-way merged from the LAST point the two sides agreed:
 | Delivery dashboard (`delivery-dashboard-clone`) | `eb67431f` (the version we pulled 11-12) | HEAD | joshua tip | ts 7 · html 3 |
 
 ## Resolutions (and why)
-**JC Health ts → Joshua's file whole.** In September both sides ported the same features separately, so a 3-way
+**JC Health ts → Joshua's file whole** (⚠ lost five of our fixes — see "Lost in the merge" below). In September both sides ported the same features separately, so a 3-way
 produced duplicated members (jcDoneEvents, jcPipeline, setSchedBucket…). His later commits already carry our fixes
 (cancelled JCs excluded; hardened `isOnboardingAppt`; coach's-own-schedule = his "review F3"). Our side had no hooks
 in the ts. Checked: tsc + `ng build --configuration development` clean.
@@ -56,6 +56,21 @@ hub-referenced tile ids), other `dd-*` / `pm-*` → `ddc-*`. `ddc-div-009/010` (
 - Seed: follow-ups on the JCH base (healthtracker_activity) + an Ev. Prep world under its own run tag `<run>_evp`.
 - Firestore index `appointments(participantproductid, attended, endtime desc)` from Joshua's 0bb85765 NOT needed by our
   merged lookup (it queries `participantproductid in` only) — not added.
+
+## Lost in the merge — found by the journey suite, restored (2026-11-18)
+Taking Joshua's JC Health ts "whole" (see Resolutions) was WRONG on five points: his tip did not carry these
+charan-release fixes. The first local journey run failed 9 coach-health cases; root causes:
+| Hub case | Cause | Fix |
+|---|---|---|
+| JCH-07, JCH-14 | His coach-scope appointment load (review F3) returned early on every NOT-attended doc before classifying it → a coach's Schedule never had booked sessions | classify every JC appointment, contact recency still attended-only |
+| JCH-03 | Row A&H chips had no 180-day window → a years-old critical letter still flagged | `llSince` window restored in `loadLoveLetterTagsFor` |
+| JCH-08/09 | Planning A&H card + drill were base-wide again (a coach saw / drilled other coaches' participants) | `ahScopeIds` / `ahDocsInScope` / `computeAhSummary` restored (eac54b29) |
+| JCH-02, JCH-17 | Finance filter compared case-sensitively → 'Defaulted' never matched the 'defaulted' filter (tile said 1, table showed 0) | case-insensitive match restored |
+| (unit) jc-pipeline | Attended legacy onboarding calls (journeyid / type ref only) counted as "JC done"; `isCoachingDone` gone | classify via `isOnboardingAppt`, `isCoachingDone` restored (cef4e0bd) |
+Kept as Joshua designed (3ccd560d, 2026-11-11): finance (locked / defaulted) is OUT of Needs attention and its
+reason chips; the hub's JCH-04 / JCH-10 now assert that rule. Contract spec context widened for his onCoachChange.
+Verified: revert guards 52/52, contract 11/11, unit lane 597/597, journey suite on the emulator lane — full run
+106 passed / 10 failed, then coach-health 17/17, Ev. Prep 2/2, delivery 8/8 after the fixes.
 
 ## Follow-ups on top (operator, same day)
 - **"Ongoing by product" → All products chip** showed a hardcoded `&mdash;` (Joshua's v4) → now `kpiOngoingTotal`, the
