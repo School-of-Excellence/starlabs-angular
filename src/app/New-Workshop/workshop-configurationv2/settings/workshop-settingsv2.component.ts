@@ -907,7 +907,7 @@ export class WorkshopSettingsv2Component implements OnInit, AfterViewInit, OnDes
   // Settings, and it must stay usable on a workshop that has not been saved yet.
   readonly accessKeys = WORKSHOP_ACCESS_KEYS;
   readonly accessListDefs: { key: AdminListKey; title: string; hint: string }[] = [
-    { key: 'dashboardAdmins', title: 'Full dashboard access', hint: 'Everything on every workshop dashboard. People here are not given actions one by one.' },
+    { key: 'dashboardAdmins', title: 'Full dashboard access', hint: 'Everything on every workshop dashboard except Clear. People here are not given actions one by one.' },
     { key: 'editAccess', title: 'Workshop editing', hint: 'Create, edit and duplicate a workshop, and change its Active, Web Active and Completed switches.' },
     { key: 'newUsersAccess', title: 'New users screen', hint: 'Open the new users screen from the workshops list.' },
   ];
@@ -940,7 +940,7 @@ export class WorkshopSettingsv2Component implements OnInit, AfterViewInit, OnDes
       this.zone.run(() => {
         this.accessPeople = people;
         this.accessNameMap = people.reduce((acc: Record<string, string>, p) => { acc[p.id] = p.name; return acc; }, {});
-        this.adminLists = { dashboardAdmins: [...lists.dashboardAdmins], editAccess: [...lists.editAccess], newUsersAccess: [...lists.newUsersAccess] };
+        this.adminLists = { dashboardAdmins: [...lists.dashboardAdmins], editAccess: [...lists.editAccess], newUsersAccess: [...lists.newUsersAccess], clearWorkshop: [...lists.clearWorkshop] };
         this.accessGrants = Object.keys(grants).reduce((acc: WorkshopAccessGrants, id) => { acc[id] = [...grants[id]]; return acc; }, {});
         this.accessRows = Object.keys(this.accessGrants).sort((a, b) => this.accessNameFor(a).localeCompare(this.accessNameFor(b)));
         this.accessDirty = false;

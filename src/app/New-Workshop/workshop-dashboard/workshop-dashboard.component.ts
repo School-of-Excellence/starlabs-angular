@@ -210,7 +210,8 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     ['activeParticipants', []],
     ['completedParticipants', []],
   ]);
-  filterOption: 'all' | 'new' | 'old' = 'all';
+  /** Side panel New / Exist filter: New = isNewUserProfile (moved-to-exist people count as Exist). */
+  filterOption: 'all' | 'new' | 'exist' = 'all';
   /** Side-panel name search. Narrows the list in the panel only — never the progress table. */
   sideSearch = '';
   cohortTypeFilter: 'all' | 'facilitator' | 'cohort' = 'all';
@@ -720,6 +721,88 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     this.unsubscribes.push(unsubscribe);
   }
 
+  /** Total Enrolled panel: profileid -> the tag names on their enrolled doc, shown beside the New tag. */
+  enrolledTagNames: Record<string, string[]> = {};
+  /** Total Enrolled panel's Tag filter: the tag names carried by people in the panel, A→Z. */
+  enrolledTagOptions: string[] = [];
+  /** Ticked tag names; a person matches when they carry any of them. */
+  selectedTagFilters: string[] = [];
+
+  /** First enrolled doc per person, the same one buildParticipantEntry reads. */
+  private firstEnrolledDocs(): Map<string, any> {
+    const docs = new Map<string, any>();
+    for (const e of this.enrolledParticipants || []) {
+      if (e?.profileid && !docs.has(e.profileid)) docs.set(e.profileid, e);
+    }
+    return docs;
+  }
+
+  /** An enrolled doc's tag ids as names, in stored order. A tag id with no newusertags doc is left out. */
+  private tagNamesOf(enrolledDoc: any, names: Map<string, string>): string[] {
+    return (Array.isArray(enrolledDoc?.tags) ? enrolledDoc.tags : [])
+      .map((id: string) => names.get(id)).filter((n: string | undefined): n is string => !!n);
+  }
+
+  /** Participant Data header: the tag names on the opened person's enrolled doc (operator 2026-11-13). */
+  selectedParticipantTags: string[] = [];
+
+  private async loadSelectedParticipantTags(enrolledDoc: any): Promise<void> {
+    this.selectedParticipantTags = [];
+    const names = await this.loadTagNames(Array.isArray(enrolledDoc?.tags) ? enrolledDoc.tags : []);
+    // Someone else may have been opened while the names were read.
+    if (this.selectedParticipantData?.profileid !== enrolledDoc?.profileid) return;
+    this.selectedParticipantTags = this.tagNamesOf(enrolledDoc, names);
+  }
+
+  /** Read the tag names for everyone enrolled, when the Total Enrolled panel opens. */
+  private async loadEnrolledTagNames(): Promise<void> {
+    const inPanel = new Set((this.selectedParticipants || []).map((p: any) => p?.profileid));
+    const docs = this.firstEnrolledDocs();
+    const names = await this.loadTagNames([...docs.values()].flatMap(e => e?.tags || []));
+    const out: Record<string, string[]> = {};
+    const options = new Set<string>();
+    for (const [pid, e] of docs) {
+      const n = this.tagNamesOf(e, names);
+      if (!n.length) continue;
+      out[pid] = n;
+      if (inPanel.has(pid)) n.forEach(t => options.add(t));
+    }
+    this.enrolledTagNames = out;
+    this.enrolledTagOptions = [...options].sort((a, b) => a.localeCompare(b));
+  }
+
+  toggleTagFilter(tag: string) {
+    const idx = this.selectedTagFilters.indexOf(tag);
+    if (idx >= 0) { this.selectedTagFilters.splice(idx, 1); } else { this.selectedTagFilters.push(tag); }
+    this.applyFilterSide();
+  }
+
+  clearTagFilters() {
+    this.selectedTagFilters = [];
+    this.applyFilterSide();
+  }
+
+  /** newusertags id -> name, read only for the ids asked for; ids already read are kept for the session. */
+  private tagNameCache = new Map<string, string>();
+  private async loadTagNames(ids: string[]): Promise<Map<string, string>> {
+    const missing = [...new Set(ids)].filter(id => typeof id === 'string' && id && !this.tagNameCache.has(id));
+    const BATCH_SIZE = 30; // Firestore 'in' query limit
+    try {
+      const snaps = await Promise.all(Array.from({ length: Math.ceil(missing.length / BATCH_SIZE) }, (_, i) =>
+        getDocs(query(collection(this.firestoreDefault, 'newusertags'),
+          where(documentId(), 'in', missing.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE))))));
+      for (const snap of snaps) {
+        for (const d of snap.docs) this.tagNameCache.set(d.id, (d.data()?.['name'] ?? '').toString().trim());
+      }
+      // A tag doc that no longer exists is remembered as blank so it is not asked for again.
+      for (const id of missing) if (!this.tagNameCache.has(id)) this.tagNameCache.set(id, '');
+    } catch (err) {
+      // The export still downloads; the Tags column is just empty for what could not be read.
+      console.error('Could not read tag names:', err);
+    }
+    return this.tagNameCache;
+  }
+
   // Batched profileid -> name lookup from the full profile_data directory.
   async getProfileNameMapForIds(profileIds: string[]): Promise<{ [id: string]: string }> {
     const nameMap: { [id: string]: string } = {};
@@ -1071,6 +1154,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
           profileid: data['profileid'],
           participantworkshopref: data['participantworkshopref'],
           enrollmentdate: data['enrollmentdate'],
+          tags: Array.isArray(data['tags']) ? data['tags'] : [],
           workshopStartedAt: data['workshopStartedAt'],
           status: data['status'],
           workshopcategory: data['workshopcategory'] || null,
@@ -1205,6 +1289,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
         ...enrolledParticipant,
         progressData: participant
       };
+      void this.loadSelectedParticipantTags(enrolledParticipant);
       this.loadParticipantWorkshopDataFromCache(participant.profileid);
       setTimeout(() => { this.scrollToParticipantData(); }, 500);
     }
@@ -1760,7 +1845,11 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       this.selectedTierFilters = [];
       this.selectedCategoryFilters = [];
       this.selectedNotStartedTypeFilters = [];
+      this.selectedTagFilters = [];
+      // Total Enrolled opens with the most recent enrollments first (operator 2026-11-13).
+      this.sideSort = metricType === 'totalEnrolled' ? 'enrolledNew' : '';
       this.applyFilterSide();
+      if (metricType === 'totalEnrolled') void this.loadEnrolledTagNames();
     }
   }
 
@@ -2319,10 +2408,12 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   applyFilterSide() {
     let base = this.selectedParticipants;
 
+    // New / Exist (operator 2026-11-12): a still-new user from new_user_data is New; everyone else —
+    // including people marked movedtoexist — is an existing user from participant metadata.
     if (this.filterOption === 'new') {
-      base = base.filter(p => this.mapProfile[p.profileid]?.workshoponly === true);
-    } else if (this.filterOption === 'old') {
-      base = base.filter(p => !this.mapProfile[p.profileid]?.workshoponly);
+      base = base.filter(p => this.isNewUserProfile(p.profileid));
+    } else if (this.filterOption === 'exist') {
+      base = base.filter(p => !this.isNewUserProfile(p.profileid));
     }
 
     // Exist Users Enrolled carries its own journey + customer-status filters. They are
@@ -2368,6 +2459,11 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
         const participantCat = this.participantWorkshopCategoryMap.get(p.profileid);
         return participantCat ? this.selectedCategoryFilters.includes(participantCat) : false;
       });
+    }
+
+    // Tag filter (operator 2026-11-12): keep people whose enrolled doc carries any ticked tag.
+    if (this.selectedStatusInfo?.status === 'totalEnrolled' && this.selectedTagFilters.length > 0) {
+      base = base.filter(p => (this.enrolledTagNames[p.profileid] || []).some(t => this.selectedTagFilters.includes(t)));
     }
 
     if (this.selectedStatusInfo?.status === 'totalEnrolled' &&
@@ -2466,6 +2562,59 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     if (this.selectedStatusInfo?.status === 'saleAchieved') {
       this.filteredParticipants = sortSaleBuyers(this.filteredParticipants, this.saleSort);
     }
+    // Total Enrolled: the chosen sort, over whatever the filters and search left (operator 2026-11-13).
+    if (this.selectedStatusInfo?.status === 'totalEnrolled' && this.sideSort) {
+      this.filteredParticipants = this.sortEnrolledPanel(this.filteredParticipants, this.sideSort);
+    }
+  }
+
+  /** Total Enrolled panel sort; '' keeps the list in its unsorted order. Each time the panel opens it starts on
+   *  'enrolledNew' (most recent enrollment first). */
+  sideSort: '' | 'enrolledNew' | 'enrolledOld' | 'nameAZ' | 'nameZA' = '';
+
+  /** Picking the active sort again turns it off, so the menu needs no extra "none" row. */
+  setSideSort(by: 'enrolledNew' | 'enrolledOld' | 'nameAZ' | 'nameZA'): void {
+    this.sideSort = this.sideSort === by ? '' : by;
+    this.applyFilterSide();
+  }
+
+  /** A stored enrollment date as epoch ms, or NaN when there is none or it can't be read. */
+  private enrolledMillis(v: any): number {
+    if (v == null || v === '') return NaN;
+    if (typeof v?.toMillis === 'function') return v.toMillis();
+    if (typeof v?.toDate === 'function') return v.toDate().getTime();
+    if (v instanceof Date) return v.getTime();
+    if (typeof v?.seconds === 'number') return v.seconds * 1000;
+    const n = typeof v === 'number' ? v : Date.parse(v);
+    return Number.isFinite(n) ? n : NaN;
+  }
+
+  /**
+   * Enrollment date reads each person's first enrolled doc (the one the card and export use). People without
+   * a date, or without a name, go last whichever way the list is sorted. Ties keep the usual order.
+   */
+  private sortEnrolledPanel(list: any[], by: 'enrolledNew' | 'enrolledOld' | 'nameAZ' | 'nameZA'): any[] {
+    const docs = this.firstEnrolledDocs();
+    const rows = list.map((p, i) => ({
+      p, i,
+      when: this.enrolledMillis(docs.get(p?.profileid)?.enrollmentdate),
+      name: (this.sideNameFor(p) || '').toString().trim(),
+    }));
+    const byName = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true });
+    rows.sort((a, b) => {
+      if (by === 'enrolledNew' || by === 'enrolledOld') {
+        const am = Number.isNaN(a.when), bm = Number.isNaN(b.when);
+        if (am !== bm) return am ? 1 : -1;
+        if (!am && a.when !== b.when) return by === 'enrolledNew' ? b.when - a.when : a.when - b.when;
+      } else {
+        const am = !a.name || a.name === 'Unknown', bm = !b.name || b.name === 'Unknown';
+        if (am !== bm) return am ? 1 : -1;
+        const c = byName(a.name, b.name);
+        if (c !== 0) return by === 'nameAZ' ? c : -c;
+      }
+      return a.i - b.i;
+    });
+    return rows.map(r => r.p);
   }
 
   /** The name a side-panel row shows: its own, else whichever directory knows the profile. */
@@ -3326,7 +3475,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     }
   }
 
-  exportParticipants() {
+  async exportParticipants() {
     if (!this.can('export')) return;
     if (!this.filteredParticipants || this.filteredParticipants.length === 0) {
       alert("No participants selected to export."); return;
@@ -3340,11 +3489,22 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       this.downloadCSV(this.createCSVContent(rows), name);
       return;
     }
+    // Total Enrolled also exports each person's enrollment date and time, then their tag names
+    // (operator 2026-11-12), last so the existing columns keep their positions. First enrolled doc per
+    // person, as buildParticipantEntry reads it.
+    const withEnrolledOn = this.selectedStatusInfo?.status === 'totalEnrolled';
+    let enrolledDoc = new Map<string, any>();
+    let tagNames = new Map<string, string>();
+    if (withEnrolledOn) {
+      enrolledDoc = this.firstEnrolledDocs();
+      const tagIds = this.filteredParticipants.flatMap((p: any) => enrolledDoc.get(p?.profileid)?.tags || []);
+      tagNames = await this.loadTagNames(tagIds);
+    }
     const csvData = this.filteredParticipants.map((p: any) => {
       // Some panels attach only participant metadata; a new user who lives only in new_user_data had
       // none and the export threw on `.email` (operator 2026-10-20). Fall back to either directory.
       const m = p?.['metadata'] || this.mapProfile?.[p?.profileid] || this.mapProfileNew?.[p?.profileid] || {};
-      return {
+      const row: any = {
         'Participant Name': (p.name && p.name !== 'Unknown') ? p.name : (m['name'] || p.name || 'N/A'),
         'Email': m['email'] || '',
         'Phone': m['phonenumber'] || '',
@@ -3352,6 +3512,12 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
         'Last Journey': this.JourneyMap[m['lastcompletedjourney']] || '',
         'Subscription End': this.formatDate(m['subscriptionend']) || '',
       };
+      if (withEnrolledOn) {
+        const e = enrolledDoc.get(p?.profileid);
+        row['Enrollment Date'] = this.formatDateTime(e?.enrollmentdate) || '';
+        row['Tags'] = this.tagNamesOf(e, tagNames).join(', ');
+      }
+      return row;
     });
     const csvContent = this.createCSVContent(csvData);
     const fileName = `workshop-participants-${this.workshopData?.detailpage?.title || 'workshop'}-${new Date().toISOString().split('T')[0]}.csv`;

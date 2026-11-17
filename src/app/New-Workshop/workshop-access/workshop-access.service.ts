@@ -138,10 +138,12 @@ export class WorkshopAccessService {
       },
       { merge: true },
     );
+    // clearworkshop is not written here (no editor manages it), so the merge leaves it as stored.
     this.adminListsPromise = Promise.resolve({
       dashboardAdmins: [...(lists.dashboardAdmins || [])],
       editAccess: [...(lists.editAccess || [])],
       newUsersAccess: [...(lists.newUsersAccess || [])],
+      clearWorkshop: [...(lists.clearWorkshop || [])],
     });
   }
 
@@ -162,6 +164,9 @@ export class WorkshopAccessService {
    */
   async saveWorkshopGrants(workshopId: string, grants: WorkshopAccessGrants, savedBy?: string | null): Promise<void> {
     if (!workshopId) return;
+    // mergeFields, not merge: `dashboardaccess` is replaced whole. A plain merge deep-merged the map, so
+    // a person removed (or set to None) kept their stored actions — Clear included — whenever anyone
+    // else still had a row (2026-11-12). Other fields on the document are still left as they are.
     await setDoc(
       doc(this.firestore, SETTINGS_COLLECTION, workshopId),
       {
@@ -170,7 +175,7 @@ export class WorkshopAccessService {
         updatedat: serverTimestamp(),
         ...(savedBy ? { updatedby: savedBy } : {}),
       },
-      { merge: true },
+      { mergeFields: ['workshopid', 'dashboardaccess', 'updatedat', ...(savedBy ? ['updatedby'] : [])] },
     );
   }
 
@@ -182,7 +187,7 @@ export class WorkshopAccessService {
         this.getAdminLists(),
         this.getWorkshopGrants(workshopId),
       ]);
-      return new WorkshopAccess(profileId, grants, lists.dashboardAdmins);
+      return new WorkshopAccess(profileId, grants, lists.dashboardAdmins, lists.clearWorkshop);
     } catch (err) {
       console.error('Could not resolve dashboard access:', err);
       return NO_ACCESS;

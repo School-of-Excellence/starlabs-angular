@@ -1493,6 +1493,56 @@
   align-items: center;
   gap: 8px;
 }
+/* Several tags can follow a name; let them wrap instead of pushing the row wider. */
+.participant-details:has(.enrolled-tag) {
+  flex-wrap: wrap;
+}
+
+/* Total Enrolled filter menu: the Tag filter under All / New / Exist. */
+.side-tag-filter {
+  display: flex;
+  flex-direction: column;
+  max-height: 260px;
+  overflow-y: auto;
+  margin-top: 8px;
+  padding: 8px 12px 4px;
+  border-top: 1px solid rgba(128, 128, 128, 0.2);
+}
+.side-tag-filter-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+.side-tag-filter-clear {
+  border: 0;
+  background: none;
+  padding: 2px 0;
+  color: #5e35b1;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* Total Enrolled panel: the tags on each person's enrolled doc, next to the New tag. */
+.enrolled-tag {
+  display: inline-block;
+  flex: 0 0 auto;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: #e8f5e9;
+  border: 1px solid #a5d6a7;
+  color: #2e7d32;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  white-space: nowrap;
+  vertical-align: middle;
+}
 
 /* "New" used to be an image (assets/new.png). A text pill reads at any zoom, scales with the
    row, needs no network round-trip and stays legible next to a long name. */
@@ -3142,3 +3192,18 @@
 }
 .sale-panel-total-label { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.7; }
 .sale-panel-total-amt { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; color: #0c8a5f; }
+
+/* Total Enrolled sort menu: the active choice reads as selected. */
+::ng-deep .side-sort-menu .mat-mdc-menu-item.on {
+  background: #eef2ff;
+  color: #4f46e5;
+}
+::ng-deep .side-sort-menu .mat-mdc-menu-item.on .mat-icon {
+  color: #4f46e5;
+}
+
+/* Participant Data header: the enrollment's tags, as the same green pills the Total Enrolled cards use. */
+.pd-tags {
+  flex-wrap: wrap;
+  gap: 4px;
+}

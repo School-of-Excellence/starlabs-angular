@@ -1,59 +1,73 @@
 # PROGRESS
 
 ## Current state
-- **starlabs-angular `atc-development`**: last pushed `12821f0b`. Today's work (15 files + 2 new in
-  `src/app/shared/`) is **local and uncommitted**. NOT merged into `development` / `production`.
-- **starlabs-e2e-tests `main`**: pushed through `54f2701`; today's 2 spec edits are **local**.
-- **Flutter (`breakthroughs-flutter` → `Flutter_Projects/Version_3.44.3/Breakthroughs-Achievement`)**:
-  4 files + a journal, **local**.
-- `ng build` green, `flutter test` 48/48, `flutter analyze` adds no new issues. Operator verified the web and
-  the app end to end: slider index saved and labels shown correctly in both.
-- The local emulator may still be running (`npm run emu:up` in the hub).
+- **starlabs-angular `nanda-development`**: HEAD `f1124b66`. Everything since 2026-11-12 is **local and
+  uncommitted**: 17 modified files and 9 new ones (2 unit specs, 1 plan, 6 journals). Not merged, not deployed.
+- **starlabs-e2e-tests `main`**: pushed through `69bd71c`. The full workshops suite ran first: 169 passed /
+  0 failed / 33 skipped. The new spec files are gated on hooks that ship with the uncommitted app changes, so
+  CI skips them until those land.
+- Unit tests:
+  - `workshop-dashboard.export.spec.ts` 15/15, `newusersprofile.columns.spec.ts` 5/5,
+    `workshop-access.model.spec.ts` 7/7.
+  - The dashboard folder has 197 passing and 1 failing; the failure is the old empty "should create" stub.
+- The test servers are stopped and the cloud-function `functions/package.json` is restored.
 
-## Last session changes (2026-11-03) — journal `specs/journals/2026-11-03-participant-view-and-slider-contract.md`
-- **`participantview` on ATC model forms** — a "Participant can view" checkbox per form row; the participant
-  app shows a form only when it is true. Absent reads false (old models expose nothing); a row added in the
-  dialog starts true. Covered by hub `journey/atcmodel-forms.spec.ts` AMF-06.
-- **ATC model dialog** — the forms list became a labelled grid with a stacked fallback under 760px, and the
-  dialog went from a fixed 540px to 920px capped at 95vw. The checkbox had squeezed the form-name column to
-  one character per line.
-- **Flipping answers now render in both previews** (`form-overlay-view`, `form-template-preview`). They had
-  never been rendered at all — zero flipping code in either.
-- **Slider contract: a 0-based index into `options`**, both apps, both slider kinds. Web moved to
-  `[min]="0"` / `[max]="options.length - 1"` and now shows the option label instead of the number; the
-  hardcoded `[max]="10"` on the flipping slider is gone. `sliderPosition` clamps every read in both repos.
-  This fixed a `RangeError` that took the app down on the flipping slider and, more quietly, on the last
-  option of every plain slider.
-- **Time contract: `"HH:mm"`**, 24-hour, zero-padded, converted at each UI boundary (`time-value.ts`;
-  `FillForm.dart`). The web had been storing a Timestamp that the app could not read. No migration needed —
-  reads accept all four shapes.
-- **Failure mid-session**: the fill screens were switched to labels while the previews still showed raw
-  indices, so every slider read one apart between a form and its preview. Fixed. A reported app-side `+1`
-  turned out to be a stale build.
+## Last session changes (2026-11-12 → 11-16)
+- **Workshop dashboard, Total Enrolled.**
+  - The export adds Enrollment Date (with time) and Tags.
+  - The side filter is All / New / Exist. People in `movedtoexist` count as Exist everywhere, which also fixes
+    the "New" tags.
+  - Cards show tag names. There is a Tag filter, and a sort that opens newest-enrolled first.
+  - Participant Data shows the enrollment's tags.
+  - Journals: `2026-11-12-total-enrolled-*`, `-new-exist-and-export-tags`, `2026-11-13-total-enrolled-sort-and-pd-tags`.
+- **Clear button.** Only `Workshop Admin.clearworkshop` or that workshop's own Clear tick grants it; full
+  dashboard access no longer does.
+  - Fixed along the way: the access editor's save deep-merged the grants map, so removing someone or pressing
+    None kept their stored actions. It now uses `mergeFields`.
+  - Journal: `2026-11-12-clear-button-access`.
+- **New Users screen (`/newusersprofile`).**
+  - Manage tags can rename a tag. Before, clicking a tag in that mode did nothing.
+  - Column chooser: Name, Phone, Email, Created and Tags by default, saved per browser.
+  - Layout:
+    - a two-row toolbar;
+    - a sticky header;
+    - a selection bar under the table instead of the side panel that squeezed it;
+    - real loading and no-match states;
+    - full tag names;
+    - a Created filter that matches the other filters.
+  - A two-reviewer pass found 10 small bugs; all are fixed and tested (NUS-06..11).
+  - Plan `specs/plans/2026-11-12-new-users-screen.md`; journal `2026-11-12-new-users-screen`.
+- **EiFlix home config, Upcoming Workshops.** Confirmed now counts the responses, the same set View lists,
+  instead of the number stored on the widget. The stored number is untouched, and EiFlix still shows it.
+  Journal: `2026-11-13-eiflix-confirmed-vs-responses`.
+- **Failures and their root causes.**
+  - WS-40 timed out once in the full suite. It passed on a rerun and nothing touches it, so it was a flake.
+  - WNE-07's first negative control used p1, who is "enrolled, not started" and so has no progress row.
+    Switched to p0, untagged.
+  - Behaviour-only changes need a new hook. The hub-ahead guard only skips a spec file that references a hook
+    the branch lacks; otherwise older branches would go red.
+  - A session cut-off left one e2e rerun unrun. It ran later, with the follow-up work.
 
 ## Pending
-1. **Operator: commit the three repos** (nothing is committed; pushing is a separate, gated step).
-2. **Migration — slider answers written before today are 1-based** and display one option high. Needs
-   `value - 1` over `formsByClient` + `temporary_forms`, floored at 0, for `slider` fields and each
-   `flippingquestion.value` entry. Not idempotent: needs a marker or a one-shot against a snapshot.
-3. **`form-based-submission` (B!G) is still 1-based AND stores the option label, not the index** — its
-   `onSliderValueChange` writes `options[event.value - 1]`. Deferred (operator, 2026-11-03): the route
-   `/formbasedsubmission` is registered but **nothing navigates to it** — in-app links, Cloud Functions and
-   the Flutter app all have none, and the B!G board now opens `/formtemplate` instead
-   (`participant-assignment-board.component.ts:593,595`). So the live B!G flow is already on the fixed screen.
-   Fixing it needs three changes, not two (min, max, and both handler bodies). Revisit with B!G work.
-   Related trap: `form-assignment.component.ts:478-480` still has the same label-writing
-   `onSliderValueChange`, harmless only because its template call is commented out at `:236` — delete it.
-4. ~~Hub slider assertions~~ **done** — `expectAllAnswers` now returns the label and resolves the saved index
-   through the answer's own `options`; the two flipping assertions (`> 1`, written for the old 1-10 scale) were
-   also wrong against a 2-option seed and now check the index names a real option. Compiles, 17 tests listed.
-5. **The ATC suite still has not run locally.** The overlay (`ci/setup-emulator-config.sh`, which overwrites the
-   untracked `environment.ts` / `environment.development.ts` — back them up) fixed the wiring: traffic reached
-   `localhost:8080` / `starlabs-cicd`, no real-DB hits. It then failed on CORS because **a running Flutter app
-   (process `Runner`, GCDWebServer) binds `[::1]:8080` while the Firestore emulator binds only `127.0.0.1:8080`,
-   and `localhost` resolves to `::1` first** — so the browser talked to the app, not the emulator. Stop the
-   simulator app before running, or point the emulator host at `127.0.0.1`. Env files were restored (checksums
-   verified).
-6. **Required sliders** — Flutter auto-answers on render; the web's flipping slider never evaluates
-   `required`; neither can select the first option without moving away and back.
-7. Carried over: `atc-development` is not on a deploy branch, so the appointment prefill is still unreleased.
+1. **Operator: commit all the angular files above together.** The pushed hub specs key on their hooks.
+2. **Before deploying to production:**
+   - put the right profile ids in `static meta data/Workshop Admin.clearworkshop` (full-access people lose
+     Clear on deploy);
+   - confirm the Firestore rules allow **updating** `newusertags`, or renames will fail with "Could not
+     rename the tag".
+3. **EiFlix Confirmed**: the stored `confirmed` can still differ from the real responses. Option 3, a one-off
+   repair, is not done; it needs approval and an approved way into production.
+4. **New Users audit, not done:**
+   - three-state chips in bulk tag edit;
+   - search inside the filter menus;
+   - debounced search;
+   - a load-error state;
+   - collapsing the filters on narrow screens.
+5. **Known, left as is:**
+   - a full-access person's hidden per-workshop Clear tick still grants Clear;
+   - a failed admin-lists read can let the editor save empty lists.
+6. `graphify` isn't installed here, so the graph-rebuild step was skipped.
+7. Carried over:
+   - `/engagementdashboardv2` needs a route-config entry and `authGuard`;
+   - EiFlix consumers must read `showtext`, and the learner app `allowedit`.
+   - Older ATC slider items: see `specs/journals/2026-11-03-participant-view-and-slider-contract.md`.
