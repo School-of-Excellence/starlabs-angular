@@ -1,5 +1,20 @@
 <div class="jchd-wrap" [ngClass]="'jchd-view-' + view" [attr.data-theme]="theme">
 
+  <!-- ─── Journey Experience top-level tabs ─── -->
+  <nav class="jx-tabbar" role="tablist" aria-label="Journey experience" data-testid="jchd-tabbar">
+    <button type="button" class="jx-tab" role="tab" [class.on]="experienceTab==='overall'" [attr.aria-selected]="experienceTab==='overall'" (click)="setExperienceTab('overall')" data-testid="jchd-tab-overall"><span class="jx-tab-step">1</span><span class="jx-tab-label">Overall Summary</span></button>
+    <button type="button" class="jx-tab" role="tab" [class.on]="experienceTab==='onboarding'" [attr.aria-selected]="experienceTab==='onboarding'" (click)="setExperienceTab('onboarding')" data-testid="jchd-tab-onboarding"><span class="jx-tab-step">2</span><span class="jx-tab-label">Onboarding</span></button>
+    <button type="button" class="jx-tab" role="tab" [class.on]="experienceTab==='evprep'" [attr.aria-selected]="experienceTab==='evprep'" (click)="setExperienceTab('evprep')" data-testid="jchd-tab-evprep"><span class="jx-tab-step">3</span><span class="jx-tab-label">Ev. Preparation</span></button>
+    <button type="button" class="jx-tab" role="tab" [class.on]="experienceTab==='planning'" [attr.aria-selected]="experienceTab==='planning'" (click)="setExperienceTab('planning')" data-testid="jchd-tab-planning"><span class="jx-tab-step">4</span><span class="jx-tab-label">Journey Planning</span></button>
+    <!-- One light/dark switch for all four tabs (jc-health-ux-review T3; moved from the Journey Planning header). -->
+    <button type="button" class="jchd-theme-toggle jx-theme-toggle" data-testid="jchd-theme-toggle" (click)="toggleTheme()"
+      [attr.aria-label]="'Switch to ' + (isDark ? 'light' : 'dark') + ' mode'" matTooltip="Toggle dark mode">
+      <mat-icon>{{ isDark ? 'light_mode' : 'dark_mode' }}</mat-icon>
+    </button>
+  </nav>
+
+  <!-- ═══ Journey Planning tab = the existing coach-health screen (unchanged) ═══ -->
+  <ng-container *ngIf="experienceTab === 'planning'">
   <header class="jchd-header">
     <div class="header-left">
       <div class="jchd-eyebrow">Coach overview</div>
@@ -16,17 +31,12 @@
         <mat-button-toggle value="scoreboard">Coaches</mat-button-toggle>
       </mat-button-toggle-group>
 
-      <button data-testid="jchd-theme-toggle" type="button" class="jchd-theme-toggle" (click)="toggleTheme()"
-        [attr.aria-label]="'Switch to ' + (isDark ? 'light' : 'dark') + ' mode'" matTooltip="Toggle dark mode">
-        <mat-icon>{{ isDark ? 'light_mode' : 'dark_mode' }}</mat-icon>
-      </button>
-
       <label class="jchd-pill jchd-pill-select coach-pill" *ngIf="view === 'summary' || view === 'base'">
         <span class="jchd-pill-label"><span class="vk">Viewing</span>{{ selectedCoachName }}</span>
         <select data-testid="jchd-sel-002" [ngModel]="selectedCoachId" (ngModelChange)="onCoachChange($event)" aria-label="Viewing scope">
           <option [value]="ALL">All participants</option>
           <option *ngFor="let c of coaches" [value]="c.id">{{ c.name }}</option>
-          <option [value]="UNASSIGNED">Unassigned · no coach ({{ unassignedCount }})</option>
+          <option [value]="UNASSIGNED">Unassigned · no coach ({{ unassignedKnown ? unassignedCount : '…' }})</option>
         </select>
         <svg class="jchd-pill-chev" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
           stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
@@ -109,11 +119,14 @@
 
       <!-- Row 1: Needs attention (who needs you) + Your base (lifecycle split) -->
       <div class="ios2-top">
-        <button data-testid="jchd-btn-014" type="button" class="ios2-card ios2-hero" (click)="goToParticipantsWithLever('needsAttention')">
+        <div class="ios2-hero-col">
+        <button type="button" class="ios2-card ios2-hero" (click)="goToParticipantsWithLever('needsAttention')" data-testid="jchd-btn-014">
           <div class="ios2-head">
             <span class="ios2-app ap-red"><mat-icon>priority_high</mat-icon></span>
             <span class="ios2-title">Needs attention</span>
+            <span class="jchd-new" *ngIf="newCount('na') > 0" data-testid="jchd-new-na" matTooltip="New since yesterday">+{{ newCount('na') }} new</span>
             <span class="ios2-big">{{ needsAttentionCount }}</span>
+            <ng-container *ngTemplateOutlet="trendTpl; context: { k: 'needsAttention' }"></ng-container>
           </div>
           <div class="ios2-people" *ngIf="needsAttentionRows().length; else naEmpty">
             <span class="ios2-person" *ngFor="let r of needsAttentionRows() | slice:0:3">
@@ -124,6 +137,19 @@
           </div>
           <ng-template #naEmpty><p class="ios2-empty">Nothing needs you right now.</p></ng-template>
         </button>
+        <!-- Finance breakdown folded into the hero: Defaulted + Payments locked (relocated from the KPI tile row). -->
+        <div class="ios2-hero-finance" data-testid="jchd-hero-finance">
+          <span class="ios2-fin-label">Finance</span>
+          <button type="button" class="ios2-fin-chip fin-defaulted" (click)="goToDefaulted()" matTooltip="Participants with defaulted payments" data-testid="jchd-kpi-defaulted">
+            <mat-icon>credit_card_off</mat-icon><span class="ios2-fin-n">{{ summary.defaulted }}</span><span class="ios2-fin-l">Defaulted</span>
+            <ng-container *ngTemplateOutlet="trendTpl; context: { k: 'defaulted' }"></ng-container>
+          </button>
+          <button type="button" class="ios2-fin-chip fin-locked" (click)="goToPaymentsLocked()" matTooltip="Participants with locked payments" data-testid="jchd-btn-020">
+            <mat-icon>lock</mat-icon><span class="ios2-fin-n">{{ summary.paymentsLocked }}</span><span class="ios2-fin-l">Payments locked</span>
+            <ng-container *ngTemplateOutlet="trendTpl; context: { k: 'paymentsLocked' }"></ng-container>
+          </button>
+        </div>
+        </div>
 
         <section class="ios2-card jchd-status-band">
           <div class="ios2-head">
@@ -166,20 +192,17 @@
            (operator directive, 2026-08-26) — the coach selector still offers the Unassigned scope,
            with its own live count. -->
       <div class="ios2-tiles">
-        <button data-testid="jchd-btn-019" type="button" class="ios2-tile" (click)="goToParticipantsWithLever('goingQuiet')">
+        <button type="button" class="ios2-tile" (click)="goToParticipantsWithLever('goingQuiet')" data-testid="jchd-btn-019">
           <span class="ios2-app ap-orange"><mat-icon>notifications_paused</mat-icon></span>
           <span class="ios2-n">{{ summary.goingQuiet }}</span><span class="ios2-l">Going quiet</span>
+          <span class="jchd-trend-row">
+            <span class="jchd-new" *ngIf="newCount('gq') > 0" data-testid="jchd-new-gq" matTooltip="New since yesterday">+{{ newCount('gq') }} new</span>
+            <ng-container *ngTemplateOutlet="trendTpl; context: { k: 'goingQuiet' }"></ng-container>
+          </span>
         </button>
-        <button data-testid="jchd-btn-020" type="button" class="ios2-tile" (click)="goToPaymentsLocked()">
-          <span class="ios2-app ap-red"><mat-icon>lock</mat-icon></span>
-          <span class="ios2-n">{{ summary.paymentsLocked }}</span><span class="ios2-l">Payments locked</span>
-        </button>
-        <button data-testid="jchd-kpi-defaulted" type="button" class="ios2-tile" (click)="goToDefaulted()">
-          <span class="ios2-app ap-purple"><mat-icon>money_off</mat-icon></span>
-          <span class="ios2-n">{{ summary.defaulted }}</span><span class="ios2-l">Defaulted</span>
-        </button>
+        <!-- Defaulted & Payments locked relocated into the Needs-attention hero finance breakdown. -->
         <button data-testid="jchd-kpi-missed" type="button" class="ios2-tile" (click)="goToMissed()">
-          <span class="ios2-app ap-orange"><mat-icon>schedule</mat-icon></span>
+          <span class="ios2-app ap-indigo"><mat-icon>schedule</mat-icon></span>
           <span class="ios2-n">{{ summary.missed }}</span><span class="ios2-l">Missed</span>
         </button>
         <button data-testid="jchd-btn-021" type="button" class="ios2-tile" (click)="goToParticipantsWithLever('renewalWindow')">
@@ -294,6 +317,23 @@
           </div>
 
         </div>
+        <!-- Follow-ups (item 5): coach-scheduled follow-ups from the slide-over's New log > Schedule -->
+        <div class="jcs-fu" data-testid="jchd-sched-fu" *ngIf="fuCounts() as fc">
+          <div class="jcs-colhead"><span class="jcs-tag jcs-tag-fu">Follow-ups</span></div>
+          <div class="jcp-row">
+            <button type="button" class="jcp-tile" data-testid="jchd-sched-fu-today" [class.is-on]="fuBucket()==='today'" (click)="setFuBucket('today')" matTooltip="Filter to due today"><span class="jcp-num">{{ fc.today }}</span><span class="jcp-label">Today</span></button>
+            <button type="button" class="jcp-tile" data-testid="jchd-sched-fu-week" [class.is-on]="fuBucket()==='week'" (click)="setFuBucket('week')" matTooltip="Filter to the next 7 days"><span class="jcp-num">{{ fc.week }}</span><span class="jcp-label">Next 7 days</span></button>
+            <button type="button" class="jcp-tile jcp-overdue" data-testid="jchd-sched-fu-overdue" [class.is-on]="fuBucket()==='overdue'" (click)="setFuBucket('overdue')" matTooltip="Filter to overdue"><span class="jcp-num">{{ fc.overdue }}</span><span class="jcp-label">Overdue</span></button>
+          </div>
+          <div class="jcp-list" data-testid="jchd-sched-fu-list" *ngIf="fuList().length; else noFu">
+            <div class="jcp-item" data-testid="jchd-sched-fu-item" *ngFor="let f of fuList()" (click)="openJcParticipant(f.profileid)" matTooltip="Open participant">
+              <span class="ios-avatar av-xs" [ngClass]="avatarClass(f.profileid)">{{ initials(f.participant) }}</span>
+              <span class="jcp-who"><span class="jcp-p">{{ f.participant }}</span><span class="jcp-c" *ngIf="f.note">{{ f.note }}</span></span>
+              <span class="jcp-when" [class.is-overdue]="f.overdue">{{ f.dueMs | date:'EEE d MMM' }}</span>
+            </div>
+          </div>
+          <ng-template #noFu><p class="ios2-empty">No follow-ups due.</p></ng-template>
+        </div>
       </section>
 
       <!-- Ecosystem Health · Ask A&H + Love Letter analytics (item 3): flag breakdown per collection +
@@ -354,7 +394,7 @@
         <div class="ah-cards">
           <button data-testid="jchd-ahmini-unflagged" type="button" class="ah-mini ah-mini-unflagged" (click)="openAhDrill('both', 'unflagged', false, 'Unflagged')"><span class="ah-mini-k">Unflagged</span><span class="ah-mini-n">{{ s.unflagged }}</span></button>
           <button data-testid="jchd-ahmini-positive" type="button" class="ah-mini ah-mini-positive" (click)="openAhDrill('both', 'liked', false, 'Positive flags')"><span class="ah-mini-k">Positive flags</span><span class="ah-mini-n">{{ s.liked }}</span></button>
-          <button data-testid="jchd-ahmini-critattn" type="button" class="ah-mini ah-mini-critattn" (click)="openAhDrill('both', 'critattn', false, 'Critical + Attention')"><span class="ah-mini-k">Critical + Attn</span><span class="ah-mini-n">{{ s.critical + s.tagged }}</span></button>
+          <button data-testid="jchd-ahmini-critattn" type="button" class="ah-mini ah-mini-critattn" (click)="openAhDrill('both', 'critattn', false, 'Critical + Attention')"><span class="ah-mini-k">Critical + Attn</span><span class="ah-mini-n">{{ s.critAttn }}</span></button>
         </div>
       </section>
 
@@ -483,35 +523,51 @@
 
     <!-- Compact iOS summary strip — tap a card to apply the matching lever filter. -->
     <section class="ios-mini-summary" *ngIf="selectedCoachId !== UNASSIGNED">
-      <button data-testid="jchd-btn-041" type="button" class="ios-mini-card" [class.is-on]="activeLever==='needsAttention'"
-        (click)="setLever(activeLever==='needsAttention' ? 'all' : 'needsAttention')"
-        matTooltip="Going quiet · lapsed · not started · renewing · open tickets">
+      <button type="button" class="ios-mini-card" data-testid="jchd-btn-041" [class.is-on]="activeLever==='needsAttention'"
+        (click)="activeLever==='needsAttention' ? setLever('all') : goToParticipantsWithLever('needsAttention')"
+        matTooltip="Lapsed · journey not started · open tickets · A&H critical / needs attention. Marked-addressed participants are excluded.">
         <span class="mc-label"><span class="mc-dot dot-red"></span>Needs Attention</span>
         <span class="mc-num">{{ needsAttentionCount }}</span>
+        <span class="mc-trend">
+          <span class="jchd-new" *ngIf="newCount('na') > 0" data-testid="jchd-mc-new-na">+{{ newCount('na') }} new</span>
+          <ng-container *ngTemplateOutlet="trendTpl; context: { k: 'needsAttention' }"></ng-container>
+        </span>
       </button>
-      <button data-testid="jchd-btn-042" type="button" class="ios-mini-card" [class.is-on]="kpiActive('goingQuiet')" (click)="kpi('goingQuiet')"
+      <button type="button" class="ios-mini-card" data-testid="jchd-btn-042" [class.is-on]="kpiActive('goingQuiet')" (click)="kpi('goingQuiet')"
         matTooltip="No coach contact in {{ QUIET_DAYS }}+ days (touchpoints + appointments, base-wide)">
         <span class="mc-label"><span class="mc-dot dot-orange"></span>Going quiet<span class="mc-scope" *ngIf="pagedMode && !contactDataLoaded()"
           matTooltip="Loading activity data — count finalizes in a moment."> loading…</span></span>
         <span class="mc-num">{{ summary.goingQuiet }}</span>
+        <span class="mc-trend">
+          <span class="jchd-new" *ngIf="newCount('gq') > 0" data-testid="jchd-mc-new-gq">+{{ newCount('gq') }} new</span>
+          <ng-container *ngTemplateOutlet="trendTpl; context: { k: 'goingQuiet' }"></ng-container>
+        </span>
       </button>
-      <button data-testid="jchd-btn-043" type="button" class="ios-mini-card" [class.is-on]="financeFilters.includes('locked')"
+      <button type="button" class="ios-mini-card" data-testid="jchd-btn-043" [class.is-on]="financeFilters.includes('locked')"
         (click)="financeFilters.includes('locked') ? clearFilters() : goToPaymentsLocked()"
         matTooltip="Participants with locked payments">
         <span class="mc-label"><span class="mc-dot dot-red"></span>Payments locked</span>
         <span class="mc-num">{{ summary.paymentsLocked }}</span>
+        <span class="mc-trend"><ng-container *ngTemplateOutlet="trendTpl; context: { k: 'paymentsLocked' }"></ng-container></span>
       </button>
-      <button data-testid="jchd-btn-044" type="button" class="ios-mini-card" [class.is-on]="kpiActive('renewalsSoon')" (click)="kpi('renewalsSoon')"
+      <button type="button" class="ios-mini-card" data-testid="jchd-mc-defaulted" [class.is-on]="financeFilters.includes('defaulted')"
+        (click)="financeFilters.includes('defaulted') ? clearFilters() : goToDefaulted()"
+        matTooltip="Participants with defaulted payments">
+        <span class="mc-label"><span class="mc-dot dot-purple"></span>Payment defaulted</span>
+        <span class="mc-num">{{ summary.defaulted }}</span>
+        <span class="mc-trend"><ng-container *ngTemplateOutlet="trendTpl; context: { k: 'defaulted' }"></ng-container></span>
+      </button>
+      <button type="button" class="ios-mini-card" data-testid="jchd-btn-044" [class.is-on]="kpiActive('renewalsSoon')" (click)="kpi('renewalsSoon')"
         matTooltip="Active subscription ending within the next 90 days">
         <span class="mc-label"><span class="mc-dot dot-blue"></span>Renewing 90d</span>
         <span class="mc-num">{{ summary.renewalsSoon }}</span>
       </button>
-      <button data-testid="jchd-btn-045" type="button" class="ios-mini-card" [class.is-on]="kpiActive('tickets')" (click)="kpi('tickets')"
+      <button type="button" class="ios-mini-card" data-testid="jchd-btn-045" [class.is-on]="kpiActive('tickets')" (click)="kpi('tickets')"
               matTooltip="Participants with at least one OPEN support ticket (not a ticket total)">
         <span class="mc-label"><span class="mc-dot dot-teal"></span>People with tickets</span>
         <span class="mc-num">{{ summary.withOpenTickets }}</span>
       </button>
-      <button data-testid="jchd-btn-046" type="button" class="ios-mini-card" [class.is-on]="kpiActive('flagged')" (click)="kpi('flagged')"
+      <button type="button" class="ios-mini-card" data-testid="jchd-btn-046" [class.is-on]="kpiActive('flagged')" (click)="kpi('flagged')"
         matTooltip="Flagged participants (visible to all coaches)">
         <span class="mc-label"><span class="mc-dot dot-pink"></span>Flagged</span>
         <span class="mc-num">{{ flaggedCount() }}</span>
@@ -656,6 +712,7 @@
     <div class="jchd-diag" *ngIf="!pagedMode && selectedCoachId !== UNASSIGNED">
       {{ summary.total }} participant(s) for <strong>{{ selectedCoachName || 'selected coach' }}</strong>
       · matched {{ matchedCount }} of {{ scannedCount }} journey-product records · ranked by priority
+      <span *ngIf="hasActiveFilters" data-testid="jchd-diag-showing"> · showing {{ dataSource.filteredData.length }} with the current filter</span>
       <span *ngIf="matchedCount === 0"> — this coach has no participants assigned via <code>coachedby</code>. Pick another coach above, or assignment data may be sparse here.</span>
     </div>
     <!-- paged views (ALL / UNASSIGNED) — matched-set pagination; total = all matches across pages -->
@@ -697,6 +754,7 @@
               <app-profile-picture [profileId]="r.profileid" [name]="r.name" [size]="32"></app-profile-picture>
               <span class="cp-id-wrap">
                 <span class="cp-name">{{ r.name }}
+                  <span class="jchd-new jchd-new-row" *ngIf="isNewRow(r)" data-testid="jchd-row-new" matTooltip="New since yesterday">New</span>
                   <span class="flag-icon" *ngIf="r.flagged" matTooltip="Flagged">
                     <mat-icon>flag</mat-icon>
                   </span>
@@ -708,6 +766,8 @@
                   <span data-testid="jchd-ah-attention" class="chip chip-warn" *ngIf="r.llAttention" matTooltip="Needs-Attention tag on a recent Ask A&H / Love Letter">Needs Attention</span>
                   <span data-testid="jchd-ah-opportunity" class="chip" *ngIf="r.llOpportunity" matTooltip="Opportunity tag on a recent Ask A&H / Love Letter">Opportunity</span>
                 </span>
+                <span class="jchd-due" *ngIf="rowDue(r.profileid) as due" [class.is-overdue]="due.overdue" data-testid="jchd-row-due"
+                      [matTooltip]="due.overdue ? 'Follow-up overdue' : 'Scheduled follow-up'">Due {{ due.ms | date:'d MMM' }}</span>
               </span>
             </span>
           </td>
@@ -832,6 +892,7 @@
             [class.no-tap]="selectedCoachId === UNASSIGNED"
             (click)="selectedCoachId !== UNASSIGNED && openSlideover(row)"
             [class.jchd-row-focused]="i === focusedRowIndex"
+            [class.jchd-row-new]="isNewRow(row)"
             [attr.aria-current]="i === focusedRowIndex ? 'true' : null"></tr>
       </table>
 
@@ -1062,7 +1123,10 @@
 
   </ng-container>
 
-  <!-- ===== A&H drill overlay (native; themed by the .jchd-wrap design tokens, dark included) ===== -->
+  </ng-container>
+  <!-- ═══ end Journey Planning tab ═══ -->
+
+  <!-- ===== A&H drill overlay — shared by Journey Planning and Overall Summary (native; themed by the .jchd-wrap design tokens, dark included) ===== -->
   <div data-testid="jchd-ahd-backdrop" class="ahd-backdrop" *ngIf="ahDrill() as drill" (click)="closeAhDrill()">
     <div class="ahd-panel" data-testid="jchd-ahd-overlay" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
       <div class="ahd-head">
@@ -1079,4 +1143,259 @@
       </div>
     </div>
   </div>
+
+  <!-- ─── Onboarding tab: Gross & Assured sales + Onboarding by product (Journey Experience dashboard,
+       embedded in onboarding mode — its tables and dialogs come along so every drill-down works),
+       with the intake pipeline directly below the by-product table. ─── -->
+  <!-- Mounted the first time Overall or Onboarding opens, then kept alive (hidden off its tab) so the
+       Overall Summary reads the SAME instance — one load, one date range (operator 2026-11-11, option B). -->
+  <section class="jx-tab-panel jx-onboarding" *ngIf="jcdMounted" [class.jx-offstage]="experienceTab !== 'onboarding'" data-testid="jchd-panel-onboarding">
+    <!-- Sales counts, Onboarding by product, the 4-stage pipeline and the drill-down table all live in the
+         embedded Journey Experience dashboard. The 5-bucket intake funnel (app-onboarding-pipeline) was replaced
+         on this tab by operator decision 2026-11-11; /onboarding-pipeline is unchanged. -->
+    <app-journeycoach-dashboard [embedOnboarding]="true" [hostDark]="isDark" data-testid="jchd-onboarding-sales"></app-journeycoach-dashboard>
+  </section>
+
+  <!-- ─── Ev. Preparation tab: two kanban boards (New Participants / Attended 1 uP! and above) ─── -->
+  <section class="jx-tab-panel" *ngIf="evprepMounted" [class.jx-offstage]="experienceTab !== 'evprep'" data-testid="jchd-panel-evprep">
+    <app-jc-evprep-board data-testid="jchd-evprep-board"></app-jc-evprep-board>
+  </section>
+
+  <!-- ─── Overall Summary tab (operator spec 2026-11-11) ───
+       1-2 read the shared Onboarding dashboard (org-wide, its date range); 3, 5, 6 read this screen's data
+       scoped by Viewing as; 4 waits for the Ev. Preparation tab. Drills use the native overlay above. -->
+  <section class="jx-tab-panel jx-overall" *ngIf="experienceTab === 'overall'" data-testid="jchd-panel-overall">
+
+    <div class="ov-bar">
+      <div class="ov-seg" role="group" aria-label="Date mode">
+        <button type="button" [class.on]="ovPickerMode() === 'month'" (click)="ovSetMonth(ovMonth())" data-testid="jchd-ov-date-month-mode">Month</button>
+        <button type="button" [class.on]="ovPickerMode() === 'range'" (click)="ovSetRange('start', ovIsoDate(ovRange()?.start))" data-testid="jchd-ov-date-range-mode">Range</button>
+      </div>
+      <span class="ov-pill" *ngIf="ovPickerMode() === 'month'">
+        <button type="button" class="ov-ico" (click)="ovStepMonth(-1)" aria-label="Previous month" data-testid="jchd-ov-date-prev"><mat-icon>chevron_left</mat-icon></button>
+        <input type="month" class="ov-in" [ngModel]="ovMonth()" (ngModelChange)="ovSetMonth($event)" aria-label="Month" data-testid="jchd-ov-date-month">
+        <button type="button" class="ov-ico" (click)="ovStepMonth(1)" aria-label="Next month" data-testid="jchd-ov-date-next"><mat-icon>chevron_right</mat-icon></button>
+      </span>
+      <span class="ov-pill" *ngIf="ovPickerMode() === 'range'">
+        <input type="date" class="ov-in" [ngModel]="ovIsoDate(ovRange()?.start)" (ngModelChange)="ovSetRange('start', $event)" aria-label="Start date" data-testid="jchd-ov-date-start">
+        <span class="ov-dash">–</span>
+        <input type="date" class="ov-in" [ngModel]="ovIsoDate(ovRange()?.end)" (ngModelChange)="ovSetRange('end', $event)" aria-label="End date" data-testid="jchd-ov-date-end">
+      </span>
+      <span class="ov-range" *ngIf="ovRange() as r" data-testid="jchd-ov-date-label">{{ r.start | date:'d MMM y' }} – {{ r.end | date:'d MMM y' }}</span>
+      <label class="ov-pill ov-viewing">
+        <span class="ov-vk">Viewing as</span>
+        <select data-testid="jchd-ov-viewing-select" [ngModel]="selectedCoachId" (ngModelChange)="onCoachChange($event)" aria-label="Viewing as">
+          <option [value]="ALL">All participants</option>
+          <option *ngFor="let c of coaches" [value]="c.id">{{ c.name }}</option>
+          <option [value]="UNASSIGNED">Unassigned · no coach ({{ unassignedKnown ? unassignedCount : '…' }})</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="ov-grid">
+
+      <!-- 1. Sales by Journey (Gross; Overall = New + Upgrades + Add-ons) -->
+      <section class="ios2-card ov-card ov-s7" data-testid="jchd-ov-sales">
+        <div class="ios2-head">
+          <span class="ios2-app ap-blue"><mat-icon>point_of_sale</mat-icon></span>
+          <span class="ios2-title">Sales by Journey</span>
+          <span class="ov-scope">Org-wide · Gross</span>
+        </div>
+        <p class="ios2-empty" *ngIf="ovLoading()">Loading…</p>
+        <div class="ah-table" *ngIf="!ovLoading()">
+          <table>
+            <thead><tr><th class="ah-flag">Journey</th><th>New</th><th>Upgrades</th><th>Add-ons</th><th>Overall</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let r of ovSales().rows" data-testid="jchd-ov-sales-row">
+                <td class="ah-flag">{{ r.name }}</td>
+                <td><button type="button" class="ah-num" (click)="ovSalesDrill(r.id, 'new', r.name + ' · New')" data-testid="jchd-ov-sales-new">{{ r.newN }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovSalesDrill(r.id, 'upgrade', r.name + ' · Upgrades')" data-testid="jchd-ov-sales-up">{{ r.upN }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovSalesDrill(r.id, 'addon', r.name + ' · Add-ons')" data-testid="jchd-ov-sales-add">{{ r.addN }}</button></td>
+                <td><button type="button" class="ah-num ov-strong" (click)="ovSalesDrill(r.id, 'all', r.name + ' · Overall')" data-testid="jchd-ov-sales-all">{{ r.total }}</button></td>
+              </tr>
+              <tr *ngIf="!ovSales().rows.length"><td class="ah-flag ov-muted" colspan="5">No approved sales in this range.</td></tr>
+              <tr class="ah-total" *ngIf="ovSales() as s">
+                <td class="ah-flag">Total</td>
+                <td><button type="button" class="ah-num" (click)="ovSalesDrill(null, 'new', 'All journeys · New')" data-testid="jchd-ov-sales-tot-new">{{ s.tot.newN }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovSalesDrill(null, 'upgrade', 'All journeys · Upgrades')" data-testid="jchd-ov-sales-tot-up">{{ s.tot.upN }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovSalesDrill(null, 'addon', 'All journeys · Add-ons')" data-testid="jchd-ov-sales-tot-add">{{ s.tot.addN }}</button></td>
+                <td><button type="button" class="ah-num" data-testid="jchd-ov-sales-total" (click)="ovSalesDrill(null, 'all', 'All journeys · Overall')">{{ s.tot.total }}</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="ov-foot">Approved Gross sales, the same New / Upgrades / Add-ons split as the Gross Sales card. Pending sales are not counted.</p>
+      </section>
+
+      <!-- 2. Onboarding status -->
+      <section class="ios2-card ov-card ov-s5" data-testid="jchd-ov-onboarding">
+        <div class="ios2-head">
+          <span class="ios2-app ap-green"><mat-icon>how_to_reg</mat-icon></span>
+          <span class="ios2-title">Onboarding status</span>
+          <span class="ov-scope">Org-wide</span>
+        </div>
+        <div class="ov-tiles ov-t4">
+          <button type="button" class="jcp-tile ov-hero" (click)="ovOpenOnboardingTable('toBeOnboarded')" data-testid="jchd-ov-ob-tobe"><span class="jcp-num">{{ ovObCount('all') }}</span><span class="jcp-label">To be onboarded</span></button>
+          <button type="button" class="jcp-tile" (click)="ovOpenOnboardingTable('less7Days')" data-testid="jchd-ov-ob-le7"><span class="jcp-num">{{ ovObCount('last7DaysnotOnboarded') }}</span><span class="jcp-label">≤ 7 days</span></button>
+          <button type="button" class="jcp-tile ov-warn" (click)="ovOpenOnboardingTable('more7Days')" data-testid="jchd-ov-ob-gt7"><span class="jcp-num">{{ ovObCount('last15daysnotOnboarded') }}</span><span class="jcp-label">7+ days</span></button>
+          <button type="button" class="jcp-tile ov-good" (click)="ovOpenOnboardingTable('onboarded')" data-testid="jchd-ov-ob-onboarded"><span class="jcp-num">{{ ovObCount('onboarded') }}</span><span class="jcp-label">Onboarded</span></button>
+        </div>
+        <div class="ov-avg" data-testid="jchd-ov-ob-avg"><span>Avg days from ASV to Onboarding</span><b>{{ ovObAvg() }}</b></div>
+        <p class="ov-foot">The Onboarding tab's numbers. Onboarded and the average follow the date range; the open buckets cover every open onboarding.</p>
+      </section>
+
+      <!-- 3. Scheduled & completed — Journey Coaching and Onboarding kept separate -->
+      <section class="ios2-card ov-card ov-s12" data-testid="jchd-ov-schedule">
+        <div class="ios2-head">
+          <span class="ios2-app ap-indigo"><mat-icon>event_available</mat-icon></span>
+          <span class="ios2-title">Scheduled &amp; completed</span>
+          <span class="fb-hint" *ngIf="!ovSched().ready">loading…</span>
+          <span class="ov-scope ov-scope-coach">Viewing as</span>
+        </div>
+        <div class="ov-srow" *ngIf="ovSched() as k">
+          <span><span class="jcs-tag jcs-tag-jc">Journey Coaching</span></span>
+          <div class="ov-tiles ov-t4">
+            <button type="button" class="jcp-tile" (click)="ovSchedDrill(false, 'today', 'Journey Coaching · scheduled today')" data-testid="jchd-ov-jc-today"><span class="jcp-num">{{ k.jcToday }}</span><span class="jcp-label">Scheduled today</span></button>
+            <button type="button" class="jcp-tile" (click)="ovSchedDrill(false, 'week', 'Journey Coaching · next 7 days')" data-testid="jchd-ov-jc-week"><span class="jcp-num">{{ k.jcWeek }}</span><span class="jcp-label">Next 7 days</span></button>
+            <button type="button" class="jcp-tile" (click)="ovSchedDrill(false, 'month', 'Journey Coaching · next 30 days')" data-testid="jchd-ov-jc-month"><span class="jcp-num">{{ k.jcMonth }}</span><span class="jcp-label">Next 30 days</span></button>
+            <button type="button" class="jcp-tile ov-good" (click)="ovSchedDrill(false, 'done', 'Journey Coaching · completed')" data-testid="jchd-ov-jc-done"><span class="jcp-num">{{ k.jcDone }}</span><span class="jcp-label">Completed · in range</span></button>
+          </div>
+        </div>
+        <div class="ov-srow" *ngIf="ovSched() as k">
+          <span><span class="jcs-tag jcs-tag-ob">Onboarding</span></span>
+          <div class="ov-tiles ov-t4">
+            <button type="button" class="jcp-tile" (click)="ovSchedDrill(true, 'today', 'Onboarding · scheduled today')" data-testid="jchd-ov-obs-today"><span class="jcp-num">{{ k.obToday }}</span><span class="jcp-label">Scheduled today</span></button>
+            <button type="button" class="jcp-tile" (click)="ovSchedDrill(true, 'week', 'Onboarding · next 7 days')" data-testid="jchd-ov-obs-week"><span class="jcp-num">{{ k.obWeek }}</span><span class="jcp-label">Next 7 days</span></button>
+            <button type="button" class="jcp-tile" (click)="ovSchedDrill(true, 'month', 'Onboarding · next 30 days')" data-testid="jchd-ov-obs-month"><span class="jcp-num">{{ k.obMonth }}</span><span class="jcp-label">Next 30 days</span></button>
+            <button type="button" class="jcp-tile ov-good" (click)="ovSchedDrill(true, 'done', 'Onboarding · completed')" data-testid="jchd-ov-obs-done"><span class="jcp-num">{{ k.obDone }}</span><span class="jcp-label">Completed · in range</span></button>
+          </div>
+        </div>
+        <p class="ov-foot">Today and Next 7 days match Journey Planning's Schedule card. Next 30 days = booked sessions in the 30 days after today (includes the next 7). Completed = attended sessions in the date range.</p>
+      </section>
+
+      <!-- 4. Planned journey · next 6 months (participantplanning, Viewing as = a specific coach) -->
+      <section class="ios2-card ov-card ov-s6" data-testid="jchd-ov-plan">
+        <div class="ios2-head">
+          <span class="ios2-app ap-orange"><mat-icon>event_note</mat-icon></span>
+          <span class="ios2-title">Planned journey · next 6 months</span>
+          <span class="ov-scope ov-scope-coach">Viewing as</span>
+        </div>
+        <div class="ov-pending" *ngIf="!ovPlanCoachScoped()" data-testid="jchd-ov-plan-pick">Pick a coach to see plans.</div>
+        <ng-container *ngIf="ovPlanCoachScoped()">
+          <p class="ios2-empty" *ngIf="!ovPlan() || ovPlan()?.status === 'loading'">Loading…</p>
+          <p class="ios2-empty" *ngIf="ovPlan()?.status === 'error'" data-testid="jchd-ov-plan-error">Plans could not be loaded.</p>
+          <div class="ah-table" *ngIf="ovPlan()?.status === 'ready'" data-testid="jchd-ov-plan-grid">
+            <table>
+              <thead><tr><th class="ah-flag">Planned</th><th *ngFor="let m of ovPlanMonths()">{{ m.label }}</th></tr></thead>
+              <tbody>
+                <tr *ngFor="let r of ovPlan()?.rows ?? []" data-testid="jchd-ov-plan-row">
+                  <td class="ah-flag">{{ r.label }}</td>
+                  <td *ngFor="let c of r.cells; let i = index"><button type="button" class="ah-num" data-testid="jchd-ov-plan-cell" [disabled]="!c.length" (click)="ovPlanDrill(r, i)">{{ c.length }}</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </ng-container>
+        <p class="ov-foot">Participants of the viewed coach with each item in their journey plan for that month. Products show by name.</p>
+      </section>
+
+      <!-- 5. Participant health (Coach-set health, Active participants on Ecosystem products) -->
+      <section class="ios2-card ov-card ov-s6 health-card" data-testid="jchd-ov-health" *ngIf="ovHealth() as hd">
+        <div class="ios2-head">
+          <span class="ios2-app ap-pink"><mat-icon>favorite</mat-icon></span>
+          <span class="ios2-title">Participant health</span>
+          <span class="ov-scope ov-scope-coach">Viewing as</span>
+        </div>
+        <p class="ov-sub">Active participants on Ecosystem products · <b data-testid="jchd-ov-health-total">{{ hd.total }}</b></p>
+        <div class="health-bar" *ngIf="hd.total > 0" aria-hidden="true">
+          <span class="hb-segment state-happy" [style.width.%]="healthPct(hd.happy, hd.total)"></span>
+          <span class="hb-segment state-neutral" [style.width.%]="healthPct(hd.neutral, hd.total)"></span>
+          <span class="hb-segment state-unhappy" [style.width.%]="healthPct(hd.unhappy, hd.total)"></span>
+          <span class="hb-segment state-at-risk" [style.width.%]="healthPct(hd.atRisk, hd.total)"></span>
+          <span class="hb-segment state-critical" [style.width.%]="healthPct(hd.critical, hd.total)"></span>
+          <span class="hb-segment state-not-assessed" [style.width.%]="healthPct(hd.notAssessed, hd.total)"></span>
+        </div>
+        <div class="ov-legend">
+          <button type="button" (click)="ovHealthDrill('HAPPY', 'Participant health · Happy')" data-testid="jchd-ov-health-happy"><span><i class="hl-dot state-happy"></i>Happy</span><b>{{ hd.happy }}</b></button>
+          <button type="button" (click)="ovHealthDrill('NEUTRAL', 'Participant health · Neutral')" data-testid="jchd-ov-health-neutral"><span><i class="hl-dot state-neutral"></i>Neutral</span><b>{{ hd.neutral }}</b></button>
+          <button type="button" (click)="ovHealthDrill('UNHAPPY', 'Participant health · Unhappy')" data-testid="jchd-ov-health-unhappy"><span><i class="hl-dot state-unhappy"></i>Unhappy</span><b>{{ hd.unhappy }}</b></button>
+          <button type="button" (click)="ovHealthDrill('AT_RISK', 'Participant health · At-risk')" data-testid="jchd-ov-health-atrisk"><span><i class="hl-dot state-at-risk"></i>At-risk</span><b>{{ hd.atRisk }}</b></button>
+          <button type="button" (click)="ovHealthDrill('CRITICAL', 'Participant health · Critical')" data-testid="jchd-ov-health-critical"><span><i class="hl-dot state-critical"></i>Critical</span><b>{{ hd.critical }}</b></button>
+          <button type="button" (click)="ovHealthDrill(null, 'Participant health · Not assessed')" data-testid="jchd-ov-health-unassessed"><span><i class="hl-dot state-not-assessed"></i>Not assessed</span><b>{{ hd.notAssessed }}</b></button>
+        </div>
+      </section>
+
+      <!-- 6. Ask A&H & Love Letter (the Journey Planning table, scoped by Viewing as) -->
+      <section class="ios2-card ov-card ov-s12 jchd-ah-card" data-testid="jchd-ov-ah" *ngIf="ovAh() as s">
+        <div class="ios2-head">
+          <span class="ios2-app ap-pink"><mat-icon>mail</mat-icon></span>
+          <span class="ios2-title">Ask A&amp;H &amp; Love Letter</span>
+          <span class="ah-src">
+            <button type="button" class="ah-src-pill ah-src-ask" (click)="ovAhDrill('ask', 'all', false, 'Ask AH · all')" data-testid="jchd-ov-ahsrc-ask">Ask AH · {{ s.askAH.total }}</button>
+            <button type="button" class="ah-src-pill ah-src-love" (click)="ovAhDrill('love', 'all', false, 'Love Letter · all')" data-testid="jchd-ov-ahsrc-love">Love Letter · {{ s.loveLetter.total }}</button>
+          </span>
+          <span class="ov-scope ov-scope-coach">Viewing as · last 180 days</span>
+        </div>
+        <div class="ah-table">
+          <table>
+            <thead><tr><th class="ah-flag">Flag</th><th>Ask AH</th><th>Love Letter</th><th>Combined</th><th class="ah-res">Resolved</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="ah-flag"><span class="ah-dot ah-happy"></span>Happy</td>
+                <td><button type="button" class="ah-num" (click)="ovAhDrill('ask', 'liked', false, 'Ask AH · Happy')" data-testid="jchd-ov-ahcell-liked-ask">{{ s.askAH.liked }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovAhDrill('love', 'liked', false, 'Love Letter · Happy')" data-testid="jchd-ov-ahcell-liked-love">{{ s.loveLetter.liked }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovAhDrill('both', 'liked', false, 'Happy · combined')" data-testid="jchd-ov-ahcell-liked-both">{{ s.liked }}</button></td>
+                <td class="ah-res"><button type="button" class="ah-num" (click)="ovAhDrill('both', 'liked', true, 'Happy · resolved')" data-testid="jchd-ov-ahcell-liked-res">{{ s.resolvedLiked }}</button></td>
+              </tr>
+              <tr>
+                <td class="ah-flag"><span class="ah-dot ah-attn"></span>Needs Attention</td>
+                <td><button type="button" class="ah-num" (click)="ovAhDrill('ask', 'tagged', false, 'Ask AH · Needs Attention')" data-testid="jchd-ov-ahcell-tagged-ask">{{ s.askAH.tagged }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovAhDrill('love', 'tagged', false, 'Love Letter · Needs Attention')" data-testid="jchd-ov-ahcell-tagged-love">{{ s.loveLetter.tagged }}</button></td>
+                <td><button type="button" class="ah-num" data-testid="jchd-ov-ah-needsattention-combined" (click)="ovAhDrill('both', 'tagged', false, 'Needs Attention · combined')">{{ s.tagged }}</button></td>
+                <td class="ah-res"><button type="button" class="ah-num" (click)="ovAhDrill('both', 'tagged', true, 'Needs Attention · resolved')" data-testid="jchd-ov-ahcell-tagged-res">{{ s.resolvedTagged }}</button></td>
+              </tr>
+              <tr>
+                <td class="ah-flag"><span class="ah-dot ah-opp"></span>Opportunity</td>
+                <td><button type="button" class="ah-num" (click)="ovAhDrill('ask', 'opportunity', false, 'Ask AH · Opportunity')" data-testid="jchd-ov-ahcell-opportunity-ask">{{ s.askAH.opportunity }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovAhDrill('love', 'opportunity', false, 'Love Letter · Opportunity')" data-testid="jchd-ov-ahcell-opportunity-love">{{ s.loveLetter.opportunity }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovAhDrill('both', 'opportunity', false, 'Opportunity · combined')" data-testid="jchd-ov-ahcell-opportunity-both">{{ s.opportunity }}</button></td>
+                <td class="ah-res"><button type="button" class="ah-num" (click)="ovAhDrill('both', 'opportunity', true, 'Opportunity · resolved')" data-testid="jchd-ov-ahcell-opportunity-res">{{ s.resolvedOpportunity }}</button></td>
+              </tr>
+              <tr>
+                <td class="ah-flag"><span class="ah-dot ah-crit"></span>Critical</td>
+                <td><button type="button" class="ah-num" (click)="ovAhDrill('ask', 'critical', false, 'Ask AH · Critical')" data-testid="jchd-ov-ahcell-critical-ask">{{ s.askAH.critical }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovAhDrill('love', 'critical', false, 'Love Letter · Critical')" data-testid="jchd-ov-ahcell-critical-love">{{ s.loveLetter.critical }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovAhDrill('both', 'critical', false, 'Critical · combined')" data-testid="jchd-ov-ahcell-critical-both">{{ s.critical }}</button></td>
+                <td class="ah-res"><button type="button" class="ah-num" (click)="ovAhDrill('both', 'critical', true, 'Critical · resolved')" data-testid="jchd-ov-ahcell-critical-res">{{ s.resolvedCritical }}</button></td>
+              </tr>
+              <tr class="ah-total">
+                <td class="ah-flag">Total Flagged</td>
+                <td>{{ s.askAH.liked + s.askAH.tagged + s.askAH.opportunity + s.askAH.critical }}</td>
+                <td>{{ s.loveLetter.liked + s.loveLetter.tagged + s.loveLetter.opportunity + s.loveLetter.critical }}</td>
+                <td>{{ s.liked + s.tagged + s.opportunity + s.critical }}</td>
+                <td class="ah-res">{{ s.resolvedTotal }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="ah-cards">
+          <button type="button" class="ah-mini ah-mini-unflagged" (click)="ovAhDrill('both', 'unflagged', false, 'Unflagged')" data-testid="jchd-ov-ahmini-unflagged"><span class="ah-mini-k">Unflagged</span><span class="ah-mini-n">{{ s.unflagged }}</span></button>
+          <button type="button" class="ah-mini ah-mini-positive" (click)="ovAhDrill('both', 'liked', false, 'Positive flags')" data-testid="jchd-ov-ahmini-positive"><span class="ah-mini-k">Positive flags</span><span class="ah-mini-n">{{ s.liked }}</span></button>
+          <button type="button" class="ah-mini ah-mini-critattn" (click)="ovAhDrill('both', 'critattn', false, 'Critical + Attention')" data-testid="jchd-ov-ahmini-critattn"><span class="ah-mini-k">Critical + Attn</span><span class="ah-mini-n">{{ s.critAttn }}</span></button>
+        </div>
+      </section>
+
+    </div>
+  </section>
 </div>
+
+<!-- Daily trend (item 6): delta vs yesterday + 14-day sparkline; renders nothing until yesterday's snapshot exists -->
+<ng-template #trendTpl let-k="k">
+  <span class="jchd-trend" *ngIf="trendFor(k) as t" data-testid="jchd-trend">
+    <span class="jchd-delta" [class.up]="t.delta > 0" [class.down]="t.delta < 0" data-testid="jchd-trend-delta"
+          matTooltip="Change vs yesterday">{{ t.delta > 0 ? '+' + t.delta : t.delta }}</span>
+    <svg class="jchd-spark" *ngIf="t.spark" viewBox="0 0 52 14" preserveAspectRatio="none" aria-hidden="true" data-testid="jchd-trend-spark">
+      <polyline [attr.points]="t.spark"></polyline>
+    </svg>
+  </span>
+</ng-template>
