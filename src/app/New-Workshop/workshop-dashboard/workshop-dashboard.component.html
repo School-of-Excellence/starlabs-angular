@@ -913,7 +913,7 @@
                     <!-- {{ mapProfile[participant.profileid]['name'] }} -->
                     <div class="participant-details">
                       <span class="participant-name">{{ mapProfile[participant.profileid]?.['name'] }}</span>
-                      <span class="new-badge" *ngIf="mapProfile[participant.profileid]?.workshoponly">New</span>
+                      <span class="new-badge" *ngIf="isNewUserProfile(participant.profileid)">New</span>
                   </div>
                   </div>
                 </td>
@@ -1124,7 +1124,7 @@
             <div class="pd-hero-main">
               <div class="pd-hero-name">
                 {{ mapProfile[selectedParticipantData.profileid]?.['name'] }}
-                <span class="new-badge" *ngIf="mapProfile[selectedParticipantData.profileid]?.workshoponly">New</span>
+                <span class="new-badge" *ngIf="isNewUserProfile(selectedParticipantData.profileid)">New</span>
               </div>
               <div class="pd-hero-meta">
                 <span class="participant-type-chip" *ngIf="workshopData?.categorybased === true"
@@ -1139,6 +1139,11 @@
                 </span>
                 <span class="pd-meta-item" data-testid="wdash-pd-platform" matTooltip="Platform this participant enrolled from">
                   <mat-icon>devices</mat-icon> via {{ enrollmentPlatform }}
+                </span>
+                <!-- The tags on this person's enrollment, by name. -->
+                <span class="pd-meta-item pd-tags" *ngIf="selectedParticipantTags.length > 0" matTooltip="Tags on this enrollment">
+                  <mat-icon>sell</mat-icon>
+                  <span class="enrolled-tag" data-testid="wd-pd-tag" *ngFor="let tag of selectedParticipantTags">{{ tag }}</span>
                 </span>
               </div>
             </div>
@@ -1741,16 +1746,58 @@
         <ng-container *ngIf="selectedStatusInfo?.status !== 'totalNewUsers' &&
                             selectedStatusInfo?.status !== 'totalNewUsersNotEnrolled' &&
                             selectedStatusInfo?.status !== 'saleAchieved'">
-          <button data-testid="wd-button-63" mat-icon-button [matMenuTriggerFor]="filterMenu" aria-label="Filter participants">
+          <button data-testid="wd-button-63" mat-icon-button [matMenuTriggerFor]="filterMenu" aria-label="Filter participants"
+                  [color]="selectedStatusInfo?.status === 'totalEnrolled' && selectedTagFilters.length > 0 ? 'accent' : ''">
             <mat-icon>filter_list</mat-icon>
           </button>
           <mat-menu #filterMenu="matMenu">
             <mat-radio-group data-testid="wd-change-apply-filter-side-64" [(ngModel)]="filterOption" (change)="applyFilterSide()">
-              <mat-radio-button value="all">All</mat-radio-button><br />
-              <mat-radio-button value="new">New</mat-radio-button><br />
-              <mat-radio-button value="old">Old</mat-radio-button>
+              <mat-radio-button data-testid="wd-side-filter-all" value="all">All</mat-radio-button><br />
+              <mat-radio-button data-testid="wd-side-filter-new" value="new">New</mat-radio-button><br />
+              <mat-radio-button data-testid="wd-side-filter-exist" value="exist">Exist</mat-radio-button>
             </mat-radio-group>
+            <!-- Total Enrolled: filter by the tags on each person's enrolment. Ticking keeps the menu open. -->
+            <div class="side-tag-filter" data-testid="wd-side-tag-filter"
+                 *ngIf="selectedStatusInfo?.status === 'totalEnrolled' && enrolledTagOptions.length > 0"
+                 (click)="$event.stopPropagation()">
+              <div class="side-tag-filter-head">
+                <span>Tags</span>
+                <button type="button" class="side-tag-filter-clear" data-testid="wd-side-tag-clear"
+                        *ngIf="selectedTagFilters.length > 0" (click)="clearTagFilters()">Clear</button>
+              </div>
+              <mat-checkbox data-testid="wd-side-tag-option" *ngFor="let tag of enrolledTagOptions"
+                            [checked]="selectedTagFilters.includes(tag)" (change)="toggleTagFilter(tag)">{{ tag }}</mat-checkbox>
+            </div>
           </mat-menu>
+          <!-- Total Enrolled: sort by enrollment date or name. Picking the active option again turns it off. -->
+          <ng-container *ngIf="selectedStatusInfo?.status === 'totalEnrolled'">
+            <button data-testid="wd-side-sort-btn" mat-icon-button [matMenuTriggerFor]="sideSortMenu"
+                    aria-label="Sort participants" matTooltip="Sort" [color]="sideSort ? 'accent' : ''">
+              <mat-icon>swap_vert</mat-icon>
+            </button>
+            <mat-menu #sideSortMenu="matMenu" class="side-sort-menu">
+              <button mat-menu-item data-testid="wd-side-sort-enrolled-new" type="button"
+                      [class.on]="sideSort === 'enrolledNew'" (click)="setSideSort('enrolledNew')">
+                <mat-icon>{{ sideSort === 'enrolledNew' ? 'radio_button_checked' : 'radio_button_unchecked' }}</mat-icon>
+                <span>Enrollment date: newest first</span>
+              </button>
+              <button mat-menu-item data-testid="wd-side-sort-enrolled-old" type="button"
+                      [class.on]="sideSort === 'enrolledOld'" (click)="setSideSort('enrolledOld')">
+                <mat-icon>{{ sideSort === 'enrolledOld' ? 'radio_button_checked' : 'radio_button_unchecked' }}</mat-icon>
+                <span>Enrollment date: oldest first</span>
+              </button>
+              <button mat-menu-item data-testid="wd-side-sort-name-az" type="button"
+                      [class.on]="sideSort === 'nameAZ'" (click)="setSideSort('nameAZ')">
+                <mat-icon>{{ sideSort === 'nameAZ' ? 'radio_button_checked' : 'radio_button_unchecked' }}</mat-icon>
+                <span>Name: A to Z</span>
+              </button>
+              <button mat-menu-item data-testid="wd-side-sort-name-za" type="button"
+                      [class.on]="sideSort === 'nameZA'" (click)="setSideSort('nameZA')">
+                <mat-icon>{{ sideSort === 'nameZA' ? 'radio_button_checked' : 'radio_button_unchecked' }}</mat-icon>
+                <span>Name: Z to A</span>
+              </button>
+            </mat-menu>
+          </ng-container>
         </ng-container>
 
     <ng-container *ngIf="selectedStatusInfo?.status === 'totalNewUsers' || selectedStatusInfo?.status === 'totalNewUsersNotEnrolled'">
@@ -2199,7 +2246,11 @@
               <mat-icon class="participant-avatar">person</mat-icon>
               <div class="participant-details">
                 <span class="participant-name">{{ participant.name }}</span>
-                <span class="new-badge" *ngIf="mapProfile[participant.profileid]?.workshoponly">New</span>
+                <span class="new-badge" *ngIf="isNewUserProfile(participant.profileid)">New</span>
+                <ng-container *ngIf="selectedStatusInfo?.status === 'totalEnrolled'">
+                  <span class="enrolled-tag" data-testid="wd-side-enrolled-tag"
+                        *ngFor="let tag of enrolledTagNames[participant.profileid] || []">{{ tag }}</span>
+                </ng-container>
                 <ng-container *ngIf="workshopData?.categorybased === true">
                   <span style="font-size: 11px; margin-top: 3px; display: block;"
                         [style.opacity]="0.7">

@@ -2,9 +2,9 @@
 import { HttpClient } from '@angular/common/http';
 import { AfterViewInit, Component, computed, ElementRef, HostListener, OnDestroy, signal, ViewChild } from '@angular/core';
 import { firstValueFrom, lastValueFrom, Subject, takeUntil } from 'rxjs';
-import { ConnectionQuality, createLocalScreenTracks, LocalAudioTrack, LocalVideoTrack, Participant, RemoteParticipant, RemoteTrack, RemoteTrackPublication, Room, RoomEvent, Track, LocalTrackPublication, VideoQuality, ScreenSharePresets, VideoPreset } from 'livekit-client';
+import { ConnectionQuality, createLocalScreenTracks, LocalAudioTrack, LocalVideoTrack, Participant, RemoteParticipant, RemoteTrack, RemoteTrackPublication, Room, RoomEvent, Track, TrackEvent, LocalTrackPublication, VideoQuality, ScreenSharePresets, VideoPreset } from 'livekit-client';
 import { CdkDrag, CdkDragEnd } from '@angular/cdk/drag-drop';
-import { doc, docData, getDoc, Firestore } from '@angular/fire/firestore';
+import { doc, docData, getDoc, setDoc, serverTimestamp, Firestore } from '@angular/fire/firestore';
 import { environment } from '../../../environments/environment';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthguardService } from '../../authguard.service';
@@ -85,6 +85,38 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   // UI States
   loading = true;
   meetingRoomStatus: null | "servercheck" | "serverstarting" | "serverfailed" | "connecting" | "connected" | "left" | "ended" = "servercheck"
+
+  // ── Waiting for a video server (2026-11-14 plan items 2.1, 2.1b, 3.1) ──────────────────────
+  // A stopped server is woken by the 5-minute job (≤5 min) and boots in ~10 min, so the tab keeps
+  // waiting with a friendly message and shows the real error only after SERVER_WAIT_LIMIT_MS.
+  // Once the server is up, a token request can still get "Media node not ready" (a node booting,
+  // or all nodes busy) — retried for up to TOKEN_WAIT_LIMIT_MS instead of 3 tries.
+  private static readonly SERVER_WAIT_LIMIT_MS = 20 * 60 * 1000;
+  private static readonly TOKEN_WAIT_LIMIT_MS = 12 * 60 * 1000;
+  private static readonly TOKEN_RETRY_MAX_S = 30;
+  // Re-touch the room while its server is stopped so the 5-minute job's wake-on-join (rooms
+  // updated in the last 30 min) still sees it when the room itself is older than that.
+  private static readonly WAKE_TOUCH_EVERY_MS = 10 * 60 * 1000;
+  serverWaitStartedAt = 0;
+  tokenWaitStartedAt = 0;
+  waitNow = Date.now();            // ticks every second while waiting → elapsed time on screen
+  // The waiting clock counts from the room's creation when it was made in the last 30 min
+  // (operator 2026-11-15: "should show from the time we created the room"); older rooms
+  // (re-used queue rooms, pre-created appointments) count from opening the page instead.
+  private static readonly WAIT_FROM_CREATION_MAX_MS = 30 * 60 * 1000;
+  private roomCreatedAt = 0;
+  // Ends the current token-retry wait early (leaving the page, tab back in front).
+  private retryWake: (() => void) | null = null;
+  private waitTicker: any = null;
+  private lastWakeTouchAt = 0;
+  // Host action in flight per participant → "Muting…" / "Removing…" in the menu, repeat clicks
+  // ignored. The functions cold-start (~5–10 s), which looked like "nothing happened".
+  hostActionBusy: Record<string, 'muting' | 'removing'> = {};
+  hostActionNote: string | null = null;
+  joinError: string | null = null; // shown on the "left" screen when joining failed
+
+  // Browser blocked sound until the user taps (Safari / iPhone autoplay rule) — plan item 2.2.
+  audioBlocked = false;
   // Fullscreen Enable
   isFullscreen = false;
   @ViewChild('meetingContainer') meetingContainer!: ElementRef;
@@ -123,6 +155,31 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   selectedCameraId = '';
   selectedSpeakerId = '';
   private deviceChangeHandler: (() => void) | null = null;
+  // Device following (plan item 2.4). Auto mode until the person picks a device in the menu.
+  private micPickedByUser = false;
+  private speakerPickedByUser = false;
+  // True while WE restart the mic (device pick, noise mode switch), so the Restarted handler only
+  // reacts to LiveKit's own automatic restart (e.g. after the mic in use was unplugged).
+  private switchingMic = false;
+  private micRestartHandler: (() => void) | null = null;
+  private micTrackWatched: LocalAudioTrack | null = null;
+  // One recovery at a time: set BEFORE any await. A trigger during a recovery asks for one
+  // re-check afterwards instead of a second, parallel restart (test 2026-11-15 round 2).
+  private micRecovering = false;
+  private micRecheckPending = false;
+  // Speaker auto-follow of newly plugged outputs (fix E): outputs seen so far, and the one we
+  // switched to by ourselves (unplugging it returns to the system default).
+  private knownOutputIds = new Set<string>();
+  private autoSpeakerId: string | null = null;
+  private autoSpeakerTimer: any = null;
+  // A just-plugged USB output needs a moment before it can play (round 3, 2026-11-16).
+  private static readonly NEW_OUTPUT_SETTLE_MS = 1500;
+  // Outputs that are screens / TVs, not earphones — never auto-selected.
+  private static readonly NOT_EARPHONES = /hdmi|displayport|airplay|display|\btv\b|monitor/i;
+  // Host-control warm-up (fix A): keeps mute / remove / end-call functions loaded during a call.
+  private static readonly HOST_WARMUP_EVERY_MS = 10 * 60 * 1000;
+  private static readonly HOST_CONTROL_FUNCTIONS = ['muteParticipant', 'kickParticipant', 'openViduCloseRoom'];
+  private hostWarmTimer: any = null;
 
   private previewStream: MediaStream | null = null;
 
@@ -232,6 +289,8 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
             // running with ≥1 healthy media node — essential for instant meetings, where the
             // server was fired moments ago and boots for several minutes. DO has no status
             // doc yet, so it skips the gate (capacity handled by the 503 retry).
+            if(!this.roomCreatedAt) this.roomCreatedAt = this.recentCreationMs(data["createddate"])
+
             if(this.roomDetail.title == ""){
               if(this.provider === "do") this.prepareParticipant()
               else this.checkServer()
@@ -275,6 +334,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.stopHostWarmup();
     // 3. Stop adaptive quality monitoring (synchronous)
     this.adaptiveQuality.stopMonitoring();
 
@@ -300,30 +360,83 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
 
   async checkServer(){
     // Watch the status doc of the cloud hosting THIS room (poll + event-push keep it fresh).
+    // Wait for a READY media node (media software up), not just a running VM — the backend
+    // writes instanceStates.ready since 2026-11-14 (plan item 3.1); older docs only have healthy.
+    this.serverWaitStartedAt = Date.now();
+    this.startWaitTicker();
     const status$ = this.provider === "oci" ? this.infraService.getOciStatus() : this.infraService.getStatus();
     status$.pipe(takeUntil(this.serverSubscription)).subscribe({
       next: (serverData) => {
         if (serverData) {
           const masterStatus = serverData["master"]["state"]
-          const mediaNode = serverData["media"]["instanceStates"]["healthy"] || 0
+          const states = serverData["media"]?.["instanceStates"] || {}
+          const readyNodes = (states["ready"] ?? states["healthy"]) || 0
 
-          if(masterStatus == "running" && mediaNode > 0){
+          if(masterStatus == "running" && readyNodes > 0){
+            this.serverWaitStartedAt = 0
+            this.stopWaitTicker()
             this.prepareParticipant()
             this.serverSubscription?.next()
             this.serverSubscription?.complete()
+            return
           }
-          else if(masterStatus == "running" || masterStatus == "starting"){
-            this.meetingRoomStatus = "serverstarting"
+          // Stopped: the 5-minute job starts it for a room opened in the last 30 min. Keep this
+          // room "fresh" for that rule while we wait (no-op for the AWS standby, which has no wake).
+          if(this.provider === "oci" && (masterStatus == "stopped" || masterStatus == "stopping")){
+            this.touchRoomForWake()
           }
-          else {
-            this.meetingRoomStatus = "serverfailed"
-          }
+          this.meetingRoomStatus = this.serverWaitExpired() ? "serverfailed" : "serverstarting"
         }
       },
       error: (err) => {
         console.error('Infrastructure status error:', err);
       }
     });
+  }
+
+  private serverWaitExpired(): boolean {
+    return this.serverWaitStartedAt > 0 && Date.now() - this.serverWaitStartedAt >= JoinLivekitCallComponent.SERVER_WAIT_LIMIT_MS;
+  }
+
+  /** Room creation time (ms) when it is under 30 min old, else 0. The creator's first snapshot
+   *  has no server timestamp yet (null) → 0, and a later snapshot fills it in. */
+  private recentCreationMs(created: any): number {
+    const ms = created?.toMillis ? created.toMillis() : 0;
+    if (!ms) return 0;
+    const age = Date.now() - ms;
+    return age >= 0 && age <= JoinLivekitCallComponent.WAIT_FROM_CREATION_MAX_MS ? ms : 0;
+  }
+
+  /** "m:ss" since the room was created (recent rooms) or since `startedAt` — template helper. */
+  waitElapsed(startedAt: number): string {
+    if (!startedAt) return '0:00';
+    const from = this.roomCreatedAt && this.roomCreatedAt < startedAt ? this.roomCreatedAt : startedAt;
+    const total = Math.max(0, Math.floor((this.waitNow - from) / 1000));
+    return `${Math.floor(total / 60)}:${(total % 60).toString().padStart(2, '0')}`;
+  }
+
+  private startWaitTicker(): void {
+    if (this.waitTicker) return;
+    this.waitNow = Date.now();
+    this.waitTicker = setInterval(() => {
+      this.waitNow = Date.now();
+      // The status doc may not change for a while — flip to the error once the limit passes.
+      if (this.meetingRoomStatus === "serverstarting" && this.serverWaitExpired()) {
+        this.meetingRoomStatus = "serverfailed";
+      }
+    }, 1000);
+  }
+
+  private stopWaitTicker(): void {
+    if (this.waitTicker) { clearInterval(this.waitTicker); this.waitTicker = null; }
+  }
+
+  private touchRoomForWake(): void {
+    const roomId = this.roomDetail?.roomId;
+    if (!roomId || Date.now() - this.lastWakeTouchAt < JoinLivekitCallComponent.WAKE_TOUCH_EVERY_MS) return;
+    this.lastWakeTouchAt = Date.now();
+    setDoc(doc(this.firestore, "openviduroom", roomId), { waitingForServerAt: serverTimestamp() }, { merge: true })
+      .catch(err => console.log("Wake touch failed (server still wakes for rooms opened in the last 30 min):", err));
   }
 
   async prepareParticipant() {
@@ -557,6 +670,15 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       this.leaveRoom(false);
     });
 
+    // Browser autoplay rule (Safari / iPhone): LiveKit reports when it cannot play sound until a
+    // tap — show the "Tap to enable sound" button instead of silently playing nothing (plan 2.2).
+    room.on(RoomEvent.AudioPlaybackStatusChanged, () => {
+      this.audioBlocked = !room.canPlaybackAudio;
+    });
+
+    // Device following (plan 2.4): LiveKit has already re-checked defaults when this fires.
+    room.on(RoomEvent.MediaDevicesChanged, () => void this.onDevicesChanged());
+
     try {
       // Request a new token
       const response = await this.getTokenWithRetry();
@@ -570,6 +692,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       // await ensures we wait until initial signaling is done
       await room.connect(response.url, response.token);
       this.meetingRoomStatus = "connected"
+      this.audioBlocked = !room.canPlaybackAudio;
       this.localParticipantIdentity = room.localParticipant.identity;
       console.log('Room connected:', this.loggedinProfileid);
 
@@ -599,12 +722,15 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       // sole noise processor; when DFN is OFF, use Chrome's own processing for a clean bare mic.
       // These constraints must be set at CAPTURE — applyConstraints() on a live track is ignored
       // by Chrome for NS/EC/AGC.
-      await room.localParticipant.setMicrophoneEnabled(true, {
-        noiseSuppression: !this.dfnEnabled,
-        echoCancellation: !this.dfnEnabled,
-        autoGainControl: !this.dfnEnabled,
-      });
+      //
+      // ECHO (2026-11-14 plan item 1.1, decision D8): echo cancellation stays ON even with DFN.
+      // The July fix proved NS + AGC pre-gate the signal; EC was switched off alongside them but
+      // was never shown to be the cause — and without it, a person on laptop speakers sends the
+      // other side's voice straight back (echo). DFN removes noise, not echo.
+      // Revert = echoCancellation: !this.dfnEnabled here, in micCaptureOptions() and applyDfnProcessor().
+      await room.localParticipant.setMicrophoneEnabled(true, this.micCaptureOptions());
       await this.applyDfnProcessor();
+      this.watchMicTrack();
       this.logMicProcessingState('initial mic set');
       this.startDfnBroadcast();
 
@@ -626,6 +752,10 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       // Populate device menus now that permissions are granted (labels are only exposed
       // after getUserMedia succeeds) and keep them fresh as devices are plugged/unplugged.
       await this.refreshDevices();
+      this.knownOutputIds = new Set(this.speakers.map(s => s.deviceId));
+      if (this.isHost()) this.startHostWarmup();
+      // Menus refresh on the raw browser event; following devices runs on LiveKit's
+      // MediaDevicesChanged (above), after LiveKit's own default-device handling.
       this.deviceChangeHandler = () => void this.refreshDevices();
       navigator.mediaDevices?.addEventListener?.('devicechange', this.deviceChangeHandler);
 
@@ -635,7 +765,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       // the internal mic as "Microphone Array (…)".
       const builtInMic = this.mics.find(m => /built[\s-]?in|internal|macbook|microphone array/i.test(m.label));
       if (builtInMic && builtInMic.deviceId !== this.selectedMicId) {
-        await this.selectMic(builtInMic.deviceId);
+        await this.selectMic(builtInMic.deviceId, false);
       }
 
       // Prime the PiP source and arm auto-PiP.
@@ -646,6 +776,11 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       // Handle connection errors gracefully
       console.log(error)
       console.log('There was an error connecting to the room:', error?.error?.errorMessage || error?.message || error);
+      if (!this.joinError && this.meetingRoomStatus === 'connecting') {
+        this.joinError = error?.message || 'Could not connect to the call.';
+      }
+      this.tokenWaitStartedAt = 0;
+      this.stopWaitTicker();
       this.leaveRoom(false);
     }
   }
@@ -655,11 +790,13 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     const participantId = this.loggedinProfileid || `user-${Date.now()}`;
     const participantName = this.loggedinProfileRole["name"] || 'Guest';
 
-    let retryCount = 0;
-
-    while (retryCount <= 3) {
+    // "Media node not ready" = a media server is still booting, or every server already holds a
+    // call and one more was just ordered (~5–8 min). Keep trying for up to TOKEN_WAIT_LIMIT_MS
+    // with an on-screen message + elapsed time (was 3 tries over ~3 min) — plan item 2.1b.
+    const startedAt = Date.now();
+    while (true) {
       try {
-        return await firstValueFrom(
+        const response = await firstValueFrom(
           this.httpClient.post<any>(`https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/createOpenViduToken`, {
             roomName,
             participantName,
@@ -667,22 +804,49 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
             provider: this.provider
           })
         );
+        this.tokenWaitStartedAt = 0;
+        this.stopWaitTicker();
+        return response;
       } catch (error: any) {
         if (error.status === 503 && error.error?.code === 'SCALING_IN_PROGRESS') {
-          retryCount++;
           // Surface the server's actual reason (differs per provider/failure: AWS capacity
           // gate vs "Media node not ready") instead of a blanket capacity message.
           const serverMessage = error.error?.message || 'System at capacity';
-          if (retryCount > 3) throw new Error(serverMessage);
+          if (Date.now() - startedAt >= JoinLivekitCallComponent.TOKEN_WAIT_LIMIT_MS) {
+            throw new Error(`We couldn't get a video server ready in time (${serverMessage}). Please refresh to try again.`);
+          }
+          if (!this.tokenWaitStartedAt) { this.tokenWaitStartedAt = startedAt; this.startWaitTicker(); }
 
-          const wait = error.error?.retryAfter || 60;
+          const wait = Math.min(error.error?.retryAfter || JoinLivekitCallComponent.TOKEN_RETRY_MAX_S, JoinLivekitCallComponent.TOKEN_RETRY_MAX_S);
           console.log(`Token 503 (${this.provider}): ${serverMessage} — retry in ${wait}s`);
-          await new Promise(r => setTimeout(r, wait * 1000));
+          // ONE timer, not 1 s steps: Chrome slows timers in a background tab to about once a
+          // minute, so 30 × 1 s became ~30 min (test 2026-11-15: a Room 2 tab behind a Room 1
+          // call stopped retrying). Bringing the tab to the front or leaving ends the wait early.
+          if (this.meetingRoomStatus !== 'connecting') throw new Error('Left while waiting for a video server');
+          await this.waitForRetry(wait * 1000);
+          if (this.meetingRoomStatus !== 'connecting') throw new Error('Left while waiting for a video server');
         } else {
           throw error;
         }
       }
     }
+  }
+
+  /** Resolves after `ms`, or earlier when the tab comes back to the front or the page is left. */
+  private waitForRetry(ms: number): Promise<void> {
+    return new Promise<void>(resolve => {
+      let timer: any = null;
+      const onVisible = () => { if (document.visibilityState === 'visible') done(); };
+      const done = () => {
+        clearTimeout(timer);
+        document.removeEventListener('visibilitychange', onVisible);
+        if (this.retryWake === done) this.retryWake = null;
+        resolve();
+      };
+      timer = setTimeout(done, ms);
+      document.addEventListener('visibilitychange', onVisible);
+      this.retryWake = done;
+    });
   }
 
   // Leave/Disconnect from the Room
@@ -696,6 +860,9 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     // (RoomEvent.Disconnected also calls leaveRoom — without this guard it loops)
     if (this.meetingRoomStatus === 'left' || this.meetingRoomStatus === 'ended') return;
     this.meetingRoomStatus = 'left'; // set immediately so re-entrant Disconnected event is ignored
+    this.retryWake?.();              // end a token-retry wait now (it re-checks the status and stops)
+    this.stopHostWarmup();
+    if (this.autoSpeakerTimer) { clearTimeout(this.autoSpeakerTimer); this.autoSpeakerTimer = null; }
     this.clearPip();
 
     const currentRoom = this.room();
@@ -720,6 +887,14 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     try { (this.dfnProc as any)?.destroy?.(); } catch (_) {}
     this.dfnProc = null;
     this.dfnState.stop();
+    this.stopWaitTicker();
+    this.serverSubscription?.next();
+    if (this.micTrackWatched && this.micRestartHandler) {
+      try { this.micTrackWatched.off(TrackEvent.Restarted, this.micRestartHandler); } catch (_) {}
+    }
+    this.micTrackWatched = null;
+    this.micRestartHandler = null;
+    this.audioBlocked = false;
 
     // Reset all variables
     this.room.set(undefined);
@@ -804,12 +979,14 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   private logMicProcessingState(context: string): void {
     try {
       const micTrack = this.getLocalTrackPublication(Track.Source.Microphone)?.audioTrack as LocalAudioTrack | undefined;
-      const mst = micTrack?.mediaStreamTrack;
+      // Fix C: read the RAW mic, not the noise filter's output (which always looked "EC off").
+      const mst = this.rawMicTrack(micTrack);
       if (!mst) { console.warn(`[mic-check] (${context}) no local mic track yet`); return; }
       const s = (mst.getSettings() as any) ?? {};
-      const processed = s.noiseSuppression === true || s.echoCancellation === true || s.autoGainControl === true;
+      // Echo cancellation is ON by design (plan 1.1) — "processed" = NS / AGC, the pre-gating pair.
+      const processed = s.noiseSuppression === true || s.autoGainControl === true;
       console.log(
-        `%c[mic-check] (${context}) "${mst.label}" → ${processed ? 'PROCESSED (browser-level NS/EC/AGC active)' : 'RAW'}`,
+        `%c[mic-check] (${context}) "${mst.label}" → ${processed ? 'PROCESSED (browser-level NS/AGC active)' : 'RAW (echo cancellation ' + (s.echoCancellation ? 'on' : 'off') + ')'}`,
         `font-weight:bold;color:${processed ? '#ff9800' : '#4caf50'}`,
         {
           noiseSuppression: s.noiseSuppression,
@@ -869,13 +1046,15 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       // via applyConstraints on a live track. This call still carries voiceIsolation, and keeps the
       // toggle state coherent; the reliable switch is the capture constraints on (re)publish.
       try {
-        const mst = micTrack.mediaStreamTrack;
+        // Fix C: constrain the RAW mic — the filter's output track rejects these (OverconstrainedError).
+        const mst = this.rawMicTrack(micTrack);
         if (mst) {
           // Core raw constraints only — NO voiceIsolation (non-standard; it throws
           // OverconstrainedError on devices like the MacBook mic that CAN still do raw,
           // which wrongly looked like "can't do raw" and disabled DFN).
+          // Echo cancellation stays ON in both modes (plan item 1.1 / D8).
           const constraints = this.dfnEnabled
-            ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+            ? { echoCancellation: true, noiseSuppression: false, autoGainControl: false }
             : { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
           await mst.applyConstraints(constraints as unknown as MediaTrackConstraints);
         }
@@ -935,13 +1114,10 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       }
       const deviceId = this.selectedMicId || micTrack.mediaStreamTrack?.getSettings?.()?.deviceId || undefined;
       try {
-        await micTrack.restartTrack({
-          deviceId,
-          echoCancellation: !wantDfn,
-          noiseSuppression: !wantDfn,
-          autoGainControl: !wantDfn,
-        });
+        this.switchingMic = true;
+        await micTrack.restartTrack({ deviceId, ...this.micCaptureOptions() });
       } catch (e) { console.warn('[nc] mic capture restart failed:', e); }
+      finally { this.switchingMic = false; }
       // Going to DFN: attach the processor to the fresh raw track.
       this.dfnProc = null;
       await this.applyDfnProcessor();
@@ -1391,9 +1567,12 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  async selectMic(deviceId: string): Promise<void> {
+  /** `byUser` = picked in the menu → stop auto-following the mic for this call (plan 2.4). */
+  async selectMic(deviceId: string, byUser = true): Promise<void> {
     const room = this.room();
     if (!room || room.state !== 'connected') return;
+    if (byUser) this.micPickedByUser = true;
+    this.switchingMic = true;
     try {
       await room.switchActiveDevice('audioinput', deviceId);
       this.selectedMicId = deviceId;
@@ -1406,6 +1585,235 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       await this.applyDfnProcessor();
       this.logMicProcessingState('mic changed');
     } catch (e) { console.warn('selectMic failed:', e); }
+    finally { this.switchingMic = false; }
+  }
+
+  /** Mic capture constraints: echo cancellation always ON; NS + AGC only without DFN (plan 1.1). */
+  private micCaptureOptions(): { echoCancellation: boolean; noiseSuppression: boolean; autoGainControl: boolean } {
+    return { echoCancellation: true, noiseSuppression: !this.dfnEnabled, autoGainControl: !this.dfnEnabled };
+  }
+
+  /**
+   * Plan items 2.4 (1.3 + 1.4): when the mic in use is unplugged, LiveKit restarts the track by
+   * itself — with NO constraints (browser NS/AGC back on, so DFN gets pre-gated audio) and without
+   * our DFN re-attach step. On that automatic restart, re-acquire the same device with our
+   * constraints and attach a fresh DFN. Our own restarts (menu pick, noise-mode switch) set
+   * `switchingMic` and are skipped here.
+   */
+  private watchMicTrack(): void {
+    const micTrack = this.getLocalTrackPublication(Track.Source.Microphone)?.audioTrack as LocalAudioTrack | undefined;
+    if (!micTrack || micTrack === this.micTrackWatched) return;
+    if (this.micTrackWatched && this.micRestartHandler) {
+      try { this.micTrackWatched.off(TrackEvent.Restarted, this.micRestartHandler); } catch (_) {}
+    }
+    this.micRestartHandler = () => void this.onMicRestartedByLiveKit(micTrack);
+    micTrack.on(TrackEvent.Restarted, this.micRestartHandler);
+    this.micTrackWatched = micTrack;
+    this.watchAudioContext(micTrack);
+  }
+
+  private async onMicRestartedByLiveKit(_micTrack: LocalAudioTrack): Promise<void> {
+    if (this.switchingMic) return;
+    // LiveKit fell back to "default" with no capture settings — move to the preferred mic with ours.
+    await this.recoverMic('mic restarted by LiveKit (device lost)');
+  }
+
+  /** Built-in mic (join rule: avoids Bluetooth HFP), else the OS default, else the first one. */
+  private preferredMic(): MediaDeviceInfo | undefined {
+    return this.mics.find(m => /built[\s-]?in|internal|macbook|microphone array/i.test(m.label))
+      || this.mics.find(m => m.deviceId === 'default') || this.mics[0];
+  }
+
+  /**
+   * Re-acquire the mic on the preferred device WITH our capture settings, re-attach a fresh noise
+   * filter, keep LiveKit's device bookkeeping in step, then check it really sends sound (falls back
+   * to the OS default once if it is pure silence). Test 2026-11-15: on "Default" (= earphone mic),
+   * unplugging the earphones left the other side hearing nothing.
+   */
+  private async recoverMic(reason: string): Promise<void> {
+    const micTrack = this.getLocalTrackPublication(Track.Source.Microphone)?.audioTrack as LocalAudioTrack | undefined;
+    if (!micTrack || this.switchingMic) return;
+    // Fix B (test 2026-11-15 round 2): two device-change events started two recoveries at once —
+    // the old guard was set only after an await — which stacked noise filters → distorted audio.
+    // The guard is now taken synchronously; a trigger during a recovery queues ONE re-check.
+    if (this.micRecovering) { this.micRecheckPending = true; return; }
+    this.micRecovering = true;
+    try {
+      const preferred = await this.restartMicOn('preferred', reason, micTrack);
+      if (preferred.silent && preferred.deviceId !== 'default') {
+        await this.restartMicOn('default', `"${preferred.label}" sends silence — trying the OS default mic`, micTrack);
+      }
+    } finally {
+      this.micRecovering = false;
+    }
+    if (this.micRecheckPending) {
+      this.micRecheckPending = false;
+      await this.checkMicStillPresent();
+    }
+  }
+
+  /** One mic restart on the preferred / OS-default device with our settings + a fresh noise filter. */
+  private async restartMicOn(which: 'preferred' | 'default', reason: string, micTrack: LocalAudioTrack):
+      Promise<{ deviceId: string; label: string; silent: boolean }> {
+    await this.refreshDevices();
+    const target = which === 'preferred' ? this.preferredMic() : this.mics.find(m => m.deviceId === 'default');
+    const deviceId = target?.deviceId || 'default';
+    const label = target?.label || 'default';
+    console.log(`[devices] ${reason} → "${label}"`);
+    this.switchingMic = true;
+    let silent = false;
+    try {
+      if (this.dfnProc) { this.dfnProc = null; try { await micTrack.stopProcessor(); } catch (_) {} }
+      await micTrack.restartTrack({ deviceId, ...this.micCaptureOptions() });
+      this.room()?.localParticipant?.activeDeviceMap?.set('audioinput', deviceId);
+      this.selectedMicId = deviceId;
+      // Check the RAW capture before the noise filter goes back on (its warm-up output is silence).
+      // A just-opened mic can deliver zeros for a moment: settle 0.5 s, and only call it silent
+      // if two checks in a row say so.
+      if (!micTrack.isMuted) {
+        await new Promise(r => setTimeout(r, 500));
+        silent = await micTrack.checkForSilence() && await micTrack.checkForSilence();
+      }
+      await this.applyDfnProcessor();
+      this.watchAudioContext(micTrack);
+      this.logMicProcessingState(reason);
+    } catch (e) {
+      console.warn('[devices] mic recovery failed:', e);
+    } finally {
+      this.switchingMic = false;
+    }
+    return { deviceId, label, silent };
+  }
+
+  /** Resume the mic's audio processing if the browser pauses it (device switch, OS sleep) — plan 1.4. */
+  private watchAudioContext(micTrack: LocalAudioTrack): void {
+    const ctx: AudioContext | undefined = (micTrack as any).audioContext;
+    if (!ctx || (ctx as any).__lkResumeWatch) return;
+    (ctx as any).__lkResumeWatch = true;
+    ctx.addEventListener('statechange', () => {
+      if (ctx.state !== 'running' && ctx.state !== 'closed') {
+        console.log(`[devices] mic audio processing ${ctx.state} — resuming`);
+        ctx.resume().catch(err => console.warn('[devices] AudioContext resume failed:', err));
+      }
+    });
+  }
+
+  private resumeMicAudio(): void {
+    const micTrack = this.getLocalTrackPublication(Track.Source.Microphone)?.audioTrack as any;
+    const ctx: AudioContext | undefined = micTrack?.audioContext;
+    if (ctx && ctx.state !== 'running' && ctx.state !== 'closed') ctx.resume().catch(() => {});
+  }
+
+  /**
+   * Plan item 2.4 (1.2) — follow device changes:
+   *  - SPEAKER: in auto mode (until the person picks in the menu) play to the browser's "default"
+   *    output, which follows the OS by itself when earphones / Bluetooth come or go. A SPECIFIC
+   *    device id was used before (test 2026-11-15): Chrome's echo cancellation is unreliable on a
+   *    non-default output (LiveKit notes the same) and the other side heard echo; Safari, which
+   *    cannot pick outputs, had none. A picked device that disappears → back to auto.
+   *    Exception (fix E): an output plugged in DURING the call (not a screen / TV) takes the sound,
+   *    because macOS does not always switch to it (USB-C earphones); unplugging it → back to default.
+   *  - MIC: when the physical mic behind the track is gone — including "Default" whose device
+   *    (an earphone mic) was unplugged, which never counted as "gone" before — re-acquire the
+   *    preferred mic with our settings (recoverMic). A newly plugged headset still does NOT take
+   *    over the mic: the join rule prefers the built-in mic (Bluetooth mic = low-quality HFP).
+   */
+  private async onDevicesChanged(): Promise<void> {
+    const room = this.room();
+    if (!room || room.state !== 'connected') return;
+    await this.refreshDevices();
+    this.resumeMicAudio();
+
+    if (this.speakers.length > 0) {
+      const ids = new Set(this.speakers.map(s => s.deviceId));
+      // Fix E (test 2026-11-15 round 2): USB-C earphones appeared in the menu but macOS kept the
+      // laptop speakers as the system output, so "follow the system" stayed on the speakers.
+      // A newly plugged output (not a screen / TV) now takes the call's sound in auto mode.
+      const firstLook = this.knownOutputIds.size === 0;   // event before the join snapshot
+      const added = firstLook ? [] : this.speakers.filter(s =>
+        !this.knownOutputIds.has(s.deviceId) && s.deviceId !== 'default' && s.deviceId !== 'communications'
+        && !JoinLivekitCallComponent.NOT_EARPHONES.test(s.label));
+      this.knownOutputIds = ids;
+
+      const pickedGone = this.speakerPickedByUser && !!this.selectedSpeakerId && !ids.has(this.selectedSpeakerId);
+      if (pickedGone) this.speakerPickedByUser = false;
+      if (this.autoSpeakerId && !ids.has(this.autoSpeakerId)) this.autoSpeakerId = null;   // unplugged
+      const hasDefault = ids.has('default');
+
+      if (!this.speakerPickedByUser) {
+        if (added.length > 0) {
+          // Round 3 (2026-11-16): switching the instant macOS listed USB-C earphones left the sound
+          // on the laptop (the device was not ready yet; Chrome kept the old output). Wait first.
+          const target = added[added.length - 1];
+          console.log(`[speaker] newly plugged "${target.label}" — switching in ${JoinLivekitCallComponent.NEW_OUTPUT_SETTLE_MS / 1000} s`);
+          if (this.autoSpeakerTimer) clearTimeout(this.autoSpeakerTimer);
+          this.autoSpeakerTimer = setTimeout(() => void this.switchToPluggedSpeaker(target.deviceId, target.label),
+            JoinLivekitCallComponent.NEW_OUTPUT_SETTLE_MS);
+        } else if (!this.autoSpeakerId && hasDefault && this.selectedSpeakerId !== 'default') {
+          console.log('[devices] speaker → system default (follows the OS)');
+          await this.selectSpeaker('default', false);
+        }
+      }
+    }
+
+    if (this.switchingMic) return;
+    if (this.micRecovering) { this.micRecheckPending = true; return; }
+    await this.checkMicStillPresent();
+  }
+
+  /** Recover the mic if the physical device behind it is gone (unplugged, incl. under "Default"). */
+  private async checkMicStillPresent(): Promise<void> {
+    const room = this.room();
+    if (!room || room.state !== 'connected' || this.switchingMic) return;
+    const micTrack = this.getLocalTrackPublication(Track.Source.Microphone)?.audioTrack as LocalAudioTrack | undefined;
+    if (!micTrack) return;
+    // The RAW capture track — with the noise filter on, `mediaStreamTrack` is the filter's output,
+    // which carries no device / groupId.
+    const settings = micTrack.getSourceTrackSettings?.() || {};
+    const rawEnded = this.rawMicTrack(micTrack)?.readyState === 'ended';
+    const micId = room.getActiveDevice('audioinput');
+    const idGone = !!micId && micId !== 'default' && !this.mics.some(d => d.deviceId === micId);
+    const deviceGone = !!settings.groupId && !this.mics.some(d => d.groupId === settings.groupId);
+    if (idGone || deviceGone || rawEnded) {
+      await this.recoverMic(idGone ? 'mic in use disappeared' : 'device behind the mic was unplugged');
+    }
+  }
+
+  /**
+   * The mic's RAW capture track. With the noise filter attached, `mediaStreamTrack` is the filter's
+   * output (a MediaStreamAudioDestinationNode track) — its settings say nothing about the mic and it
+   * rejects capture constraints. LiveKit keeps the raw one in `_mediaStreamTrack`.
+   */
+  private rawMicTrack(micTrack: LocalAudioTrack | undefined): MediaStreamTrack | undefined {
+    if (!micTrack) return undefined;
+    return (micTrack as any)._mediaStreamTrack || micTrack.mediaStreamTrack;
+  }
+
+  /** Fix E, delayed part: switch to the newly plugged output if it is still there and still auto mode. */
+  private async switchToPluggedSpeaker(deviceId: string, label: string): Promise<void> {
+    this.autoSpeakerTimer = null;
+    const room = this.room();
+    if (!room || room.state !== 'connected' || this.speakerPickedByUser) return;
+    const outputs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audiooutput');
+    if (!outputs.some(d => d.deviceId === deviceId)) {
+      console.log(`[speaker] "${label}" was unplugged before the switch — staying put`);
+      return;
+    }
+    this.autoSpeakerId = deviceId;
+    console.log(`[speaker] newly plugged "${label}" → playing the call there`);
+    await this.selectSpeaker(deviceId, false);
+  }
+
+  /** "Tap to enable sound" (plan 2.2): a tap is the user gesture browsers require to play audio. */
+  async enableSound(): Promise<void> {
+    const room = this.room();
+    try { await room?.startAudio(); } catch (e) { console.warn('[sound] startAudio failed:', e); }
+    // Our own <audio> elements (openvidu-audio-element) are attached outside LiveKit's playback
+    // bookkeeping — start them inside the same tap.
+    const els = Array.from(document.querySelectorAll('audio')) as HTMLAudioElement[];
+    const results = await Promise.allSettled(els.map(el => el.play()));
+    this.resumeMicAudio();
+    this.audioBlocked = results.some(r => r.status === 'rejected') || (!!room && !room.canPlaybackAudio);
   }
 
   async selectCamera(deviceId: string): Promise<void> {
@@ -1413,7 +1821,9 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     catch (e) { console.warn('selectCamera failed:', e); }
   }
 
-  async selectSpeaker(deviceId: string): Promise<void> {
+  /** `byUser` = picked in the menu → stop auto-following the speaker for this call (plan 2.4). */
+  async selectSpeaker(deviceId: string, byUser = true): Promise<void> {
+    if (byUser) { this.speakerPickedByUser = true; this.autoSpeakerId = null; }
     this.selectedSpeakerId = deviceId;
 
     // LiveKit path — stores room.options.audioOutput so tracks subscribed LATER inherit the
@@ -1432,7 +1842,9 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       catch (e) { console.warn(`[speaker] element "${el.id || '?'}" setSinkId failed:`, e); }
     }));
     const label = this.speakers.find(s => s.deviceId === deviceId)?.label || deviceId;
-    console.log(`[speaker] output → "${label}"`, els.map(el => ({ element: el.id || '?', sinkId: el.sinkId })));
+    // One line, readable without expanding: each <audio> element and the output it now plays to.
+    const sinks = els.map(el => `${el.id || '?'}=${el.sinkId === deviceId ? 'OK' : `"${el.sinkId}"`}`).join(', ');
+    console.log(`[speaker] output → "${label}" | ${els.length} audio element(s): ${sinks || 'none'}`);
   }
 
   async startScreenShare() {
@@ -1734,9 +2146,11 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       return;
     }
 
+    if (this.hostActionBusy[participantIdentity]) return; // a click is already being handled
     const confirmed = confirm(`Are you sure you want to remove ${participantName} from the call?`);
     if (!confirmed) return;
 
+    this.startHostAction(participantIdentity, 'removing', `Removing ${participantName}…`);
     try {
       const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/kickParticipant`;
 
@@ -1756,17 +2170,53 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     } catch (error: any) {
       console.error('Failed to kick participant:', error);
 
+      // The functions answer { error: "…" } — show that text instead of the generic message.
       let errorMessage = 'Failed to remove participant. Please try again.';
       if (error.status === 403) {
         errorMessage = 'Only hosts can remove participants';
       } else if (error.status === 404) {
         errorMessage = 'Room not found';
-      } else if (error.error?.message) {
-        errorMessage = error.error.message;
+      } else if (error.error?.message || error.error?.error) {
+        errorMessage = error.error.message || error.error.error;
       }
 
       alert(errorMessage);
+    } finally {
+      this.endHostAction(participantIdentity);
     }
+  }
+
+  /**
+   * Fix A (test 2026-11-15 round 2): mute / remove / end call waited 9–18 s, almost all of it the
+   * function starting cold. While a host is in the call, send each of those functions a tiny
+   * `{warmup: true}` request on join and every 10 min — the function answers 204 at once without
+   * touching LiveKit or Firestore, and stays loaded between pings. Result ignored.
+   */
+  private startHostWarmup(): void {
+    if (this.hostWarmTimer) return;
+    const warm = () => {
+      for (const fn of JoinLivekitCallComponent.HOST_CONTROL_FUNCTIONS) {
+        this.httpClient.post(`https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/${fn}`, { warmup: true })
+          .subscribe({ error: () => {} });
+      }
+    };
+    warm();
+    this.hostWarmTimer = setInterval(warm, JoinLivekitCallComponent.HOST_WARMUP_EVERY_MS);
+  }
+
+  private stopHostWarmup(): void {
+    if (this.hostWarmTimer) { clearInterval(this.hostWarmTimer); this.hostWarmTimer = null; }
+  }
+
+  private startHostAction(identity: string, action: 'muting' | 'removing', note: string): void {
+    this.hostActionBusy = { ...this.hostActionBusy, [identity]: action };
+    this.hostActionNote = note;
+  }
+
+  private endHostAction(identity: string): void {
+    const { [identity]: _done, ...rest } = this.hostActionBusy;
+    this.hostActionBusy = rest;
+    if (Object.keys(rest).length === 0) this.hostActionNote = null;
   }
 
   /**
@@ -1919,9 +2369,11 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     }
 
     const action = 'mute';
+    if (this.hostActionBusy[participantIdentity]) return; // a click is already being handled
     const confirmed = confirm(`Are you sure you want to ${action} ${participantName}?`);
     if (!confirmed) return;
 
+    this.startHostAction(participantIdentity, 'muting', `Muting ${participantName}…`);
     try {
 
       const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/muteParticipant`;
@@ -1947,12 +2399,14 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       if (error.status === 403) {
         errorMessage = 'Only hosts can mute/unmute participants';
       } else if (error.status === 404) {
-        errorMessage = 'Room not found';
-      } else if (error.error?.message) {
-        errorMessage = error.error.message;
+        errorMessage = error.error?.error || 'Room not found';
+      } else if (error.error?.message || error.error?.error) {
+        errorMessage = error.error.message || error.error.error;
       }
 
       alert(errorMessage);
+    } finally {
+      this.endHostAction(participantIdentity);
     }
   }
 
