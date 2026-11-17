@@ -57,6 +57,13 @@ hub-referenced tile ids), other `dd-*` / `pm-*` → `ddc-*`. `ddc-div-009/010` (
 - Firestore index `appointments(participantproductid, attended, endtime desc)` from Joshua's 0bb85765 NOT needed by our
   merged lookup (it queries `participantproductid in` only) — not added.
 
+## Gate miss after the push (2026-11-18, later)
+The console's suite check flagged 38 interactive elements with no hook (JC Health Overall drill buttons 33, delivery
+stage-mix segments 5). My pre-push gate used `--files` against a stale local `development` and reported MATCHED;
+run against `origin/development` it did not. Hooked with literal ids (`jchd-ov-sales-*`, `jchd-ov-health-*`,
+`jchd-ov-ahsrc-*`, `jchd-ov-ahcell-*`, `jchd-ov-ahmini-*`, `ddc-stagemix-<stage>`), registered in hub JCH-ADDR2 / DDC-ADDR3.
+Lesson: run the gate as CI does — `--base origin/development --head HEAD`, never `--files`.
+
 ## Lost in the merge — found by the journey suite, restored (2026-11-18)
 Taking Joshua's JC Health ts "whole" (see Resolutions) was WRONG on five points: his tip did not carry these
 charan-release fixes. The first local journey run failed 9 coach-health cases; root causes:

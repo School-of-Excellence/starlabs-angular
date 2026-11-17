@@ -1208,17 +1208,17 @@
             <tbody>
               <tr *ngFor="let r of ovSales().rows" data-testid="jchd-ov-sales-row">
                 <td class="ah-flag">{{ r.name }}</td>
-                <td><button type="button" class="ah-num" (click)="ovSalesDrill(r.id, 'new', r.name + ' · New')">{{ r.newN }}</button></td>
-                <td><button type="button" class="ah-num" (click)="ovSalesDrill(r.id, 'upgrade', r.name + ' · Upgrades')">{{ r.upN }}</button></td>
-                <td><button type="button" class="ah-num" (click)="ovSalesDrill(r.id, 'addon', r.name + ' · Add-ons')">{{ r.addN }}</button></td>
-                <td><button type="button" class="ah-num ov-strong" (click)="ovSalesDrill(r.id, 'all', r.name + ' · Overall')">{{ r.total }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovSalesDrill(r.id, 'new', r.name + ' · New')" data-testid="jchd-ov-sales-new">{{ r.newN }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovSalesDrill(r.id, 'upgrade', r.name + ' · Upgrades')" data-testid="jchd-ov-sales-up">{{ r.upN }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovSalesDrill(r.id, 'addon', r.name + ' · Add-ons')" data-testid="jchd-ov-sales-add">{{ r.addN }}</button></td>
+                <td><button type="button" class="ah-num ov-strong" (click)="ovSalesDrill(r.id, 'all', r.name + ' · Overall')" data-testid="jchd-ov-sales-all">{{ r.total }}</button></td>
               </tr>
               <tr *ngIf="!ovSales().rows.length"><td class="ah-flag ov-muted" colspan="5">No approved sales in this range.</td></tr>
               <tr class="ah-total" *ngIf="ovSales() as s">
                 <td class="ah-flag">Total</td>
-                <td><button type="button" class="ah-num" (click)="ovSalesDrill(null, 'new', 'All journeys · New')">{{ s.tot.newN }}</button></td>
-                <td><button type="button" class="ah-num" (click)="ovSalesDrill(null, 'upgrade', 'All journeys · Upgrades')">{{ s.tot.upN }}</button></td>
-                <td><button type="button" class="ah-num" (click)="ovSalesDrill(null, 'addon', 'All journeys · Add-ons')">{{ s.tot.addN }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovSalesDrill(null, 'new', 'All journeys · New')" data-testid="jchd-ov-sales-tot-new">{{ s.tot.newN }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovSalesDrill(null, 'upgrade', 'All journeys · Upgrades')" data-testid="jchd-ov-sales-tot-up">{{ s.tot.upN }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovSalesDrill(null, 'addon', 'All journeys · Add-ons')" data-testid="jchd-ov-sales-tot-add">{{ s.tot.addN }}</button></td>
                 <td><button type="button" class="ah-num" data-testid="jchd-ov-sales-total" (click)="ovSalesDrill(null, 'all', 'All journeys · Overall')">{{ s.tot.total }}</button></td>
               </tr>
             </tbody>
@@ -1316,12 +1316,12 @@
           <span class="hb-segment state-not-assessed" [style.width.%]="healthPct(hd.notAssessed, hd.total)"></span>
         </div>
         <div class="ov-legend">
-          <button type="button" (click)="ovHealthDrill('HAPPY', 'Participant health · Happy')"><span><i class="hl-dot state-happy"></i>Happy</span><b>{{ hd.happy }}</b></button>
-          <button type="button" (click)="ovHealthDrill('NEUTRAL', 'Participant health · Neutral')"><span><i class="hl-dot state-neutral"></i>Neutral</span><b>{{ hd.neutral }}</b></button>
-          <button type="button" (click)="ovHealthDrill('UNHAPPY', 'Participant health · Unhappy')"><span><i class="hl-dot state-unhappy"></i>Unhappy</span><b>{{ hd.unhappy }}</b></button>
-          <button type="button" (click)="ovHealthDrill('AT_RISK', 'Participant health · At-risk')"><span><i class="hl-dot state-at-risk"></i>At-risk</span><b>{{ hd.atRisk }}</b></button>
-          <button type="button" (click)="ovHealthDrill('CRITICAL', 'Participant health · Critical')"><span><i class="hl-dot state-critical"></i>Critical</span><b>{{ hd.critical }}</b></button>
-          <button type="button" (click)="ovHealthDrill(null, 'Participant health · Not assessed')"><span><i class="hl-dot state-not-assessed"></i>Not assessed</span><b>{{ hd.notAssessed }}</b></button>
+          <button type="button" (click)="ovHealthDrill('HAPPY', 'Participant health · Happy')" data-testid="jchd-ov-health-happy"><span><i class="hl-dot state-happy"></i>Happy</span><b>{{ hd.happy }}</b></button>
+          <button type="button" (click)="ovHealthDrill('NEUTRAL', 'Participant health · Neutral')" data-testid="jchd-ov-health-neutral"><span><i class="hl-dot state-neutral"></i>Neutral</span><b>{{ hd.neutral }}</b></button>
+          <button type="button" (click)="ovHealthDrill('UNHAPPY', 'Participant health · Unhappy')" data-testid="jchd-ov-health-unhappy"><span><i class="hl-dot state-unhappy"></i>Unhappy</span><b>{{ hd.unhappy }}</b></button>
+          <button type="button" (click)="ovHealthDrill('AT_RISK', 'Participant health · At-risk')" data-testid="jchd-ov-health-atrisk"><span><i class="hl-dot state-at-risk"></i>At-risk</span><b>{{ hd.atRisk }}</b></button>
+          <button type="button" (click)="ovHealthDrill('CRITICAL', 'Participant health · Critical')" data-testid="jchd-ov-health-critical"><span><i class="hl-dot state-critical"></i>Critical</span><b>{{ hd.critical }}</b></button>
+          <button type="button" (click)="ovHealthDrill(null, 'Participant health · Not assessed')" data-testid="jchd-ov-health-unassessed"><span><i class="hl-dot state-not-assessed"></i>Not assessed</span><b>{{ hd.notAssessed }}</b></button>
         </div>
       </section>
 
@@ -1331,8 +1331,8 @@
           <span class="ios2-app ap-pink"><mat-icon>mail</mat-icon></span>
           <span class="ios2-title">Ask A&amp;H &amp; Love Letter</span>
           <span class="ah-src">
-            <button type="button" class="ah-src-pill ah-src-ask" (click)="ovAhDrill('ask', 'all', false, 'Ask AH · all')">Ask AH · {{ s.askAH.total }}</button>
-            <button type="button" class="ah-src-pill ah-src-love" (click)="ovAhDrill('love', 'all', false, 'Love Letter · all')">Love Letter · {{ s.loveLetter.total }}</button>
+            <button type="button" class="ah-src-pill ah-src-ask" (click)="ovAhDrill('ask', 'all', false, 'Ask AH · all')" data-testid="jchd-ov-ahsrc-ask">Ask AH · {{ s.askAH.total }}</button>
+            <button type="button" class="ah-src-pill ah-src-love" (click)="ovAhDrill('love', 'all', false, 'Love Letter · all')" data-testid="jchd-ov-ahsrc-love">Love Letter · {{ s.loveLetter.total }}</button>
           </span>
           <span class="ov-scope ov-scope-coach">Viewing as · last 180 days</span>
         </div>
@@ -1342,31 +1342,31 @@
             <tbody>
               <tr>
                 <td class="ah-flag"><span class="ah-dot ah-happy"></span>Happy</td>
-                <td><button type="button" class="ah-num" (click)="ovAhDrill('ask', 'liked', false, 'Ask AH · Happy')">{{ s.askAH.liked }}</button></td>
-                <td><button type="button" class="ah-num" (click)="ovAhDrill('love', 'liked', false, 'Love Letter · Happy')">{{ s.loveLetter.liked }}</button></td>
-                <td><button type="button" class="ah-num" (click)="ovAhDrill('both', 'liked', false, 'Happy · combined')">{{ s.liked }}</button></td>
-                <td class="ah-res"><button type="button" class="ah-num" (click)="ovAhDrill('both', 'liked', true, 'Happy · resolved')">{{ s.resolvedLiked }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovAhDrill('ask', 'liked', false, 'Ask AH · Happy')" data-testid="jchd-ov-ahcell-liked-ask">{{ s.askAH.liked }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovAhDrill('love', 'liked', false, 'Love Letter · Happy')" data-testid="jchd-ov-ahcell-liked-love">{{ s.loveLetter.liked }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovAhDrill('both', 'liked', false, 'Happy · combined')" data-testid="jchd-ov-ahcell-liked-both">{{ s.liked }}</button></td>
+                <td class="ah-res"><button type="button" class="ah-num" (click)="ovAhDrill('both', 'liked', true, 'Happy · resolved')" data-testid="jchd-ov-ahcell-liked-res">{{ s.resolvedLiked }}</button></td>
               </tr>
               <tr>
                 <td class="ah-flag"><span class="ah-dot ah-attn"></span>Needs Attention</td>
-                <td><button type="button" class="ah-num" (click)="ovAhDrill('ask', 'tagged', false, 'Ask AH · Needs Attention')">{{ s.askAH.tagged }}</button></td>
-                <td><button type="button" class="ah-num" (click)="ovAhDrill('love', 'tagged', false, 'Love Letter · Needs Attention')">{{ s.loveLetter.tagged }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovAhDrill('ask', 'tagged', false, 'Ask AH · Needs Attention')" data-testid="jchd-ov-ahcell-tagged-ask">{{ s.askAH.tagged }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovAhDrill('love', 'tagged', false, 'Love Letter · Needs Attention')" data-testid="jchd-ov-ahcell-tagged-love">{{ s.loveLetter.tagged }}</button></td>
                 <td><button type="button" class="ah-num" data-testid="jchd-ov-ah-needsattention-combined" (click)="ovAhDrill('both', 'tagged', false, 'Needs Attention · combined')">{{ s.tagged }}</button></td>
-                <td class="ah-res"><button type="button" class="ah-num" (click)="ovAhDrill('both', 'tagged', true, 'Needs Attention · resolved')">{{ s.resolvedTagged }}</button></td>
+                <td class="ah-res"><button type="button" class="ah-num" (click)="ovAhDrill('both', 'tagged', true, 'Needs Attention · resolved')" data-testid="jchd-ov-ahcell-tagged-res">{{ s.resolvedTagged }}</button></td>
               </tr>
               <tr>
                 <td class="ah-flag"><span class="ah-dot ah-opp"></span>Opportunity</td>
-                <td><button type="button" class="ah-num" (click)="ovAhDrill('ask', 'opportunity', false, 'Ask AH · Opportunity')">{{ s.askAH.opportunity }}</button></td>
-                <td><button type="button" class="ah-num" (click)="ovAhDrill('love', 'opportunity', false, 'Love Letter · Opportunity')">{{ s.loveLetter.opportunity }}</button></td>
-                <td><button type="button" class="ah-num" (click)="ovAhDrill('both', 'opportunity', false, 'Opportunity · combined')">{{ s.opportunity }}</button></td>
-                <td class="ah-res"><button type="button" class="ah-num" (click)="ovAhDrill('both', 'opportunity', true, 'Opportunity · resolved')">{{ s.resolvedOpportunity }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovAhDrill('ask', 'opportunity', false, 'Ask AH · Opportunity')" data-testid="jchd-ov-ahcell-opportunity-ask">{{ s.askAH.opportunity }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovAhDrill('love', 'opportunity', false, 'Love Letter · Opportunity')" data-testid="jchd-ov-ahcell-opportunity-love">{{ s.loveLetter.opportunity }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovAhDrill('both', 'opportunity', false, 'Opportunity · combined')" data-testid="jchd-ov-ahcell-opportunity-both">{{ s.opportunity }}</button></td>
+                <td class="ah-res"><button type="button" class="ah-num" (click)="ovAhDrill('both', 'opportunity', true, 'Opportunity · resolved')" data-testid="jchd-ov-ahcell-opportunity-res">{{ s.resolvedOpportunity }}</button></td>
               </tr>
               <tr>
                 <td class="ah-flag"><span class="ah-dot ah-crit"></span>Critical</td>
-                <td><button type="button" class="ah-num" (click)="ovAhDrill('ask', 'critical', false, 'Ask AH · Critical')">{{ s.askAH.critical }}</button></td>
-                <td><button type="button" class="ah-num" (click)="ovAhDrill('love', 'critical', false, 'Love Letter · Critical')">{{ s.loveLetter.critical }}</button></td>
-                <td><button type="button" class="ah-num" (click)="ovAhDrill('both', 'critical', false, 'Critical · combined')">{{ s.critical }}</button></td>
-                <td class="ah-res"><button type="button" class="ah-num" (click)="ovAhDrill('both', 'critical', true, 'Critical · resolved')">{{ s.resolvedCritical }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovAhDrill('ask', 'critical', false, 'Ask AH · Critical')" data-testid="jchd-ov-ahcell-critical-ask">{{ s.askAH.critical }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovAhDrill('love', 'critical', false, 'Love Letter · Critical')" data-testid="jchd-ov-ahcell-critical-love">{{ s.loveLetter.critical }}</button></td>
+                <td><button type="button" class="ah-num" (click)="ovAhDrill('both', 'critical', false, 'Critical · combined')" data-testid="jchd-ov-ahcell-critical-both">{{ s.critical }}</button></td>
+                <td class="ah-res"><button type="button" class="ah-num" (click)="ovAhDrill('both', 'critical', true, 'Critical · resolved')" data-testid="jchd-ov-ahcell-critical-res">{{ s.resolvedCritical }}</button></td>
               </tr>
               <tr class="ah-total">
                 <td class="ah-flag">Total Flagged</td>
@@ -1379,9 +1379,9 @@
           </table>
         </div>
         <div class="ah-cards">
-          <button type="button" class="ah-mini ah-mini-unflagged" (click)="ovAhDrill('both', 'unflagged', false, 'Unflagged')"><span class="ah-mini-k">Unflagged</span><span class="ah-mini-n">{{ s.unflagged }}</span></button>
-          <button type="button" class="ah-mini ah-mini-positive" (click)="ovAhDrill('both', 'liked', false, 'Positive flags')"><span class="ah-mini-k">Positive flags</span><span class="ah-mini-n">{{ s.liked }}</span></button>
-          <button type="button" class="ah-mini ah-mini-critattn" (click)="ovAhDrill('both', 'critattn', false, 'Critical + Attention')"><span class="ah-mini-k">Critical + Attn</span><span class="ah-mini-n">{{ s.critAttn }}</span></button>
+          <button type="button" class="ah-mini ah-mini-unflagged" (click)="ovAhDrill('both', 'unflagged', false, 'Unflagged')" data-testid="jchd-ov-ahmini-unflagged"><span class="ah-mini-k">Unflagged</span><span class="ah-mini-n">{{ s.unflagged }}</span></button>
+          <button type="button" class="ah-mini ah-mini-positive" (click)="ovAhDrill('both', 'liked', false, 'Positive flags')" data-testid="jchd-ov-ahmini-positive"><span class="ah-mini-k">Positive flags</span><span class="ah-mini-n">{{ s.liked }}</span></button>
+          <button type="button" class="ah-mini ah-mini-critattn" (click)="ovAhDrill('both', 'critattn', false, 'Critical + Attention')" data-testid="jchd-ov-ahmini-critattn"><span class="ah-mini-k">Critical + Attn</span><span class="ah-mini-n">{{ s.critAttn }}</span></button>
         </div>
       </section>
 

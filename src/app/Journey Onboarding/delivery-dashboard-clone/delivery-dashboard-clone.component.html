@@ -372,23 +372,23 @@
                    segment opens the same list its pill does. -->
               <div class="dd-stagemix" data-testid="ddc-stagemix" [attr.aria-label]="stageMixLabel(cardId)"
                 [title]="stageMixLabel(cardId)">
-                <button type="button" class="dd-stagemix__seg dd-bg-s1"
+                <button type="button" class="dd-stagemix__seg dd-bg-s1" data-testid="ddc-stagemix-awaiting"
                   *ngIf="getCardFunnel(cardId).awaiting.length > 0"
                   [style.flex]="getCardFunnel(cardId).awaiting.length"
                   (click)="openCardFunnelModal(cardId, 'awaiting', $event)"></button>
-                <button type="button" class="dd-stagemix__seg dd-bg-s2"
+                <button type="button" class="dd-stagemix__seg dd-bg-s2" data-testid="ddc-stagemix-initiated"
                   *ngIf="getCardFunnel(cardId).initiated.length > 0"
                   [style.flex]="getCardFunnel(cardId).initiated.length"
                   (click)="openCardFunnelModal(cardId, 'initiated', $event)"></button>
-                <button type="button" class="dd-stagemix__seg dd-bg-s3"
+                <button type="button" class="dd-stagemix__seg dd-bg-s3" data-testid="ddc-stagemix-started"
                   *ngIf="getCardFunnel(cardId).started.length > 0"
                   [style.flex]="getCardFunnel(cardId).started.length"
                   (click)="openCardFunnelModal(cardId, 'started', $event)"></button>
-                <button type="button" class="dd-stagemix__seg dd-bg-s4"
+                <button type="button" class="dd-stagemix__seg dd-bg-s4" data-testid="ddc-stagemix-ongoing"
                   *ngIf="(getCardFunnel(cardId).ongoing?.length || 0) > 0"
                   [style.flex]="getCardFunnel(cardId).ongoing?.length || 0"
                   (click)="openCardFunnelModal(cardId, 'ongoing', $event)"></button>
-                <button type="button" class="dd-stagemix__seg dd-bg-s5"
+                <button type="button" class="dd-stagemix__seg dd-bg-s5" data-testid="ddc-stagemix-completed"
                   *ngIf="getCardFunnel(cardId).completed.length > 0"
                   [style.flex]="getCardFunnel(cardId).completed.length"
                   (click)="openCardFunnelModal(cardId, 'completed', $event)"></button>
