@@ -24,7 +24,9 @@
       "src/app/EvolutionMapping/evolution-mapping/participant-evolution-mapping/**/*.unit.spec.ts",
       "src/app/video-player/**/*.unit.spec.ts",
       "src/app/instance-status.service.unit.spec.ts",
-      "src/app/web-studio-invitation/**/*.unit.spec.ts"
+      "src/app/web-studio-invitation/**/*.unit.spec.ts",
+      "src/app/LiveKit-Cloud/**/*.unit.spec.ts",
+      "src/app/openvidu-loading-game/**/*.unit.spec.ts"
     ],
     "journey": [
       "src/app/Journey Onboarding/**/*.unit.spec.ts",
@@ -48,7 +50,8 @@
       "src/app/Communication Center/**/*.unit.spec.ts",
       "src/app/Channel Communication/**/*.unit.spec.ts",
       "src/app/in-app-message-input/**/*.unit.spec.ts",
-      "src/app/Customer Support/releaselogdialog/**/*.unit.spec.ts"
+      "src/app/Customer Support/releaselogdialog/**/*.unit.spec.ts",
+      "src/app/AppEngagement/calls-record/**/*.unit.spec.ts"
     ],
     "content": [
       "src/app/content/**/*.unit.spec.ts",
@@ -74,7 +77,8 @@
       "src/app/route-configuration-duplicate/**/*.unit.spec.ts",
       "src/app/slackwebhookurls/**/*.unit.spec.ts",
       "src/app/updatesnackbar/**/*.unit.spec.ts",
-      "src/app/icon-list.unit.spec.ts"
+      "src/app/icon-list.unit.spec.ts",
+      "src/app/authloading/**/*.unit.spec.ts"
     ],
     "workshops": [
       "src/app/Workshop/**/*.unit.spec.ts",
@@ -101,10 +105,12 @@
       "src/app/Participants Profile Management/participants-analytics/ah-notification/**/*.unit.spec.ts",
       "src/app/Participants Profile Management/participants-analytics/bulk-add-products/**/*.unit.spec.ts",
       "src/app/Participants Profile Management/participants-analytics/tag-participants/**/*.unit.spec.ts",
-      "src/app/Channel Communication/channel-communication/**/*.unit.spec.ts"
+      "src/app/Channel Communication/channel-communication/**/*.unit.spec.ts",
+      "src/app/arena-design-insights/**/*.unit.spec.ts"
     ],
     "profiles": [
       "src/app/Participants Profile Management/**/*.unit.spec.ts",
+      "src/app/Participant Intelligence/**/*.unit.spec.ts",
       "src/app/ProfilePicture/**/*.unit.spec.ts",
       "src/app/AppEngagement/app-action-pending/**/*.unit.spec.ts",
       "src/app/loading-progress/**/*.unit.spec.ts",
@@ -113,6 +119,35 @@
       "src/app/participant-videoask/**/*.unit.spec.ts",
       "src/app/video-player/**/*.unit.spec.ts",
       "src/app/Customer Support/add-issue/**/*.unit.spec.ts"
+    ],
+    "support": [
+      "src/app/Customer Support/**/*.unit.spec.ts"
+    ],
+    "atc": [
+      "src/app/ATC/prescribe-atc/**/*.unit.spec.ts",
+      "src/app/ATC/edit-atc/**/*.unit.spec.ts",
+      "src/app/ATC/view-prescribed-atc/**/*.unit.spec.ts",
+      "src/app/ATC/shared/**/*.unit.spec.ts",
+      "src/app/ATC/atc-option/**/*.unit.spec.ts",
+      "src/app/ATC/atc-ael-confirm/**/*.unit.spec.ts",
+      "src/app/ATC/preview-atc-before-submission/**/*.unit.spec.ts",
+      "src/app/ATC/select-validator/**/*.unit.spec.ts",
+      "src/app/shared/atc-draft.service.unit.spec.ts",
+      "src/app/shared/atc-draft.logic.unit.spec.ts",
+      "src/app/shared/media-cache.service.unit.spec.ts",
+      "src/app/shared/media-url.service.unit.spec.ts",
+      "src/app/ATC/atc-audio/**/*.unit.spec.ts",
+      "src/app/ATC/atc-preview/**/*.unit.spec.ts",
+      "src/app/ATC/view-upgraded-atc/**/*.unit.spec.ts",
+      "src/app/ATC/view-participant-atc/**/*.unit.spec.ts",
+      "src/app/ATC/view-assigned-atc/**/*.unit.spec.ts",
+      "src/app/ATC/review-flag-atc/**/*.unit.spec.ts",
+      "src/app/ATC/add-review-notes/**/*.unit.spec.ts",
+      "src/app/ATC/pick-for-mentoring/**/*.unit.spec.ts",
+      "src/app/ATC/eit-education-atc/**/*.unit.spec.ts",
+      "src/app/ATC/live-prescription/**/*.unit.spec.ts",
+      "src/app/ATC/Triple ATC/**/*.unit.spec.ts",
+      "src/app/view-ai-generated-atc/**/*.unit.spec.ts"
     ]
   }
 }
