@@ -9,12 +9,40 @@
 }
 
 .page-head {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
+}
+
+:host {
+  display: block;
+  font-family: Roboto, "Helvetica Neue", sans-serif;
+  line-height: 1.4;
+  letter-spacing: normal;
+  /* Material's button labels are widely tracked by default; keep them like the rest of the text. */
+  --mdc-outlined-button-label-text-tracking: 0.01em;
+  --mdc-filled-button-label-text-tracking: 0.01em;
+  --mdc-text-button-label-text-tracking: 0.01em;
+  --mat-outlined-button-label-text-tracking: 0.01em;
+  --mat-filled-button-label-text-tracking: 0.01em;
+  --mat-text-button-label-text-tracking: 0.01em;
+  /* One outline and one label colour for every filter control, buttons and the date field alike. */
+  --nu-filter-border: #d5d9e2;
+  --nu-filter-text: #1f2937;
+}
+
+.tag-select-btn,
+.tags-manage-btn {
+  --mdc-outlined-button-outline-color: var(--nu-filter-border);
+  --mat-outlined-button-outline-color: var(--nu-filter-border);
+  --mdc-outlined-button-label-text-color: var(--nu-filter-text);
+  --mat-outlined-button-label-text-color: var(--nu-filter-text);
 }
 
 .page-head-text h1 {
   margin: 0;
+  font-family: inherit;
   font-size: 1.5rem;
+  line-height: 1.3;
+  letter-spacing: normal;
   font-weight: 600;
   color: #1f2937;
 }
@@ -49,6 +77,9 @@
 
 .empty-state h3 {
   margin: 12px 0 4px 0;
+  font-family: inherit;
+  font-size: 1.05rem;
+  line-height: 1.4;
   color: #374151;
   font-weight: 600;
 }
@@ -58,40 +89,48 @@
   font-size: 0.88rem;
 }
 
-/* ---- layout: table + right side panel ---- */
-.content-row {
+/* ---- layout: table card, then the selection bar under it ---- */
+.nu-layout {
   display: flex;
-  align-items: flex-start;
-  gap: 16px;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.content-main {
+.nu-spacer {
   flex: 1 1 auto;
-  min-width: 0;
-  transition: max-width 200ms ease;
 }
 
-.side-panel {
-  flex: 0 0 300px;
-  width: 300px;
+/* Sticks to the bottom of the screen while the table scrolls; grows upward when Export or Send opens. */
+.nu-selbar {
   position: sticky;
-  top: 16px;
-  background: #ffffff;
-  border: 1px solid #eceff4;
-  border-radius: 14px;
-  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.05);
-  padding: 14px;
+  bottom: 12px;
+  z-index: 20;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  padding: 10px 12px;
+  background: #ffffff;
+  border: 1px solid #c7d2fe;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.12);
 }
 
-.sp-head {
+.nu-selbar-main {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #f0f2f6;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.nu-selbar-pop {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.nu-selbar-pop .export-panel,
+.nu-selbar-pop .comm-panel {
+  width: 100%;
+  max-width: 560px;
 }
 
 .sp-count {
@@ -100,6 +139,12 @@
   gap: 6px;
   color: #374151;
   font-size: 0.9rem;
+}
+
+.sp-hidden {
+  color: #b45309;
+  font-size: 0.82rem;
+  cursor: help;
 }
 
 .sp-num {
@@ -127,10 +172,15 @@
 }
 
 .sp-action {
-  width: 100%;
-  height: 42px;
+  height: 38px;
   border-radius: 10px;
   font-weight: 600;
+  white-space: nowrap;
+}
+
+.sp-action.sp-open {
+  background: #eef2ff;
+  border-color: #c7d2fe;
 }
 
 .sp-action mat-icon {
@@ -138,16 +188,10 @@
   margin-right: 4px;
 }
 
-.sp-export-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .sp-caret {
-  margin-left: auto;
+  margin-left: 2px;
   margin-right: 0 !important;
-  color: #9aa2b1;
+  color: #6b7280;
 }
 
 .export-panel {
@@ -200,42 +244,67 @@
 
 .export-hint {
   margin: 8px 0 0 0;
-  font-size: 0.74rem;
-  color: #9ca3af;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: #6b7280;
   text-align: center;
 }
 
-@media (max-width: 900px) {
-  .content-row {
-    flex-direction: column;
-  }
-  .side-panel {
-    position: static;
-    width: 100%;
-    flex-basis: auto;
-  }
-}
-
-.table-card {
+/* Not `.table-card`: another screen's stylesheet restyles `.table-card` globally. */
+.nu-table-card {
   background: #ffffff;
   border: 1px solid #eceff4;
   border-radius: 14px;
   box-shadow: 0 1px 3px rgba(16, 24, 40, 0.04);
-  overflow: hidden;
+  overflow: clip;
 }
 
-.table-toolbar {
+.nu-toolbar {
+  border-bottom: 1px solid #f0f2f6;
+}
+
+/* Row 1: search and result count on the left; columns, tag management and file selection on the right. */
+.nu-toolbar-top {
   display: flex;
   align-items: center;
-  /* Wrap whenever the buttons outgrow the row (e.g. side panel open on a
-     1366px laptop) — flex-wrap is inert while everything fits. */
   flex-wrap: wrap;
   gap: 10px;
-  padding: 14px 14px 4px 14px;
+  padding: 14px 14px 10px 14px;
+}
+
+/* Row 2: every filter, in one line under its own label. */
+.nu-toolbar-filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 14px 12px 14px;
+  background: #fafbfd;
+  border-top: 1px solid #f0f2f6;
+}
+
+.nu-filters-label {
+  margin-right: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.nu-count {
+  color: #6b7280;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
+.nu-count strong {
+  color: #1f2937;
+  font-weight: 700;
 }
 
 .tag-select-btn {
-  height: 44px;
+  height: 40px;
   border-radius: 10px;
   font-weight: 600;
   color: #4f46e5;
@@ -252,7 +321,7 @@
   margin-left: 2px;
 }
 
-.tag-select-btn.active {
+.tag-select-btn.filter-on {
   background: #eef2ff;
   border-color: #c7d2fe;
 }
@@ -273,6 +342,11 @@
 }
 
 /* ---- tag filter menu (rendered in an overlay -> ::ng-deep) ---- */
+/* The column chooser shares these styles; its seven fixed rows must all be visible. */
+::ng-deep .tag-filter-menu .tfm-list.tfm-columns {
+  max-height: none;
+}
+
 ::ng-deep .tag-filter-menu .mat-mdc-menu-content {
   padding: 0 !important;
 }
@@ -432,33 +506,97 @@
 /* ---- created-date range filter ----
    A real range input sits in the toolbar (both bounds visible and typable),
    compressed to the 44px height of the filter pills beside it. */
+/* Styled as one more filter button: same outline, radius, height, leading icon and label weight. */
 .created-range-field {
-  width: 272px;
+  width: 270px;
   max-width: 100%;
+  --mdc-outlined-text-field-outline-color: var(--nu-filter-border);
+  --mdc-outlined-text-field-hover-outline-color: #b6bcc8;
+  --mdc-outlined-text-field-focus-outline-color: #6366f1;
+  --mdc-outlined-text-field-outline-width: 1px;
+  --mdc-outlined-text-field-focus-outline-width: 1px;
+  --mdc-outlined-text-field-container-shape: 10px;
+  --mdc-outlined-text-field-input-text-color: var(--nu-filter-text);
+  --mdc-outlined-text-field-input-text-placeholder-color: var(--nu-filter-text);
+  --mat-form-field-container-text-size: 14px;
+  --mat-form-field-container-text-weight: 600;
+  --mat-form-field-container-text-tracking: 0.01em;
 }
 
 .created-range-field ::ng-deep .mat-mdc-text-field-wrapper {
   border-radius: 10px;
   background: #ffffff;
+  padding-left: 12px;
+}
+
+.created-range-field ::ng-deep .mat-mdc-form-field-icon-prefix {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 6px 0 0;
+}
+
+.created-range-field .df-lead {
+  font-size: 20px;
+  height: 20px;
+  width: 20px;
+  padding: 0;
+  color: var(--nu-filter-text);
+}
+
+/* Placeholders read like the other filter labels, not like faded hint text. */
+.created-range-field ::ng-deep .mat-date-range-input-inner {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--nu-filter-text);
+}
+
+.created-range-field ::ng-deep .mat-date-range-input-inner::placeholder {
+  color: var(--nu-filter-text);
+  opacity: 1;
+  font-weight: 600;
+}
+
+.created-range-field ::ng-deep .mat-date-range-input-separator {
+  color: #6b7280;
+  font-weight: 600;
 }
 
 /* Material's outline infix is 56px tall by default; 44px + 11px padding keeps
    the 20px line box centred and the field level with the buttons. */
 .created-range-field ::ng-deep .mat-mdc-form-field-infix {
-  min-height: 44px;
-  padding-top: 11px;
-  padding-bottom: 11px;
+  min-height: 40px;
+  padding-top: 9px;
+  padding-bottom: 9px;
 }
 
 /* Same indigo tint the other filters use once they are narrowing the table. */
-.created-range-field.active ::ng-deep .mat-mdc-text-field-wrapper {
+.created-range-field.filter-on ::ng-deep .mat-mdc-text-field-wrapper {
   background: #eef2ff;
 }
 
-.created-range-field.active ::ng-deep .mdc-notched-outline__leading,
-.created-range-field.active ::ng-deep .mdc-notched-outline__notch,
-.created-range-field.active ::ng-deep .mdc-notched-outline__trailing {
+.created-range-field.filter-on ::ng-deep .mdc-notched-outline__leading,
+.created-range-field.filter-on ::ng-deep .mdc-notched-outline__notch,
+.created-range-field.filter-on ::ng-deep .mdc-notched-outline__trailing {
   border-color: #c7d2fe;
+}
+
+/* The calendar and clear buttons are 48px by default, which made this field taller than the filters. */
+.created-range-field ::ng-deep .mat-mdc-form-field-icon-suffix {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 4px 0 0;
+}
+
+.created-range-field ::ng-deep .mat-mdc-form-field-icon-suffix .mat-mdc-icon-button {
+  --mdc-icon-button-state-layer-size: 32px;
+  width: 32px;
+  height: 32px;
+  padding: 4px;
+}
+
+.created-range-field ::ng-deep .mat-mdc-form-field-icon-suffix .mat-mdc-icon-button .mat-mdc-button-touch-target {
+  width: 32px;
+  height: 32px;
 }
 
 .created-range-field ::ng-deep .mat-date-range-input-separator {
@@ -496,10 +634,12 @@
 }
 
 .clear-filters-btn {
-  height: 44px;
+  height: 40px;
   border-radius: 10px;
   font-weight: 600;
-  color: #d76060;
+  color: #b42318;
+  --mdc-text-button-label-text-color: #b42318;
+  --mat-text-button-label-text-color: #b42318;
 }
 
 .clear-filters-btn mat-icon {
@@ -511,9 +651,28 @@
 }
 
 .search-field {
-  width: 320px;
-  max-width: 100%;
-  margin-left: auto;
+  flex: 1 1 280px;
+  max-width: 440px;
+  --mdc-outlined-text-field-outline-color: var(--nu-filter-border);
+  --mdc-outlined-text-field-hover-outline-color: #b6bcc8;
+  --mdc-outlined-text-field-focus-outline-color: #6366f1;
+  --mdc-outlined-text-field-container-shape: 10px;
+}
+
+.search-field ::ng-deep .mat-mdc-text-field-wrapper {
+  border-radius: 10px;
+}
+
+.search-field ::ng-deep .mat-mdc-form-field-infix {
+  min-height: 40px;
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+
+.search-field ::ng-deep .mat-mdc-form-field-icon-suffix .mat-mdc-icon-button {
+  width: 32px;
+  height: 32px;
+  padding: 4px;
 }
 
 /* ---- workshop filter (toolbar) ---- */
@@ -556,8 +715,11 @@
 
 @media (max-width: 820px) {
   .search-field {
-    margin-left: 0;
-    width: 100%;
+    flex-basis: 100%;
+    max-width: none;
+  }
+  .nu-spacer {
+    display: none;
   }
 }
 
@@ -570,36 +732,47 @@
 }
 
 .comm-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  background: #3f6fd8;
-  border-radius: 12px;
-  padding: 12px 8px;
 }
 
 .comm-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
-  border: none;
+  gap: 8px;
+  height: 42px;
+  padding: 0 10px;
+  border: 1px solid #c7d2fe;
   border-radius: 10px;
-  background: transparent;
-  color: #ffffff;
+  background: #ffffff;
+  color: #3730a3;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
-  font-size: 1.15rem;
-  transition: background 120ms;
+  transition: background 120ms, border-color 120ms;
 }
 
 .comm-btn:hover {
-  background: rgba(255, 255, 255, 0.18);
+  background: #eef2ff;
+  border-color: #a5b4fc;
 }
 
-.comm-btn mat-icon {
-  color: #ffffff;
+.comm-btn mat-icon,
+.comm-btn i {
+  color: #4f46e5;
+  font-size: 18px;
+  height: 18px;
+  width: 18px;
+}
+
+@media (max-width: 640px) {
+  .comm-bar {
+    grid-template-columns: 1fr;
+  }
 }
 
 .search-field mat-icon[matPrefix] {
@@ -607,8 +780,14 @@
   margin-right: 6px;
 }
 
+/* Scrolls inside the card so the header and paginator stay put. ~400px = app bar, page head, the two toolbar
+   rows, paginator and padding. `isolation` keeps the sticky header's z-index (100) inside the table, so it
+   can't paint over the selection bar. */
 .table-scroll {
-  overflow-x: auto;
+  max-height: calc(100vh - 400px);
+  min-height: 240px;
+  overflow: auto;
+  isolation: isolate;
 }
 
 .select-col {
@@ -685,21 +864,22 @@
 }
 
 .users-table th.mat-mdc-header-cell {
-  background: #f9fafb;
+  background: #f6f7fa;
   color: #6b7280;
   font-weight: 600;
   font-size: 0.74rem;
   text-transform: uppercase;
   letter-spacing: 0.02em;
   white-space: nowrap;
-  padding: 12px 14px;
+  padding: 10px 12px;
+  box-shadow: inset 0 -1px 0 #eceff4;
 }
 
 .users-table td.mat-mdc-cell {
   color: #374151;
   font-size: 0.9rem;
   border-bottom-color: #f0f2f6;
-  padding: 12px 14px;
+  padding: 10px 12px;
 }
 
 .users-table tr.mat-mdc-row:hover {
@@ -712,8 +892,20 @@
 }
 
 .email-cell {
-  color: #4f63c4;
-  overflow-wrap: anywhere;
+  color: #3f51b5;
+}
+
+/* One line per address; the full address is in the hover title. */
+.email-text {
+  display: block;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nowrap-cell {
+  white-space: nowrap;
 }
 
 .chip {
@@ -746,6 +938,7 @@
   gap: 6px;
 }
 
+/* Full tag names (operator 2026-11-12): no cut-off; the cell wraps pills onto more lines instead. */
 .tag-pill {
   display: inline-block;
   padding: 3px 10px;
@@ -755,6 +948,12 @@
   background: #eef2ff;
   color: #4338ca;
   white-space: nowrap;
+}
+
+.tag-pill.tag-more {
+  background: #f1f3f6;
+  color: #4b5563;
+  cursor: help;
 }
 
 .tag-edit-btn {
@@ -786,7 +985,7 @@
 
 /* toolbar tags manager button */
 .tags-manage-btn {
-  height: 44px;
+  height: 40px;
   border-radius: 10px;
   font-weight: 600;
   color: #4f46e5;
@@ -799,10 +998,22 @@
 }
 
 .no-match-cell {
-  padding: 28px 14px;
+  padding: 36px 14px;
   text-align: center;
-  color: #9ca3af;
+  color: #6b7280;
   font-size: 0.9rem;
+}
+
+.no-match-body {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.no-match-body mat-icon {
+  color: #9aa2b1;
 }
 
 mat-paginator {
