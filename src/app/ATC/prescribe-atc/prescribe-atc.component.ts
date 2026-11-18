@@ -3,6 +3,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { collection, collectionData, collectionSnapshots, doc, DocumentReference, Firestore, getDoc, getDocs, getFirestore, limit, orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
 import { Storage, ref, uploadBytes, deleteObject, uploadBytesResumable } from '@angular/fire/storage';
 import { AuthguardService } from '../../authguard.service';
+import { AtcAudioComponent } from '../atc-audio/atc-audio.component';
 import { CommonModule, DatePipe, Location } from '@angular/common';
 import * as RecordRTC from 'recordrtc';
 import { DomSanitizer } from '@angular/platform-browser';
@@ -62,7 +63,8 @@ const generateId = (firestore: Firestore, collectionName: string) => doc(collect
     MatDatepickerModule,
     MatProgressSpinnerModule,
     MatProgressBarModule,
-    MarkdownModule
+    MarkdownModule,
+    AtcAudioComponent
   ],
 
   templateUrl: './prescribe-atc.component.html',

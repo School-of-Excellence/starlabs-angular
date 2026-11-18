@@ -285,7 +285,10 @@ export const routes: Routes = [
   // Communication Center
   {path: 'zoom-recording-dashboard', loadComponent: () => import('./Communication Center/zoom-recording-dashboard/zoom-recording-dashboard.component').then(m => m.ZoomRecordingDashboardComponent), canActivate:[authGuard]},
   {path: 'email-templates', loadComponent: () => import('./Communication Center/create-email-template/create-email-template.component').then(m => m.CreateEmailTemplateComponent), canActivate:[authGuard]},
-  {path: 'communication', loadComponent: () => import('./Communication Center/communication/communication.component').then(m => m.CommunicationComponent), canActivate:[authGuard]},
+  // Retired 2026-11-18 (call-recording signed-URL migration): this screen played `recordingurl`
+  // straight into <audio [src]>, which silently fails once rows hold object paths. Calls are
+  // played from /notificationrecord → Calls tab via the shared signed-URL player instead.
+  // {path: 'communication', loadComponent: () => import('./Communication Center/communication/communication.component').then(m => m.CommunicationComponent), canActivate:[authGuard]},
   {path: 'communication-grid-planner', loadComponent: () => import('./Communication Center/communication-grid-planner/communication-grid-planner.component').then(m => m.CommunicationGridPlannerComponent), canActivate:[authGuard]},
 
   // New Workshop

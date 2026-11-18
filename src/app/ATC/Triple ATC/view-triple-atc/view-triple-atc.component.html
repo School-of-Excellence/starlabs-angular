@@ -145,7 +145,7 @@
             <label><b>Changework Brief: </b></label><br>
             <div *ngIf="mapATCnotes[atc['notesid']]['changeworkbrief'] != null">
               <div *ngFor="let audio of mapATCnotes[atc['notesid']]['changeworkbrief']; let i = index; trackBy: trackByMediaRef">
-                <app-atc-audio
+                <app-atc-audio compact
                   [path]="audio"
                   [label]="(i + 1) + '.'"></app-atc-audio>
               </div>

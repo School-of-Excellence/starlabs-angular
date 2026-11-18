@@ -94,6 +94,22 @@ describe('MediaUrlService — request economy', () => {
     expect(svc.stats.passthrough).toBe(1);
   });
 
+  it('plays a local blob: preview as-is — nothing to sign (prescribe/edit ATC)', async () => {
+    const { svc, invocations } = makeService();
+    const preview = 'blob:http://localhost:4200/6f1c2d3e-0000-4000-8000-000000000000';
+    const got = await svc.resolve(preview);
+
+    expect(got).toBe(preview);
+    expect(invocations.length).toBe(0);
+    expect(svc.stats.passthrough).toBe(1);
+  });
+
+  it('still signs a bare path that merely contains "blob"', async () => {
+    const { svc, invocations } = makeService();
+    await svc.resolve('ATC_Audio_Notes/pid/blob-1.wav');
+    expect(invocations.length).toBe(1);
+  });
+
   it('splits a batch larger than the per-call cap across requests', async () => {
     const { svc, invocations } = makeService();
     const urls = await Promise.all(paths(250).map(p => svc.resolve(p)));
@@ -146,5 +162,89 @@ describe('MediaUrlService — request economy', () => {
     expect(await svc.resolve(p)).toBeNull();
     expect(await svc.resolve(p)).toBeNull();
     expect(invocations.length).toBe(2);              // retried rather than stuck
+  });
+});
+
+
+// ── keep-warm (2026-11-18) ───────────────────────────────────────────────────────────
+// One shared 10-minute ping per tab while any player is on screen, paused while hidden.
+
+describe('MediaUrlService — keep-warm ping', () => {
+  const TEN_MIN = 10 * 60_000;
+  let pings: number;
+  let visibility: DocumentVisibilityState;
+
+  function warmService() {
+    const { svc, invocations } = makeService();
+    (svc as any).stats.warmPings = 0;
+    (svc as any).warmUsers = 0;
+    (svc as any).warmTimer = null;
+    (svc as any).lastHit = 0;
+    (svc as any).onVisible = () => { if (document.visibilityState === 'visible') (svc as any).pingIfDue(); };
+    (svc as any).warmCall = async () => { pings++; return { data: { warm: true } }; };
+    return { svc, invocations };
+  }
+
+  beforeEach(() => {
+    pings = 0;
+    visibility = 'visible';
+    spyOnProperty(document, 'visibilityState', 'get').and.callFake(() => visibility);
+    jasmine.clock().install();
+    jasmine.clock().mockDate(new Date(2026, 10, 18, 12, 0, 0));
+  });
+  afterEach(() => jasmine.clock().uninstall());
+
+  it('pings once when the first player appears, not again for a second player', () => {
+    const { svc } = warmService();
+    const a = svc.keepWarm();
+    const b = svc.keepWarm();
+    expect(pings).toBe(1);
+    a(); b();
+  });
+
+  it('pings again after 10 minutes, and stops when the last player goes', () => {
+    const { svc } = warmService();
+    const release = svc.keepWarm();
+    jasmine.clock().tick(TEN_MIN - 60_000);
+    expect(pings).toBe(1);                 // not yet due
+    jasmine.clock().tick(60_000);
+    expect(pings).toBe(2);                 // due at 10 min
+    release();
+    jasmine.clock().tick(3 * TEN_MIN);
+    expect(pings).toBe(2);                 // timer gone
+  });
+
+  it('a hidden tab never pings; becoming visible pings at once if due', () => {
+    visibility = 'hidden';
+    const { svc } = warmService();
+    const release = svc.keepWarm();
+    jasmine.clock().tick(3 * TEN_MIN);
+    expect(pings).toBe(0);
+    visibility = 'visible';
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(pings).toBe(1);
+    release();
+  });
+
+  it('a real signing call counts as a ping — no extra request on an active screen', async () => {
+    const { svc } = warmService();
+    const release = svc.keepWarm();        // ping #1 at t=0
+    jasmine.clock().tick(8 * 60_000);
+    const p = svc.resolve('signed-url-test/x.jpg');
+    jasmine.clock().tick(20);              // flush the batch → real call at t=8 min
+    await p;
+    jasmine.clock().tick(5 * 60_000);      // t=13 min: only 5 min since the real call
+    expect(pings).toBe(1);
+    release();
+  });
+
+  it('release is idempotent — a double destroy cannot stop another player\'s warmth', () => {
+    const { svc } = warmService();
+    const a = svc.keepWarm();
+    const b = svc.keepWarm();
+    a(); a();
+    jasmine.clock().tick(TEN_MIN);
+    expect(pings).toBe(2);                 // b still holds the timer
+    b();
   });
 });

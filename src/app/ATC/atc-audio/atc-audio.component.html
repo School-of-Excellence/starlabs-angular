@@ -1,13 +1,17 @@
 <!-- The <audio> element is always in the DOM (hidden until a URL exists) so @ViewChild can
      be static and src can be assigned before it is shown. Native controls take over once
-     ready — they give scrubbing and elapsed time, which a 30-minute note needs. -->
-<div class="atc-audio">
+     ready — they give scrubbing and elapsed time, which a 30-minute note needs.
+     `compact` (Calls tab) replaces the native controls with our own bar: no download menu,
+     no right-click menu. -->
+<div class="atc-audio"
+     [class.atc-audio--compact]="compact"
+     (contextmenu)="compact && $event.preventDefault()">
   <span class="atc-audio__label" *ngIf="label">{{ label }}</span>
 
   <button type="button"
           data-testid="aa-start"
           class="atc-audio__start"
-          *ngIf="!ready"
+          *ngIf="!compact && !ready"
           [disabled]="loading"
           (click)="start()">
     {{ loading ? 'Loading…' : 'Play' }}
@@ -16,13 +20,55 @@
   <audio #el
          data-testid="aa-player"
          class="atc-audio__player"
-         [hidden]="!ready"
-         controls
-         (play)="ensureFresh()"
+         [hidden]="compact || !ready"
+         [attr.controls]="compact ? null : ''"
+         [attr.controlslist]="compact ? 'nodownload noplaybackrate' : null"
+         (play)="playing = true; ensureFresh()"
+         (pause)="playing = false"
          (seeking)="ensureFresh()"
+         (timeupdate)="onTime()"
+         (loadedmetadata)="onTime()"
          (error)="onFail()"
          (stalled)="onFail()"
          (ended)="onEnded()"></audio>
+
+  <div class="atc-audio__bar" *ngIf="compact">
+    <button type="button"
+            data-testid="aa-play"
+            class="atc-audio__play"
+            [disabled]="loading"
+            [attr.aria-label]="playing ? 'Pause' : 'Play'"
+            (click)="togglePlay()">
+      <span *ngIf="loading" class="atc-audio__spinner" aria-hidden="true"></span>
+      <svg *ngIf="!loading && !playing" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+      <svg *ngIf="!loading && playing" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>
+    </button>
+
+    <span class="atc-audio__time" data-testid="aa-time">{{ fmt(position) }}</span>
+
+    <input type="range"
+           data-testid="aa-seek"
+           class="atc-audio__seek"
+           min="0"
+           step="0.1"
+           aria-label="Seek"
+           [attr.title]="ready ? null : 'Press play to enable seeking'"
+           [max]="total || 0"
+           [value]="position"
+           [disabled]="!ready || !total"
+           [style.background-size]="percent + '% 100%'"
+           (input)="onScrub($event)"
+           (change)="onSeekCommit($event)">
+
+    <span class="atc-audio__time" data-testid="aa-duration">{{ total ? fmt(total) : '--:--' }}</span>
+
+    <button type="button"
+            data-testid="aa-rate"
+            class="atc-audio__rate"
+            [disabled]="!ready"
+            aria-label="Playback speed"
+            (click)="cycleRate()">{{ rate }}x</button>
+  </div>
 
   <!-- Deliberately not "the link expired": an <audio> error carries no HTTP status, so a
        lapsed URL and a deleted object look identical here. Testing against a missing object

@@ -58,6 +58,7 @@ export class MediaUrlService {
   // FirebaseApp, so this needs no provideFunctions() in app.config.ts.
   private fn: Functions = getFunctions(this.app, 'us-central1');
   private call = httpsCallable<{ refs: string[] }, MediaUrlsResponse>(this.fn, 'getMediaUrls');
+  private warmCall = httpsCallable<{ warm: true }, { warm: boolean }>(this.fn, 'getMediaUrls');
 
   /** A URL this close to expiry is treated as already stale. */
   private static readonly SKEW_MS = 60_000;
@@ -65,6 +66,13 @@ export class MediaUrlService {
   private static readonly BATCH_MS = 16;
   /** Must not exceed MAX_REFS in the callable. */
   private static readonly MAX_PER_CALL = 200;
+  /**
+   * Keep-warm interval. Google may stop an idle instance at ~15 min (sometimes sooner), so
+   * 10 min lands safely inside that window. A cold start measured 14–17 s; warm is <1 s.
+   */
+  private static readonly WARM_EVERY_MS = 10 * 60_000;
+  /** How often to check whether a ping is due — cheap, local, no network. */
+  private static readonly WARM_CHECK_MS = 60_000;
 
   private cache = new Map<string, { url: string; expiresAt: number; duration: number | null }>();
   private waiting = new Map<string, ((url: string | null) => void)[]>();
@@ -72,11 +80,22 @@ export class MediaUrlService {
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Readable from the console (or a test screen) to see the mechanism working. */
-  readonly stats = { passthrough: 0, signed: 0, cacheHits: 0, failed: 0, calls: 0 };
+  readonly stats = { passthrough: 0, signed: 0, cacheHits: 0, failed: 0, calls: 0, warmPings: 0 };
 
-  /** True when the stored value is already loadable as-is. */
+  // ── keep-warm state (one timer per tab, however many players are on screen) ──────────
+  private warmUsers = 0;
+  private warmTimer: ReturnType<typeof setInterval> | null = null;
+  /** Last time the function was hit — by a ping OR a real signing call (both keep it warm). */
+  private lastHit = 0;
+  private onVisible = () => { if (document.visibilityState === 'visible') this.pingIfDue(); };
+
+  /**
+   * True when the value is already loadable as-is: an http(s) URL (legacy download URL), or
+   * a `blob:` URL — a brief recorded or loaded in this tab (prescribe/edit ATC previews),
+   * which lives only in this browser and has nothing to sign.
+   */
   static isFetchableUrl(ref: string): boolean {
-    return /^https?:\/\//i.test(ref.trim());
+    return /^(https?:\/\/|blob:)/i.test(ref.trim());
   }
 
   /**
@@ -145,6 +164,40 @@ export class MediaUrlService {
     return this.cache.get(ref)?.duration ?? null;
   }
 
+  /**
+   * Keep getMediaUrls warm while a player is on screen. Call when a player appears; call the
+   * returned function when it goes. The first player pings at once (so the ~15 s cold start
+   * happens while the user is still reading), then every 10 minutes while the tab is
+   * VISIBLE. A hidden tab never pings; coming back to it pings at once if one is due. A real
+   * signing call counts as a ping, so an active screen sends no extra requests at all.
+   */
+  keepWarm(): () => void {
+    this.warmUsers++;
+    if (this.warmUsers === 1) {
+      this.pingIfDue();
+      this.warmTimer = setInterval(() => this.pingIfDue(), MediaUrlService.WARM_CHECK_MS);
+      document.addEventListener('visibilitychange', this.onVisible);
+    }
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      if (--this.warmUsers === 0) {
+        if (this.warmTimer !== null) { clearInterval(this.warmTimer); this.warmTimer = null; }
+        document.removeEventListener('visibilitychange', this.onVisible);
+      }
+    };
+  }
+
+  private pingIfDue(): void {
+    if (document.visibilityState === 'hidden') return;
+    if (Date.now() - this.lastHit < MediaUrlService.WARM_EVERY_MS) return;
+    this.lastHit = Date.now();
+    this.stats.warmPings++;
+    // Fire-and-forget: a failed ping costs nothing but a cold start on the next Play.
+    this.warmCall({ warm: true }).catch(() => { /* offline / signed out — ignore */ });
+  }
+
   /** Drop a cached URL so the next resolve() re-requests. The expiry retry path. */
   invalidate(ref: string): void {
     this.cache.delete(ref);
@@ -168,6 +221,7 @@ export class MediaUrlService {
 
     try {
       this.stats.calls++;
+      this.lastHit = Date.now();          // a real call keeps the instance warm too
       const { data } = await this.call({ refs });
       for (const r of data.results) {
         if (r.url && r.expiresAt) {

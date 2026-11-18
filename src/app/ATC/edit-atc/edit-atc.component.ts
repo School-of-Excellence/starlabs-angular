@@ -3,6 +3,7 @@ import { CommonModule, DatePipe, Location } from "@angular/common";
 import { collection, collectionSnapshots, doc, docSnapshots, DocumentReference, Firestore, getDoc, getDocs, getFirestore, orderBy, query, serverTimestamp, setDoc, Timestamp, updateDoc, writeBatch } from '@angular/fire/firestore';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthguardService } from '../../authguard.service';
+import { AtcAudioComponent } from '../atc-audio/atc-audio.component';
 import { Subject, Subscription, takeUntil, timer } from 'rxjs';
 import * as RecordRTC from 'recordrtc';
 import { DomSanitizer } from '@angular/platform-browser';
@@ -45,7 +46,8 @@ import { isEISolutionProduct, isWiSHProduct } from '../shared/atc-product';
     NgxMatSelectSearchModule,
     MatCheckboxModule,
     MarkdownModule,
-    MatSnackBarModule
+    MatSnackBarModule,
+    AtcAudioComponent
   ],
   templateUrl: './edit-atc.component.html',
   styleUrl: './edit-atc.component.css',

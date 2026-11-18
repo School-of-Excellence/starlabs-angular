@@ -671,7 +671,7 @@
                          its signed URL on play, renews it before expiry, and resumes from
                          the same position. The duration decides how long that URL lives. -->
                     <div *ngFor="let audio of notesData['changeworkbrief']; let i = index; trackBy: trackByAtcId">
-                      <app-atc-audio
+                      <app-atc-audio compact
                         [path]="audio"
                         [label]="(i + 1) + '.'"></app-atc-audio>
                     </div>

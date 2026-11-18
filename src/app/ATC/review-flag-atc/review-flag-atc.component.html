@@ -158,7 +158,7 @@
                 <!-- app-atc-audio resolves its own signed URL on play and renews it before
                      expiry. trackBy keeps the player alive across live snapshots. -->
                 <div *ngFor="let audio of notesData['changeworkbrief']; let i = index; trackBy: trackByMediaRef">
-                  <app-atc-audio
+                  <app-atc-audio compact
                     [path]="audio"
                     [label]="(i + 1) + '.'"></app-atc-audio>
                 </div>

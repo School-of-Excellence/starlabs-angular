@@ -1,4 +1,4 @@
-import { Component, ElementRef, Input, OnDestroy, ViewChild, inject } from '@angular/core';
+import { Component, ElementRef, Input, OnDestroy, OnInit, ViewChild, booleanAttribute, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MediaUrlService } from '../../shared/media-url.service';
 
@@ -34,13 +34,26 @@ import { MediaUrlService } from '../../shared/media-url.service';
   imports: [CommonModule],
   templateUrl: './atc-audio.component.html',
   styleUrl: './atc-audio.component.css',
+  // compact (Calls tab) must fill its cell; a bare custom element is inline and shrinks to
+  // its content, which squeezed the seek bar to its minimum width.
+  host: { '[class.aa-compact-host]': 'compact' },
 })
-export class AtcAudioComponent implements OnDestroy {
+export class AtcAudioComponent implements OnInit, OnDestroy {
 
   /** Stored ref — an object path after migration, a legacy download URL before it. */
   @Input({ required: true }) path!: string;
   /** Shown beside the player, e.g. the clip's index in the note. */
   @Input() label = '';
+  /**
+   * Compact custom controls instead of the browser's native player — used by the Calls tab
+   * (2026-11-18). Play/pause, a wide seek bar, elapsed/total time and a speed toggle; no
+   * download menu and no right-click menu. ATC screens leave this off and keep native controls.
+   *
+   * Honest limit: this removes the download UI, not the ability to download. The signed URL
+   * is still visible in DevTools to a signed-in user — what bounds that is the link's expiry
+   * (duration + 20 min), not the player.
+   */
+  @Input({ transform: booleanAttribute }) compact = false;
 
   @ViewChild('el', { static: true }) elRef!: ElementRef<HTMLAudioElement>;
 
@@ -61,7 +74,15 @@ export class AtcAudioComponent implements OnDestroy {
   loading = false;
   failed = false;     // the link died and could not be replaced — offer "Try again"
 
+  // Compact-mode display state.
+  playing = false;
+  position = 0;             // seconds shown on the bar; follows the element unless dragging
+  rate = 1;
+  private scrubbing = false;
+  private static readonly RATES = [1, 1.25, 1.5, 2];
+
   private timer: ReturnType<typeof setInterval> | null = null;
+  private releaseWarm: (() => void) | null = null;
   private busy = false;   // a swap is in flight; keeps the handlers re-entrant-safe
   // Element failures seen since the last deliberate start(). Without this the component
   // re-signed a missing object indefinitely, because signing a path always succeeds.
@@ -189,7 +210,64 @@ export class AtcAudioComponent implements OnDestroy {
 
   /** Nothing left to keep alive once the track has run out. */
   onEnded(): void {
+    this.playing = false;
     this.stopWatch();
+  }
+
+  // ── compact controls ──────────────────────────────────────────────────────────────
+
+  /** Clip length: the element's once metadata is in, else the server-measured length. */
+  get total(): number {
+    const d = this.elRef?.nativeElement.duration;
+    if (Number.isFinite(d) && d > 0) return d;
+    return this.media.durationOf(this.path) ?? 0;
+  }
+
+  get percent(): number {
+    return this.total ? Math.min(100, (this.position / this.total) * 100) : 0;
+  }
+
+  async togglePlay(): Promise<void> {
+    if (!this.ready) { await this.start(); return; }
+    if (this.el.paused || this.el.ended) {
+      await this.ensureFresh();
+      try { await this.el.play(); } catch { /* gesture/autoplay policy */ }
+    } else {
+      this.el.pause();
+    }
+  }
+
+  onTime(): void {
+    if (!this.scrubbing) this.position = this.el.currentTime;
+  }
+
+  /** While dragging only the display moves — one seek on release, not one per pixel. */
+  onScrub(ev: Event): void {
+    this.scrubbing = true;
+    this.position = +(ev.target as HTMLInputElement).value;
+  }
+
+  onSeekCommit(ev: Event): void {
+    const t = +(ev.target as HTMLInputElement).value;
+    this.scrubbing = false;
+    this.position = t;
+    this.el.currentTime = t;      // fires (seeking) → ensureFresh()
+  }
+
+  cycleRate(): void {
+    const r = AtcAudioComponent.RATES;
+    this.rate = r[(r.indexOf(this.rate) + 1) % r.length];
+    // default too: a renewal swaps src, which resets playbackRate to the default
+    this.el.defaultPlaybackRate = this.rate;
+    this.el.playbackRate = this.rate;
+  }
+
+  fmt(secs: number): string {
+    if (!Number.isFinite(secs) || secs < 0) secs = 0;
+    const s = Math.floor(secs);
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
+    const mm = h ? String(m).padStart(2, '0') : String(m);
+    return `${h ? h + ':' : ''}${mm}:${String(r).padStart(2, '0')}`;
   }
 
   // These rows live inside *ngFor over onSnapshot data, so components are destroyed and
@@ -197,5 +275,15 @@ export class AtcAudioComponent implements OnDestroy {
   // detached element.
   ngOnDestroy(): void {
     this.stopWatch();
+    this.releaseWarm?.();
+  }
+
+  /**
+   * While this player is on screen, keep getMediaUrls warm (shared, one timer per tab — see
+   * MediaUrlService.keepWarm). Not for a local blob: preview (prescribe/edit), which never
+   * calls the function.
+   */
+  ngOnInit(): void {
+    if (this.path && !/^blob:/i.test(this.path)) this.releaseWarm = this.media.keepWarm();
   }
 }

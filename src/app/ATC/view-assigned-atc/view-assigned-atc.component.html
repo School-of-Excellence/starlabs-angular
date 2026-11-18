@@ -176,7 +176,7 @@
                          it any document change recreates these components and kills playback
                          mid-listen. app-atc-audio resolves and renews its own URL. -->
                     <div *ngFor="let audio of notesData['changeworkbrief']; let i = index; trackBy: trackByMediaRef">
-                      <app-atc-audio
+                      <app-atc-audio compact
                         [path]="audio"
                         [label]="(i + 1) + '.'"></app-atc-audio>
                     </div>

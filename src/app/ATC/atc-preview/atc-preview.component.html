@@ -150,7 +150,7 @@
             <!-- app-atc-audio resolves its own signed URL on play and renews it before
                  expiry. The sanitize() wrapper is gone with it: a signed URL is built by
                  the callable, never interpolated from user input. -->
-            <app-atc-audio [path]="audio"></app-atc-audio>
+            <app-atc-audio compact [path]="audio"></app-atc-audio>
           </div>
         </div>
       </div>
