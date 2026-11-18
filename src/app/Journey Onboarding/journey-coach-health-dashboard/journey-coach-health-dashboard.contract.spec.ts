@@ -128,6 +128,9 @@ describe('JourneyCoachHealthDashboard · onCoachChange (coach-scope guard)', () 
     loadFullPortfolio: jasmine.createSpy('loadFullPortfolio').and.resolveTo(undefined),
     // onCoachChange also re-scopes the A&H analytics card (2026-09-23).
     computeAhSummary: jasmine.createSpy('computeAhSummary'),
+    // 2026-11-18 merge (Joshua's tip): the switch also clears the trend and refreshes the Overall plan + follow-ups.
+    trendDataScope: null, trend: { set() {} },
+    ensureOvPlan: async () => {}, loadFollowUps: async () => {},
     ...over,
   });
 

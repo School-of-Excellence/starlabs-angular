@@ -9,6 +9,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import {
   Firestore,
   collection,
@@ -45,7 +46,8 @@ interface ResponseRow {
     MatFormFieldModule,
     MatInputModule,
     MatDialogModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    MatTooltipModule
   ],
   templateUrl: './upcomingworkshopresponses.component.html',
   styleUrl: './upcomingworkshopresponses.component.css'
@@ -94,7 +96,8 @@ export class UpcomingworkshopresponsesComponent implements OnInit {
         r.customerstatus,
         this.datePipe.transform(r.subscriptionstart, 'mediumDate'),
         this.datePipe.transform(r.subscriptionend, 'mediumDate'),
-        this.datePipe.transform(r.created, 'medium')
+        this.datePipe.transform(r.created, 'medium'),
+        this.datePipe.transform(r.created, 'd MMM y, h:mm a')   // as the column shows it
       ]
         .filter(Boolean)
         .join(' ')
@@ -236,6 +239,43 @@ export class UpcomingworkshopresponsesComponent implements OnInit {
     }
 
     return map;
+  }
+
+  // ---- Export (operator 2026-11-16) ----
+  /** The rows as the table shows them: search applied, in the current sort order, every page. */
+  private rowsInView(): ResponseRow[] {
+    const rows = this.dataSource.filteredData.slice();
+    return this.dataSource.sort ? this.dataSource.sortData(rows, this.dataSource.sort) : rows;
+  }
+
+  /** One CSV cell: quoted when needed, and a leading = or @ defused so a spreadsheet can't run it as a formula. */
+  private csvCell(v: unknown): string {
+    let s = (v ?? '').toString();
+    if (/^[=@\t\r]/.test(s)) s = `'${s}`;
+    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  }
+
+  exportResponses(): void {
+    const rows = this.rowsInView();
+    if (!rows.length) return;
+    const day = (d: Date | null, f: string) => (d ? this.datePipe.transform(d, f) || '' : '');
+    const header = ['Name', 'Country Code', 'Phone', 'Email', 'Customer Status', 'Subscription Start', 'Subscription End', 'Created'];
+    const lines = [header, ...rows.map(r => [
+      r.name, r.countrycode, r.phonenumber, r.email, r.customerstatus,
+      day(r.subscriptionstart, 'mediumDate'), day(r.subscriptionend, 'mediumDate'), day(r.created, 'd MMM y, h:mm a'),
+    ])];
+    const csv = lines.map(cols => cols.map(c => this.csvCell(c)).join(',')).join('\r\n');
+    // The BOM makes Excel read the file as UTF-8 (names in any script).
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+    const slug = (this.title || 'workshop').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'workshop';
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `responses-${slug}-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   close(): void {
