@@ -1,4 +1,5 @@
 import { Component, OnInit, ChangeDetectorRef, QueryList, ElementRef, ViewChildren, ViewChild, NgZone, inject } from '@angular/core';
+import { AtcAudioComponent } from '../../ATC/atc-audio/atc-audio.component';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { firstValueFrom, Subject, Subscription, takeUntil } from 'rxjs';
 import { QueueInvitationApprovalComponent } from '../queue-invitation-approval/queue-invitation-approval.component';
@@ -40,12 +41,18 @@ import { ViewParticipantAtcComponent } from '../../ATC/view-participant-atc/view
     MatSlideToggleModule,
     ReactiveFormsModule,
     ViewParticipantAtcComponent,
+    AtcAudioComponent,
   ],
   templateUrl: './dynamic-studio.component.html',
   styleUrl: './dynamic-studio.component.css'
 })
 export class DynamicStudioComponent {
   @ViewChildren('itemElement') itemElements: QueryList<ElementRef>;
+
+  // Keeps an audio row's component alive across queue snapshots; without it a snapshot
+  // destroys the player mid-listen and loses the listener's place.
+  trackByMediaRef = (_: number, ref: string) => ref;
+
   profileRoles = {}
   profileid = null
   mapProfile = {}

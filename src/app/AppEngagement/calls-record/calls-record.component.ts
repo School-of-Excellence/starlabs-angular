@@ -17,21 +17,11 @@ import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatBadgeModule } from '@angular/material/badge';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { MatSliderModule } from '@angular/material/slider';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 import { Firestore, collection, query, where, orderBy, onSnapshot, Unsubscribe, getDocs } from '@angular/fire/firestore';
 import { Subject, takeUntil } from 'rxjs';
+import { AtcAudioComponent } from '../../ATC/atc-audio/atc-audio.component';
 
-interface AudioState {
-  isPlaying: boolean;
-  isActive: boolean;
-  isMuted: boolean;
-  progress: number;
-  currentTime: number;
-  duration: number;
-  volume: number;
-}
 
 @Component({
   selector: 'app-calls-record',
@@ -55,9 +45,8 @@ interface AudioState {
     MatProgressSpinnerModule,
     MatBadgeModule,
     MatTooltipModule,
-    MatSliderModule,
-    MatProgressBarModule,
-    NgxMatSelectSearchModule
+    NgxMatSelectSearchModule,
+    AtcAudioComponent
   ],
   templateUrl: './calls-record.component.html',
   styleUrl: './calls-record.component.css'
@@ -70,7 +59,6 @@ export class CallsRecordComponent implements OnInit, OnDestroy {
   paginatedData = [];
   newRecordIds: Set<string> = new Set();
   
-  audioStates: { [key: number]: AudioState } = {};
   profiles = [];
   filteredProfiles = [];
   profileMap = {};
@@ -79,7 +67,10 @@ export class CallsRecordComponent implements OnInit, OnDestroy {
   filterForm: FormGroup;
   profileSearchCtrl
   isLoading = false;
+  /** True while the calls listener is attached and has delivered its first snapshot. */
   isRealTimeActive = false;
+  /** The date range the listener is actually serving — dates in the form only apply on Apply. */
+  private appliedRange: { start: Date; end: Date } | null = null;
   
   // Pagination
   pageSize = 10;
@@ -106,12 +97,13 @@ export class CallsRecordComponent implements OnInit, OnDestroy {
       searchText: ['']
     });
 
-    // Watch for form changes
-    this.filterForm.valueChanges.pipe(
-      takeUntil(this.unsubscribe$)
-    ).subscribe(() => {
-      this.applyFilters();
-    });
+    // Profile / status / search filter instantly in the browser. Dates are NOT watched:
+    // they only take effect on Apply (or a quick-date button), which re-queries Firestore.
+    for (const name of ['profile', 'callStatus', 'searchText']) {
+      this.filterForm.get(name)!.valueChanges.pipe(
+        takeUntil(this.unsubscribe$)
+      ).subscribe(() => this.applyFilters());
+    }
 
     // Watch for profile search changes
     this.profileSearchCtrl.valueChanges.pipe(
@@ -122,10 +114,7 @@ export class CallsRecordComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    this.loadProfiles().then(() => {
-      this.loadCallsData();
-      this.startRealTimeUpdates();
-    });
+    this.loadProfiles().then(() => this.subscribeToCalls());
   }
 
   ngOnDestroy() {
@@ -152,8 +141,11 @@ export class CallsRecordComponent implements OnInit, OnDestroy {
       
       profileSnapshot.docs.forEach((doc: any) => {
         const profileData = doc.data();
-        this.profiles.push(profileData);
-        this.profileMap[profileData.myoperatorid] = profileData;
+        if (profileData.myoperatorid) {
+          // only these can be picked in the Profile filter (its value is the MyOperator id)
+          this.profiles.push(profileData);
+          this.profileMap[profileData.myoperatorid] = profileData;
+        }
         if (profileData.number) {
           this.profileNumberMap[profileData.number] = profileData;
         }
@@ -173,127 +165,66 @@ export class CallsRecordComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.filteredProfiles = this.profiles.filter(profile => 
-      profile.name.toLowerCase().includes(searchValue) ||
-      profile.number.includes(searchValue) ||
-      profile.myoperatorid.toLowerCase().includes(searchValue)
+    // profile_data docs do not all carry name / number / myoperatorid.
+    this.filteredProfiles = this.profiles.filter(profile =>
+      [profile.name, profile.number, profile.myoperatorid]
+        .some((v) => String(v ?? '').toLowerCase().includes(searchValue))
     );
   }
 
-  async loadCallsData() {
-    const startDate = this.filterForm.get('startDate')?.value || this.getDateDaysAgo(7);
+  private rangeFromForm(): { start: Date; end: Date } {
+    const start = this.filterForm.get('startDate')?.value || this.getDateDaysAgo(7);
     const endDate = this.filterForm.get('endDate')?.value || new Date();
-    
-    // Set end date to end of day
-    const endOfDay = new Date(endDate);
-    endOfDay.setHours(23, 59, 59, 999);
-    
-    this.isLoading = true;
-    
-    try {
-      const q = query(
-        collection(this.firestore, 'myoperator calls'),
-        where("time", ">=", startDate),
-        where("time", "<=", endOfDay),
-        orderBy("time", "desc")
-      );
-      
-      const querySnapshot = await getDocs(q);
-      
-      this.allCallsData = [];
-      this.audioStates = {};
-      
-      if (querySnapshot.docs.length > 0) {
-        querySnapshot.docs.forEach((doc, index) => {
-          const data = doc.data();
-          this.allCallsData.push(data);
-          
-          // Initialize audio state for each call
-          this.audioStates[index] = {
-            isPlaying: false,
-            isActive: false,
-            isMuted: false,
-            progress: 0,
-            currentTime: 0,
-            duration: 0,
-            volume: 1
-          };
-        });
-        
-        this.applyFilters();
-      } else {
-        console.log("No Calls Data Found for the selected date range");
-        this.filteredData = [];
-        this.updatePaginatedData();
-      }
-    } catch (error) {
-      console.error("Error loading calls:", error);
-    } finally {
-      this.isLoading = false;
-    }
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+    return { start, end };
   }
 
-  startRealTimeUpdates() {
-    if (this.isRealTimeActive) return;
-    
-    const startDate = this.filterForm.get('startDate')?.value || this.getDateDaysAgo(7);
-    const endDate = this.filterForm.get('endDate')?.value || new Date();
-    const endOfDay = new Date(endDate);
-    endOfDay.setHours(23, 59, 59, 999);
+  /**
+   * ONE listener per applied date range — it is both the load and the live feed.
+   *
+   * Previously the tab ran a getDocs AND an onSnapshot over the same range (every call read
+   * twice on open, with a race between them), and "Start Live" attached a fresh listener
+   * that re-read the whole range each time. Now a listener is attached on open, replaced only
+   * when the range changes (Apply / quick dates / Refresh), and detached on leave.
+   */
+  private subscribeToCalls() {
+    this.stopRealTimeUpdates();
+    const range = this.rangeFromForm();
+    this.appliedRange = range;
+    this.isLoading = true;
+    let first = true;
 
     const q = query(
       collection(this.firestore, 'myoperator calls'),
-      where("time", ">=", startDate),
-      where("time", "<=", endOfDay),
+      where("time", ">=", range.start),
+      where("time", "<=", range.end),
       orderBy("time", "desc")
     );
 
     this.realtimeUnsubscribe = onSnapshot(q, (snapshot) => {
-      snapshot.docChanges().forEach((change:any) => {
-        const data = change.doc.data();
-        
-        if (change.type === 'added') {
-          // Check if this is a new record (not in initial load)
-          const existingIndex = this.allCallsData.findIndex((call:any) => call.docid === data.docid);
-          if (existingIndex === -1) {
-            this.allCallsData.unshift(data);
-            this.newRecordIds.add(data.docid);
-            
-            // Initialize audio state
-            const newIndex = this.allCallsData.length - 1;
-            this.audioStates[newIndex] = {
-              isPlaying: false,
-              isActive: false,
-              isMuted: false,
-              progress: 0,
-              currentTime: 0,
-              duration: 0,
-              volume: 1
-            };
-            
-            // Remove new record indicator after 5 seconds
-            setTimeout(() => {
-              this.newRecordIds.delete(data.docid);
-            }, 5000);
-          }
-        } else if (change.type === 'modified') {
-          const index = this.allCallsData.findIndex(call => call.docid === data.docid);
-          if (index !== -1) {
-            this.allCallsData[index] = data;
-          }
-        } else if (change.type === 'removed') {
-          const index = this.allCallsData.findIndex(call => call.docid === data.docid);
-          if (index !== -1) {
-            this.allCallsData.splice(index, 1);
-            delete this.audioStates[index];
-          }
-        }
-      });
-
-      this.applyFilters();
+      // Only calls that arrive AFTER the first snapshot are "new"; the first one is the load.
+      if (!first) {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type !== 'added') return;
+          const id = change.doc.data()['docid'];
+          this.newRecordIds.add(id);
+          setTimeout(() => this.newRecordIds.delete(id), 5000);
+        });
+      }
+      this.allCallsData = snapshot.docs.map((d) => d.data());
+      // A live update keeps the page you are on; only the first load starts at page 1.
+      this.applyFilters(first);
+      if (first) {
+        first = false;
+        this.isLoading = false;
+        this.isRealTimeActive = true;
+      }
+    }, (error) => {
+      console.error("Error listening to calls:", error);
+      this.isLoading = false;
+      this.isRealTimeActive = false;
     });
-
-    this.isRealTimeActive = true;
   }
 
   stopRealTimeUpdates() {
@@ -302,14 +233,6 @@ export class CallsRecordComponent implements OnInit, OnDestroy {
       this.realtimeUnsubscribe = null;
     }
     this.isRealTimeActive = false;
-  }
-
-  toggleRealTime() {
-    if (this.isRealTimeActive) {
-      this.stopRealTimeUpdates();
-    } else {
-      this.startRealTimeUpdates();
-    }
   }
 
   isNewRecord(row): boolean {
@@ -325,11 +248,7 @@ export class CallsRecordComponent implements OnInit, OnDestroy {
       endDate: endDate
     });
     
-    this.loadCallsData();
-    if (this.isRealTimeActive) {
-      this.stopRealTimeUpdates();
-      this.startRealTimeUpdates();
-    }
+    this.subscribeToCalls();
   }
 
   isQuickDateActive(days: number): boolean {
@@ -341,41 +260,66 @@ export class CallsRecordComponent implements OnInit, OnDestroy {
     return startDate.getTime() === expectedStart.getTime();
   }
 
-  applyFilters() {
-    const filters = this.filterForm.value;
+  /** The Apply button: re-query if the dates changed, then filter. */
+  apply() {
+    const r = this.rangeFromForm();
+    const a = this.appliedRange;
+    if (!a || a.start.getTime() !== r.start.getTime() || a.end.getTime() !== r.end.getTime()) {
+      this.subscribeToCalls();     // the first snapshot runs applyFilters
+    } else {
+      this.applyFilters();
+    }
+  }
+
+  /** Last 10 digits — MyOperator sends bare numbers, profiles may carry +91 / spaces. */
+  private digits(v: any): string {
+    return String(v ?? '').replace(/\D/g, '').slice(-10);
+  }
+
+  applyFilters(resetPage = true) {
+    // getRawValue(), not .value: this runs from a CHILD control's valueChanges, which fires
+    // before the parent group's .value is recomputed — .value would still hold the old text.
+    const filters = this.filterForm.getRawValue();
+    const profile = filters.profile ? this.profileMap[filters.profile] : null;
+    const profileDigits = this.digits(profile?.number);
+    const searchLower = (filters.searchText || '').trim().toLowerCase();
     
     this.filteredData = this.allCallsData.filter(call => {
-      let matches = true;
-      
-      // Profile filter
-      if (filters.profile && call.calledby !== filters.profile && call.calledto !== filters.profile) {
-        matches = false;
+      // Profile filter — the profile as caller (MyOperator id) OR as the number called.
+      if (filters.profile) {
+        const asCaller = call.calledby === filters.profile;
+        const asCallee = !!profileDigits && this.digits(call.calledto) === profileDigits;
+        if (!asCaller && !asCallee) return false;
       }
       
       // Call status filter
-      if (filters.callStatus && call.callstatus?.toLowerCase() !== filters.callStatus.toLowerCase()) {
-        matches = false;
+      if (filters.callStatus && (call.callstatus || '').toLowerCase() !== filters.callStatus.toLowerCase()) {
+        return false;
       }
       
-      // Search text filter
-      if (filters.searchText) {
-        const searchLower = filters.searchText.toLowerCase();
-        const callerName = this.getProfileName(call.calledby).toLowerCase();
-        const calleeName = (this.profileNumberMap[call.calledto]?.name || '').toLowerCase();
-        
-        matches = matches && (
-          call.calledby.includes(searchLower) ||
-          call.calledto.includes(searchLower) ||
-          callerName.includes(searchLower) ||
-          calleeName.includes(searchLower)
-        );
+      // Search text filter — every field may be null (the webhook writes null when
+      // MyOperator omits it), so nothing here may assume a string.
+      if (searchLower) {
+        const haystack = [
+          call.calledby,
+          call.calledto,
+          this.getProfileName(call.calledby),
+          this.profileNumberMap[call.calledto]?.name,
+        ].map((v) => String(v ?? '').toLowerCase());
+        if (!haystack.some((v) => v.includes(searchLower))) return false;
       }
       
-      return matches;
+      return true;
     });
     
     this.sortData({ active: this.sortColumn, direction: this.sortDirection });
-    this.pageIndex = 0;
+    if (resetPage) {
+      this.pageIndex = 0;
+    } else {
+      // keep the current page, unless the list shrank under it
+      const lastPage = Math.max(0, Math.ceil(this.filteredData.length / this.pageSize) - 1);
+      this.pageIndex = Math.min(this.pageIndex, lastPage);
+    }
     this.updatePaginatedData();
   }
 
@@ -388,12 +332,9 @@ export class CallsRecordComponent implements OnInit, OnDestroy {
     this.profileSearchCtrl.setValue('');
   }
 
+  /** Re-attach the listener for the form's dates (re-reads the range). */
   refreshData() {
-    this.loadCallsData();
-    if (this.isRealTimeActive) {
-      this.stopRealTimeUpdates();
-      this.startRealTimeUpdates();
-    }
+    this.subscribeToCalls();
   }
 
   sortData(sort: Sort) {
@@ -445,8 +386,8 @@ export class CallsRecordComponent implements OnInit, OnDestroy {
   }
 
   getProfileName(profileId: string): string {
-    const profile = this.profileMap[profileId];
-    return profile?.name || profileId;
+    const profile = profileId ? this.profileMap[profileId] : null;
+    return profile?.name || profileId || '';
   }
 
   getStatusIcon(status: string): string {
@@ -471,174 +412,6 @@ export class CallsRecordComponent implements OnInit, OnDestroy {
       default:
         return 'call';
     }
-  }
-
-  // Enhanced Audio Control Methods
-  toggleAudio(call, index: number) {
-    if (!call.recordingurl) return;
-
-    const state = this.audioStates[index];
-
-    if (!state.isActive) {
-      // Close any other active audio players
-      Object.keys(this.audioStates).forEach(key => {
-        const keyNum = +key;
-        if (keyNum !== index) {
-          this.audioStates[keyNum].isActive = false;
-          this.audioStates[keyNum].isPlaying = false;
-        }
-      });
-      
-      state.isActive = true;
-      
-      // Wait for next tick to ensure audio element is rendered
-      setTimeout(() => {
-        const audioElement = document.querySelector(`#audio-player-${index} audio`) as HTMLAudioElement;
-        if (audioElement) {
-          audioElement.play();
-        }
-      }, 100);
-    } else {
-      this.togglePlayPause(document.querySelector(`#audio-player-${index} audio`) as HTMLAudioElement, index);
-    }
-  }
-
-  togglePlayPause(audioElement: HTMLAudioElement, index: number) {
-    if (!audioElement) return;
-    
-    const state = this.audioStates[index];
-    if (state.isPlaying) {
-      audioElement.pause();
-    } else {
-      audioElement.play();
-    }
-  }
-
-  skipBackward(audioElement: HTMLAudioElement, index: number) {
-    if (audioElement) {
-      audioElement.currentTime = Math.max(0, audioElement.currentTime - 10);
-    }
-  }
-
-  skipForward(audioElement: HTMLAudioElement, index: number) {
-    if (audioElement) {
-      audioElement.currentTime = Math.min(audioElement.duration, audioElement.currentTime + 10);
-    }
-  }
-
-  onAudioLoaded(event: any, index: number) {
-    const audio = event.target;
-    const state = this.audioStates[index];
-    if (state && audio.duration) {
-      state.duration = audio.duration;
-    }
-  }
-
-  updateProgress(event: any, index: number) {
-    const audio = event.target;
-    const state = this.audioStates[index];
-    
-    if (state && audio.duration) {
-      state.currentTime = audio.currentTime;
-      state.duration = audio.duration;
-      state.progress = (audio.currentTime / audio.duration) * 100;
-    }
-  }
-
-  onSeekChange(event: any, audioElement: HTMLAudioElement, index: number) {
-    if (audioElement && audioElement.duration) {
-      const newTime = event.value;
-      audioElement.currentTime = newTime;
-    }
-  }
-
-  seekToPosition(event: MouseEvent, audioElement: HTMLAudioElement, index: number) {
-    if (audioElement && audioElement.duration) {
-      const progressBar = event.currentTarget as HTMLElement;
-      const rect = progressBar.getBoundingClientRect();
-      const clickX = event.clientX - rect.left;
-      const percentage = clickX / rect.width;
-      const newTime = percentage * audioElement.duration;
-      
-      audioElement.currentTime = newTime;
-    }
-  }
-
-  onVolumeChange(event: any, audioElement: HTMLAudioElement, index: number) {
-    if (audioElement) {
-      const volume = event.value;
-      audioElement.volume = volume;
-      this.audioStates[index].volume = volume;
-      this.audioStates[index].isMuted = volume === 0;
-    }
-  }
-
-  audioEnded(index: number) {
-    const state = this.audioStates[index];
-    if (state) {
-      state.isPlaying = false;
-      state.progress = 0;
-      state.currentTime = 0;
-    }
-  }
-
-  audioPaused(index: number) {
-    const state = this.audioStates[index];
-    if (state) {
-      state.isPlaying = false;
-    }
-  }
-
-  audioPlayed(index: number) {
-    const state = this.audioStates[index];
-    if (state) {
-      state.isPlaying = true;
-    }
-  }
-
-  toggleMute(audioElement: HTMLAudioElement, index: number) {
-    const state = this.audioStates[index];
-    if (audioElement && state) {
-      audioElement.muted = !audioElement.muted;
-      state.isMuted = audioElement.muted;
-    }
-  }
-
-  changePlaybackSpeed(speed: string, audioElement: HTMLAudioElement, index: number) {
-    if (audioElement) {
-      audioElement.playbackRate = parseFloat(speed);
-    }
-  }
-
-  downloadAudio(url: string, call) {
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `call-recording-${call.docid}-${this.formatDateTime(call.time, 'date')}.mp3`;
-    link.click();
-  }
-
-  closeAudio(index: number) {
-    const state = this.audioStates[index];
-    if (state) {
-      state.isActive = false;
-      state.isPlaying = false;
-      state.progress = 0;
-      state.currentTime = 0;
-    }
-    
-    const audioElement = document.querySelector(`#audio-player-${index} audio`) as HTMLAudioElement;
-    if (audioElement) {
-      audioElement.pause();
-      audioElement.currentTime = 0;
-    }
-  }
-
-  formatTime(timeInSeconds: number): string {
-    if (!timeInSeconds || isNaN(timeInSeconds)) return '0:00';
-    
-    const minutes = Math.floor(timeInSeconds / 60);
-    const seconds = Math.floor(timeInSeconds % 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   }
 
   formatDateTime(timestamp: any, type: 'time' | 'date'): string {

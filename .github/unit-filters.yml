@@ -32,6 +32,7 @@ _all:
   - 'angular.json'
   - 'package.json'
   - 'tsconfig*.json'
+  - 'karma.ci.conf.js'
 
 queue:
   - 'src/app/queue system/**'
@@ -56,6 +57,8 @@ queue:
   - 'src/app/video-player/**'
   - 'src/app/instance-status.service.ts'
   - 'src/app/web-studio-invitation/**'
+  - 'src/app/LiveKit-Cloud/**'
+  - 'src/app/openvidu-loading-game/**'
 
 journey:
   - 'src/app/Journey Onboarding/**'
@@ -80,6 +83,7 @@ comms:
   - 'src/app/Channel Communication/**'
   - 'src/app/in-app-message-input/**'
   - 'src/app/Customer Support/releaselogdialog/**'
+  - 'src/app/AppEngagement/calls-record/**'
 
 content:
   - 'src/app/content/**'
@@ -106,6 +110,7 @@ authroles:
   - 'src/app/slackwebhookurls/**'
   - 'src/app/updatesnackbar/**'
   - 'src/app/icon-list.ts'
+  - 'src/app/authloading/**'
 
 workshops:
   - 'src/app/Workshop/**'
@@ -133,9 +138,11 @@ events:
   - 'src/app/Participants Profile Management/participants-analytics/bulk-add-products/**'
   - 'src/app/Participants Profile Management/participants-analytics/tag-participants/**'
   - 'src/app/Channel Communication/channel-communication/**'
+  - 'src/app/arena-design-insights/**'
 
 profiles:
   - 'src/app/Participants Profile Management/**'
+  - 'src/app/Participant Intelligence/**'
   - 'src/app/ProfilePicture/**'
   - '!**/*.component.spec.ts'
   - 'src/app/AppEngagement/app-action-pending/**'
@@ -145,3 +152,32 @@ profiles:
   - 'src/app/participant-videoask/**'
   - 'src/app/video-player/**'
   - 'src/app/Customer Support/add-issue/**'
+
+support:
+  - 'src/app/Customer Support/**'
+
+atc:
+  - 'src/app/ATC/prescribe-atc/**'
+  - 'src/app/ATC/edit-atc/**'
+  - 'src/app/ATC/view-prescribed-atc/**'
+  - 'src/app/ATC/shared/**'
+  - 'src/app/ATC/atc-option/**'
+  - 'src/app/ATC/atc-ael-confirm/**'
+  - 'src/app/ATC/preview-atc-before-submission/**'
+  - 'src/app/ATC/select-validator/**'
+  - 'src/app/shared/atc-draft.service.ts'
+  - 'src/app/shared/atc-draft.logic.ts'
+  - 'src/app/shared/media-cache.service.ts'
+  - 'src/app/shared/media-url.service.ts'
+  - 'src/app/ATC/atc-audio/**'
+  - 'src/app/ATC/atc-preview/**'
+  - 'src/app/ATC/view-upgraded-atc/**'
+  - 'src/app/ATC/view-participant-atc/**'
+  - 'src/app/ATC/view-assigned-atc/**'
+  - 'src/app/ATC/review-flag-atc/**'
+  - 'src/app/ATC/add-review-notes/**'
+  - 'src/app/ATC/pick-for-mentoring/**'
+  - 'src/app/ATC/eit-education-atc/**'
+  - 'src/app/ATC/live-prescription/**'
+  - 'src/app/ATC/Triple ATC/**'
+  - 'src/app/view-ai-generated-atc/**'
