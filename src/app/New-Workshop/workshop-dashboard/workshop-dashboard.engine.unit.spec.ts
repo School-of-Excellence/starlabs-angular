@@ -58,6 +58,9 @@ import {
   isReadyForChallenge,
   isReadyForSubChallenge,
   moveButtonText,
+  personMenuNoDataNote,
+  panelEntryFill,
+  isTransientReadError, retryRead, ReadTimeoutError,
   moveButtonTooltip,
   neverStartedIds,
   normalizeSubChallengeStatus,
@@ -961,6 +964,115 @@ describe('workshop-dashboard.engine', () => {
         .toBe('Click to view previous question assignment from 18 May 2026');
       expect(oldResultTooltip({ date: '18 May 2026' }))
         .toBe('Click to view previous form submission from 18 May 2026');
+    });
+
+    it('words the person menu\'s "no data" line by the enrolled doc, never as Not started for someone who started', () => {
+      // A progress row needs status 'enrolled' AND a participant workshop doc; the other three cases have none.
+      expect(personMenuNoDataNote({ status: 'enrollednotstarted' })).toBe('Not started — no data in this workshop yet');
+      expect(personMenuNoDataNote({ status: 'enrolled' })).toBe('Started — no progress recorded yet');
+      expect(personMenuNoDataNote(undefined)).toBe('Not enrolled in this workshop');
+      expect(personMenuNoDataNote(null)).toBe('Not enrolled in this workshop');
+      expect(personMenuNoDataNote({})).toBe('Not started — no data in this workshop yet');
+    });
+
+    // new_user_data lands after a side panel was opened (2026-11-18): the open rows are patched in place.
+    describe('panelEntryFill', () => {
+      const nuDoc = { name: 'NU Alpha', email: 'nu@x.test', phonenumber: '900' };
+      const movedDoc = { name: 'Moved One', email: 'old@x.test', movedtoexist: true };
+
+      it('names a row built before the read landed, and gives it the details the senders and exports read', () => {
+        // Built while loading: buildParticipantEntry found no name and no profile.
+        expect(panelEntryFill({ profileid: 'nu', name: 'Unknown', metadata: undefined }, nuDoc, nuDoc))
+          .toEqual({ name: 'NU Alpha', metadata: nuDoc });
+        // openZoomAttendees falls back to an empty object.
+        expect(panelEntryFill({ profileid: 'nu', name: '', metadata: {} }, nuDoc, nuDoc))
+          .toEqual({ name: 'NU Alpha', metadata: nuDoc });
+      });
+
+      it('names a moved person from their new_user_data doc but never takes their stale details from it', () => {
+        // No participant metadata yet: the profile map has nothing for them, only new_user_data names them.
+        expect(panelEntryFill({ profileid: 'm', name: 'Unknown' }, undefined, movedDoc)).toEqual({ name: 'Moved One' });
+        expect(panelEntryFill({ profileid: 'm', name: 'Unknown', metadata: {} }, {}, movedDoc)).toEqual({ name: 'Moved One' });
+      });
+
+      it('never overwrites a name or details the row already had', () => {
+        const meta = { name: 'Meta Name', email: 'm@x.test' };
+        expect(panelEntryFill({ name: 'Shared As', metadata: meta }, nuDoc, nuDoc)).toBeNull();
+        // A share / purchase row keeps the name it was given, and only gains the missing details.
+        expect(panelEntryFill({ name: 'Shared As' }, nuDoc, nuDoc)).toEqual({ metadata: nuDoc });
+        expect(panelEntryFill({ name: 'Unknown', metadata: meta }, nuDoc, nuDoc)).toEqual({ name: 'NU Alpha' });
+      });
+
+      it('changes nothing when neither directory knows the person', () => {
+        expect(panelEntryFill({ profileid: 'x', name: 'Unknown' }, undefined, undefined)).toBeNull();
+        expect(panelEntryFill({ profileid: 'x', name: 'Unknown', metadata: {} }, {}, {})).toBeNull();
+        expect(panelEntryFill(null, undefined, undefined)).toBeNull();
+      });
+    });
+
+    // The one-time new_user_data read retries a dropped connection and gives up by a deadline (2026-11-18 review).
+    describe('isTransientReadError / retryRead', () => {
+      const err = (code: string) => Object.assign(new Error(code), { code });
+      const noWait = () => Promise.resolve();
+
+      it('retries only what trying again can help: a dropped connection or a server hiccup, never rules or auth', () => {
+        for (const c of ['unknown', 'unavailable', 'deadline-exceeded', 'internal', 'resource-exhausted', 'aborted', 'cancelled', 'firestore/unavailable']) {
+          expect(isTransientReadError(err(c))).withContext(c).toBeTrue();
+        }
+        for (const c of ['permission-denied', 'unauthenticated', 'invalid-argument', 'failed-precondition', 'not-found', 'unimplemented']) {
+          expect(isTransientReadError(err(c))).withContext(c).toBeFalse();
+        }
+        expect(isTransientReadError(new TypeError('a bug'))).toBeFalse();
+        expect(isTransientReadError(undefined)).toBeFalse();
+      });
+
+      it('a dropped connection is tried again after each wait, and the read that gets through wins', async () => {
+        const waits: number[] = []; let calls = 0;
+        const v = await retryRead(async () => { calls++; if (calls < 3) throw err('unknown'); return 'data'; },
+          { delaysMs: [1000, 3000], timeoutMs: 60_000, sleep: async ms => { waits.push(ms); } });
+        expect(v).toBe('data');
+        expect(calls).toBe(3);
+        expect(waits).toEqual([1000, 3000]);
+      });
+
+      it('gives up after the last retry with the last error', async () => {
+        let calls = 0;
+        await expectAsync(retryRead(async () => { calls++; throw err('unavailable'); }, { delaysMs: [1, 1], timeoutMs: 60_000, sleep: noWait }))
+          .toBeRejectedWith(jasmine.objectContaining({ code: 'unavailable' }));
+        expect(calls).toBe(3);
+      });
+
+      it('never retries an error that would fail the same way again', async () => {
+        let calls = 0;
+        await expectAsync(retryRead(async () => { calls++; throw err('permission-denied'); }, { delaysMs: [1, 1], timeoutMs: 60_000, sleep: noWait }))
+          .toBeRejectedWith(jasmine.objectContaining({ code: 'permission-denied' }));
+        expect(calls).toBe(1);
+      });
+
+      it('a stalled read settles at the deadline, and if it lands afterwards the late value is handed over', async () => {
+        let land!: (v: string) => void;
+        const late: string[] = [];
+        const p = retryRead(() => new Promise<string>(r => { land = r; }), { delaysMs: [1, 1], timeoutMs: 20, onLate: v => late.push(v) });
+        await expectAsync(p).toBeRejectedWith(jasmine.any(ReadTimeoutError));
+        await expectAsync(p).toBeRejectedWith(jasmine.objectContaining({ code: 'deadline-exceeded' }));
+        land('late data');
+        await new Promise(r => setTimeout(r, 0));
+        expect(late).toEqual(['late data']);
+      });
+
+      it('starts no new attempt once the deadline has passed during a wait', async () => {
+        let calls = 0;
+        const p = retryRead(async () => { calls++; throw err('unknown'); }, { delaysMs: [60, 60], timeoutMs: 20 });
+        await expectAsync(p).toBeRejectedWith(jasmine.any(ReadTimeoutError));
+        await new Promise(r => setTimeout(r, 80));
+        expect(calls).toBe(1);
+      });
+
+      it('a read on time never calls onLate', async () => {
+        const late: any[] = [];
+        expect(await retryRead(async () => 7, { delaysMs: [], timeoutMs: 1000, onLate: v => late.push(v) })).toBe(7);
+        expect(late).toEqual([]);
+      });
     });
   });
 

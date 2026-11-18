@@ -1,478 +1,1368 @@
-<div class="page">
-  <div class="page-head">
-    <div class="page-head-text">
-      <h1>New Users</h1>
-      <p>People who signed up but are not participants yet. Filter, tag, export or message them.</p>
-    </div>
-  </div>
+<!--
+  New Users · Heritage Ledger (design 2026-11-16). ViewEncapsulation.None: every class is nx- prefixed and the
+  tokens live on .nx-root. Hook-only classes the hub reads (users-table, select-col, nowrap-cell, tag-pill,
+  workshop-pill, nu-table-card, sel) carry no CSS. Hooks are literal data-testid attributes with the new- prefix only.
+  Template refs used by the overlays (#importOrigin, #searchOrigin, #tagsOrigin, #workshopsOrigin, #createdOrigin,
+  #conversionOrigin, #columnsOrigin) are declared in the same block as the overlay that uses them.
+  Layout-only controls (Filters button and sheet, card bar, phone sheets) are swapped in with @if on isNarrow /
+  isPhone (a ResizeObserver on #screenRoot), never hidden with CSS, so no hook is ever in the DOM twice.
+-->
+<div class="nx-root nx-shell" #screenRoot>
+  <div class="nx-page">
 
-  <!-- Access is granted in a workshop's Dashboard Access settings. -->
-  <div class="empty-state" data-testid="new-no-access" *ngIf="accessChecked && !accessAllowed">
-    <mat-icon>lock</mat-icon>
-    <h3>You do not have access to this screen</h3>
-    <p>Ask someone who manages workshops to give you access to the new users screen.</p>
-  </div>
-
-  <div class="loading" *ngIf="!accessChecked || (accessAllowed && loading)">
-    <mat-spinner diameter="36"></mat-spinner>
-  </div>
-
-  <div class="empty-state" *ngIf="accessAllowed && !loading && dataSource.data.length === 0">
-    <mat-icon>group_off</mat-icon>
-    <h3>No users yet</h3>
-    <p>New users will appear here.</p>
-  </div>
-
-  <div class="nu-layout" *ngIf="accessAllowed && !loading && dataSource.data.length > 0">
-  <div class="nu-table-card">
-    <div class="nu-toolbar">
-      <div class="nu-toolbar-top">
-      <mat-form-field appearance="outline" class="search-field" subscriptSizing="dynamic">
-        <mat-icon matPrefix>search</mat-icon>
-        <input matInput data-testid="new-search-input" [value]="searchText" (input)="applyFilter($event)"
-          placeholder="Search name, phone, email or tag" aria-label="Search users" />
-        <button data-testid="new-search-clear" matSuffix mat-icon-button type="button" *ngIf="searchText"
-          (click)="clearSearch()" aria-label="Clear search">
-          <mat-icon>close</mat-icon>
-        </button>
-      </mat-form-field>
-
-      <span class="nu-count" data-testid="new-result-count">
-        <strong>{{ dataSource.filteredData.length }}</strong> of {{ dataSource.data.length }} users
-      </span>
-      <span class="nu-spacer"></span>
-
-      <button data-testid="new-columns-btn" mat-stroked-button type="button" class="tags-manage-btn"
-        [matMenuTriggerFor]="columnsMenu" matTooltip="Choose which columns to show">
-        <mat-icon>view_column</mat-icon>
-        Columns
-      </button>
-
-      <!-- One literal hook per column: the readiness gate can't read generated ids. -->
-      <mat-menu #columnsMenu="matMenu" class="tag-filter-menu" xPosition="before">
-        <div data-testid="new-columns-panel" class="tfm" (click)="$event.stopPropagation()" (keydown.tab)="$event.stopPropagation()">
-          <div class="tfm-head">
-            <span class="tfm-title">Show columns</span>
-            <button data-testid="new-columns-reset" type="button" class="tfm-clear" *ngIf="!columnsAreDefault" (click)="resetColumns()">
-              Default
-            </button>
-          </div>
-          <div class="tfm-list tfm-columns">
-            <button data-testid="new-column-name" type="button" class="tfm-item" [class.sel]="isColumnOn('name')" [attr.aria-pressed]="isColumnOn('name')"
-              [disabled]="isLastColumn('name')" (click)="toggleColumn('name')">
-              <mat-icon class="tfm-check">{{ isColumnOn('name') ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
-              <span class="tfm-name">Name</span>
-            </button>
-            <button data-testid="new-column-phone" type="button" class="tfm-item" [class.sel]="isColumnOn('phonenumber')" [attr.aria-pressed]="isColumnOn('phonenumber')"
-              [disabled]="isLastColumn('phonenumber')" (click)="toggleColumn('phonenumber')">
-              <mat-icon class="tfm-check">{{ isColumnOn('phonenumber') ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
-              <span class="tfm-name">Phone</span>
-            </button>
-            <button data-testid="new-column-email" type="button" class="tfm-item" [class.sel]="isColumnOn('email')" [attr.aria-pressed]="isColumnOn('email')"
-              [disabled]="isLastColumn('email')" (click)="toggleColumn('email')">
-              <mat-icon class="tfm-check">{{ isColumnOn('email') ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
-              <span class="tfm-name">Email</span>
-            </button>
-            <button data-testid="new-column-created" type="button" class="tfm-item" [class.sel]="isColumnOn('created')" [attr.aria-pressed]="isColumnOn('created')"
-              [disabled]="isLastColumn('created')" (click)="toggleColumn('created')">
-              <mat-icon class="tfm-check">{{ isColumnOn('created') ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
-              <span class="tfm-name">Created</span>
-            </button>
-            <button data-testid="new-column-status" type="button" class="tfm-item" [class.sel]="isColumnOn('enable')" [attr.aria-pressed]="isColumnOn('enable')"
-              [disabled]="isLastColumn('enable')" (click)="toggleColumn('enable')">
-              <mat-icon class="tfm-check">{{ isColumnOn('enable') ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
-              <span class="tfm-name">Status</span>
-            </button>
-            <button data-testid="new-column-referredby" type="button" class="tfm-item" [class.sel]="isColumnOn('referredby')" [attr.aria-pressed]="isColumnOn('referredby')"
-              [disabled]="isLastColumn('referredby')" (click)="toggleColumn('referredby')">
-              <mat-icon class="tfm-check">{{ isColumnOn('referredby') ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
-              <span class="tfm-name">Referred by</span>
-            </button>
-            <button data-testid="new-column-tags" type="button" class="tfm-item" [class.sel]="isColumnOn('tags')" [attr.aria-pressed]="isColumnOn('tags')"
-              [disabled]="isLastColumn('tags')" (click)="toggleColumn('tags')">
-              <mat-icon class="tfm-check">{{ isColumnOn('tags') ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
-              <span class="tfm-name">Tags</span>
-            </button>
-          </div>
-          <div class="tfm-foot">
-            <mat-icon>info_outline</mat-icon>
-            <span>Workshop and Moved On show up by themselves while those filters are on.</span>
-          </div>
-        </div>
-      </mat-menu>
-
-      <button data-testid="new-open-tags-manager-20" mat-stroked-button class="tags-manage-btn" (click)="openTagsManager()"
-        matTooltip="Create and rename tags, copy segment links">
-        <mat-icon>label</mat-icon>
-        Manage tags
-      </button>
-
-      <button data-testid="new-import-from-excel-21" mat-stroked-button class="tags-manage-btn" (click)="importFromExcel()" [disabled]="importing"
-        matTooltip="Pick an Excel file with emails in the first column; the matching people get selected">
-        <mat-icon>upload_file</mat-icon>
-        {{ importing ? 'Reading file…' : 'Select from file' }}
-      </button>
-
+    <!-- ============================================================ page header -->
+    <header class="nx-head">
+      <div>
+        <h1 class="nx-title">New Users</h1>
+        <span class="nx-rule" aria-hidden="true"></span>
+        <p class="nx-lede">People who signed up but are not participants yet. Filter, tag, export or message them.</p>
       </div>
 
-      <div class="nu-toolbar-filters" role="group" aria-label="Filters">
-      <span class="nu-filters-label">Filters</span>
-
-      <button data-testid="new-button-1" mat-stroked-button class="tag-select-btn" [class.filter-on]="selectByTagIds.size > 0"
-        [matMenuTriggerFor]="tagSelectMenu">
-        <mat-icon>sell</mat-icon>
-        Tags
-        <span class="tag-badge" *ngIf="selectByTagIds.size > 0">{{ selectByTagIds.size }}</span>
-        <mat-icon class="trail" iconPositionEnd>arrow_drop_down</mat-icon>
-      </button>
-
-      <mat-menu #tagSelectMenu="matMenu" class="tag-filter-menu" xPosition="after">
-        <div data-testid="new-event-2" class="tfm" (click)="$event.stopPropagation()" (keydown.tab)="$event.stopPropagation()">
-          <div class="tfm-head">
-            <span class="tfm-title">Filter by tags</span>
-            <button data-testid="new-clear-tag-filter-3" type="button" class="tfm-clear" *ngIf="selectByTagIds.size > 0" (click)="clearTagFilter()">
-              Clear
-            </button>
+      <!-- The tools appear once access is confirmed (hidden while checking, denied, empty and on a load error). -->
+      @if (phase === 'loading' || phase === 'ready') {
+        <div class="nx-head-aside">
+          <div class="nx-figure">
+            <span class="nx-figure-num" data-testid="new-total-count" [attr.aria-busy]="totalCount === null ? 'true' : null">@if (totalCount !== null) {{{ totalCount | number }}} @else {<span class="nx-skel nx-skel--figure"></span>}</span>
+            <span class="nx-figure-label"><span class="nx-lbl-long">New users in total</span><span class="nx-lbl-short">In total</span></span>
           </div>
-
-          <div class="tfm-modes">
-            <button data-testid="new-set-tag-mode-4" type="button" class="tfm-mode" [class.on]="selectByTagMode === 'all'" (click)="setTagMode('all')">
-              <mat-icon>done_all</mat-icon> Match all
-            </button>
-            <button data-testid="new-set-tag-mode-5" type="button" class="tfm-mode" [class.on]="selectByTagMode === 'any'" (click)="setTagMode('any')">
-              <mat-icon>done</mat-icon> Match any
-            </button>
-          </div>
-
-          <div class="tfm-modes">
-            <button data-testid="new-set-tag-polarity-6" type="button" class="tfm-mode" [class.on]="selectByTagPolarity === 'include'"
-              (click)="setTagPolarity('include')">
-              <mat-icon>how_to_reg</mat-icon> Include
-            </button>
-            <button data-testid="new-set-tag-polarity-7" type="button" class="tfm-mode" [class.on]="selectByTagPolarity === 'exclude'"
-              (click)="setTagPolarity('exclude')">
-              <mat-icon>person_off</mat-icon> Exclude
-            </button>
-          </div>
-
-          <div class="tfm-list">
-            <button data-testid="new-toggle-tag-select-8" type="button" class="tfm-item" *ngFor="let t of allTags"
-              [class.sel]="selectByTagIds.has(t.id)" (click)="toggleTagSelect(t.id)">
-              <mat-icon class="tfm-check">
-                {{ selectByTagIds.has(t.id) ? 'check_box' : 'check_box_outline_blank' }}
-              </mat-icon>
-              <span class="tfm-name">{{ t.name }}</span>
-            </button>
-            <div class="tfm-empty" *ngIf="allTags.length === 0">No tags available</div>
-          </div>
-
-          <div class="tfm-foot">
-            <mat-icon>filter_alt</mat-icon>
-            <span>{{ matchCount() }} profile(s) shown</span>
-          </div>
-        </div>
-      </mat-menu>
-
-      <button data-testid="new-button-9" mat-stroked-button class="tag-select-btn" [class.filter-on]="selectedWorkshopIds.size > 0"
-        [matMenuTriggerFor]="workshopSelectMenu">
-        <mat-icon>co_present</mat-icon>
-        Workshops
-        <span class="tag-badge" *ngIf="selectedWorkshopIds.size > 0">{{ selectedWorkshopIds.size }}</span>
-        <mat-spinner class="wf-spinner" diameter="16" *ngIf="workshopFilterLoading"></mat-spinner>
-        <mat-icon class="trail" iconPositionEnd>arrow_drop_down</mat-icon>
-      </button>
-
-      <mat-menu #workshopSelectMenu="matMenu" class="tag-filter-menu" xPosition="after">
-        <div data-testid="new-event-10" class="tfm" (click)="$event.stopPropagation()" (keydown.tab)="$event.stopPropagation()">
-          <div class="tfm-head">
-            <span class="tfm-title">Filter by workshops</span>
-            <button data-testid="new-clear-workshop-filter-11" type="button" class="tfm-clear" *ngIf="selectedWorkshopIds.size > 0"
-              (click)="clearWorkshopFilter()">
-              Clear
-            </button>
-          </div>
-
-          <div class="tfm-toggle-row">
-            <span class="tfm-toggle-label">
-              <mat-icon>filter_vintage</mat-icon> Funnel only
-            </span>
-            <mat-slide-toggle data-testid="new-change-set-funnel-only-12" color="primary" [checked]="funnelOnly"
-              (change)="setFunnelOnly($event.checked)"></mat-slide-toggle>
-          </div>
-
-          <div class="tfm-modes">
-            <button data-testid="new-set-workshop-filter-mode-13" type="button" class="tfm-mode" [class.on]="workshopFilterMode === 'include'"
-              (click)="setWorkshopFilterMode('include')">
-              <mat-icon>how_to_reg</mat-icon> Include
-            </button>
-            <button data-testid="new-set-workshop-filter-mode-14" type="button" class="tfm-mode" [class.on]="workshopFilterMode === 'exclude'"
-              (click)="setWorkshopFilterMode('exclude')">
-              <mat-icon>person_off</mat-icon> Exclude
-            </button>
-          </div>
-
-          <div class="tfm-list">
-            <button data-testid="new-toggle-workshop-select-15" type="button" class="tfm-item" *ngFor="let w of visibleWorkshopOptions"
-              [class.sel]="selectedWorkshopIds.has(w.id)" (click)="toggleWorkshopSelect(w.id)">
-              <mat-icon class="tfm-check">
-                {{ selectedWorkshopIds.has(w.id) ? 'check_box' : 'check_box_outline_blank' }}
-              </mat-icon>
-              <span class="tfm-name">{{ w.title }}</span>
-            </button>
-            <div class="tfm-empty" *ngIf="visibleWorkshopOptions.length === 0">
-              {{ funnelOnly ? 'No funnel workshops available' : 'No workshops available' }}
-            </div>
-          </div>
-
-          <div class="tfm-foot">
-            <mat-icon>filter_alt</mat-icon>
-            <span>{{ matchCount() }} profile(s) shown</span>
-          </div>
-        </div>
-      </mat-menu>
-
-      <!-- Created-date range. Both bounds are on screen and typable, and the
-           calendar button opens the range picker; either bound alone is valid. -->
-      <mat-form-field class="created-range-field" [class.filter-on]="hasDateFilter" appearance="outline"
-        subscriptSizing="dynamic">
-        <mat-icon matIconPrefix class="df-lead">date_range</mat-icon>
-        <mat-date-range-input [rangePicker]="createdPicker">
-          <input matStartDate data-testid="new-created-start-date" placeholder="Created from"
-            [(ngModel)]="startDate" [ngModelOptions]="{ standalone: true }" (dateChange)="onDateChange()" />
-          <input matEndDate data-testid="new-created-end-date" placeholder="to"
-            [(ngModel)]="endDate" [ngModelOptions]="{ standalone: true }" (dateChange)="onDateChange()" />
-        </mat-date-range-input>
-        <mat-icon data-testid="new-event-17" matIconSuffix *ngIf="hasDateFilter" class="df-clear"
-          matTooltip="Clear dates" (click)="clearDates()">close</mat-icon>
-        <mat-datepicker-toggle data-testid="new-created-picker-16" matIconSuffix
-          [for]="createdPicker"></mat-datepicker-toggle>
-        <mat-date-range-picker #createdPicker></mat-date-range-picker>
-      </mat-form-field>
-
-      <!-- Conversion status: two options, and re-picking the active one clears
-           it, so the menu needs no third "any" row. -->
-      <button data-testid="new-toggle-converted-filter-18" mat-stroked-button type="button"
-        class="tag-select-btn converted-filter-btn" [class.filter-on]="!!convertedFilter"
-        [matMenuTriggerFor]="convertedMenu" matTooltip="Filter by whether a profile moved to existing users">
-        <mat-icon>swap_horiz</mat-icon>
-        {{ convertedLabel }}
-        <mat-icon data-testid="new-event-19" *ngIf="convertedFilter" class="df-clear" iconPositionEnd
-          matTooltip="Clear converted filter"
-          (click)="$event.stopPropagation(); clearConvertedFilter()">close</mat-icon>
-        <mat-icon class="trail" iconPositionEnd *ngIf="!convertedFilter">arrow_drop_down</mat-icon>
-      </button>
-
-      <mat-menu #convertedMenu="matMenu" class="converted-filter-menu" xPosition="after">
-        <button data-testid="new-set-converted-filter-converted" mat-menu-item type="button"
-          [class.on]="convertedFilter === 'converted'" (click)="setConvertedFilter('converted')">
-          <mat-icon>{{ convertedFilter === 'converted' ? 'radio_button_checked' : 'radio_button_unchecked' }}</mat-icon>
-          <span>Converted</span>
-        </button>
-        <button data-testid="new-set-converted-filter-not-converted" mat-menu-item type="button"
-          [class.on]="convertedFilter === 'notconverted'" (click)="setConvertedFilter('notconverted')">
-          <mat-icon>{{ convertedFilter === 'notconverted' ? 'radio_button_checked' : 'radio_button_unchecked' }}</mat-icon>
-          <span>Not converted</span>
-        </button>
-      </mat-menu>
-
-      <button data-testid="new-clear-all-filters-22" mat-button type="button" class="clear-filters-btn" *ngIf="hasAnyFilter"
-        (click)="clearAllFilters()" matTooltip="Clear all filters">
-        <mat-icon>filter_alt_off</mat-icon>
-        Clear all
-      </button>
-
-      </div>
-    </div>
-
-    <div class="table-scroll">
-      <table mat-table [dataSource]="dataSource" matSort class="users-table">
-
-        <ng-container matColumnDef="select">
-          <th mat-header-cell *matHeaderCellDef class="select-col">
-            <mat-checkbox data-testid="new-change-master-toggle-23" color="primary" (change)="masterToggle()"
-              [checked]="isAllSelected()"
-              [indeterminate]="someSelected()"
-              matTooltip="Select all">
-            </mat-checkbox>
-          </th>
-          <td mat-cell *matCellDef="let u" class="select-col">
-            <mat-checkbox data-testid="new-change-selection-24" color="primary" (change)="selection.toggle(rowId(u))"
-              [checked]="selection.isSelected(rowId(u))">
-            </mat-checkbox>
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="name">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
-          <td mat-cell *matCellDef="let u"><div class="cell-strong">{{ u.name || '—' }}</div></td>
-        </ng-container>
-
-        <ng-container matColumnDef="phonenumber">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header>Phone</th>
-          <td mat-cell *matCellDef="let u">
-            {{ (u.countryCode || u.phonenumber)
-                ? ((u.countryCode ? u.countryCode + ' ' : '') + (u.phonenumber || '')) : '—' }}
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="email">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header>Email</th>
-          <td mat-cell *matCellDef="let u" class="email-cell"><span class="email-text" [title]="u.email || ''">{{ u.email || '—' }}</span></td>
-        </ng-container>
-
-        <ng-container matColumnDef="created">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header>Created</th>
-          <td mat-cell *matCellDef="let u" class="nowrap-cell">{{ toDate(u.created) ? (toDate(u.created) | date: 'd MMM y, h:mm a') : '—' }}</td>
-        </ng-container>
-
-        <ng-container matColumnDef="enable">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header>Status</th>
-          <td mat-cell *matCellDef="let u">
-            <span class="chip" [class.chip-on]="u.enable" [class.chip-off]="!u.enable">
-              {{ u.enable ? 'Enabled' : 'Disabled' }}
-            </span>
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="referredby">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header>Referred by</th>
-          <td mat-cell *matCellDef="let u">
-            <span *ngIf="isSubscriber(u)" class="chip chip-sub">Subscriber</span>
-            <span *ngIf="!isSubscriber(u) && referredBy(u)" data-testid="new-referred-by">{{ referredBy(u) }}</span>
-            <span *ngIf="!isSubscriber(u) && !referredBy(u)">—</span>
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="tags">
-          <th mat-header-cell *matHeaderCellDef>Tags</th>
-          <td mat-cell *matCellDef="let u">
-            <div class="tags-cell">
-              <span class="tag-pill" *ngFor="let name of tagNames(u) | slice: 0 : 3" [title]="name">{{ name }}</span>
-              <span class="tag-pill tag-more" *ngIf="tagNames(u).length > 3"
-                [matTooltip]="(tagNames(u) | slice: 3).join(', ')">+{{ tagNames(u).length - 3 }}</span>
-              <button data-testid="new-open-tags-25" type="button" class="tag-edit-btn" (click)="openTags(u)"
-                [matTooltip]="tagNames(u).length ? 'Change tags' : 'Add tags'"
-                [attr.aria-label]="(tagNames(u).length ? 'Change tags for ' : 'Add tags for ') + (u.name || 'this user')">
-                <mat-icon>{{ tagNames(u).length ? 'edit' : 'add' }}</mat-icon>
-              </button>
-            </div>
-          </td>
-        </ng-container>
-
-        <!-- Shown only while the workshop filter is active. -->
-        <ng-container matColumnDef="workshop">
-          <th mat-header-cell *matHeaderCellDef>Workshop</th>
-          <td mat-cell *matCellDef="let u">
-            <div class="tags-cell">
-              <span class="tag-pill workshop-pill" *ngFor="let name of workshopNames(u)" [title]="name">{{ name }}</span>
-              <span *ngIf="workshopNames(u).length === 0">—</span>
-            </div>
-          </td>
-        </ng-container>
-
-        <!-- Shown only while the Converted filter is active.. -->
-        <ng-container matColumnDef="movedon">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header>Moved On</th>
-          <td mat-cell *matCellDef="let u">{{ toDate(u.movedon) ? (toDate(u.movedon) | date: 'medium') : '—' }}</td>
-        </ng-container>
-
-        <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
-        <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
-
-        <tr class="no-match-row" *matNoDataRow>
-          <td class="no-match-cell" [attr.colspan]="displayedColumns.length">
-            <!-- While a workshop's people are being read, an empty table is not a "no match". -->
-            <div class="no-match-body" data-testid="new-workshop-filter-loading" *ngIf="workshopFilterLoading; else noMatch">
-              <mat-spinner diameter="22"></mat-spinner>
-              <span>Loading the workshop's people…</span>
-            </div>
-            <ng-template #noMatch>
-              <div class="no-match-body">
-                <mat-icon>search_off</mat-icon>
-                <span>No users match {{ hasAnyFilter ? 'these filters' : 'your search' }}.</span>
-                <button data-testid="new-no-match-clear-filters" mat-stroked-button type="button" class="tags-manage-btn"
-                  *ngIf="hasAnyFilter" (click)="clearAllFilters()">
-                  <mat-icon>filter_alt_off</mat-icon> Clear filters
+          <button class="nx-tool" type="button" data-testid="new-import-from-excel-21"
+            cdkOverlayOrigin #importOrigin="cdkOverlayOrigin"
+            [class.is-open]="isPanelOpen('import')" [disabled]="importing || phase !== 'ready'" [attr.aria-busy]="importing ? 'true' : null"
+            aria-haspopup="dialog" [attr.aria-expanded]="isPanelOpen('import')"
+            [attr.aria-label]="importing ? importBusyLabel : 'Select from file'"
+            title="Pick an Excel file of emails; the matching people get selected"
+            (click)="openImport()">
+            @if (importing) {
+              <span class="nx-spin"></span><span class="nx-tool-hide">{{ importBusyLabel }}</span>
+            } @else {
+              <svg nxIcon="file-up" class="nx-ic"></svg><span class="nx-tool-hide">Select from file</span>
+            }
+          </button>
+          <button class="nx-tool" type="button" data-testid="new-open-tags-manager-20"
+            aria-label="Manage tags" title="Create and rename tags, copy segment links"
+            (click)="openTagsManager()">
+            <svg nxIcon="tag" class="nx-ic"></svg><span class="nx-tool-hide">Manage tags</span>
+          </button>
+          <!-- Select from file (4.2): the rule first, then the picker. No backdrop; Escape and an outside click close it. -->
+          <ng-template cdkConnectedOverlay
+            [cdkConnectedOverlayOrigin]="importOrigin"
+            [cdkConnectedOverlayOpen]="openPanel === 'import'"
+            [cdkConnectedOverlayHasBackdrop]="false"
+            [cdkConnectedOverlayPositions]="panelPositionsEnd"
+            [cdkConnectedOverlayFlexibleDimensions]="true"
+            [cdkConnectedOverlayMinHeight]="150"
+            [cdkConnectedOverlayViewportMargin]="12"
+            (overlayOutsideClick)="onPanelOutsideClick($event, importOrigin.elementRef)"
+            (overlayKeydown)="onOverlayKeydown($event, importOrigin.elementRef)"
+            (detach)="onPanelDetach('import')">
+            <div class="nx-root nx-pop nx-pop--import" role="dialog" aria-labelledby="nx-import-title" tabindex="-1" nxAutofocus data-testid="new-import-popover">
+              <div class="nx-pop-head"><span class="nx-pop-title" id="nx-import-title">Select people from a file</span></div>
+              <p class="nx-pop-text">Use an Excel file (.xlsx or .xls) with emails in the first column, under the heading “email”.</p>
+              <div class="nx-xls" aria-hidden="true">
+                <div class="nx-xls-row nx-xls-row--h"><span></span><span>A</span><span>B</span></div>
+                <div class="nx-xls-row nx-xls-row--title"><span>1</span><span>email</span><span></span></div>
+                <div class="nx-xls-row"><span>2</span><span>name&#64;example.com</span><span></span></div>
+                <div class="nx-xls-row"><span>3</span><span>another&#64;example.com</span><span></span></div>
+                <div class="nx-xls-row"><span>4</span><span>someone&#64;example.org</span><span></span></div>
+              </div>
+              <div class="nx-pop-foot">
+                <span>Replaces the current selection</span>
+                <button class="nx-primary nx-primary--sm" type="button" data-testid="new-import-choose-file" [disabled]="importing || phase !== 'ready'" (click)="pickImportFile(importOrigin.elementRef)">
+                  <svg nxIcon="sheet" class="nx-ic nx-ic--sm"></svg>Choose file
                 </button>
               </div>
-            </ng-template>
-          </td>
-        </tr>
-      </table>
-    </div>
+            </div>
+          </ng-template>
+        </div>
+      }
+    </header>
 
-    <mat-paginator [pageSize]="20" [pageSizeOptions]="[20, 50, 100]" showFirstLastButtons></mat-paginator>
-  </div>
+    @switch (phase) {
 
-  <!-- Bulk actions for the ticked rows: a bar under the table, so ticking a row never squeezes the table. -->
-  <div class="nu-selbar" data-testid="new-selection-bar" *ngIf="selection.hasValue()">
-    <div class="nu-selbar-pop" *ngIf="showExport || showComm">
-    <div class="export-panel" *ngIf="showExport">
-      <div class="export-head">
-        <span class="export-label">Columns</span>
-        <button data-testid="new-select-all-export-columns-29" type="button" class="export-all" (click)="selectAllExportColumns()">Select all</button>
-      </div>
+      <!-- ============================================================ 1.1 checking access -->
+      @case ('checking') {
+        <section class="nx-sheet" aria-busy="true" aria-label="New users">
+          <div class="nx-progress nx-progress--run" role="progressbar" aria-label="Checking your access"></div>
+          <div class="nx-bar nx-ghost" aria-hidden="true">
+            <span class="nx-search">
+              <svg nxIcon="search" class="nx-ic"></svg>
+              <input type="search" disabled tabindex="-1" placeholder="Search name, phone, email, tag or date">
+            </span>
+            <span class="nx-vr"></span>
+            <div class="nx-pills">
+              <span class="nx-fpill"><svg nxIcon="tag" class="nx-ic nx-ic--sm"></svg>Tags</span>
+              <span class="nx-fpill"><svg nxIcon="workshop" class="nx-ic nx-ic--sm"></svg>Workshops</span>
+              <span class="nx-fpill"><svg nxIcon="calendar" class="nx-ic nx-ic--sm"></svg>Created</span>
+              <span class="nx-fpill"><svg nxIcon="convert" class="nx-ic nx-ic--sm"></svg>Conversion</span>
+            </div>
+          </div>
+          <div class="nx-checking" role="status" data-testid="new-checking-access">
+            <span class="nx-checking-title"><span class="nx-spin"></span>Checking your access…</span>
+            <p>Your role decides whether this screen opens. It takes a moment.</p>
+          </div>
+        </section>
+      }
 
-      <mat-chip-listbox multiple [(ngModel)]="selectedExportKeys" class="export-chips">
-        <mat-chip-option *ngFor="let c of exportColumnsView" [value]="c.key">{{ c.label }}</mat-chip-option>
-      </mat-chip-listbox>
+      <!-- ============================================================ 2.1 no access (no <table> anywhere: WDA-06) -->
+      @case ('denied') {
+        <section class="nx-sheet" aria-label="New users">
+          <div class="nx-msg" data-testid="new-no-access">
+            <span class="nx-msg-ic"><svg nxIcon="lock" class="nx-ic"></svg></span>
+            <h3 class="nx-msg-title">You do not have access to this screen</h3>
+            <p class="nx-msg-text">Ask someone who manages workshops to give you access to New Users.</p>
+          </div>
+        </section>
+      }
 
-      <button data-testid="new-export-excel-30" mat-flat-button color="primary" class="download-btn" (click)="exportExcel()"
-        [disabled]="selectedExportKeys.length === 0 || workshopFilterLoading">
-        <mat-icon>download</mat-icon>
-        {{ workshopFilterLoading ? 'Loading workshops…' : 'Download Excel' }}
-      </button>
-      <p class="export-hint">Exports the {{ selection.selected.length }} selected profile(s).</p>
-    </div>
+      <!-- ============================================================ 2.2 no users yet -->
+      @case ('empty') {
+        <section class="nx-sheet" aria-label="New users">
+          <div class="nx-msg" data-testid="new-no-users">
+            <span class="nx-msg-ic"><svg nxIcon="users" class="nx-ic"></svg></span>
+            <h3 class="nx-msg-title">No users yet</h3>
+            <p class="nx-msg-text">New users will appear here as people sign up.</p>
+            <div class="nx-msg-actions">
+              <button class="nx-tool" type="button" data-testid="new-no-users-manage-tags" (click)="openTagsManager()">
+                <svg nxIcon="tag" class="nx-ic"></svg>Manage tags
+              </button>
+            </div>
+          </div>
+        </section>
+      }
 
-    <div class="comm-panel" *ngIf="showComm">
-      <div class="comm-bar">
-        <button data-testid="new-send-email-to-selected-paricipant-32" type="button" class="comm-btn" (click)="sendEmailToSelectedParicipant()">
-          <mat-icon>mail</mat-icon><span>Email</span>
-        </button>
-        <!-- Old email composer — replaced by the EmailInputComponent flow above.
-        <button type="button" class="comm-btn" (click)="sendMail()" matTooltip="Email">
-          <i class="fa-solid fa-envelope"></i>
-        </button>
+      <!-- ============================================================ 2.3 load error -->
+      @case ('error') {
+        <section class="nx-sheet" aria-label="New users">
+          <div class="nx-msg" role="alert" data-testid="new-load-error">
+            <span class="nx-msg-ic nx-msg-ic--danger"><svg nxIcon="alert" class="nx-ic"></svg></span>
+            <h3 class="nx-msg-title">We could not load new users</h3>
+            <p class="nx-msg-text">Something went wrong while reading the list. Check the connection and try again.</p>
+            <div class="nx-msg-actions">
+              <button class="nx-primary" type="button" data-testid="new-load-retry" (click)="retry()">
+                <svg nxIcon="refresh" class="nx-ic"></svg>Retry
+              </button>
+            </div>
+          </div>
+        </section>
+      }
+
+      <!-- ============================================================ 1.2 loading, and the screen itself -->
+      @default {
+        <!-- The one .nu-table-card (NUS-05 measures its width; it never changes when the dock appears). -->
+        <section class="nx-sheet nu-table-card" aria-label="New users" [attr.aria-busy]="phase === 'loading' ? 'true' : null">
+
+          <!-- ---------------------------------------------------- toolbar -->
+          <div class="nx-bar">
+            <label class="nx-search" role="search" cdkOverlayOrigin #searchOrigin="cdkOverlayOrigin" #searchField>
+              <span class="nx-sr">Search new users</span>
+              <svg nxIcon="search" class="nx-ic"></svg>
+              <input type="search" data-testid="new-search-input" autocomplete="off" spellcheck="false"
+                [placeholder]="isPhone ? 'Search' : 'Search name, phone, email, tag or date'"
+                role="combobox" aria-autocomplete="list" aria-controls="nx-suggest-list"
+                [attr.aria-expanded]="suggestOpen && suggestions.length > 0"
+                [attr.aria-activedescendant]="suggestOpen && suggestActive >= 0 ? 'nx-sug-' + suggestActive : null"
+                [value]="searchText" (input)="onSearchInput($event)" (keydown)="onSearchKeydown($event)">
+              @if (searchText) {
+                <button class="nx-search-x" type="button" data-testid="new-search-clear" aria-label="Clear search" (click)="clearSearch()">
+                  <svg nxIcon="x" class="nx-ic nx-ic--sm"></svg>
+                </button>
+              }
+            </label>
+
+            <span class="nx-vr" aria-hidden="true"></span>
+
+            <!-- The four pills: label plus a count or a dot only. The readout spells the values out.
+                 Ghosted (and disabled) until there are rows to filter (1.2). -->
+            <div class="nx-pills" role="group" aria-label="Filters" [class.nx-ghost]="!filtersReady" [attr.aria-hidden]="filtersReady ? null : 'true'">
+              <button class="nx-fpill" type="button" data-testid="new-button-1"
+                cdkOverlayOrigin #tagsOrigin="cdkOverlayOrigin"
+                [disabled]="!filtersReady"
+                [class.is-set]="selectByTagIds.size > 0" [class.is-open]="isPanelOpen('tags')"
+                aria-haspopup="dialog" [attr.aria-expanded]="isPanelOpen('tags')"
+                [attr.aria-label]="selectByTagIds.size > 0 ? 'Tags filter, ' + selectByTagIds.size + (selectByTagIds.size === 1 ? ' tag' : ' tags') + ' chosen' : 'Tags filter, off'"
+                (click)="togglePanel('tags')">
+                <svg nxIcon="tag" class="nx-ic nx-ic--sm"></svg>Tags
+                @if (selectByTagIds.size > 0) {<span class="nx-fcount" aria-hidden="true">{{ selectByTagIds.size }}</span>}
+                <svg [nxIcon]="isPanelOpen('tags') ? 'chev-up' : 'chev-down'" class="nx-ic nx-chev"></svg>
+              </button>
+
+              <button class="nx-fpill" type="button" data-testid="new-button-9"
+                cdkOverlayOrigin #workshopsOrigin="cdkOverlayOrigin"
+                [disabled]="!filtersReady"
+                [class.is-set]="selectedWorkshopIds.size > 0" [class.is-open]="isPanelOpen('workshops')"
+                aria-haspopup="dialog" [attr.aria-expanded]="isPanelOpen('workshops')"
+                [attr.aria-busy]="workshopFilterLoading ? 'true' : null"
+                [attr.aria-label]="(selectedWorkshopIds.size > 0 ? 'Workshops filter, ' + selectedWorkshopIds.size + (selectedWorkshopIds.size === 1 ? ' workshop' : ' workshops') + ' chosen' : 'Workshops filter, off') + (workshopFilterLoading ? ', loading' : '')"
+                (click)="togglePanel('workshops')">
+                <svg nxIcon="workshop" class="nx-ic nx-ic--sm"></svg>Workshops
+                @if (selectedWorkshopIds.size > 0) {<span class="nx-fcount" aria-hidden="true">{{ selectedWorkshopIds.size }}</span>}
+                @if (workshopFilterLoading) {
+                  <span class="nx-spin nx-spin--sm"></span>
+                } @else {
+                  <svg [nxIcon]="isPanelOpen('workshops') ? 'chev-up' : 'chev-down'" class="nx-ic nx-chev"></svg>
+                }
+              </button>
+
+              <button class="nx-fpill" type="button" data-testid="new-created-pill"
+                cdkOverlayOrigin #createdOrigin="cdkOverlayOrigin"
+                [disabled]="!filtersReady"
+                [class.is-set]="hasDateFilter" [class.is-open]="isPanelOpen('created')"
+                aria-haspopup="dialog" [attr.aria-expanded]="isPanelOpen('created')"
+                [attr.aria-label]="hasDateFilter ? 'Created date filter, on' : 'Created date filter, off'"
+                (click)="togglePanel('created')">
+                <svg nxIcon="calendar" class="nx-ic nx-ic--sm"></svg>Created
+                @if (hasDateFilter) {<span class="nx-fdot" aria-hidden="true"></span>}
+                <svg [nxIcon]="isPanelOpen('created') ? 'chev-up' : 'chev-down'" class="nx-ic nx-chev"></svg>
+              </button>
+
+              <!-- WS-57 / NUS-10 click this at (14, 22): the leading icon sits there; never a clear control. -->
+              <button class="nx-fpill" type="button" data-testid="new-toggle-converted-filter-18"
+                cdkOverlayOrigin #conversionOrigin="cdkOverlayOrigin"
+                [disabled]="!filtersReady"
+                [class.is-set]="!!convertedFilter" [class.is-open]="isPanelOpen('conversion')"
+                aria-haspopup="menu" [attr.aria-expanded]="isPanelOpen('conversion')"
+                [attr.aria-label]="convertedFilter ? 'Conversion filter, ' + (convertedFilter === 'converted' ? 'Converted' : 'Not converted') : 'Conversion filter, off'"
+                (click)="togglePanel('conversion')">
+                <svg nxIcon="convert" class="nx-ic nx-ic--sm"></svg>Conversion
+                @if (convertedFilter) {<span class="nx-fdot" aria-hidden="true"></span>}
+                <svg [nxIcon]="isPanelOpen('conversion') ? 'chev-up' : 'chev-down'" class="nx-ic nx-chev"></svg>
+              </button>
+            </div>
+
+            <!-- Below 900px the pills fold into one Filters button (DOM swap on isNarrow, never CSS: no hook twice). -->
+            @if (isNarrow) {
+              <button class="nx-tool nx-filters-btn" type="button" data-testid="new-filters-btn"
+                [disabled]="!filtersReady" [class.nx-ghost]="!filtersReady"
+                aria-haspopup="dialog" [attr.aria-expanded]="filtersSheetOpen"
+                [attr.aria-label]="activeFilterCount ? 'Filters, ' + activeFilterCount + ' on' : 'Filters'"
+                (click)="openFiltersSheet()">
+                <svg nxIcon="filter" class="nx-ic"></svg>Filters
+                @if (activeFilterCount) {<span class="nx-fcount" aria-hidden="true">{{ activeFilterCount }}</span>}
+              </button>
+            }
+
+            <div class="nx-bar-end">
+              <button class="nx-tool nx-tool--sm" type="button" data-testid="new-columns-btn"
+                cdkOverlayOrigin #columnsOrigin="cdkOverlayOrigin"
+                [class.is-open]="isPanelOpen('columns')"
+                aria-haspopup="dialog" [attr.aria-expanded]="isPanelOpen('columns')"
+                [attr.aria-label]="'Columns, ' + columnsShownCount + ' of ' + columnsTotal + ' shown'"
+                (click)="togglePanel('columns')">
+                <svg nxIcon="columns" class="nx-ic nx-ic--sm"></svg><span class="nx-tool-hide">Columns</span>
+                <span class="nx-tool-note nx-tool-hide" data-testid="new-columns-count">{{ columnsShownCount }} of {{ columnsTotal }}</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- ---------------------------------------------------- readout: the one place the result and filters are spelled out -->
+          <div class="nx-readout" data-testid="new-readout">
+            @if (phase === 'loading') {
+              <p class="nx-count" role="status"><span class="nx-count-wait" data-testid="new-count-pending"><span class="nx-spin"></span>Reading new users…</span></p>
+            } @else if (workshopFilterLoading) {
+              <p class="nx-count" role="status"><span class="nx-count-wait" data-testid="new-count-pending"><span class="nx-spin"></span>Reading the people in {{ selectedWorkshopIds.size }} {{ selectedWorkshopIds.size === 1 ? 'workshop' : 'workshops' }}…</span></p>
+            } @else {
+              <!-- Exactly "N of M users": plain numbers, nothing else inside the hook (NUS-04/08). -->
+              <p class="nx-count" aria-live="polite" data-testid="new-result-count"><strong>{{ filteredCount }}</strong> of {{ totalUsers }} users</p>
+            }
+
+            @if (phase === 'ready') {
+              @if (hasActiveFilters) {
+                <span class="nx-vr" aria-hidden="true"></span>
+                <span class="nx-eyebrow">Applied</span>
+                @for (c of readoutChips; track c.key) {
+                  @switch (c.key) {
+                    @case ('tags') {
+                      <span class="nx-chip" data-testid="new-chip-tags"><span class="nx-chip-k">{{ c.phrase }}</span><b>{{ isPhone ? c.valueShort : c.value }}</b><button class="nx-chip-x" type="button" data-testid="new-chip-tags-x" [attr.aria-label]="c.removeLabel" (click)="removeChip('tags')"><svg nxIcon="x" class="nx-ic nx-ic--xs"></svg></button></span>
+                    }
+                    @case ('workshops') {
+                      <span class="nx-chip" data-testid="new-chip-workshops"><span class="nx-chip-k">{{ c.phrase }}</span><b>{{ isPhone ? c.valueShort : c.value }}</b><button class="nx-chip-x" type="button" data-testid="new-chip-workshops-x" [attr.aria-label]="c.removeLabel" (click)="removeChip('workshops')"><svg nxIcon="x" class="nx-ic nx-ic--xs"></svg></button></span>
+                    }
+                    @case ('created') {
+                      <!-- The × keeps the old hook: it is visible while a date bound is set and clears both ends. -->
+                      <span class="nx-chip" data-testid="new-chip-created"><span class="nx-chip-k">{{ c.phrase }}</span><b>{{ isPhone ? c.valueShort : c.value }}</b><button class="nx-chip-x" type="button" data-testid="new-event-17" [attr.aria-label]="c.removeLabel" (click)="removeChip('created')"><svg nxIcon="x" class="nx-ic nx-ic--xs"></svg></button></span>
+                    }
+                    @case ('conversion') {
+                      <!-- The × keeps the old hook: WS-57 clears Conversion with it, without opening the panel. -->
+                      <span class="nx-chip" data-testid="new-chip-conversion"><span class="nx-chip-k">{{ c.phrase }}</span><b>{{ isPhone ? c.valueShort : c.value }}</b><button class="nx-chip-x" type="button" data-testid="new-event-19" [attr.aria-label]="c.removeLabel" (click)="removeChip('conversion')"><svg nxIcon="x" class="nx-ic nx-ic--xs"></svg></button></span>
+                    }
+                  }
+                }
+                <button class="nx-link" type="button" data-testid="new-clear-all-filters-22" (click)="clearAllFilters()">Clear all filters</button>
+              } @else if (!selection.hasValue() && filteredCount > 0) {
+                <span class="nx-vr" aria-hidden="true"></span>
+                <span class="nx-hint" data-testid="new-readout-hint">Tick people to tag, export or message them.</span>
+              }
+            }
+          </div>
+
+          <!-- ---------------------------------------------------- file result (kept until dismissed or replaced) -->
+          @if (fileBanner; as fb) {
+            <div class="nx-inline-banner">
+              <div class="nx-banner" data-testid="new-file-banner"
+                [class.nx-banner--ok]="fb.variant === 'ok'" [class.nx-banner--warn]="fb.variant === 'warn'" [class.nx-banner--danger]="fb.variant === 'danger'"
+                [attr.role]="fb.variant === 'danger' ? 'alert' : 'status'">
+                @switch (fb.variant) {
+                  @case ('ok') { <svg nxIcon="user-check" class="nx-ic"></svg> }
+                  @case ('warn') { <svg nxIcon="info" class="nx-ic"></svg> }
+                  @default { <svg nxIcon="alert" class="nx-ic"></svg> }
+                }
+                <div class="nx-banner-body">
+                  <div class="nx-banner-title">{{ fb.title }}</div>
+                  @if (fb.variant === 'ok' && fileResult) {
+                    <div class="nx-banner-meta">
+                      @if (fileResult.total) {<span><b>{{ fileResult.total | number }}</b> {{ fileResult.total === 1 ? 'email' : 'emails' }} in the file</span>}
+                      @if (fileResult.matched) {<span><b>{{ fileResult.matched | number }}</b> matched</span>}
+                      @if (fileResult.missing) {<span><b>{{ fileResult.missing | number }}</b> matched no one</span>}
+                      @if (fileResultHiddenCount) {<span><b>{{ fileResultHiddenCount | number }}</b> of those selected {{ fileResultHiddenCount === 1 ? 'is' : 'are' }} hidden by the current filters</span>}
+                      @if (fileResult.invalid) {<span><b>{{ fileResult.invalid | number }}</b> {{ fileResult.invalid === 1 ? 'value was not an email' : 'values were not emails' }}</span>}
+                    </div>
+                    @if (showUnmatched && fileResult.unmatched.length) {
+                      <ul class="nx-unmatched" data-testid="new-file-unmatched-list" aria-label="Emails that matched no one">
+                        @for (e of fileResult.unmatched; track $index) {<li>{{ e }}</li>}
+                      </ul>
+                    }
+                  } @else if (fb.message) {
+                    <div class="nx-banner-meta"><span>{{ fb.message }}</span></div>
+                  }
+                  @if (fb.variant === 'danger') {
+                    <div class="nx-banner-more">
+                      <button class="nx-quiet" type="button" data-testid="new-file-choose-another" [disabled]="importing" (click)="pickImportFile()">
+                        <svg nxIcon="sheet" class="nx-ic nx-ic--sm"></svg>Choose another file
+                      </button>
+                    </div>
+                  }
+                </div>
+                <div class="nx-banner-actions">
+                  @if (fb.variant === 'ok' && fileResult?.unmatched?.length) {
+                    <button class="nx-link" type="button" data-testid="new-file-show-unmatched" [attr.aria-expanded]="showUnmatched" (click)="toggleUnmatched()">{{ showUnmatched ? 'Hide unmatched emails' : 'Show unmatched emails' }}</button>
+                  }
+                  <button class="nx-iconbtn" type="button" data-testid="new-file-banner-dismiss" aria-label="Dismiss" (click)="dismissFileResult()">
+                    <svg nxIcon="x" class="nx-ic nx-ic--sm"></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          }
+
+          <!-- ---------------------------------------------------- cross-page selection (7.2) -->
+          @if (allMatchingSelected) {
+            <div class="nx-xpage" role="status" data-testid="new-xpage-banner">
+              <span>All <b>{{ filteredCount | number }} {{ filteredCount === 1 ? 'person' : 'people' }}</b> {{ hasAnyFilter ? 'matching these filters' : 'in the list' }} {{ filteredCount === 1 ? 'is' : 'are' }} selected, including {{ selectedOffPage | number }} on other pages.</span>
+              <button class="nx-link" type="button" data-testid="new-xpage-only-this-page" (click)="onlyThisPage()">Select only this page</button>
+            </div>
+          }
+
+          <!-- ---------------------------------------------------- card bar (below 900px): replaces the header row -->
+          @if (isNarrow && phase === 'ready') {
+            <div class="nx-cardbar" data-testid="new-card-bar">
+              <mat-checkbox class="nx-mcb" disableRipple data-testid="new-cardbar-select-all"
+                [checked]="isAllSelected()" [indeterminate]="someSelected()" [disabled]="tableLocked"
+                [aria-label]="'Select all ' + filteredCount + ' matching people'"
+                (change)="masterToggle()"></mat-checkbox>
+              <span>Select all {{ filteredCount | number }}</span>
+              <label class="nx-cardbar-sort">
+                <span>Sort</span>
+                <span class="nx-selectbox">
+                  <select data-testid="new-card-sort" aria-label="Sort people" [disabled]="tableLocked" (change)="setCardSort($any($event.target).value)">
+                    @for (o of cardSortChoices; track o.key) {<option [value]="o.key" [selected]="o.key === cardSortKey">{{ o.label }}</option>}
+                  </select>
+                </span>
+              </label>
+            </div>
+          }
+
+          @if (phase === 'loading') {
+            <!-- ---------------------------------------------------- 1.2 skeleton: plain divs (never a table or a mat-row) -->
+            <div class="nx-skeltable" data-testid="new-loading-skeleton" role="presentation" aria-hidden="true">
+              <div class="nx-skel-head">
+                <span class="nx-skel-c nx-c-select"><span class="nx-skel nx-skel--box"></span></span>
+                @for (c of columnOptions; track c.key) {
+                  @if (isColumnOn(c.key)) {<span class="nx-skel-c">{{ c.label }}</span>}
+                }
+              </div>
+              @for (i of [0, 1, 2, 3, 4]; track i) {
+                <div class="nx-skel-row">
+                  <span class="nx-skel-c nx-c-select"><span class="nx-skel nx-skel--box"></span></span>
+                  @for (c of columnOptions; track c.key) {
+                    @if (isColumnOn(c.key)) {
+                      @switch (c.key) {
+                        @case ('name') {
+                          <span class="nx-skel-c"><span class="nx-person"><span class="nx-skel nx-skel--circle"></span><span class="nx-skel" [style.width.px]="[150, 118, 170, 132, 146][i]"></span></span></span>
+                        }
+                        @case ('created') {
+                          <span class="nx-skel-c"><span class="nx-skel-stack"><span class="nx-skel" style="width:84px"></span><span class="nx-skel nx-skel--thin" style="width:52px"></span></span></span>
+                        }
+                        @case ('tags') {
+                          <span class="nx-skel-c"><span class="nx-tags">
+                            <span class="nx-skel nx-skel--pill" [style.width.px]="[96, 88, 104, 92, 80][i]"></span>
+                            @if (i % 2 === 0) {<span class="nx-skel nx-skel--pill" [style.width.px]="[84, 0, 92, 0, 110][i]"></span>}
+                          </span></span>
+                        }
+                        @case ('email') {
+                          <span class="nx-skel-c"><span class="nx-skel" [style.width.px]="[200, 150, 182, 164, 176][i]"></span></span>
+                        }
+                        @case ('referredby') {
+                          <span class="nx-skel-c">@if (i % 3 !== 1) {<span class="nx-skel" [style.width.px]="[120, 0, 104, 130, 96][i]"></span>}</span>
+                        }
+                        @case ('enable') {
+                          <span class="nx-skel-c"><span class="nx-skel" style="width:70px"></span></span>
+                        }
+                        @default {
+                          <span class="nx-skel-c"><span class="nx-skel" style="width:112px"></span></span>
+                        }
+                      }
+                    }
+                  }
+                </div>
+              }
+            </div>
+          } @else {
+            <!-- ---------------------------------------------------- the ledger -->
+            <div class="nx-tablewrap" #tablewrap (scroll)="tablewrap.classList.toggle('is-scrolled', tablewrap.scrollTop > 0)">
+              <table mat-table class="nx-table users-table" data-testid="new-users-table" aria-label="New users"
+                [dataSource]="dataSource" [trackBy]="trackRow"
+                matSort #sort="matSort" [matSortDisabled]="tableLocked">
+
+                <ng-container matColumnDef="select">
+                  <th mat-header-cell *matHeaderCellDef class="nx-c-select select-col">
+                    <mat-checkbox class="nx-mcb" disableRipple data-testid="new-change-master-toggle-23"
+                      [checked]="isAllSelected()" [indeterminate]="someSelected()" [disabled]="tableLocked"
+                      [aria-label]="'Select all ' + filteredCount + ' matching people'"
+                      title="Select everyone who matches, on every page"
+                      (change)="masterToggle()"></mat-checkbox>
+                  </th>
+                  <td mat-cell *matCellDef="let u" class="nx-c-select select-col">
+                    <mat-checkbox class="nx-mcb" disableRipple data-testid="new-change-selection-24"
+                      [checked]="selection.isSelected(rowId(u))"
+                      [aria-label]="'Select ' + (vm(u).name || 'this person')"
+                      (change)="selection.toggle(rowId(u))"></mat-checkbox>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="name">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header class="nx-c-name"
+                    [class.is-sorted]="sort.active === 'name' && !!sort.direction">Name<svg [nxIcon]="'name' | nxSortIcon : sort.active : sort.direction" class="nx-ic nx-sort-ic"></svg></th>
+                  <td mat-cell *matCellDef="let u" class="nx-c-name">
+                    @let v = vm(u);
+                    <div class="nx-person"><span class="nx-mono" aria-hidden="true">{{ v.initials }}</span><span class="nx-name">{{ v.name || '—' }}</span></div>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="phonenumber">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header class="nx-c-phone"
+                    [class.is-sorted]="sort.active === 'phonenumber' && !!sort.direction">Phone<svg [nxIcon]="'phonenumber' | nxSortIcon : sort.active : sort.direction" class="nx-ic nx-sort-ic"></svg></th>
+                  <td mat-cell *matCellDef="let u" class="nx-c-phone">
+                    @let v = vm(u);
+                    @if (v.phoneLabel) {
+                      <span class="nx-phone">@if (v.phoneCc) {<span class="nx-cc">{{ v.phoneCc }}</span>}{{ v.phoneNumber }}</span>
+                    } @else {
+                      <span class="nx-nil" aria-label="No phone">—</span>
+                    }
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="email">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header class="nx-c-email"
+                    [class.is-sorted]="sort.active === 'email' && !!sort.direction">Email<svg [nxIcon]="'email' | nxSortIcon : sort.active : sort.direction" class="nx-ic nx-sort-ic"></svg></th>
+                  <td mat-cell *matCellDef="let u" class="nx-c-email">
+                    @let v = vm(u);
+                    <!-- Never cut: breaks only before the @ (and after dots in a very long local part); the full address is the title. -->
+                    @if (v.email) {
+                      <span class="nx-email" [title]="v.email">@for (p of v.emailLocalParts; track $index) {@if (!$first) {<wbr>}{{ p }}}<wbr>{{ v.emailDomain }}</span>
+                    } @else {
+                      <span class="nx-nil" aria-label="No email">—</span>
+                    }
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="created">
+                  <!-- Newest first is the data order, not an active sort: the arrow is a visual hint only (no aria-sort). -->
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header class="nx-c-created"
+                    [class.is-sorted]="(sort.active === 'created' && !!sort.direction) || !sort.active || !sort.direction">Created<svg [nxIcon]="'created' | nxSortIcon : sort.active : sort.direction : true" class="nx-ic nx-sort-ic"></svg></th>
+                  <!-- textContent is exactly 'd MMM y, h:mm a': the ", " separator is visually hidden in table mode (NUS-09). -->
+                  <td mat-cell *matCellDef="let u" class="nx-c-created nowrap-cell" data-label="Created">@let v = vm(u);@if (v.createdLabel) {<span class="nx-date">{{ v.createdDay }}<span class="nx-time-sep">, </span><span class="nx-time">{{ v.createdTime }}</span></span>} @else {<span class="nx-nil">—</span>}</td>
+                </ng-container>
+
+                <ng-container matColumnDef="enable">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header class="nx-c-status"
+                    [class.is-sorted]="sort.active === 'enable' && !!sort.direction">Status<svg [nxIcon]="'enable' | nxSortIcon : sort.active : sort.direction" class="nx-ic nx-sort-ic"></svg></th>
+                  <td mat-cell *matCellDef="let u" class="nx-c-status">
+                    @let v = vm(u);
+                    <span class="nx-status" [class.nx-status--on]="v.enabled" [class.nx-status--off]="!v.enabled">{{ v.enabled ? 'Enabled' : 'Disabled' }}</span>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="referredby">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header class="nx-c-ref"
+                    [class.is-sorted]="sort.active === 'referredby' && !!sort.direction">Referred by<svg [nxIcon]="'referredby' | nxSortIcon : sort.active : sort.direction" class="nx-ic nx-sort-ic"></svg></th>
+                  <td mat-cell *matCellDef="let u" class="nx-c-ref"
+                    [class.is-empty]="!vm(u).isSubscriber && !vm(u).referredBy"
+                    [attr.data-label]="!vm(u).isSubscriber && vm(u).referredBy ? 'Referred by' : null">
+                    @let v = vm(u);
+                    @if (v.isSubscriber) {
+                      <span class="nx-sub" data-testid="new-subscriber-badge">Subscriber</span>
+                    } @else if (v.referredBy) {
+                      <span data-testid="new-referred-by">{{ v.referrerName }}</span>
+                    } @else {
+                      <span class="nx-nil" aria-label="No referrer">—</span>
+                    }
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="tags">
+                  <th mat-header-cell *matHeaderCellDef class="nx-c-tags">Tags</th>
+                  <td mat-cell *matCellDef="let u" class="nx-c-tags">
+                    @let v = vm(u);
+                    <!-- Up to three pills in the person's own order, then "+N" (also .tag-pill, NUS-03), then the edit button. -->
+                    @if (v.tagNames.length) {
+                      <div class="nx-tags">
+                        @for (t of v.shownTags; track $index) {
+                          @if (!$last) {
+                            <span class="nx-tag tag-pill">{{ t }}</span>
+                          } @else {
+                            <span class="nx-tags-end">
+                              <span class="nx-tag tag-pill">{{ t }}</span>
+                              @if (v.moreCount > 0) {
+                                <button class="nx-more tag-pill" type="button" data-testid="new-tag-more"
+                                  [matTooltip]="v.moreTip" matTooltipClass="nx-tipbox" matTooltipPosition="above"
+                                  [attr.aria-label]="v.moreCount + (v.moreCount === 1 ? ' more tag: ' : ' more tags: ') + v.moreTip">+{{ v.moreCount }}</button>
+                              }
+                              <button class="nx-tagedit" type="button" data-testid="new-open-tags-25"
+                                [attr.aria-label]="'Edit tags for ' + (v.name || 'this person')"
+                                matTooltip="Edit tags" matTooltipClass="nx-tipbox" matTooltipPosition="above"
+                                (click)="openTags(u)">
+                                <svg nxIcon="pencil" class="nx-ic nx-ic--sm"></svg>
+                              </button>
+                            </span>
+                          }
+                        }
+                      </div>
+                    } @else {
+                      <div class="nx-tags">
+                        <button class="nx-addtag" type="button" data-testid="new-open-tags-25"
+                          [attr.aria-label]="'Add a tag for ' + (v.name || 'this person')"
+                          (click)="openTags(u)">
+                          <svg nxIcon="plus" class="nx-ic"></svg>Add tag
+                        </button>
+                      </div>
+                    }
+                  </td>
+                </ng-container>
+
+                <!-- Shown by itself while the Workshops filter includes people. -->
+                <ng-container matColumnDef="workshop">
+                  <th mat-header-cell *matHeaderCellDef class="nx-c-ws">Workshop</th>
+                  <td mat-cell *matCellDef="let u" class="nx-c-ws" data-label="Workshop">
+                    @let v = vm(u);
+                    @if (v.workshopNames.length) {
+                      <div class="nx-tags">
+                        @for (w of v.workshopNames; track $index) {<span class="nx-tag nx-tag--ws workshop-pill" [title]="w">{{ w }}</span>}
+                      </div>
+                    } @else {
+                      <span class="nx-nil">—</span>
+                    }
+                  </td>
+                </ng-container>
+
+                <!-- Shown by itself while Conversion is set to Converted. -->
+                <ng-container matColumnDef="movedon">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header class="nx-c-moved"
+                    [class.is-sorted]="sort.active === 'movedon' && !!sort.direction">Moved On<svg [nxIcon]="'movedon' | nxSortIcon : sort.active : sort.direction" class="nx-ic nx-sort-ic"></svg></th>
+                  <td mat-cell *matCellDef="let u" class="nx-c-moved" data-label="Moved on">@let v = vm(u);@if (v.movedDay) {<span class="nx-date">{{ v.movedDay }}<span class="nx-time-sep">, </span><span class="nx-time">{{ v.movedTime }}</span></span>} @else {<span class="nx-nil">—</span>}</td>
+                </ng-container>
+
+                <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
+                <tr mat-row *matRowDef="let row; columns: displayedColumns" [class.is-picked]="selection.isSelected(rowId(row))"></tr>
+
+                <!-- Never a mat-row: a workshop read in progress (2.5), or no match with one chip per condition (2.4). -->
+                <tr class="nx-nodata" *matNoDataRow>
+                  <td class="nx-msgcell" [attr.colspan]="displayedColumns.length">
+                    @if (workshopFilterLoading) {
+                      <div class="nx-progress nx-progress--run" data-testid="new-workshop-filter-progress" role="progressbar" aria-label="Loading the workshop's people"></div>
+                      <div class="nx-statusrow" role="status">
+                        <span class="nx-flex" data-testid="new-workshop-filter-loading"><span class="nx-spin"></span>Loading the people enrolled in {{ loadingWorkshopLabel }}…</span>
+                      </div>
+                      @for (i of [0, 1]; track i) {
+                        <div class="nx-skel-line" aria-hidden="true">
+                          <span class="nx-skel nx-skel--box"></span>
+                          <span class="nx-person"><span class="nx-skel nx-skel--circle"></span><span class="nx-skel" [style.width.px]="[150, 118][i]"></span></span>
+                          <span class="nx-skel" style="width:112px"></span>
+                          <span class="nx-skel" [style.width.px]="[200, 150][i]"></span>
+                          <span class="nx-skel-stack"><span class="nx-skel" style="width:84px"></span><span class="nx-skel nx-skel--thin" style="width:52px"></span></span>
+                          <span class="nx-skel nx-skel--pill" style="width:150px"></span>
+                        </div>
+                      }
+                    } @else if (isNoMatch) {
+                      <div class="nx-msg nx-msg--wide" data-testid="new-no-match">
+                        <span class="nx-msg-ic"><svg nxIcon="search-off" class="nx-ic"></svg></span>
+                        <!-- Verbatim for NUS-04, in exactly one element. -->
+                        <h3 class="nx-msg-title">No users match these filters.</h3>
+                        <p class="nx-msg-text">
+                          @if (noMatchReasons.length > 1) {
+                            Together these conditions leave no one. Each one shows how many people it finds on its own; remove one to widen the list:
+                          } @else {
+                            This condition leaves no one. Remove it to see everyone again:
+                          }
+                        </p>
+                        <div class="nx-why">
+                          @for (r of noMatchReasons; track r.key) {
+                            <span class="nx-chip">
+                              <span class="nx-chip-k">{{ r.phrase }}</span><b>{{ r.value }}</b>
+                              @if (r.count !== null) {<span class="nx-chip-n" [class.nx-chip-zero]="r.count === 0">· {{ r.count | number }} {{ r.count === 1 ? 'person' : 'people' }}</span>}
+                              @switch (r.key) {
+                                @case ('search') {<button class="nx-chip-x" type="button" data-testid="new-why-search-x" [attr.aria-label]="r.removeLabel" (click)="removeReason('search')"><svg nxIcon="x" class="nx-ic nx-ic--xs"></svg></button>}
+                                @case ('tags') {<button class="nx-chip-x" type="button" data-testid="new-why-tags-x" [attr.aria-label]="r.removeLabel" (click)="removeReason('tags')"><svg nxIcon="x" class="nx-ic nx-ic--xs"></svg></button>}
+                                @case ('workshops') {<button class="nx-chip-x" type="button" data-testid="new-why-workshops-x" [attr.aria-label]="r.removeLabel" (click)="removeReason('workshops')"><svg nxIcon="x" class="nx-ic nx-ic--xs"></svg></button>}
+                                @case ('created') {<button class="nx-chip-x" type="button" data-testid="new-why-created-x" [attr.aria-label]="r.removeLabel" (click)="removeReason('created')"><svg nxIcon="x" class="nx-ic nx-ic--xs"></svg></button>}
+                                @case ('conversion') {<button class="nx-chip-x" type="button" data-testid="new-why-conversion-x" [attr.aria-label]="r.removeLabel" (click)="removeReason('conversion')"><svg nxIcon="x" class="nx-ic nx-ic--xs"></svg></button>}
+                              }
+                            </span>
+                          }
+                        </div>
+                        <div class="nx-msg-actions">
+                          <!-- Clears the search AND the filters (NUS-04). -->
+                          <button class="nx-primary" type="button" data-testid="new-no-match-clear-filters" (click)="clearFiltersAndSearch()">
+                            <svg nxIcon="x" class="nx-ic"></svg>{{ searchText && hasActiveFilters ? 'Clear search and filters' : (searchText ? 'Clear search' : 'Clear filters') }}
+                          </button>
+                          @if (searchText && hasActiveFilters) {
+                            <button class="nx-link" type="button" data-testid="new-no-match-clear-search" (click)="clearSearch()">Clear search only</button>
+                          }
+                        </div>
+                      </div>
+                    }
+                  </td>
+                </tr>
+              </table>
+            </div>
+
+            <!-- ---------------------------------------------------- pager (not on no match: the sheet ends at the message) -->
+            @if (filteredCount > 0) {
+            <footer class="nx-foot">
+              <span>Rows per page</span>
+              <span class="nx-selectbox">
+                <select data-testid="new-page-size" aria-label="Rows per page" (change)="pager.setPageSize($any($event.target).value)">
+                  @for (n of pager.pageSizeOptions; track n) {<option [value]="n" [selected]="n === pager.pageSize">{{ n }}</option>}
+                </select>
+              </span>
+              <span class="nx-foot-range" data-testid="new-page-range">{{ pager.rangeLabel }}</span>
+              <div class="nx-pager">
+                <button class="nx-iconbtn" type="button" data-testid="new-page-first" aria-label="First page" [disabled]="!pager.hasPrevious" (click)="pager.firstPage()"><svg nxIcon="first" class="nx-ic"></svg></button>
+                <button class="nx-iconbtn" type="button" data-testid="new-page-prev" aria-label="Previous page" [disabled]="!pager.hasPrevious" (click)="pager.previousPage()"><svg nxIcon="chev-left" class="nx-ic"></svg></button>
+                <button class="nx-iconbtn" type="button" data-testid="new-page-next" aria-label="Next page" [disabled]="!pager.hasNext" (click)="pager.nextPage()"><svg nxIcon="chev-right" class="nx-ic"></svg></button>
+                <button class="nx-iconbtn" type="button" data-testid="new-page-last" aria-label="Last page" [disabled]="!pager.hasNext" (click)="pager.lastPage()"><svg nxIcon="last" class="nx-ic"></svg></button>
+              </div>
+            </footer>
+            }
+          }
+        </section>
+
+        <!-- ============================================================ selection dock (sticky, under the sheet: never a side panel) -->
+        @if (selection.hasValue()) {
+          <div class="nx-dock" role="region" aria-label="Selection actions" data-testid="new-selection-bar" [attr.aria-busy]="updatingTags ? 'true' : null"
+            (keydown.escape)="closeDockPanels($event, exportToggle, commToggle)">
+
+            <!-- Export and Send: one at a time, inside the dock (not modal, no backdrop), removed from the DOM when closed.
+                 Below 620px they open as bottom sheets instead (further down), never both. -->
+            @if (showExport && !updatingTags && !isPhone) {
+              <div class="nx-panel nx-dock-panel" role="group" aria-labelledby="nx-export-title" data-testid="new-export-panel">
+                <ng-container [ngTemplateOutlet]="exportBody"></ng-container>
+              </div>
+            }
+            @if (showComm && !updatingTags && !isPhone) {
+              <div class="nx-panel nx-dock-panel" role="group" aria-labelledby="nx-send-title" data-testid="new-comm-panel">
+                <ng-container [ngTemplateOutlet]="sendBody"></ng-container>
+              </div>
+            }
+
+            <div class="nx-dock-count" data-testid="new-dock-count">
+              @if (updatingTags) {
+                <span class="nx-spin nx-spin--light"></span>
+                <span class="nx-dock-label" role="status" data-testid="new-dock-updating"><b>Updating tags</b> for {{ updatingTagsCount | number }} {{ updatingTagsCount === 1 ? 'person' : 'people' }}…</span>
+              } @else if (allMatchingSelected) {
+                <span class="nx-dock-label"><b>All {{ filteredCount | number }} matching</b> selected</span>
+                <button class="nx-dock-link" type="button" data-testid="new-dock-only-this-page" (click)="onlyThisPage()">Only this page</button>
+              } @else {
+                <span class="nx-dock-num">{{ bulkCount | number }}</span><span class="nx-dock-label">selected</span>
+                @if (!isAllSelected() && filteredCount > 0) {
+                  <button class="nx-dock-link" type="button" data-testid="new-dock-select-all-matching" (click)="selectAllMatching()">Select all {{ filteredCount | number }} matching</button>
+                }
+              }
+              @if (!updatingTags && hiddenSelectedCount > 0) {
+                <span class="nx-dock-hidden" tabindex="0" data-testid="new-dock-hidden"
+                  matTooltip="Ticked earlier but hidden by the current filters or search. Edit tags, Export and Send still include them."
+                  matTooltipClass="nx-tipbox" matTooltipPosition="above"><svg nxIcon="eye-off" class="nx-ic"></svg>{{ hiddenSelectedCount }} not shown</span>
+              }
+            </div>
+
+            <button class="nx-dbtn nx-dbtn--primary" type="button" data-testid="new-open-bulk-tags-27" [disabled]="updatingTags" (click)="openBulkTags()">
+              <svg nxIcon="tag" class="nx-ic"></svg><span class="nx-lbl-long">Edit tags</span><span class="nx-lbl-short">Tags</span>
+            </button>
+            <button class="nx-dbtn" type="button" data-testid="new-toggle-export-28" #exportToggle [disabled]="updatingTags"
+              [class.is-open]="showExport" aria-haspopup="true" [attr.aria-expanded]="showExport" (click)="toggleExport()">
+              <svg nxIcon="download" class="nx-ic"></svg>Export<svg [nxIcon]="showExport ? 'chev-down' : 'chev-up'" class="nx-ic nx-chev"></svg>
+            </button>
+            <button class="nx-dbtn" type="button" data-testid="new-toggle-comm-31" #commToggle [disabled]="updatingTags"
+              [class.is-open]="showComm" aria-haspopup="true" [attr.aria-expanded]="showComm" aria-label="Send communication" (click)="toggleComm()">
+              <svg nxIcon="send" class="nx-ic"></svg><span class="nx-lbl-long">Send communication</span><span class="nx-lbl-short">Send</span><svg [nxIcon]="showComm ? 'chev-down' : 'chev-up'" class="nx-ic nx-chev"></svg>
+            </button>
+            <button class="nx-dclear" type="button" data-testid="new-clear-selection-26" [disabled]="updatingTags"
+              aria-label="Clear selection" title="Clear selection" (click)="clearSelection()">
+              <svg nxIcon="x" class="nx-ic"></svg>
+            </button>
+          </div>
+        }
+
+        <!-- ============================================================ search suggestions (3.7): no backdrop, closes on outside click and Escape -->
+        <ng-template cdkConnectedOverlay
+          [cdkConnectedOverlayOrigin]="searchOrigin"
+          [cdkConnectedOverlayOpen]="suggestOpen && suggestions.length > 0"
+          [cdkConnectedOverlayHasBackdrop]="false"
+          [cdkConnectedOverlayPositions]="[
+            { originX: 'start', originY: 'bottom', overlayX: 'start', overlayY: 'top', offsetY: 6 },
+            { originX: 'start', originY: 'top', overlayX: 'start', overlayY: 'bottom', offsetY: -6 }
+          ]"
+          (overlayOutsideClick)="onSuggestOutsideClick($event, searchField)"
+          (detach)="closeSuggestions()">
+          <div class="nx-root nx-pop nx-suggest" id="nx-suggest-list" role="listbox" aria-label="Use as a filter" data-testid="new-search-suggest">
+            <div class="nx-pop-sec"><span class="nx-eyebrow">Use as a filter</span></div>
+            <div class="nx-optlist">
+              @for (s of suggestions; track s.kind + ':' + s.id; let i = $index) {
+                @if (s.kind === 'tag') {
+                  <button class="nx-sug" type="button" role="option" data-testid="new-suggest-tag"
+                    [id]="'nx-sug-' + i" [class.is-active]="i === suggestActive" [attr.aria-selected]="i === suggestActive"
+                    (mousedown)="$event.preventDefault()" (click)="applySuggestion(s)">
+                    <span class="nx-sug-ic"><svg nxIcon="tag" class="nx-ic"></svg></span>
+                    <span><span class="nx-sug-k">Tag · </span>{{ s.before }}<mark>{{ s.match }}</mark>{{ s.after }}</span>
+                    @if (s.count !== null) {<span class="nx-sug-n">{{ s.count | number }} {{ s.count === 1 ? 'person' : 'people' }}</span>}
+                  </button>
+                } @else {
+                  <button class="nx-sug" type="button" role="option" data-testid="new-suggest-workshop"
+                    [id]="'nx-sug-' + i" [class.is-active]="i === suggestActive" [attr.aria-selected]="i === suggestActive"
+                    (mousedown)="$event.preventDefault()" (click)="applySuggestion(s)">
+                    <span class="nx-sug-ic"><svg nxIcon="workshop" class="nx-ic"></svg></span>
+                    <span><span class="nx-sug-k">Workshop · </span>{{ s.before }}<mark>{{ s.match }}</mark>{{ s.after }}</span>
+                    @if (s.count !== null) {<span class="nx-sug-n">{{ s.count | number }} {{ s.count === 1 ? 'person' : 'people' }}</span>}
+                  </button>
+                }
+              }
+            </div>
+            <div class="nx-pop-foot" data-testid="new-suggest-footer">
+              <span class="nx-suggest-note">@if (suggestSearchCount !== null) {<strong>{{ suggestSearchCount | number }}</strong> {{ suggestSearchCount === 1 ? 'person mentions' : 'people mention' }} “<span class="nx-suggest-q">{{ searchText.trim() }}</span>” in their details} @else {Search for “<span class="nx-suggest-q">{{ searchText.trim() }}</span>” in people's details}</span>
+              <span class="nx-flex nx-flex--tight"><span class="nx-kbd">Enter</span>search</span>
+            </div>
+          </div>
+        </ng-template>
+
+        <!--
+          ============================================================ filter panels (3.1–3.6) and the Columns chooser (4.1)
+          One cdkConnectedOverlay each, no backdrop (tests click other controls while a panel is open), closed by
+          Escape, Done, an outside click (the trigger itself is excluded, so its own click toggles) or another panel.
+          Rendered only while open. Every change applies live.
         -->
-        <button data-testid="new-send-watti-33" type="button" class="comm-btn" (click)="sendWatti()">
-          <i class="fa-brands fa-whatsapp"></i><span>WhatsApp</span>
-        </button>
-        <button data-testid="new-send-notificationin-breakthrough-34" type="button" class="comm-btn" (click)="sendNotificationinBreakthrough()">
-          <mat-icon>notifications_active</mat-icon><span>App notification</span>
-        </button>
-      </div>
-      <p class="export-hint">Send to the {{ selection.selected.length }} selected profile(s).</p>
-    </div>
-    </div>
 
-    <div class="nu-selbar-main">
-      <div class="sp-count">
-        <span class="sp-num">{{ selection.selected.length }}</span>
-        <span>selected</span>
-        <span class="sp-hidden" *ngIf="hiddenSelectedCount > 0"
-          matTooltip="Ticked earlier but hidden by the current filters or search. Bulk actions still include them.">
-          · {{ hiddenSelectedCount }} not shown
-        </span>
-      </div>
-      <span class="nu-spacer"></span>
-      <button data-testid="new-open-bulk-tags-27" mat-flat-button color="primary" class="sp-action" (click)="openBulkTags()" [disabled]="applyingBulk">
-        <mat-spinner *ngIf="applyingBulk" diameter="18"></mat-spinner>
-        <ng-container *ngIf="!applyingBulk"><mat-icon>sell</mat-icon> Edit tags</ng-container>
-      </button>
-      <button data-testid="new-toggle-export-28" mat-stroked-button class="sp-action" [class.sp-open]="showExport" (click)="toggleExport()">
-        <mat-icon>file_download</mat-icon> Export
-        <mat-icon class="sp-caret" iconPositionEnd>{{ showExport ? 'expand_more' : 'expand_less' }}</mat-icon>
-      </button>
-      <button data-testid="new-toggle-comm-31" mat-stroked-button class="sp-action" [class.sp-open]="showComm" (click)="toggleComm()">
-        <mat-icon>campaign</mat-icon> Send communication
-        <mat-icon class="sp-caret" iconPositionEnd>{{ showComm ? 'expand_more' : 'expand_less' }}</mat-icon>
-      </button>
-      <button data-testid="new-clear-selection-26" type="button" class="sp-clear" (click)="clearSelection()"
-        matTooltip="Clear selection" aria-label="Clear selection">
-        <mat-icon>close</mat-icon>
-      </button>
-    </div>
+        <!-- ---------------------------------------------------- Tags (3.1) -->
+        <ng-template cdkConnectedOverlay
+          [cdkConnectedOverlayOrigin]="tagsOrigin"
+          [cdkConnectedOverlayOpen]="openPanel === 'tags'"
+          [cdkConnectedOverlayHasBackdrop]="false"
+          [cdkConnectedOverlayPositions]="panelPositionsStart"
+          [cdkConnectedOverlayFlexibleDimensions]="true"
+          [cdkConnectedOverlayMinHeight]="150"
+          [cdkConnectedOverlayViewportMargin]="12"
+          (overlayOutsideClick)="onPanelOutsideClick($event, tagsOrigin.elementRef)"
+          (overlayKeydown)="onOverlayKeydown($event, tagsOrigin.elementRef)"
+          (detach)="onPanelDetach('tags')">
+          <div class="nx-root nx-pop" role="dialog" aria-labelledby="nx-tags-title" tabindex="-1" nxAutofocus data-testid="new-event-2">
+            <div class="nx-pop-head">
+              <span class="nx-pop-title" id="nx-tags-title">Filter by tags</span>
+              @if (selectByTagIds.size > 0) {
+                <button class="nx-link" type="button" data-testid="new-clear-tag-filter-3" (click)="clearTagFilter()">Clear</button>
+              }
+            </div>
+            <div class="nx-pop-sec">
+              <span class="nx-eyebrow" id="nx-tags-match">Match</span>
+              <div class="nx-seg" role="radiogroup" aria-labelledby="nx-tags-match">
+                <button type="button" role="radio" data-testid="new-set-tag-mode-5" [class.is-on]="selectByTagMode === 'any'" [attr.aria-checked]="selectByTagMode === 'any'" (click)="setTagMode('any')">Match any</button>
+                <button type="button" role="radio" data-testid="new-set-tag-mode-4" [class.is-on]="selectByTagMode === 'all'" [attr.aria-checked]="selectByTagMode === 'all'" (click)="setTagMode('all')">Match all</button>
+              </div>
+            </div>
+            <div class="nx-pop-sec">
+              <span class="nx-eyebrow" id="nx-tags-carry">People who carry them</span>
+              <div class="nx-seg" role="radiogroup" aria-labelledby="nx-tags-carry">
+                <button type="button" role="radio" data-testid="new-set-tag-polarity-6" [class.is-on]="selectByTagPolarity === 'include'" [attr.aria-checked]="selectByTagPolarity === 'include'" (click)="setTagPolarity('include')">Include</button>
+                <button type="button" role="radio" data-testid="new-set-tag-polarity-7" [class.is-on]="selectByTagPolarity === 'exclude'" [attr.aria-checked]="selectByTagPolarity === 'exclude'" (click)="setTagPolarity('exclude')">Exclude</button>
+              </div>
+            </div>
+            <div aria-live="polite">
+              @if (tagRuleParts.length) {
+                <p class="nx-ruleline" data-testid="new-tag-rule"><span>@for (p of tagRuleParts; track $index) {@if (p.bold) {<b>{{ p.text }}</b>} @else {{{ p.text }}}}</span></p>
+              }
+            </div>
+            <label class="nx-find">
+              <span class="nx-sr">Find a tag</span>
+              <svg nxIcon="search" class="nx-ic"></svg>
+              <input type="search" data-testid="new-tag-find" placeholder="Find a tag" autocomplete="off" spellcheck="false" [(ngModel)]="tagFind">
+            </label>
+            <div class="nx-optlist nx-optlist--scroll" role="group" aria-label="Tags">
+              @for (t of tagPanelChosen; track t.id) {
+                <button class="nx-opt" type="button" data-testid="new-toggle-tag-select-8"
+                  [class.is-on]="selectByTagIds.has(t.id)" [attr.aria-pressed]="selectByTagIds.has(t.id)" (click)="toggleTagSelect(t.id)">
+                  <span class="nx-box" [class.is-on]="selectByTagIds.has(t.id)">@if (selectByTagIds.has(t.id)) {<svg nxIcon="check" class="nx-ic"></svg>}</span>
+                  <span class="nx-opt-label">{{ t.name }}</span><span class="nx-opt-n" [attr.aria-label]="tagCount(t.id) + (tagCount(t.id) === 1 ? ' person' : ' people')">{{ tagCount(t.id) | number }}</span>
+                </button>
+              }
+              @if (tagPanelChosen.length && tagPanelRest.length) {
+                <span class="nx-opt-sep" data-testid="new-tag-separator" aria-hidden="true"></span>
+              }
+              @for (t of tagPanelRest; track t.id) {
+                <button class="nx-opt" type="button" data-testid="new-toggle-tag-select-8"
+                  [class.is-on]="selectByTagIds.has(t.id)" [attr.aria-pressed]="selectByTagIds.has(t.id)" (click)="toggleTagSelect(t.id)">
+                  <span class="nx-box" [class.is-on]="selectByTagIds.has(t.id)">@if (selectByTagIds.has(t.id)) {<svg nxIcon="check" class="nx-ic"></svg>}</span>
+                  <span class="nx-opt-label">{{ t.name }}</span><span class="nx-opt-n" [attr.aria-label]="tagCount(t.id) + (tagCount(t.id) === 1 ? ' person' : ' people')">{{ tagCount(t.id) | number }}</span>
+                </button>
+              }
+              @if (!tagPanelChosen.length && !tagPanelRest.length) {
+                <p class="nx-opt-empty" data-testid="new-tag-empty">{{ allTags.length ? 'No tag matches “' + tagFind.trim() + '”.' : 'No tags available' }}</p>
+              }
+            </div>
+            <div class="nx-pop-foot">
+              <span data-testid="new-tag-match-count"><strong>{{ filteredCount | number }}</strong> {{ filteredCount === 1 ? 'person matches' : 'people match' }}</span>
+              <button class="nx-quiet" type="button" data-testid="new-tag-done" (click)="closePanelAndFocus(tagsOrigin.elementRef)">Done</button>
+            </div>
+          </div>
+        </ng-template>
+
+        <!-- ---------------------------------------------------- Workshops (3.2, 3.4; list loading) -->
+        <ng-template cdkConnectedOverlay
+          [cdkConnectedOverlayOrigin]="workshopsOrigin"
+          [cdkConnectedOverlayOpen]="openPanel === 'workshops'"
+          [cdkConnectedOverlayHasBackdrop]="false"
+          [cdkConnectedOverlayPositions]="panelPositionsStart"
+          [cdkConnectedOverlayFlexibleDimensions]="true"
+          [cdkConnectedOverlayMinHeight]="150"
+          [cdkConnectedOverlayViewportMargin]="12"
+          (overlayOutsideClick)="onPanelOutsideClick($event, workshopsOrigin.elementRef)"
+          (overlayKeydown)="onOverlayKeydown($event, workshopsOrigin.elementRef)"
+          (detach)="onPanelDetach('workshops')">
+          <div class="nx-root nx-pop" role="dialog" aria-labelledby="nx-ws-title" tabindex="-1" nxAutofocus data-testid="new-event-10">
+            <div class="nx-pop-head">
+              <span class="nx-pop-title" id="nx-ws-title">Filter by workshops</span>
+              @if (selectedWorkshopIds.size > 0) {
+                <button class="nx-link" type="button" data-testid="new-clear-workshop-filter-11" (click)="clearWorkshopFilter()">Clear</button>
+              }
+            </div>
+            <div class="nx-switchrow">
+              <span><b>Funnel only</b><small>List only workshops in the funnel</small></span>
+              <!-- The hook sits on the toggle's host, which holds exactly one button element (NUS-11 clicks it). -->
+              <mat-slide-toggle class="nx-mswitch" data-testid="new-change-set-funnel-only-12" hideIcon disableRipple
+                aria-label="Funnel only" [checked]="funnelOnly" (change)="setFunnelOnly($event.checked)"></mat-slide-toggle>
+            </div>
+            @if (!workshopOptionsLoaded && (workshopOptionsLoading || !workshopOptionsError)) {
+              <div class="nx-pop-empty" role="status" data-testid="new-workshop-options-loading">
+                <span class="nx-flex nx-flex--tight"><span class="nx-spin"></span>Loading workshops…</span>
+              </div>
+            } @else if (!workshopOptionsLoaded) {
+              <div class="nx-pop-empty" role="alert" data-testid="new-workshop-options-error">
+                <b>We could not load the workshops</b>
+                <p>Check the connection and try again.</p>
+                <button class="nx-quiet" type="button" data-testid="new-workshop-options-retry" (click)="ensureWorkshopsLoaded()">
+                  <svg nxIcon="refresh" class="nx-ic nx-ic--sm"></svg>Try again
+                </button>
+              </div>
+            } @else if (funnelOnly && visibleWorkshopOptions.length === 0) {
+              <div class="nx-pop-empty" data-testid="new-workshop-no-funnel">
+                <span class="nx-msg-ic nx-msg-ic--sm"><svg nxIcon="workshop" class="nx-ic"></svg></span>
+                <b>No funnel workshops yet</b>
+                <p>Turn off Funnel only to choose from all {{ allWorkshopsCount !== null ? allWorkshopsCount + ' workshops' : 'workshops' }}.</p>
+                <button class="nx-quiet" type="button" data-testid="new-workshop-show-all" (click)="setFunnelOnly(false)">Show all workshops</button>
+              </div>
+            } @else {
+              <div class="nx-pop-sec">
+                <span class="nx-eyebrow" id="nx-ws-people">People in them</span>
+                <div class="nx-seg" role="radiogroup" aria-labelledby="nx-ws-people">
+                  <button type="button" role="radio" data-testid="new-set-workshop-filter-mode-13" [class.is-on]="workshopFilterMode === 'include'" [attr.aria-checked]="workshopFilterMode === 'include'" (click)="setWorkshopFilterMode('include')">Include</button>
+                  <button type="button" role="radio" data-testid="new-set-workshop-filter-mode-14" [class.is-on]="workshopFilterMode === 'exclude'" [attr.aria-checked]="workshopFilterMode === 'exclude'" (click)="setWorkshopFilterMode('exclude')">Exclude</button>
+                </div>
+              </div>
+              <div aria-live="polite">
+                @if (workshopRuleParts.length) {
+                  <p class="nx-ruleline" data-testid="new-workshop-rule"><span>@for (p of workshopRuleParts; track $index) {@if (p.bold) {<b>{{ p.text }}</b>} @else {{{ p.text }}}}</span></p>
+                }
+              </div>
+              <label class="nx-find">
+                <span class="nx-sr">Find a workshop</span>
+                <svg nxIcon="search" class="nx-ic"></svg>
+                <input type="search" data-testid="new-workshop-find" placeholder="Find a workshop" autocomplete="off" spellcheck="false" [(ngModel)]="workshopFind">
+              </label>
+              <div class="nx-optlist nx-optlist--scroll" role="group" aria-label="Workshops">
+                @for (w of filteredWorkshopOptions; track w.id) {
+                  <button class="nx-opt" type="button" data-testid="new-toggle-workshop-select-15" [title]="w.title"
+                    [class.is-on]="selectedWorkshopIds.has(w.id)" [attr.aria-pressed]="selectedWorkshopIds.has(w.id)" (click)="toggleWorkshopSelect(w.id)">
+                    <span class="nx-box" [class.is-on]="selectedWorkshopIds.has(w.id)">@if (selectedWorkshopIds.has(w.id)) {<svg nxIcon="check" class="nx-ic"></svg>}</span>
+                    <span class="nx-opt-label">{{ w.title }}</span>
+                  </button>
+                } @empty {
+                  <p class="nx-opt-empty" data-testid="new-workshop-empty">{{ workshopFind.trim() ? 'No workshop matches “' + workshopFind.trim() + '”.' : 'No workshops to choose from.' }}</p>
+                }
+              </div>
+              <div class="nx-pop-foot">
+                <span data-testid="new-workshop-match-count">
+                  @if (workshopFilterLoading) {
+                    <span class="nx-count-wait"><span class="nx-spin nx-spin--sm"></span>Reading the people…</span>
+                  } @else {
+                    <strong>{{ filteredCount | number }}</strong> {{ filteredCount === 1 ? 'person matches' : 'people match' }}
+                  }
+                </span>
+                <button class="nx-quiet" type="button" data-testid="new-workshop-done" (click)="closePanelAndFocus(workshopsOrigin.elementRef)">Done</button>
+              </div>
+            }
+          </div>
+        </ng-template>
+
+        <!-- ---------------------------------------------------- Created (3.5): typable From/To, quick ranges, a month grid -->
+        <ng-template cdkConnectedOverlay
+          [cdkConnectedOverlayOrigin]="createdOrigin"
+          [cdkConnectedOverlayOpen]="openPanel === 'created'"
+          [cdkConnectedOverlayHasBackdrop]="false"
+          [cdkConnectedOverlayPositions]="panelPositionsStart"
+          [cdkConnectedOverlayFlexibleDimensions]="true"
+          [cdkConnectedOverlayMinHeight]="150"
+          [cdkConnectedOverlayViewportMargin]="12"
+          (overlayOutsideClick)="onPanelOutsideClick($event, createdOrigin.elementRef)"
+          (overlayKeydown)="onOverlayKeydown($event, createdOrigin.elementRef)"
+          (detach)="onPanelDetach('created')">
+          <div class="nx-root nx-pop nx-pop--wide" role="dialog" aria-labelledby="nx-created-title" tabindex="-1" nxAutofocus data-testid="new-created-panel">
+            <div class="nx-pop-head">
+              <span class="nx-pop-title" id="nx-created-title">Created between</span>
+              @if (hasDateFilter || fromText || toText) {
+                <button class="nx-link" type="button" data-testid="new-created-clear" (click)="clearDates()">Clear</button>
+              }
+            </div>
+            <div class="nx-dfields">
+              <label class="nx-dfield">
+                <span class="nx-eyebrow">From</span>
+                <span class="nx-dfield-in">
+                  <input type="text" data-testid="new-created-start-date" placeholder="d mmm yyyy" autocomplete="off" spellcheck="false"
+                    aria-label="Created from" [(ngModel)]="fromText"
+                    (change)="commitDateText('from')" (blur)="commitDateText('from')" (keydown.enter)="commitDateText('from')">
+                  <svg nxIcon="calendar" class="nx-ic"></svg>
+                </span>
+              </label>
+              <label class="nx-dfield">
+                <span class="nx-eyebrow">To</span>
+                <span class="nx-dfield-in">
+                  <input type="text" data-testid="new-created-end-date" placeholder="d mmm yyyy" autocomplete="off" spellcheck="false"
+                    aria-label="Created until" [(ngModel)]="toText"
+                    (change)="commitDateText('to')" (blur)="commitDateText('to')" (keydown.enter)="commitDateText('to')">
+                  <svg nxIcon="calendar" class="nx-ic"></svg>
+                </span>
+              </label>
+            </div>
+            <div class="nx-presets" role="group" aria-label="Quick ranges">
+              <button class="nx-preset" type="button" data-testid="new-created-preset-today" [class.is-on]="activePreset === 'today'" [attr.aria-pressed]="activePreset === 'today'" (click)="applyPreset('today')">Today</button>
+              <button class="nx-preset" type="button" data-testid="new-created-preset-7d" [class.is-on]="activePreset === '7d'" [attr.aria-pressed]="activePreset === '7d'" (click)="applyPreset('7d')">Last 7 days</button>
+              <button class="nx-preset" type="button" data-testid="new-created-preset-30d" [class.is-on]="activePreset === '30d'" [attr.aria-pressed]="activePreset === '30d'" (click)="applyPreset('30d')">Last 30 days</button>
+              <button class="nx-preset" type="button" data-testid="new-created-preset-month" [class.is-on]="activePreset === 'month'" [attr.aria-pressed]="activePreset === 'month'" (click)="applyPreset('month')">This month</button>
+            </div>
+            <div class="nx-cal" data-testid="new-created-picker-16">
+              <div class="nx-cal-head">
+                <button class="nx-iconbtn" type="button" data-testid="new-cal-prev" aria-label="Previous month" (click)="shiftMonth(-1)"><svg nxIcon="chev-left" class="nx-ic"></svg></button>
+                <span class="nx-cal-month" data-testid="new-cal-month" aria-live="polite">{{ calMonthLabel }}</span>
+                <button class="nx-iconbtn" type="button" data-testid="new-cal-next" aria-label="Next month" (click)="shiftMonth(1)"><svg nxIcon="chev-right" class="nx-ic"></svg></button>
+              </div>
+              <div class="nx-cal-grid" role="group" [attr.aria-label]="calMonthLabel" data-testid="new-cal-grid">
+                @for (w of calWeekdays; track w) {<span class="nx-dow" aria-hidden="true">{{ w }}</span>}
+                @for (d of calDays; track $index) {
+                  @if (d) {
+                    <button class="nx-day" type="button" data-testid="new-cal-day"
+                      [class.is-start]="d.isStart" [class.is-end]="d.isEnd" [class.in-range]="d.inRange" [class.is-today]="d.isToday"
+                      [attr.aria-label]="d.label" [attr.aria-pressed]="d.isStart || d.isEnd" [attr.aria-current]="d.isToday ? 'date' : null"
+                      (click)="pickDay(d)"><span>{{ d.day }}</span></button>
+                  } @else {
+                    <span aria-hidden="true"></span>
+                  }
+                }
+              </div>
+            </div>
+            <div class="nx-pop-foot">
+              <span data-testid="new-created-match-count"><strong>{{ filteredCount | number }}</strong> {{ filteredCount === 1 ? 'person matches' : 'people match' }}</span>
+              <button class="nx-quiet" type="button" data-testid="new-created-done" (click)="closePanelAndFocus(createdOrigin.elementRef)">Done</button>
+            </div>
+          </div>
+        </ng-template>
+
+        <!-- ---------------------------------------------------- Conversion (3.6): a menu; a pick applies and closes -->
+        <ng-template cdkConnectedOverlay
+          [cdkConnectedOverlayOrigin]="conversionOrigin"
+          [cdkConnectedOverlayOpen]="openPanel === 'conversion'"
+          [cdkConnectedOverlayHasBackdrop]="false"
+          [cdkConnectedOverlayPositions]="panelPositionsStart"
+          [cdkConnectedOverlayFlexibleDimensions]="true"
+          [cdkConnectedOverlayMinHeight]="150"
+          [cdkConnectedOverlayViewportMargin]="12"
+          (overlayOutsideClick)="onPanelOutsideClick($event, conversionOrigin.elementRef)"
+          (overlayKeydown)="onOverlayKeydown($event, conversionOrigin.elementRef)"
+          (detach)="onPanelDetach('conversion')">
+          <div class="nx-root nx-pop nx-pop--menu" role="menu" aria-label="Conversion" data-testid="new-conversion-panel" (keydown)="onMenuKeydown($event)">
+            <div class="nx-optlist nx-optlist--menu">
+              <button class="nx-opt nx-opt--tall" type="button" role="menuitemradio" data-testid="new-set-converted-filter-everyone"
+                [class.is-on]="!convertedFilter" [attr.aria-checked]="!convertedFilter" [nxAutofocus]="!convertedFilter" (click)="pickConversion('', conversionOrigin.elementRef)">
+                <span class="nx-radio" [class.is-on]="!convertedFilter"></span><span>Everyone<span class="nx-opt-desc">No conversion filter</span></span>
+              </button>
+              <button class="nx-opt nx-opt--tall" type="button" role="menuitemradio" data-testid="new-set-converted-filter-converted"
+                [class.is-on]="convertedFilter === 'converted'" [attr.aria-checked]="convertedFilter === 'converted'" [nxAutofocus]="convertedFilter === 'converted'" (click)="pickConversion('converted', conversionOrigin.elementRef)">
+                <span class="nx-radio" [class.is-on]="convertedFilter === 'converted'"></span><span>Converted<span class="nx-opt-desc">Moved on to become participants</span></span>
+              </button>
+              <button class="nx-opt nx-opt--tall" type="button" role="menuitemradio" data-testid="new-set-converted-filter-not-converted"
+                [class.is-on]="convertedFilter === 'notconverted'" [attr.aria-checked]="convertedFilter === 'notconverted'" [nxAutofocus]="convertedFilter === 'notconverted'" (click)="pickConversion('notconverted', conversionOrigin.elementRef)">
+                <span class="nx-radio" [class.is-on]="convertedFilter === 'notconverted'"></span><span>Not converted<span class="nx-opt-desc">Still new users</span></span>
+              </button>
+            </div>
+          </div>
+        </ng-template>
+
+        <!-- ---------------------------------------------------- Columns chooser (4.1): stays open while ticking -->
+        <ng-template cdkConnectedOverlay
+          [cdkConnectedOverlayOrigin]="columnsOrigin"
+          [cdkConnectedOverlayOpen]="openPanel === 'columns'"
+          [cdkConnectedOverlayHasBackdrop]="false"
+          [cdkConnectedOverlayPositions]="panelPositionsEnd"
+          [cdkConnectedOverlayFlexibleDimensions]="true"
+          [cdkConnectedOverlayMinHeight]="150"
+          [cdkConnectedOverlayViewportMargin]="12"
+          (overlayOutsideClick)="onPanelOutsideClick($event, columnsOrigin.elementRef)"
+          (overlayKeydown)="onOverlayKeydown($event, columnsOrigin.elementRef)"
+          (detach)="onPanelDetach('columns')">
+          <div class="nx-root nx-pop nx-pop--columns" role="dialog" aria-labelledby="nx-cols-title" tabindex="-1" nxAutofocus data-testid="new-columns-panel">
+            <div class="nx-pop-head">
+              <span class="nx-pop-title" id="nx-cols-title">Show columns</span>
+              <!-- Absent (not hidden) while the columns are the default ones (NUS-01). -->
+              @if (!columnsAreDefault) {
+                <button class="nx-link" type="button" data-testid="new-columns-reset" (click)="resetColumns()">Reset to default</button>
+              }
+            </div>
+            <!-- `sel` is a hook-only class (NUS-01 reads it); the look comes from .nx-box. -->
+            <div class="nx-optlist" role="group" aria-label="Columns">
+              <button class="nx-opt" type="button" data-testid="new-column-name" [class.sel]="isColumnOn('name')" [attr.aria-pressed]="isColumnOn('name')" [disabled]="isLastColumn('name')" (click)="toggleColumn('name')"><span class="nx-box" [class.is-on]="isColumnOn('name')">@if (isColumnOn('name')) {<svg nxIcon="check" class="nx-ic"></svg>}</span>Name</button>
+              <button class="nx-opt" type="button" data-testid="new-column-phone" [class.sel]="isColumnOn('phonenumber')" [attr.aria-pressed]="isColumnOn('phonenumber')" [disabled]="isLastColumn('phonenumber')" (click)="toggleColumn('phonenumber')"><span class="nx-box" [class.is-on]="isColumnOn('phonenumber')">@if (isColumnOn('phonenumber')) {<svg nxIcon="check" class="nx-ic"></svg>}</span>Phone</button>
+              <button class="nx-opt" type="button" data-testid="new-column-email" [class.sel]="isColumnOn('email')" [attr.aria-pressed]="isColumnOn('email')" [disabled]="isLastColumn('email')" (click)="toggleColumn('email')"><span class="nx-box" [class.is-on]="isColumnOn('email')">@if (isColumnOn('email')) {<svg nxIcon="check" class="nx-ic"></svg>}</span>Email</button>
+              <button class="nx-opt" type="button" data-testid="new-column-created" [class.sel]="isColumnOn('created')" [attr.aria-pressed]="isColumnOn('created')" [disabled]="isLastColumn('created')" (click)="toggleColumn('created')"><span class="nx-box" [class.is-on]="isColumnOn('created')">@if (isColumnOn('created')) {<svg nxIcon="check" class="nx-ic"></svg>}</span>Created</button>
+              <button class="nx-opt" type="button" data-testid="new-column-status" [class.sel]="isColumnOn('enable')" [attr.aria-pressed]="isColumnOn('enable')" [disabled]="isLastColumn('enable')" (click)="toggleColumn('enable')"><span class="nx-box" [class.is-on]="isColumnOn('enable')">@if (isColumnOn('enable')) {<svg nxIcon="check" class="nx-ic"></svg>}</span>Status</button>
+              <button class="nx-opt" type="button" data-testid="new-column-referredby" [class.sel]="isColumnOn('referredby')" [attr.aria-pressed]="isColumnOn('referredby')" [disabled]="isLastColumn('referredby')" (click)="toggleColumn('referredby')"><span class="nx-box" [class.is-on]="isColumnOn('referredby')">@if (isColumnOn('referredby')) {<svg nxIcon="check" class="nx-ic"></svg>}</span>Referred by</button>
+              <button class="nx-opt" type="button" data-testid="new-column-tags" [class.sel]="isColumnOn('tags')" [attr.aria-pressed]="isColumnOn('tags')" [disabled]="isLastColumn('tags')" (click)="toggleColumn('tags')"><span class="nx-box" [class.is-on]="isColumnOn('tags')">@if (isColumnOn('tags')) {<svg nxIcon="check" class="nx-ic"></svg>}</span>Tags</button>
+            </div>
+            <div class="nx-pop-note" data-testid="new-columns-note"><svg nxIcon="info" class="nx-ic"></svg><span>Saved in this browser. Workshop and Moved On appear by themselves while those filters are on.</span></div>
+          </div>
+        </ng-template>
+
+        <!--
+          ============================================================ below 900px: the Filters sheet (8.2)
+          A CDK overlay at the bottom of the viewport (nxSheet), over a scrim, at most 640px wide. It exists only
+          while the layout is narrow, and it has its own hooks, so no desktop hook is ever in the DOM twice.
+          Changes apply live; "Show N people" just closes.
+        -->
+        @if (isNarrow) {
+          <ng-template nxSheet [nxSheetOpen]="filtersSheetOpen" (nxSheetClose)="closeFiltersSheet()">
+            <div class="nx-root nx-bsheet" role="dialog" aria-modal="true" aria-labelledby="nx-fsheet-title" data-testid="new-filters-sheet" cdkTrapFocus cdkTrapFocusAutoCapture>
+              <span class="nx-grab" aria-hidden="true"></span>
+              @switch (sheetView) {
+
+                <!-- ---------- sub-view: choose tags (same option markup as the desktop panel) -->
+                @case ('tags') {
+                  <div class="nx-bsheet-head">
+                    <div class="nx-flex nx-flex--tight">
+                      <button class="nx-iconbtn" type="button" data-testid="new-sheet-back" aria-label="Back to all filters" (click)="setSheetView('main')"><svg nxIcon="chev-left" class="nx-ic"></svg></button>
+                      <h3 class="nx-bsheet-title" id="nx-fsheet-title">Choose tags</h3>
+                    </div>
+                    <button class="nx-iconbtn" type="button" data-testid="new-filters-sheet-close" aria-label="Close filters" (click)="closeFiltersSheet()"><svg nxIcon="x" class="nx-ic"></svg></button>
+                  </div>
+                  <div class="nx-bsheet-body">
+                    <label class="nx-find nx-find--flush">
+                      <span class="nx-sr">Find a tag</span>
+                      <svg nxIcon="search" class="nx-ic"></svg>
+                      <input type="search" data-testid="new-sheet-find" placeholder="Find a tag" autocomplete="off" spellcheck="false" [(ngModel)]="tagFind">
+                    </label>
+                    <div class="nx-optlist nx-optlist--flush" role="group" aria-label="Tags">
+                      @for (t of tagPanelChosen; track t.id) {
+                        <button class="nx-opt" type="button" data-testid="new-sheet-tag-option"
+                          [class.is-on]="selectByTagIds.has(t.id)" [attr.aria-pressed]="selectByTagIds.has(t.id)" (click)="toggleTagSelect(t.id)">
+                          <span class="nx-box" [class.is-on]="selectByTagIds.has(t.id)">@if (selectByTagIds.has(t.id)) {<svg nxIcon="check" class="nx-ic"></svg>}</span>
+                          <span class="nx-opt-label">{{ t.name }}</span><span class="nx-opt-n">{{ tagCount(t.id) | number }}</span>
+                        </button>
+                      }
+                      @if (tagPanelChosen.length && tagPanelRest.length) {<span class="nx-opt-sep" aria-hidden="true"></span>}
+                      @for (t of tagPanelRest; track t.id) {
+                        <button class="nx-opt" type="button" data-testid="new-sheet-tag-option"
+                          [class.is-on]="selectByTagIds.has(t.id)" [attr.aria-pressed]="selectByTagIds.has(t.id)" (click)="toggleTagSelect(t.id)">
+                          <span class="nx-box" [class.is-on]="selectByTagIds.has(t.id)">@if (selectByTagIds.has(t.id)) {<svg nxIcon="check" class="nx-ic"></svg>}</span>
+                          <span class="nx-opt-label">{{ t.name }}</span><span class="nx-opt-n">{{ tagCount(t.id) | number }}</span>
+                        </button>
+                      }
+                      @if (!tagPanelChosen.length && !tagPanelRest.length) {
+                        <p class="nx-opt-empty">{{ allTags.length ? 'No tag matches “' + tagFind.trim() + '”.' : 'No tags available' }}</p>
+                      }
+                    </div>
+                  </div>
+                }
+
+                <!-- ---------- sub-view: choose workshops -->
+                @case ('workshops') {
+                  <div class="nx-bsheet-head">
+                    <div class="nx-flex nx-flex--tight">
+                      <button class="nx-iconbtn" type="button" data-testid="new-sheet-back" aria-label="Back to all filters" (click)="setSheetView('main')"><svg nxIcon="chev-left" class="nx-ic"></svg></button>
+                      <h3 class="nx-bsheet-title" id="nx-fsheet-title">Choose workshops</h3>
+                    </div>
+                    <button class="nx-iconbtn" type="button" data-testid="new-filters-sheet-close" aria-label="Close filters" (click)="closeFiltersSheet()"><svg nxIcon="x" class="nx-ic"></svg></button>
+                  </div>
+                  <div class="nx-bsheet-body">
+                    @if (!workshopOptionsLoaded && (workshopOptionsLoading || !workshopOptionsError)) {
+                      <div class="nx-pop-empty" role="status"><span class="nx-flex nx-flex--tight"><span class="nx-spin"></span>Loading workshops…</span></div>
+                    } @else if (!workshopOptionsLoaded) {
+                      <div class="nx-pop-empty" role="alert">
+                        <b>We could not load the workshops</b>
+                        <p>Check the connection and try again.</p>
+                        <button class="nx-quiet" type="button" data-testid="new-sheet-workshop-retry" (click)="ensureWorkshopsLoaded()"><svg nxIcon="refresh" class="nx-ic nx-ic--sm"></svg>Try again</button>
+                      </div>
+                    } @else if (funnelOnly && visibleWorkshopOptions.length === 0) {
+                      <div class="nx-pop-empty">
+                        <span class="nx-msg-ic nx-msg-ic--sm"><svg nxIcon="workshop" class="nx-ic"></svg></span>
+                        <b>No funnel workshops yet</b>
+                        <p>Turn off Funnel only to choose from all {{ allWorkshopsCount !== null ? allWorkshopsCount + ' workshops' : 'workshops' }}.</p>
+                        <button class="nx-quiet" type="button" data-testid="new-sheet-workshop-show-all" (click)="setFunnelOnly(false)">Show all workshops</button>
+                      </div>
+                    } @else {
+                      <div class="nx-seg" role="radiogroup" aria-label="People in them">
+                        <button type="button" role="radio" data-testid="new-sheet-workshop-include" [class.is-on]="workshopFilterMode === 'include'" [attr.aria-checked]="workshopFilterMode === 'include'" (click)="setWorkshopFilterMode('include')">Include</button>
+                        <button type="button" role="radio" data-testid="new-sheet-workshop-exclude" [class.is-on]="workshopFilterMode === 'exclude'" [attr.aria-checked]="workshopFilterMode === 'exclude'" (click)="setWorkshopFilterMode('exclude')">Exclude</button>
+                      </div>
+                      @if (workshopRuleParts.length) {
+                        <p class="nx-ruleline nx-ruleline--flush" aria-live="polite"><span>@for (p of workshopRuleParts; track $index) {@if (p.bold) {<b>{{ p.text }}</b>} @else {{{ p.text }}}}</span></p>
+                      }
+                      <label class="nx-find nx-find--flush">
+                        <span class="nx-sr">Find a workshop</span>
+                        <svg nxIcon="search" class="nx-ic"></svg>
+                        <input type="search" data-testid="new-sheet-find" placeholder="Find a workshop" autocomplete="off" spellcheck="false" [(ngModel)]="workshopFind">
+                      </label>
+                      <div class="nx-optlist nx-optlist--flush" role="group" aria-label="Workshops">
+                        @for (w of filteredWorkshopOptions; track w.id) {
+                          <button class="nx-opt" type="button" data-testid="new-sheet-workshop-option" [title]="w.title"
+                            [class.is-on]="selectedWorkshopIds.has(w.id)" [attr.aria-pressed]="selectedWorkshopIds.has(w.id)" (click)="toggleWorkshopSelect(w.id)">
+                            <span class="nx-box" [class.is-on]="selectedWorkshopIds.has(w.id)">@if (selectedWorkshopIds.has(w.id)) {<svg nxIcon="check" class="nx-ic"></svg>}</span>
+                            <span class="nx-opt-label">{{ w.title }}</span>
+                          </button>
+                        } @empty {
+                          <p class="nx-opt-empty">{{ workshopFind.trim() ? 'No workshop matches “' + workshopFind.trim() + '”.' : 'No workshops to choose from.' }}</p>
+                        }
+                      </div>
+                    }
+                  </div>
+                }
+
+                <!-- ---------- the four filters -->
+                @default {
+                  <div class="nx-bsheet-head">
+                    <h3 class="nx-bsheet-title" id="nx-fsheet-title">Filters</h3>
+                    <div class="nx-flex nx-flex--tight">
+                      @if (hasActiveFilters) {
+                        <button class="nx-link" type="button" data-testid="new-filters-sheet-clear" (click)="clearAllFilters()">Clear all</button>
+                      }
+                      <button class="nx-iconbtn" type="button" data-testid="new-filters-sheet-close" aria-label="Close filters" (click)="closeFiltersSheet()"><svg nxIcon="x" class="nx-ic"></svg></button>
+                    </div>
+                  </div>
+                  <div class="nx-bsheet-body">
+                    <div class="nx-bgroup" role="group" aria-labelledby="nx-bg-tags">
+                      <div class="nx-bgroup-h"><b id="nx-bg-tags">Tags</b><button class="nx-link" type="button" data-testid="new-sheet-tags-choose" (click)="setSheetView('tags')">Choose tags</button></div>
+                      @if (selectByTagIds.size > 0) {
+                        <div class="nx-cloud" role="group" aria-label="Chosen tags">
+                          @for (t of allTags; track t.id) {
+                            @if (selectByTagIds.has(t.id)) {
+                              <button class="nx-tchip is-on" type="button" data-testid="new-sheet-tag-chip" aria-pressed="true"
+                                [attr.aria-label]="t.name + ', chosen. Remove it'" (click)="toggleTagSelect(t.id)"><svg nxIcon="check" class="nx-ic"></svg>{{ t.name }}</button>
+                            }
+                          }
+                        </div>
+                      }
+                      <div class="nx-seg" role="radiogroup" aria-label="Match">
+                        <button type="button" role="radio" data-testid="new-sheet-tag-mode-any" [class.is-on]="selectByTagMode === 'any'" [attr.aria-checked]="selectByTagMode === 'any'" (click)="setTagMode('any')">Match any</button>
+                        <button type="button" role="radio" data-testid="new-sheet-tag-mode-all" [class.is-on]="selectByTagMode === 'all'" [attr.aria-checked]="selectByTagMode === 'all'" (click)="setTagMode('all')">Match all</button>
+                      </div>
+                      <div class="nx-seg" role="radiogroup" aria-label="Include or exclude">
+                        <button type="button" role="radio" data-testid="new-sheet-tag-include" [class.is-on]="selectByTagPolarity === 'include'" [attr.aria-checked]="selectByTagPolarity === 'include'" (click)="setTagPolarity('include')">Include</button>
+                        <button type="button" role="radio" data-testid="new-sheet-tag-exclude" [class.is-on]="selectByTagPolarity === 'exclude'" [attr.aria-checked]="selectByTagPolarity === 'exclude'" (click)="setTagPolarity('exclude')">Exclude</button>
+                      </div>
+                      <div aria-live="polite">
+                        @if (tagRuleParts.length) {
+                          <p class="nx-ruleline" data-testid="new-sheet-tag-rule"><span>@for (p of tagRuleParts; track $index) {@if (p.bold) {<b>{{ p.text }}</b>} @else {{{ p.text }}}}</span></p>
+                        }
+                      </div>
+                    </div>
+
+                    <div class="nx-bgroup" role="group" aria-labelledby="nx-bg-ws">
+                      <div class="nx-bgroup-h">
+                        <b id="nx-bg-ws">Workshops</b>
+                        <span class="nx-flex nx-bgroup-switch">Funnel only
+                          <mat-slide-toggle class="nx-mswitch" data-testid="new-sheet-funnel-only" hideIcon disableRipple
+                            aria-label="Funnel only" [checked]="funnelOnly" (change)="setFunnelOnly($event.checked)"></mat-slide-toggle>
+                        </span>
+                      </div>
+                      <button class="nx-pickrow" type="button" data-testid="new-sheet-workshops-choose" (click)="setSheetView('workshops')">
+                        Choose workshops<span>{{ selectedWorkshopIds.size ? selectedWorkshopIds.size + ' chosen' : 'None' }}</span>
+                      </button>
+                      @if (workshopRuleParts.length) {
+                        <p class="nx-ruleline"><span>@for (p of workshopRuleParts; track $index) {@if (p.bold) {<b>{{ p.text }}</b>} @else {{{ p.text }}}}</span></p>
+                      }
+                    </div>
+
+                    <div class="nx-bgroup" role="group" aria-labelledby="nx-bg-created">
+                      <div class="nx-bgroup-h"><b id="nx-bg-created">Created</b></div>
+                      <div class="nx-dfields nx-dfields--flush">
+                        <label class="nx-dfield">
+                          <span class="nx-eyebrow">From</span>
+                          <span class="nx-dfield-in">
+                            <input type="text" data-testid="new-sheet-created-start" placeholder="d mmm yyyy" autocomplete="off" spellcheck="false"
+                              aria-label="Created from" [(ngModel)]="fromText"
+                              (change)="commitDateText('from')" (blur)="commitDateText('from')" (keydown.enter)="commitDateText('from')">
+                            <svg nxIcon="calendar" class="nx-ic"></svg>
+                          </span>
+                        </label>
+                        <label class="nx-dfield">
+                          <span class="nx-eyebrow">To</span>
+                          <span class="nx-dfield-in">
+                            <input type="text" data-testid="new-sheet-created-end" placeholder="d mmm yyyy" autocomplete="off" spellcheck="false"
+                              aria-label="Created until" [(ngModel)]="toText"
+                              (change)="commitDateText('to')" (blur)="commitDateText('to')" (keydown.enter)="commitDateText('to')">
+                            <svg nxIcon="calendar" class="nx-ic"></svg>
+                          </span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="nx-bgroup" role="group" aria-labelledby="nx-bg-conv">
+                      <div class="nx-bgroup-h"><b id="nx-bg-conv">Conversion</b></div>
+                      <div class="nx-radios" role="radiogroup" aria-labelledby="nx-bg-conv">
+                        <button class="nx-opt" type="button" role="radio" data-testid="new-sheet-conv-everyone" [class.is-on]="!convertedFilter" [attr.aria-checked]="!convertedFilter" (click)="setConvertedFilter('')"><span class="nx-radio" [class.is-on]="!convertedFilter"></span>Everyone</button>
+                        <button class="nx-opt" type="button" role="radio" data-testid="new-sheet-conv-converted" [class.is-on]="convertedFilter === 'converted'" [attr.aria-checked]="convertedFilter === 'converted'" (click)="setConvertedFilter('converted')"><span class="nx-radio" [class.is-on]="convertedFilter === 'converted'"></span>Converted</button>
+                        <button class="nx-opt" type="button" role="radio" data-testid="new-sheet-conv-not-converted" [class.is-on]="convertedFilter === 'notconverted'" [attr.aria-checked]="convertedFilter === 'notconverted'" (click)="setConvertedFilter('notconverted')"><span class="nx-radio" [class.is-on]="convertedFilter === 'notconverted'"></span>Not converted</button>
+                      </div>
+                    </div>
+                  </div>
+                }
+              }
+              <div class="nx-bsheet-foot">
+                <button class="nx-primary" type="button" data-testid="new-filters-sheet-apply" (click)="closeFiltersSheet()">
+                  @if (workshopFilterLoading) {
+                    <span class="nx-spin nx-spin--light"></span>Reading the people…
+                  } @else {
+                    Show {{ filteredCount | number }} {{ filteredCount === 1 ? 'person' : 'people' }}
+                  }
+                </button>
+              </div>
+            </div>
+          </ng-template>
+        }
+
+        <!-- ============================================================ phones: Export and Send open as bottom sheets (8.3) -->
+        @if (isPhone) {
+          <ng-template nxSheet [nxSheetOpen]="showExport && !updatingTags && selection.hasValue()" (nxSheetClose)="toggleExport()">
+            <div class="nx-root nx-bsheet nx-bsheet--panel" role="dialog" aria-modal="true" aria-labelledby="nx-export-title" data-testid="new-export-sheet" cdkTrapFocus cdkTrapFocusAutoCapture>
+              <span class="nx-grab" aria-hidden="true"></span>
+              <ng-container [ngTemplateOutlet]="exportBody" [ngTemplateOutletContext]="{ $implicit: true }"></ng-container>
+            </div>
+          </ng-template>
+          <ng-template nxSheet [nxSheetOpen]="showComm && !updatingTags && selection.hasValue()" (nxSheetClose)="toggleComm()">
+            <div class="nx-root nx-bsheet nx-bsheet--panel" role="dialog" aria-modal="true" aria-labelledby="nx-send-title" data-testid="new-send-sheet" cdkTrapFocus cdkTrapFocusAutoCapture>
+              <span class="nx-grab" aria-hidden="true"></span>
+              <ng-container [ngTemplateOutlet]="sendBody" [ngTemplateOutletContext]="{ $implicit: true }"></ng-container>
+            </div>
+          </ng-template>
+        }
+
+        <!-- ============================================================ shared panel bodies (dock panel on desktop; phone sheets reuse them) -->
+        <!-- `sheet` is true when a phone sheet hosts the body: the head gains a close × (and Send a Cancel foot). -->
+        <ng-template #exportBody let-sheet>
+          <div class="nx-panel-head">
+            <div>
+              <h3 class="nx-panel-title" id="nx-export-title">Export {{ exportRowCount | number }} {{ exportRowCount === 1 ? 'person' : 'people' }}</h3>
+              @if (hiddenSelectedCount > 0) {
+                <p class="nx-panel-sub" data-testid="new-export-hidden-note"><svg nxIcon="eye-off" class="nx-ic"></svg>Includes {{ hiddenSelectedCount | number }} hidden by filters</p>
+              }
+            </div>
+            <div class="nx-flex nx-flex--tight">
+              <button class="nx-link" type="button" data-testid="new-select-all-export-columns-29" (click)="selectAllExportColumns()">Select all</button>
+              @if (sheet) {
+                <button class="nx-iconbtn" type="button" data-testid="new-export-sheet-close" aria-label="Close" (click)="toggleExport()"><svg nxIcon="x" class="nx-ic"></svg></button>
+              }
+            </div>
+          </div>
+          <div class="nx-panel-body">
+            <div class="nx-cloud" role="group" aria-label="Columns in the file">
+              <button class="nx-tchip nx-tchip--sm" type="button" data-testid="new-export-col-name" [class.is-on]="isExportKeyOn('name')" [attr.aria-pressed]="isExportKeyOn('name')" (click)="toggleExportKey('name')"><svg [nxIcon]="isExportKeyOn('name') ? 'check' : 'plus'" class="nx-ic"></svg>{{ exportLabel('name') }}</button>
+              <button class="nx-tchip nx-tchip--sm" type="button" data-testid="new-export-col-countrycode" [class.is-on]="isExportKeyOn('countryCode')" [attr.aria-pressed]="isExportKeyOn('countryCode')" (click)="toggleExportKey('countryCode')"><svg [nxIcon]="isExportKeyOn('countryCode') ? 'check' : 'plus'" class="nx-ic"></svg>{{ exportLabel('countryCode') }}</button>
+              <button class="nx-tchip nx-tchip--sm" type="button" data-testid="new-export-col-phone" [class.is-on]="isExportKeyOn('phonenumber')" [attr.aria-pressed]="isExportKeyOn('phonenumber')" (click)="toggleExportKey('phonenumber')"><svg [nxIcon]="isExportKeyOn('phonenumber') ? 'check' : 'plus'" class="nx-ic"></svg>{{ exportLabel('phonenumber') }}</button>
+              <button class="nx-tchip nx-tchip--sm" type="button" data-testid="new-export-col-email" [class.is-on]="isExportKeyOn('email')" [attr.aria-pressed]="isExportKeyOn('email')" (click)="toggleExportKey('email')"><svg [nxIcon]="isExportKeyOn('email') ? 'check' : 'plus'" class="nx-ic"></svg>{{ exportLabel('email') }}</button>
+              <button class="nx-tchip nx-tchip--sm" type="button" data-testid="new-export-col-created" [class.is-on]="isExportKeyOn('created')" [attr.aria-pressed]="isExportKeyOn('created')" (click)="toggleExportKey('created')"><svg [nxIcon]="isExportKeyOn('created') ? 'check' : 'plus'" class="nx-ic"></svg>{{ exportLabel('created') }}</button>
+              <button class="nx-tchip nx-tchip--sm" type="button" data-testid="new-export-col-status" [class.is-on]="isExportKeyOn('enable')" [attr.aria-pressed]="isExportKeyOn('enable')" (click)="toggleExportKey('enable')"><svg [nxIcon]="isExportKeyOn('enable') ? 'check' : 'plus'" class="nx-ic"></svg>{{ exportLabel('enable') }}</button>
+              <button class="nx-tchip nx-tchip--sm" type="button" data-testid="new-export-col-referredby" [class.is-on]="isExportKeyOn('referredby')" [attr.aria-pressed]="isExportKeyOn('referredby')" (click)="toggleExportKey('referredby')"><svg [nxIcon]="isExportKeyOn('referredby') ? 'check' : 'plus'" class="nx-ic"></svg>{{ exportLabel('referredby') }}</button>
+              <button class="nx-tchip nx-tchip--sm" type="button" data-testid="new-export-col-tags" [class.is-on]="isExportKeyOn('tags')" [attr.aria-pressed]="isExportKeyOn('tags')" (click)="toggleExportKey('tags')"><svg [nxIcon]="isExportKeyOn('tags') ? 'check' : 'plus'" class="nx-ic"></svg>{{ exportLabel('tags') }}</button>
+              @if (isExportColumnOffered('workshop')) {
+                <button class="nx-tchip nx-tchip--sm" type="button" data-testid="new-export-col-workshop" [class.is-on]="isExportKeyOn('workshop')" [attr.aria-pressed]="isExportKeyOn('workshop')" (click)="toggleExportKey('workshop')"><svg [nxIcon]="isExportKeyOn('workshop') ? 'check' : 'plus'" class="nx-ic"></svg>{{ exportLabel('workshop') }}</button>
+              }
+              @if (isExportColumnOffered('movedon')) {
+                <button class="nx-tchip nx-tchip--sm" type="button" data-testid="new-export-col-movedon" [class.is-on]="isExportKeyOn('movedon')" [attr.aria-pressed]="isExportKeyOn('movedon')" (click)="toggleExportKey('movedon')"><svg [nxIcon]="isExportKeyOn('movedon') ? 'check' : 'plus'" class="nx-ic"></svg>{{ exportLabel('movedon') }}</button>
+              }
+            </div>
+          </div>
+          <div class="nx-panel-foot">
+            @switch (exportDisabledReason) {
+              @case ('') { <span class="nx-grow" data-testid="new-export-summary">{{ exportSummaryText }}</span> }
+              @case ('workshop-loading') { <span class="nx-grow" data-testid="new-export-reason">{{ exportReasonText }}</span> }
+              @default { <span class="nx-grow nx-warnline" data-testid="new-export-reason"><svg nxIcon="info" class="nx-ic nx-ic--sm"></svg>{{ exportReasonText }}</span> }
+            }
+            <button class="nx-primary" type="button" data-testid="new-export-excel-30" [disabled]="exportDisabledReason !== ''" (click)="exportExcel()">
+              @if (exportDisabledReason === 'workshop-loading') {
+                <span class="nx-spin"></span>Loading…
+              } @else {
+                <svg nxIcon="download" class="nx-ic"></svg>Download Excel
+              }
+            </button>
+          </div>
+        </ng-template>
+
+        <ng-template #sendBody let-sheet>
+          <div class="nx-panel-head">
+            <div>
+              <h3 class="nx-panel-title" id="nx-send-title">Send to {{ sendCount | number }} {{ sendCount === 1 ? 'person' : 'people' }}</h3>
+              @if (hiddenSelectedCount > 0) {
+                <p class="nx-panel-sub" data-testid="new-comm-hidden-note"><svg nxIcon="eye-off" class="nx-ic"></svg>{{ hiddenSelectedCount | number }} {{ hiddenSelectedCount === 1 ? 'is' : 'are' }} hidden by filters and still included</p>
+              }
+            </div>
+            @if (sheet) {
+              <button class="nx-iconbtn" type="button" data-testid="new-send-sheet-close" aria-label="Close" (click)="toggleComm()"><svg nxIcon="x" class="nx-ic"></svg></button>
+            }
+          </div>
+          <div class="nx-panel-body">
+            <div class="nx-channels">
+              <button class="nx-channel" type="button" data-testid="new-send-email-to-selected-paricipant-32" (click)="sendEmailToSelectedParicipant()">
+                <span class="nx-channel-ic"><svg nxIcon="mail" class="nx-ic"></svg></span>
+                <span><strong>Email</strong><small>Compose an email to {{ sendCount | number }} {{ sendCount === 1 ? 'person' : 'people' }}</small></span>
+              </button>
+              <button class="nx-channel" type="button" data-testid="new-send-watti-33" (click)="sendWatti()">
+                <span class="nx-channel-ic"><svg nxIcon="chat" class="nx-ic"></svg></span>
+                <span><strong>WhatsApp</strong><small>Send a WhatsApp template to {{ sendCount | number }} {{ sendCount === 1 ? 'person' : 'people' }}</small></span>
+              </button>
+              <button class="nx-channel" type="button" data-testid="new-send-notificationin-breakthrough-34" (click)="sendNotificationinBreakthrough()">
+                <span class="nx-channel-ic"><svg nxIcon="bell" class="nx-ic"></svg></span>
+                <span><strong>App notification</strong><small>Notify {{ sendCount | number }} {{ sendCount === 1 ? 'person' : 'people' }} in the Breakthroughs app</small></span>
+              </button>
+            </div>
+          </div>
+          @if (sheet) {
+            <div class="nx-bsheet-foot">
+              <button class="nx-quiet nx-quiet--wide" type="button" data-testid="new-send-sheet-cancel" (click)="toggleComm()">Cancel</button>
+            </div>
+          }
+        </ng-template>
+      }
+    }
   </div>
-</div>
 </div>

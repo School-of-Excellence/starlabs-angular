@@ -861,6 +861,109 @@ export function canReviewAssignment(participant: any): boolean {
   } catch (error) { return false; }
 }
 
+/**
+ * The side-panel person menu's line under a disabled "View participant data" (operator 2026-11-17): why
+ * there is nothing to open. Only a started person with a participant workshop doc has a progress row,
+ * so the reason depends on the person's first enrolled doc in this workshop (undefined = not enrolled).
+ */
+export function personMenuNoDataNote(enrolledDoc: { status?: any } | null | undefined): string {
+  if (!enrolledDoc) return 'Not enrolled in this workshop';
+  if (enrolledDoc.status === 'enrolled') return 'Started — no progress recorded yet';
+  return 'Not started — no data in this workshop yet';
+}
+
+/**
+ * new_user_data is read once and the dashboard no longer waits for it (2026-11-18), so a side panel opened
+ * before it lands holds entries built without it: a new user's row says 'Unknown' and carries no contact
+ * details, which the search, the exports and the senders all read. When it lands the open panel is patched in
+ * place — its rows, filters and search stay — with what this returns for each entry: the name where the entry
+ * had none (or 'Unknown'), the contact details where it had none (or an empty object). `profile` is the
+ * dashboard's profile map entry (participant metadata, overlaid with the still-new users' new_user_data doc);
+ * `newProfile` is the person's new_user_data doc. Details come only from `profile`: a person moved to a full
+ * profile keeps their stale new_user_data doc, which must not stand in for their details (isNewUserProfile).
+ * Never overwrites what the entry already had. null = nothing to change.
+ */
+export function panelEntryFill(entry: any, profile: any, newProfile: any): { name?: string; metadata?: any } | null {
+  const out: { name?: string; metadata?: any } = {};
+  const had = entry?.name === null || entry?.name === undefined ? '' : String(entry.name).trim();
+  if (!had || had === 'Unknown') {
+    const known = profile?.name || newProfile?.name;
+    if (known) out.name = known;
+  }
+  const m = entry?.metadata;
+  const noDetails = m === null || m === undefined || (typeof m === 'object' && Object.keys(m).length === 0);
+  if (noDetails && profile && typeof profile === 'object' && Object.keys(profile).length > 0) out.metadata = profile;
+  return out.name !== undefined || out.metadata !== undefined ? out : null;
+}
+
+/**
+ * The one-time new_user_data read (2026-11-18 review): Firestore Lite sends it as a single request with no retry
+ * and no timeout of its own, so one dropped connection used to leave the three People cards on "—" until a reload,
+ * and a stalled one left them loading for good. A read is retried only when trying again can help — the network
+ * or the server hiccuped. Lite reports a request that never got an HTTP answer (a dropped connection, an aborted
+ * fetch) as 'unknown'. Rules, auth and a bad query fail the same way every time, so they are not retried.
+ * Classified by the error's `code` string only (no Firestore import, like the rest of this file).
+ */
+export const TRANSIENT_READ_CODES: readonly string[] =
+  ['unknown', 'unavailable', 'deadline-exceeded', 'internal', 'resource-exhausted', 'aborted', 'cancelled'];
+
+export function isTransientReadError(err: any): boolean {
+  const code = typeof err?.code === 'string' ? err.code.replace(/^firestore\//, '') : '';
+  return TRANSIENT_READ_CODES.includes(code);
+}
+
+/** What retryRead rejects with when the deadline passes first. */
+export class ReadTimeoutError extends Error {
+  readonly code = 'deadline-exceeded';
+  constructor(readonly timeoutMs: number) {
+    super(`gave up after ${Math.round(timeoutMs / 1000)}s`);
+    this.name = 'ReadTimeoutError';
+  }
+}
+
+export interface RetryReadOptions<T> {
+  /** The wait before each retry; its length is how many retries there are. */
+  delaysMs: number[];
+  /** The whole read, retries and waits included, gives up after this — so a caller is never left waiting forever. */
+  timeoutMs: number;
+  /** An attempt already out when the deadline passed that lands afterwards. No new attempt starts after the deadline. */
+  onLate?: (value: T) => void;
+  sleep?: (ms: number) => Promise<void>;
+}
+
+/**
+ * Runs `read`, retrying transient failures after each of `delaysMs`, and settles by `timeoutMs` at the latest:
+ * with the value, with the first error that is not worth retrying (or the last one), or with ReadTimeoutError.
+ */
+export function retryRead<T>(read: () => Promise<T>, opts: RetryReadOptions<T>): Promise<T> {
+  const sleep = opts.sleep ?? ((ms: number) => new Promise<void>(r => setTimeout(r, ms)));
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(new ReadTimeoutError(opts.timeoutMs));
+    }, opts.timeoutMs);
+    const finish = (fn: () => void) => { if (settled) return false; settled = true; clearTimeout(timer); fn(); return true; };
+    (async () => {
+      for (let attempt = 0; ; attempt++) {
+        let value: T;
+        try {
+          value = await read();
+        } catch (err) {
+          if (settled) return;
+          if (attempt >= opts.delaysMs.length || !isTransientReadError(err)) { finish(() => reject(err)); return; }
+          await sleep(opts.delaysMs[attempt]);
+          if (settled) return;   // the deadline passed while waiting: no new attempt
+          continue;
+        }
+        if (!finish(() => resolve(value))) opts.onLate?.(value);
+        return;
+      }
+    })();
+  });
+}
+
 /** Tooltip on a previous submission in the assignment history. */
 export function oldResultTooltip(oldResult: { isQuestionAssignment?: boolean; date?: any }): string {
   return oldResult.isQuestionAssignment
