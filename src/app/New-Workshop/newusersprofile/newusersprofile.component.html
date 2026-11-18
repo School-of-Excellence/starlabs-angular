@@ -27,7 +27,7 @@
           </div>
           <button class="nx-tool" type="button" data-testid="new-import-from-excel-21"
             cdkOverlayOrigin #importOrigin="cdkOverlayOrigin"
-            [class.is-open]="isPanelOpen('import')" [disabled]="importing" [attr.aria-busy]="importing ? 'true' : null"
+            [class.is-open]="isPanelOpen('import')" [disabled]="importing || phase !== 'ready'" [attr.aria-busy]="importing ? 'true' : null"
             aria-haspopup="dialog" [attr.aria-expanded]="isPanelOpen('import')"
             [attr.aria-label]="importing ? importBusyLabel : 'Select from file'"
             title="Pick an Excel file of emails; the matching people get selected"
@@ -67,7 +67,7 @@
               </div>
               <div class="nx-pop-foot">
                 <span>Replaces the current selection</span>
-                <button class="nx-primary nx-primary--sm" type="button" data-testid="new-import-choose-file" [disabled]="importing" (click)="pickImportFile()">
+                <button class="nx-primary nx-primary--sm" type="button" data-testid="new-import-choose-file" [disabled]="importing || phase !== 'ready'" (click)="pickImportFile(importOrigin.elementRef)">
                   <svg nxIcon="sheet" class="nx-ic nx-ic--sm"></svg>Choose file
                 </button>
               </div>
@@ -157,7 +157,7 @@
               <span class="nx-sr">Search new users</span>
               <svg nxIcon="search" class="nx-ic"></svg>
               <input type="search" data-testid="new-search-input" autocomplete="off" spellcheck="false"
-                placeholder="Search name, phone, email, tag or date"
+                [placeholder]="isPhone ? 'Search' : 'Search name, phone, email, tag or date'"
                 role="combobox" aria-autocomplete="list" aria-controls="nx-suggest-list"
                 [attr.aria-expanded]="suggestOpen && suggestions.length > 0"
                 [attr.aria-activedescendant]="suggestOpen && suggestActive >= 0 ? 'nx-sug-' + suggestActive : null"
@@ -288,7 +288,7 @@
                   }
                 }
                 <button class="nx-link" type="button" data-testid="new-clear-all-filters-22" (click)="clearAllFilters()">Clear all filters</button>
-              } @else if (!selection.hasValue()) {
+              } @else if (!selection.hasValue() && filteredCount > 0) {
                 <span class="nx-vr" aria-hidden="true"></span>
                 <span class="nx-hint" data-testid="new-readout-hint">Tick people to tag, export or message them.</span>
               }
@@ -361,7 +361,7 @@
                 (change)="masterToggle()"></mat-checkbox>
               <span>Select all {{ filteredCount | number }}</span>
               <label class="nx-cardbar-sort">
-                <span class="nx-sr">Sort</span>
+                <span>Sort</span>
                 <span class="nx-selectbox">
                   <select data-testid="new-card-sort" aria-label="Sort people" [disabled]="tableLocked" (change)="setCardSort($any($event.target).value)">
                     @for (o of cardSortChoices; track o.key) {<option [value]="o.key" [selected]="o.key === cardSortKey">{{ o.label }}</option>}
@@ -635,7 +635,8 @@
               </table>
             </div>
 
-            <!-- ---------------------------------------------------- pager -->
+            <!-- ---------------------------------------------------- pager (not on no match: the sheet ends at the message) -->
+            @if (filteredCount > 0) {
             <footer class="nx-foot">
               <span>Rows per page</span>
               <span class="nx-selectbox">
@@ -651,12 +652,14 @@
                 <button class="nx-iconbtn" type="button" data-testid="new-page-last" aria-label="Last page" [disabled]="!pager.hasNext" (click)="pager.lastPage()"><svg nxIcon="last" class="nx-ic"></svg></button>
               </div>
             </footer>
+            }
           }
         </section>
 
         <!-- ============================================================ selection dock (sticky, under the sheet: never a side panel) -->
         @if (selection.hasValue()) {
-          <div class="nx-dock" role="region" aria-label="Selection actions" data-testid="new-selection-bar" [attr.aria-busy]="updatingTags ? 'true' : null">
+          <div class="nx-dock" role="region" aria-label="Selection actions" data-testid="new-selection-bar" [attr.aria-busy]="updatingTags ? 'true' : null"
+            (keydown.escape)="closeDockPanels($event, exportToggle, commToggle)">
 
             <!-- Export and Send: one at a time, inside the dock (not modal, no backdrop), removed from the DOM when closed.
                  Below 620px they open as bottom sheets instead (further down), never both. -->
@@ -694,11 +697,11 @@
             <button class="nx-dbtn nx-dbtn--primary" type="button" data-testid="new-open-bulk-tags-27" [disabled]="updatingTags" (click)="openBulkTags()">
               <svg nxIcon="tag" class="nx-ic"></svg><span class="nx-lbl-long">Edit tags</span><span class="nx-lbl-short">Tags</span>
             </button>
-            <button class="nx-dbtn" type="button" data-testid="new-toggle-export-28" [disabled]="updatingTags"
+            <button class="nx-dbtn" type="button" data-testid="new-toggle-export-28" #exportToggle [disabled]="updatingTags"
               [class.is-open]="showExport" aria-haspopup="true" [attr.aria-expanded]="showExport" (click)="toggleExport()">
               <svg nxIcon="download" class="nx-ic"></svg>Export<svg [nxIcon]="showExport ? 'chev-down' : 'chev-up'" class="nx-ic nx-chev"></svg>
             </button>
-            <button class="nx-dbtn" type="button" data-testid="new-toggle-comm-31" [disabled]="updatingTags"
+            <button class="nx-dbtn" type="button" data-testid="new-toggle-comm-31" #commToggle [disabled]="updatingTags"
               [class.is-open]="showComm" aria-haspopup="true" [attr.aria-expanded]="showComm" aria-label="Send communication" (click)="toggleComm()">
               <svg nxIcon="send" class="nx-ic"></svg><span class="nx-lbl-long">Send communication</span><span class="nx-lbl-short">Send</span><svg [nxIcon]="showComm ? 'chev-down' : 'chev-up'" class="nx-ic nx-chev"></svg>
             </button>
@@ -744,7 +747,7 @@
               }
             </div>
             <div class="nx-pop-foot" data-testid="new-suggest-footer">
-              <span>@if (suggestSearchCount !== null) {<strong>{{ suggestSearchCount | number }}</strong> {{ suggestSearchCount === 1 ? 'person mentions' : 'people mention' }} “{{ searchText.trim() }}” in their details} @else {Search for “{{ searchText.trim() }}” in people's details}</span>
+              <span class="nx-suggest-note">@if (suggestSearchCount !== null) {<strong>{{ suggestSearchCount | number }}</strong> {{ suggestSearchCount === 1 ? 'person mentions' : 'people mention' }} “<span class="nx-suggest-q">{{ searchText.trim() }}</span>” in their details} @else {Search for “<span class="nx-suggest-q">{{ searchText.trim() }}</span>” in people's details}</span>
               <span class="nx-flex nx-flex--tight"><span class="nx-kbd">Enter</span>search</span>
             </div>
           </div>
@@ -1003,15 +1006,15 @@
           <div class="nx-root nx-pop nx-pop--menu" role="menu" aria-label="Conversion" data-testid="new-conversion-panel" (keydown)="onMenuKeydown($event)">
             <div class="nx-optlist nx-optlist--menu">
               <button class="nx-opt nx-opt--tall" type="button" role="menuitemradio" data-testid="new-set-converted-filter-everyone"
-                [class.is-on]="!convertedFilter" [attr.aria-checked]="!convertedFilter" [nxAutofocus]="!convertedFilter" (click)="pickConversion('')">
+                [class.is-on]="!convertedFilter" [attr.aria-checked]="!convertedFilter" [nxAutofocus]="!convertedFilter" (click)="pickConversion('', conversionOrigin.elementRef)">
                 <span class="nx-radio" [class.is-on]="!convertedFilter"></span><span>Everyone<span class="nx-opt-desc">No conversion filter</span></span>
               </button>
               <button class="nx-opt nx-opt--tall" type="button" role="menuitemradio" data-testid="new-set-converted-filter-converted"
-                [class.is-on]="convertedFilter === 'converted'" [attr.aria-checked]="convertedFilter === 'converted'" [nxAutofocus]="convertedFilter === 'converted'" (click)="pickConversion('converted')">
+                [class.is-on]="convertedFilter === 'converted'" [attr.aria-checked]="convertedFilter === 'converted'" [nxAutofocus]="convertedFilter === 'converted'" (click)="pickConversion('converted', conversionOrigin.elementRef)">
                 <span class="nx-radio" [class.is-on]="convertedFilter === 'converted'"></span><span>Converted<span class="nx-opt-desc">Moved on to become participants</span></span>
               </button>
               <button class="nx-opt nx-opt--tall" type="button" role="menuitemradio" data-testid="new-set-converted-filter-not-converted"
-                [class.is-on]="convertedFilter === 'notconverted'" [attr.aria-checked]="convertedFilter === 'notconverted'" [nxAutofocus]="convertedFilter === 'notconverted'" (click)="pickConversion('notconverted')">
+                [class.is-on]="convertedFilter === 'notconverted'" [attr.aria-checked]="convertedFilter === 'notconverted'" [nxAutofocus]="convertedFilter === 'notconverted'" (click)="pickConversion('notconverted', conversionOrigin.elementRef)">
                 <span class="nx-radio" [class.is-on]="convertedFilter === 'notconverted'"></span><span>Not converted<span class="nx-opt-desc">Still new users</span></span>
               </button>
             </div>

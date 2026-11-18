@@ -463,6 +463,8 @@ app-newusersprofile{display:block}
 .nx-day.is-end{background:linear-gradient(90deg,var(--primary-tint) 50%,transparent 50%)}
 .nx-day.is-start span,.nx-day.is-end span{background:var(--primary);color:#fff;font-weight:600}
 .nx-day.is-today span{box-shadow:inset 0 0 0 1.5px var(--accent);color:var(--accent-ink);font-weight:600}
+/* today that is also a range end: white numerals on the navy disc, with a light gold ring (review fix) */
+.nx-day.is-today:is(.is-start,.is-end) span{color:#fff;box-shadow:inset 0 0 0 2px var(--accent-on-navy)}
 /* ---- states.css 185–186 ---- */
 .nx-grow{flex:1;min-width:0;color:var(--t2);font-size:13px}
 .nx-grow strong{color:var(--t1);font-weight:600}
@@ -588,8 +590,16 @@ app-newusersprofile{display:block}
 /* CdkTable writes an inline z-index:100 on the sticky header cells: keep it inside the wrapper */
 .nx-tablewrap{isolation:isolate}
 @container nx (min-width:900px){
-  /* the header pins inside the sheet; sideways overflow stays inside the wrapper */
-  .nx-tablewrap{max-height:calc(100vh - 260px);min-height:240px;overflow:auto}
+  /* the header pins inside the sheet; sideways overflow stays inside the wrapper.
+     350px = app bar 64 + bar and readout 126 + pager 57 + dock and its gaps 100: once the page is scrolled to
+     the sheet, the whole sheet and a settled dock fit, so the dock never covers the pager (review fix) */
+  .nx-tablewrap{max-height:calc(100vh - 350px);min-height:240px;overflow:auto}
+  /* Referred by: a value with no break points (an email-like name, a raw id) wraps anywhere instead of
+     widening the column and pushing the table sideways (review fix) */
+  .nx-table td.nx-c-ref{max-width:200px;overflow-wrap:anywhere}
+}
+@container nx (min-width:900px) and (max-width:1320px){
+  .nx-table td.nx-c-ref{max-width:170px}
 }
 .nx-tablewrap.is-scrolled .nx-table th{box-shadow:0 6px 10px -8px rgba(26,37,53,.35)}
 /* the no-data row (workshop read in progress / no match) is a message, not a person */
@@ -672,7 +682,11 @@ app-newusersprofile{display:block}
 .nx-unmatched li{padding:2px 8px;border:1px solid var(--border);border-radius:6px;background:#fff;font:400 12px/1.5 'DM Mono',monospace;color:var(--t2)}
 
 /* ---------- overlay roots (suggestions, panels, sheets) carry .nx-root themselves ---------- */
-.nx-root.nx-pop.nx-suggest{width:360px;max-width:calc(100vw - 24px)}
+.nx-root.nx-pop.nx-suggest{width:420px;max-width:calc(100vw - 24px)}
+/* the footer stays on one line: a long search term is cut with an ellipsis (review fix) */
+.nx-suggest-note{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.nx-suggest-q{display:inline-block;max-width:140px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;vertical-align:bottom}
+.nx-root.nx-suggest .nx-pop-foot > .nx-flex{flex:none}
 .nx-bsheet{position:relative;max-height:94vh}
 
 /* ---------- chrome owned by Material / CDK in the overlay container ---------- */

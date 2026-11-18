@@ -381,6 +381,8 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   // Date range filter on the `created` column.
   startDate: Date | null = null;
   endDate: Date | null = null;
+  /** The quick range last clicked, so it stays marked when another preset covers the same days (the 1st, 7th, 30th). */
+  private appliedPreset: CreatedPreset | null = null;
   // Workshop filter: options from workshopconfiguration (label detailpage.title), read on first need,
   // matching rows via `workshop participant enrolled` (workshopref -> profileid).
   workshopOptions: { id: string; title: string; evergreen: boolean }[] = [];
@@ -1095,6 +1097,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
     this.selectByTagPolarity = 'include';
     this.startDate = null;
     this.endDate = null;
+    this.appliedPreset = null;
     this.calPickingEnd = false;
     this.syncDateTexts();
     this.rebuildCalendar();
@@ -1256,7 +1259,10 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
       return;
     }
     // Workshop suggestions need the list: read it now (funnel-only when that is on); they join when it lands.
-    if (!this.workshopOptionsLoaded && !this.workshopOptionsLoading && this.accessAllowed) this.ensureWorkshopsLoaded();
+    // After a failed read, retries are left to Try again and to opening the Workshops panel (not every keystroke).
+    if (!this.workshopOptionsLoaded && !this.workshopOptionsLoading && !this.workshopOptionsError && this.accessAllowed) {
+      this.ensureWorkshopsLoaded();
+    }
     const split = (label: string): { before: string; match: string; after: string } => {
       const i = label.toLowerCase().indexOf(q);
       return { before: label.slice(0, i), match: label.slice(i, i + q.length), after: label.slice(i + q.length) };
@@ -1803,6 +1809,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   clearDates(): void {
     this.startDate = null;
     this.endDate = null;
+    this.appliedPreset = null;
     this.fromText = '';
     this.toText = '';
     this.calPickingEnd = false;
@@ -1822,6 +1829,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
       return;
     }
     if (!parsed && !(text || '').trim() && !this.validDate(current)) return;
+    this.appliedPreset = null;
     if (which === 'from') this.startDate = parsed;
     else this.endDate = parsed;
     if (parsed) {
@@ -1836,6 +1844,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
     const range = this.presetRange(preset);
     this.startDate = range.start;
     this.endDate = range.end;
+    this.appliedPreset = preset;
     this.calPickingEnd = false;
     this.syncDateTexts();
     this.calMonth = NewusersprofileComponent.monthStart(range.end);
@@ -1847,6 +1856,11 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
     const s = this.validDate(this.startDate);
     const e = this.validDate(this.endDate);
     if (!s || !e) return null;
+    const applied = this.appliedPreset;
+    if (applied) {
+      const r = this.presetRange(applied);
+      if (this.sameDay(r.start, s) && this.sameDay(r.end, e)) return applied;
+    }
     for (const p of ['today', '7d', '30d', 'month'] as CreatedPreset[]) {
       const r = this.presetRange(p);
       if (this.sameDay(r.start, s) && this.sameDay(r.end, e)) return p;
@@ -1872,6 +1886,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
     if (!d) return;
     const picked = new Date(d.getFullYear(), d.getMonth(), d.getDate());
     const start = this.validDate(this.startDate);
+    this.appliedPreset = null;
     if (!this.calPickingEnd || !start) {
       this.startDate = picked;
       const end = this.validDate(this.endDate);
@@ -2063,9 +2078,10 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   }
 
   /** Conversion panel pick: set and close (menu semantics). */
-  pickConversion(value: ConvertedFilter): void {
+  /** Picks an option and closes the menu, returning focus to the pill (as mat-menu did). */
+  pickConversion(value: ConvertedFilter, trigger?: HTMLElement | ElementRef<HTMLElement> | null): void {
     this.setConvertedFilter(value);
-    if (this.openPanel === 'conversion') this.openPanel = null;
+    if (this.openPanel === 'conversion') this.closePanelAndFocus(trigger);
   }
 
   clearConvertedFilter(): void {
@@ -2119,17 +2135,28 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
     this.commitDateText('to');
     this.filtersSheetOpen = false;
     this.sheetView = 'main';
+    this.releaseTagOrder();
   }
 
   setSheetView(view: 'main' | 'tags' | 'workshops'): void {
+    if (view !== 'tags') this.releaseTagOrder();
     this.sheetView = view;
     if (view === 'tags') {
+      // Like the desktop panel: the order is frozen while choosing, so a tapped tag stays under the finger.
       this.tagFind = '';
+      this.tagOrderSnapshot = new Set(this.selectByTagIds);
       this.rebuildTagPanelLists();
     } else if (view === 'workshops') {
       this.workshopFind = '';
       this.ensureWorkshopsLoaded();
     }
+  }
+
+  /** Ends a frozen tag order (sheet tag view left or closed): chosen tags move to the top again. */
+  private releaseTagOrder(): void {
+    if (!this.tagOrderSnapshot) return;
+    this.tagOrderSnapshot = null;
+    this.rebuildTagPanelLists();
   }
 
   /** The card Sort select's current option, read off MatSort. */
@@ -2202,11 +2229,13 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
 
   /** Dock "Select all N matching": select only, never toggles off. */
   selectAllMatching(): void {
+    this.showExport = this.showComm = false;
     this.selectIds([...this.filteredIdSet].filter(id => id && !this.selection.isSelected(id)));
   }
 
   /** "Select only this page" / "Only this page": exactly the rows rendered on the current page. */
   onlyThisPage(): void {
+    this.showExport = this.showComm = false;
     const ids = (this.pageRows || []).map(u => this.rowId(u)).filter(Boolean);
     this.selection.clear();
     this.selectIds(ids);
@@ -2384,6 +2413,15 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
     if (this.showComm) this.showExport = false;
   }
 
+  /** Escape inside the dock closes Export or Send and puts focus back on the button that opened it. */
+  closeDockPanels(event?: Event | null, exportToggle?: HTMLElement | null, commToggle?: HTMLElement | null): void {
+    if (!this.showExport && !this.showComm) return;
+    const back = this.showExport ? exportToggle : commToggle;
+    this.showExport = this.showComm = false;
+    event?.stopPropagation();
+    if (this.isBrowser && back && typeof back.focus === 'function') setTimeout(() => back.focus({ preventScroll: true }));
+  }
+
   // =====================================================================================
   // Select from file
   // =====================================================================================
@@ -2398,9 +2436,9 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
     this.pickImportFile();
   }
 
-  /** "Choose file": closes the popover and opens the native picker (.xlsx / .xls). */
-  pickImportFile(): void {
-    if (this.openPanel === 'import') this.openPanel = null;
+  /** "Choose file": closes the popover (focus back on its trigger) and opens the native picker (.xlsx / .xls). */
+  pickImportFile(trigger?: HTMLElement | ElementRef<HTMLElement> | null): void {
+    if (this.openPanel === 'import') this.closePanelAndFocus(trigger);
     if (!this.isBrowser || this.importing) return;
     const input = document.createElement('input');
     this.importFileInput = input;
@@ -2574,6 +2612,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   async openBulkTags(): Promise<void> {
     const ids = this.selection.selected;
     if (!ids.length || this.applyingBulk) return;
+    this.showExport = this.showComm = false;
     const users = ids.map(id => this.dataById.get(id)).filter(Boolean);
     const ref = await this.openAssignDialog({ mode: 'bulk', users });
     ref?.afterClosed().pipe(takeUntil(this.destroy$)).subscribe((result: any) => {
@@ -2596,7 +2635,10 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
         maxHeight: '90vh',
         autoFocus: false,
         panelClass: 'atd-dialog-panel',
-        data: { ...data, tagCounts: this.tagCounts }
+        // Manage tags: pinned near the top, so the header stays put when its two tabs differ in height.
+        ...(data?.['mode'] === 'manage' ? { position: { top: '8vh' } } : {}),
+        // Counts only once the list has arrived; until then the dialog shows tags without counts.
+        data: { ...data, tagCounts: this.loading ? null : this.tagCounts }
       });
     } finally {
       this.dialogOpening = false;

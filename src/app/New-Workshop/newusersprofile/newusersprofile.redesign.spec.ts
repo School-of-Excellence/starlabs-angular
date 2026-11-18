@@ -104,9 +104,8 @@ describe('NewusersprofileComponent — redesign data layer', () => {
         c.applyPreset(p);
         expect(c.startDate.getTime()).withContext(p).toBe(start.getTime());
         expect(c.endDate.getTime()).withContext(p).toBe(today.getTime());
-        // On the 1st, 7th or 30th "This month" equals an earlier preset; the first equal one is marked.
-        const first = ['today', '7d', '30d', 'month'].find(q => c.presetRange(q).start.getTime() === start.getTime());
-        expect(c.activePreset).withContext(p).toBe(first);
+        // The clicked one stays marked, even on the 1st, 7th or 30th when another preset covers the same days.
+        expect(c.activePreset).withContext(p).toBe(p);
         expect(c.calMonth.getMonth()).toBe(today.getMonth());
         expect(c.fromText).toBe(c.formatDay(start));
       };
@@ -117,6 +116,28 @@ describe('NewusersprofileComponent — redesign data layer', () => {
       c.clearDates();
       expect(c.activePreset).toBeNull();
       expect(c.fromText).toBe('');
+    });
+
+    it('the clicked quick range stays marked on the 1st, 7th and 30th (ties with Today / Last 7 / Last 30 days)', () => {
+      jasmine.clock().install();
+      try {
+        for (const [d, twin] of [[1, 'today'], [7, '7d'], [30, '30d']] as [number, string][]) {
+          jasmine.clock().mockDate(new Date(2026, 9, d, 10, 0));
+          const c = make();
+          c.applyPreset('month');
+          expect(c.activePreset).withContext(`Oct ${d}: This month`).toBe('month');
+          c.applyPreset(twin);
+          expect(c.activePreset).withContext(`Oct ${d}: ${twin}`).toBe(twin);
+          // A typed or picked range that equals a preset marks the first equal one.
+          c.toText = '';
+          c.commitDateText('to');
+          c.toText = c.formatDay(new Date(2026, 9, d));
+          c.commitDateText('to');
+          expect(c.activePreset).withContext(`Oct ${d}: typed`).toBe(twin);
+        }
+      } finally {
+        jasmine.clock().uninstall();
+      }
     });
 
     it('builds the month grid with leading blanks, a range band and today', () => {
@@ -508,6 +529,26 @@ describe('NewusersprofileComponent — redesign data layer', () => {
     expect(c.tagPanelChosen.map((t: any) => t.name)).toEqual(['Gold Members', 'Hindi Batch']);
   });
 
+  it('the Filters sheet tag view freezes the order while choosing, like the desktop panel', () => {
+    const c = withData(make());
+    const chosen = () => c.tagPanelChosen.map((t: any) => t.name);
+    c.applyWidth(820);
+    c.openFiltersSheet();
+    c.toggleTagSelect('t3');
+    c.setSheetView('tags');
+    expect(chosen()).toEqual(['Hindi Batch']);
+    c.toggleTagSelect('t1');                    // stays in place
+    expect(chosen()).toEqual(['Hindi Batch']);
+    expect(c.tagPanelRest.map((t: any) => t.name)).toEqual(['Corporate', 'Gold Members']);
+    c.setSheetView('main');
+    expect(chosen()).toEqual(['Gold Members', 'Hindi Batch']);
+    c.setSheetView('tags');
+    c.toggleTagSelect('t2');
+    expect(chosen()).toEqual(['Gold Members', 'Hindi Batch']);
+    c.closeFiltersSheet();
+    expect(chosen()).toEqual(['Corporate', 'Gold Members', 'Hindi Batch']);
+  });
+
   it('Workshops list: read on first need, funnel-only first, the full list when Funnel only turns off', async () => {
     const c = withData(make());
     const spy = spyOn(c, 'fetchWorkshopOptions').and.callFake((funnel: boolean) => Promise.resolve(funnel
@@ -529,6 +570,24 @@ describe('NewusersprofileComponent — redesign data layer', () => {
     expect(c.allWorkshopsCount).toBe(2);
     c.workshopFind = 'alp';
     expect(c.filteredWorkshopOptions.map((w: any) => w.title)).toEqual(['Alpha Retreat']);
+  });
+
+  it('a failed workshop list read is not retried on every search keystroke; opening the panel retries', async () => {
+    const c = withData(make());
+    c.accessAllowed = true;
+    spyOn(console, 'error');
+    const spy = spyOn(c, 'fetchWorkshopOptions').and.returnValue(Promise.reject(new Error('denied')));
+    c.onSearchInput({ target: { value: 'as' } } as any);
+    await c.ensureWorkshopsLoaded();
+    expect(c.workshopOptionsError).toBeTrue();
+    expect(spy).toHaveBeenCalledTimes(1);
+    for (const q of ['ash', 'asha', 'asha ', 'asha r']) c.onSearchInput({ target: { value: q } } as any);
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(console.error).toHaveBeenCalledTimes(1);
+    c.openFilterPanel('workshops');
+    expect(spy).toHaveBeenCalledTimes(2);
+    await c.ensureWorkshopsLoaded();
+    c.commitSearch();
   });
 
   it('Columns button note and narrow layout flag', () => {
@@ -596,6 +655,11 @@ describe('NewusersprofileComponent — redesign data layer', () => {
 
   it('opens the tag dialog with the design panel, width, and per-tag counts', async () => {
     const c = withData(make());
+    c.loading = true;                            // list not arrived yet: no counts (not "0 people")
+    await c.openTagsManager();
+    expect(dialogOpen.calls.mostRecent().args[1].data.tagCounts).toBeNull();
+    dialogOpen.calls.reset();
+    c.loading = false;
     await c.openTagsManager();
     expect(dialogOpen).toHaveBeenCalledTimes(1);
     const cfg = dialogOpen.calls.mostRecent().args[1];
@@ -603,11 +667,34 @@ describe('NewusersprofileComponent — redesign data layer', () => {
     expect(cfg.width).toBe('580px');
     expect(cfg.maxWidth).toBe('95vw');
     expect(cfg.data.mode).toBe('manage');
+    expect(cfg.position).toEqual({ top: '8vh' });  // the header stays put when the tabs differ in height
     expect(cfg.data.tagCounts).toEqual({ t1: 2, t2: 2, t3: 1 });
     const u = c.dataSource.data[0];
     await c.openTags(u);
     expect(dialogOpen.calls.mostRecent().args[1].data.user).toBe(u);
     expect(dialogOpen.calls.mostRecent().args[1].data.mode).toBeUndefined();
+    expect(dialogOpen.calls.mostRecent().args[1].position).toBeUndefined();
+  });
+
+  it('Export and Send close on Escape in the dock, on Edit tags and on Select all matching / Only this page', async () => {
+    const c = withData(make());
+    c.selection.select('u1');
+    const stop = jasmine.createSpy('stopPropagation');
+    c.closeDockPanels({ stopPropagation: stop } as any, null, null);
+    expect(stop).not.toHaveBeenCalled();         // nothing open: Escape goes on
+    c.toggleExport();
+    c.closeDockPanels({ stopPropagation: stop } as any, null, null);
+    expect(c.showExport).toBeFalse();
+    expect(stop).toHaveBeenCalledTimes(1);
+    c.toggleComm();
+    c.selectAllMatching();
+    expect(c.showComm).toBeFalse();
+    c.toggleExport();
+    c.onlyThisPage();
+    expect(c.showExport).toBeFalse();
+    c.toggleComm();
+    await c.openBulkTags();
+    expect(c.showComm).toBeFalse();
   });
 
   it('Retry re-subscribes and keeps the search and filters', () => {
