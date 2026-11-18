@@ -194,3 +194,88 @@ Three causes stacked, only one of which the fix addresses:
   usually holds one but is not a guarantee. `minInstances: 1` would be deterministic, at continuous cost.
 - It does not help the **first** click of a call that starts more than 10 min after the host screen opened
   — the warm-up only begins when the host screen loads and `isHost()` is true.
+
+---
+
+## Appendix C — Scope verification: which systems create OpenVidu rooms (2026-11-18)
+
+Operator question: "we set this up only for the appointment-based system — have we integrated it
+with anything else?" Answer: **no, it is not appointment-only.** Three session types exist.
+
+| `sessiontype` | Created by | Route | `mediaProvider` stamped at creation? |
+|---|---|---|---|
+| `appointment` | `appointment-studio.component.ts:660` | `/appointmentstudio` (specialist side) | yes — via the helper's dynamic read |
+| `appointment` | `list-openvidu-room.component.ts:133` | **`/participantstudio`** (`app.routes.ts:350`) | yes — same helper |
+| `live assignment` | `dynamic-studio-v2.component.ts:5064`, `dynamic-studio.component.ts:2596` | `/dynamicstudio` (queue) | yes — same helper |
+| `private` | `openvidu-recording.component.ts:248` | instant meeting ("create a New Room") | yes — explicit `mediaProvider: activeProvider` |
+
+Note: `/participantstudio` loads `ListOpenviduRoomComponent` — the participant studio and the
+OpenVidu room list are the **same component**, which is why it writes `sessiontype: "appointment"`.
+All five creators go through `guard.createOpenViduRoom()`; none writes the doc directly any more
+(the old inline `setDoc(roomData)` blocks are commented out beside each call).
+
+### Asymmetry that still matters
+
+The 5-minute controller (`CheckOciNodeStatus`) has **two** inputs, and they do not cover the same ground:
+
+- **Pre-create / stop-to-zero gate** (`OCI_endpoint.js:712`) queries the `appointments`
+  collection only (`platform == openvidu`, `starttime` in the next 15 min, `cancelled == false`,
+  `attended == false`). Queue sessions and instant rooms have **no appointment doc**, so they are
+  invisible here — they can never pre-warm the server, and they never count as "something upcoming"
+  in the stop decision at step 6.
+- **Wake-on-join** (`findRoomsWaitingForServer`, `:521`) queries `openviduroom` for
+  `active == true` touched in the last 30 min, treating a missing `mediaProvider` as OCI. This is
+  collection-agnostic, so it covers **all three** session types. It is the only path by which a
+  queue session or an instant room can start the server.
+
+So: pre-warming is appointment-only by design; recovery is universal. A queue or instant call on a
+cold server always pays the boot — it is never pre-warmed, only woken. Raising that to "queue
+sessions pre-warm too" would need a second query (e.g. on the live-queue doc) and is **not** in the
+2026-11-14 plan — not proposed, recorded here only as a known limit.
+
+### Where the server stops, per type
+
+- **Scheduled appointment** — stop can only happen >15 min before the meeting (step 2 keeps it
+  alive inside the window). The 12 Nov incident was this plus cause A: the pre-create crashed, so
+  no room doc existed, and at 15:00:03 `starttime > now` dropped the meeting from the window →
+  step 6 fired with 0 rooms + 0 meetings.
+- **Instant (private)** — the room doc is created and the app calls `startOciMaster` immediately,
+  so a stop happens only if nobody is in it 15 idle minutes later (housekeeping), which is correct.
+- **Queue (live assignment)** — nothing in `appointments`, so step 2 contributes 0. The only thing
+  keeping the server up is the room being counted active at step 5/6. Before the `mediaProvider`
+  stamp, those rooms were not counted → **step 6 could stop the master with a live queue call
+  running.** This is the exact combination that made cause B visible, and it is why the stamp
+  (not the janitor) is the load-bearing fix.
+
+### Part 3 status
+
+Part 3 (boot time: why 8–10 min, master vs media node, can it be instant) is already written up in
+**Appendix A** above, including the ranked speed-up table and the 13-OCPU quota finding. Parked at
+the operator's request on 2026-11-18 — to be picked up after Part 1 closes.
+
+---
+
+## Appendix D — Scope decision and backlog (2026-11-18)
+
+Operator decision: the **appointment** flow is done and stays as it is. Queue and instant were
+built on the appointment system's assumptions and were never designed for; the gaps are now
+recorded in **`specs/plans/2026-11-18-openvidu-queue-instant-backlog.md`** (backlog, not an
+approved plan — nothing implemented).
+
+Two things that came out of writing it, both load-bearing:
+
+1. **"Keep the master always running" is not a config change.** `stopOciMaster()` does
+   `setPoolSize(0)` then `SOFTSTOP`, and controller step 7 never lowers the pool — "scale-down
+   only happens via stop-to-zero". So not stopping the master also means never draining the pool:
+   master + every node ever ordered stay billed. Decoupling the two needs a **new idle scale-down
+   path**, which does not exist today. That is the real work item behind the operator's direction.
+
+2. **The 8-minute media-node wait is a heuristic, not a measurement.**
+   `MEDIA_NODE_READY_AFTER_MS = 8 * 60 * 1000` with its own TODO to tune it; OpenVidu 3 exposes no
+   media-node readiness API. If cloud-init finishes in 5 min we still wait 8. So "make the boot
+   faster" (custom image) and "stop guessing when it finished" (boot-script callback) are two
+   separate wins, and after the first one the second becomes the binding constraint.
+
+Corrected timing for the record: **instant ≈ 8–10 min** (the app issues `START` ~1 s after the
+click), **queue ≈ 8–15 min** (0–5 min waiting for the next cron tick, because nothing in the queue
+path calls `startOciMaster`). The 8–15 figure belongs to queue, not instant.
