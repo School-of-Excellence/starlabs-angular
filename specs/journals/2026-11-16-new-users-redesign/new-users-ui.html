@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>New Users · Heritage Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
+<style>
+/* ==========================================================================
+   New Users · Heritage Ledger (final) — plain HTML + CSS design mockup
+   - Every class is prefixed "nx-"; nothing reuses a Bootstrap 5 or Angular
+     Material class name.
+   - Tokens are scoped to .nx-root (never :root) so the port cannot leak them.
+   - Responsive rules are container queries on .nx-shell, so the screen reacts
+     to the width of the content area (sidenav open or closed), not the window.
+   ========================================================================== */
+
+/* ---------- harness only: in the app the shell owns html/body ---------- */
+html,body{height:auto}
+body{margin:0;background:#f4f6f9;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+
+/* ---------- tokens ---------- */
+.nx-root{
+  --primary:#1a3c5e; --primary-light:#2a5a8e; --primary-deep:#14304b; --primary-tint:#eef3f9; --primary-line:#b8c7d9;
+  --accent:#c8a96e; --accent-ink:#7d5f26; --accent-tint:#fbf7ee; --accent-line:#e6d6b2; --accent-on-navy:#dcc391;
+  --bg:#f4f6f9; --surface:#fff; --head:#fafbfc; --hover:#fafbfd; --picked:#f4f7fb;
+  --border:#dde3ec; --border-light:#edf0f5; --border-strong:#c4cdd9;
+  --t1:#1a2535; --t2:#56647b; --t3:#617086;
+  --success:#2e7d52; --success-bg:#e8f5ed; --success-line:#bfe0cb;
+  --danger:#c0392b; --danger-bg:#fdecea; --danger-line:#f1c4be;
+  --warn:#a8630f; --warn-ink:#8a510b; --warn-bg:#fff4e0; --warn-line:#f0d7ab;
+  --ring:0 0 0 3px rgba(42,90,142,.2);
+  --shadow-sheet:0 1px 2px rgba(26,37,53,.04),0 10px 30px -20px rgba(26,37,53,.22);
+  --shadow-pop:0 24px 48px -20px rgba(26,37,53,.34),0 2px 6px rgba(26,37,53,.06);
+  font:400 14px/1.45 'DM Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  color:var(--t1);letter-spacing:normal;text-align:left;
+  font-variant-numeric:lining-nums tabular-nums;
+}
+
+/* ---------- hardening against the global sheets ----------
+   zero-specificity resets first, then a doubled class so `.mat-typography h1/p`
+   and the reboot's p/h margins can never restyle the screen. */
+:where(.nx-root),:where(.nx-root) *,:where(.nx-root) *::before,:where(.nx-root) *::after{box-sizing:border-box}
+:where(.nx-root) :where(button,input,select,textarea){font:inherit;color:inherit;letter-spacing:inherit;margin:0}
+:where(.nx-root) :where(button){cursor:pointer;-webkit-appearance:none;appearance:none;background:none;border:0;padding:0;text-transform:none}
+:where(.nx-root) :where(button:disabled){cursor:not-allowed}
+.nx-root table{border-collapse:separate;border-spacing:0;caption-side:top}
+.nx-root :is(th,td){text-align:left}
+.nx-root.nx-root :is(h1,h2,h3,h4,h5,h6,p,figure,figcaption){margin:0;letter-spacing:normal}
+/* classed paragraphs that need a margin use the same doubled class, e.g. .nx-root.nx-root .nx-msg-text */
+.nx-root label{white-space:normal}
+.nx-root :focus-visible{outline:2px solid var(--primary-light);outline-offset:2px}
+
+/* ---------- icons + helpers ---------- */
+.nx-ic{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;vertical-align:middle}
+.nx-ic--sm{width:15px;height:15px}
+.nx-ic--xs{width:13px;height:13px}
+.nx-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.nx-vr{width:1px;height:24px;background:var(--border);flex:none}
+.nx-lbl-short{display:none}
+
+/* ---------- page shell ---------- */
+.nx-shell{container-type:inline-size;container-name:nx;background:var(--bg)}
+.nx-page{max-width:1440px;margin:0 auto;padding:36px 40px 40px}
+
+/* ---------- header ---------- */
+.nx-head{display:flex;align-items:flex-end;justify-content:space-between;gap:32px;margin-bottom:24px}
+.nx-root .nx-title{font:500 38px/1.1 'Playfair Display',Georgia,serif;color:var(--primary)}
+.nx-root.nx-root .nx-title{letter-spacing:-.005em}
+.nx-rule{display:block;width:40px;height:0;border-top:1.5px solid var(--accent);margin:14px 0 12px}
+.nx-root .nx-lede{color:var(--t2);font-size:14.5px;max-width:62ch}
+.nx-head-aside{display:flex;align-items:center;gap:12px}
+.nx-figure{display:flex;flex-direction:column;align-items:flex-end;padding-right:20px;margin-right:6px;border-right:1px solid var(--border)}
+.nx-figure-num{font:600 28px/1 'DM Sans',sans-serif;color:var(--t1);letter-spacing:-.01em;font-variant-numeric:lining-nums tabular-nums}
+.nx-figure-label{margin-top:7px;font:600 11px/1 'DM Sans',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--t3)}
+
+/* quiet outlined tool button */
+.nx-tool{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 15px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:var(--t1);font-size:13.5px;font-weight:500;white-space:nowrap;transition:border-color .15s,background-color .15s}
+.nx-tool .nx-ic{color:var(--t2)}
+.nx-tool:hover{border-color:var(--primary-line);background:#fbfcfe}
+.nx-tool--sm{height:38px;padding:0 13px;font-size:13px}
+.nx-tool-note{color:var(--t3);font-weight:400}
+.nx-tool.is-open{border-color:var(--primary-line);background:var(--primary-tint);color:var(--primary)}
+.nx-tool:disabled{color:var(--t2);cursor:progress}
+
+/* ---------- the sheet ---------- */
+.nx-sheet{background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-sheet)}
+
+/* toolbar: search · filter pills · columns */
+.nx-bar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:14px 16px}
+.nx-search{position:relative;display:block;flex:1 1 280px;max-width:360px;min-width:240px}
+.nx-search > .nx-ic{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--t3);pointer-events:none}
+.nx-search input{display:block;width:100%;height:40px;padding:0 40px 0 38px;border:1px solid var(--border);border-radius:9px;background:var(--surface);font-size:14px;-webkit-appearance:none;appearance:none;outline-offset:0;transition:border-color .15s,box-shadow .15s}
+.nx-search input::placeholder{color:var(--t3);opacity:1}
+.nx-search input:focus,.nx-search input.is-focus{outline:none;border-color:var(--primary-light);box-shadow:var(--ring)}
+.nx-search-x{position:absolute;right:2px;top:2px;display:grid;place-items:center;width:36px;height:36px;border-radius:7px;color:var(--t2)}
+.nx-search-x:hover{background:var(--border-light);color:var(--t1)}
+.nx-bar > .nx-vr{margin:0 6px}
+.nx-pills{display:flex;flex-wrap:wrap;gap:8px}
+.nx-fpill{display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 12px 0 14px;border:1px solid var(--border);border-radius:999px;background:var(--surface);color:var(--t2);font-size:13.5px;font-weight:500;white-space:nowrap;transition:border-color .15s,background-color .15s}
+.nx-fpill:hover{border-color:var(--primary-line);color:var(--t1)}
+.nx-fpill .nx-ic{color:var(--t3)}
+.nx-fpill .nx-chev{width:14px;height:14px;margin-left:1px}
+.nx-fpill.is-set{background:var(--primary-tint);border-color:var(--primary-line);color:var(--primary);font-weight:600}
+.nx-fpill.is-set .nx-ic{color:var(--primary)}
+.nx-fpill.is-open{border-color:var(--primary-light);box-shadow:var(--ring)}
+.nx-fcount{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--primary);color:#fff;font:600 11.5px/1 'DM Sans',sans-serif}
+.nx-fdot{width:7px;height:7px;border-radius:50%;background:var(--primary);box-shadow:0 0 0 2px #fff}
+.nx-filters-btn{display:none}
+.nx-bar-end{margin-left:auto;display:flex;align-items:center;gap:8px}
+
+/* readout: the single place that spells out what is applied */
+.nx-readout{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;min-height:56px;padding:8px 16px 10px;border-top:1px solid var(--border-light)}
+.nx-readout > .nx-vr{height:18px;margin:0 4px}
+.nx-root .nx-count{color:var(--t2);font-size:13.5px;white-space:nowrap}
+.nx-count strong{color:var(--t1);font-weight:700}
+.nx-count-wait{display:inline-flex;align-items:center;gap:7px;color:var(--t3)}
+.nx-eyebrow{font:600 11px/1.2 'DM Sans',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--t3)}
+.nx-chip{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 2px 0 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);font-size:13px;color:var(--t1);white-space:nowrap}
+.nx-chip-k{color:var(--t2)}
+.nx-chip b{font-weight:600}
+.nx-chip-n{color:var(--t3);font-size:12.5px}
+.nx-chip-x{position:relative;display:inline-grid;place-items:center;width:32px;height:32px;border-radius:6px;color:var(--t2)}
+.nx-chip-x::before{content:"";position:absolute;inset:-2px}
+.nx-chip-x:hover{background:var(--danger-bg);color:var(--danger)}
+.nx-link{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 8px;border-radius:7px;color:var(--primary-light);font-size:13.5px;font-weight:600;text-decoration:underline;text-decoration-color:rgba(42,90,142,.35);text-underline-offset:3px;white-space:nowrap}
+.nx-link:hover{text-decoration-color:currentColor;background:var(--primary-tint)}
+.nx-hint{color:var(--t3);font-size:13px}
+
+/* ---------- ledger table ---------- */
+/* In the app the wrap may also take max-height:calc(100vh - 260px) + overflow:auto,
+   so the header pins inside the sheet; here it pins to the page scroller. */
+.nx-tablewrap{position:relative}
+.nx-table{width:100%;border-collapse:separate;border-spacing:0}
+.nx-table th{position:sticky;top:0;z-index:3;height:46px;padding:0 14px;background:var(--head);border-top:1px solid var(--border);border-bottom:1px solid var(--border);text-align:left;vertical-align:middle;font:600 11.5px/1.2 'DM Sans',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--t2);white-space:nowrap}
+.nx-th-sort{display:inline-flex;align-items:center;gap:6px;height:36px;margin-left:-8px;padding:0 8px;border-radius:7px;font:inherit;letter-spacing:inherit;text-transform:inherit;color:inherit}
+.nx-th-sort .nx-ic{width:13px;height:13px;opacity:.45}
+.nx-th-sort:hover{background:var(--border-light);color:var(--t1)}
+.nx-th-sort:hover .nx-ic{opacity:.85}
+.nx-th-sort.is-sorted{color:var(--t1)}
+.nx-th-sort.is-sorted .nx-ic{opacity:1;color:var(--primary)}
+.nx-table td{padding:12px 14px;border-bottom:1px solid var(--border-light);vertical-align:middle;font-size:13.5px;color:var(--t1);background:var(--surface);transition:background-color .12s}
+.nx-table tbody tr:hover td{background:var(--hover)}
+.nx-table tbody tr.is-picked td{background:var(--picked)}
+.nx-table tbody tr.is-picked td:first-child{box-shadow:inset 3px 0 0 var(--primary)}
+.nx-table tbody tr:last-child td{border-bottom:0}
+.nx-table .nx-c-select{width:56px;padding-left:12px;padding-right:0}
+
+.nx-cbhit{display:inline-grid;place-items:center;width:36px;height:36px;border-radius:8px;cursor:pointer;vertical-align:middle}
+.nx-cbhit:hover{background:var(--border-light)}
+.nx-cb{-webkit-appearance:none;appearance:none;display:block;width:18px;height:18px;margin:0;border:1.5px solid #7c8a9e;border-radius:4px;background:#fff center/13px no-repeat;cursor:pointer;transition:background-color .12s,border-color .12s}
+.nx-cb:checked,.nx-cb.is-mixed{background-color:var(--primary);border-color:var(--primary)}
+.nx-cb:checked{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E")}
+.nx-cb.is-mixed{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round'%3E%3Cpath d='M6 12h12'/%3E%3C/svg%3E")}
+.nx-cb:disabled{opacity:.45;cursor:not-allowed}
+.nx-cb:focus-visible{outline:2px solid var(--primary-light);outline-offset:2px}
+
+.nx-person{display:flex;align-items:center;gap:12px;min-width:170px}
+.nx-mono{flex:none;display:grid;place-items:center;width:34px;height:34px;border-radius:50%;border:1px solid var(--border);background:#f5f7fa;color:var(--primary);font:600 11.5px/1 'DM Sans',sans-serif;letter-spacing:.06em}
+.nx-name{font-weight:600;line-height:1.3;color:var(--t1)}
+.nx-phone{white-space:nowrap}
+.nx-cc{color:var(--t3);margin-right:5px}
+/* emails never lose their domain: a <wbr> sits before the @, so a long
+   address breaks into "local part" / "@domain" and nothing is cut */
+.nx-email{display:inline-block;max-width:270px;color:var(--t2);overflow-wrap:normal;word-break:normal;line-height:1.4}
+.nx-date{white-space:nowrap}
+.nx-time{display:block;margin-top:2px;color:var(--t3);font-size:12.5px}
+.nx-status{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;font-weight:500;white-space:nowrap}
+.nx-status::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--dot)}
+.nx-status--on{color:var(--t1);--dot:var(--success)}
+.nx-status--off{color:var(--danger);--dot:var(--danger)}
+.nx-sub{display:inline-flex;align-items:center;height:24px;padding:0 9px;border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-tint);color:var(--accent-ink);font-size:12.5px;font-weight:600;white-space:nowrap}
+.nx-nil{color:var(--t3)}
+.nx-c-ref{min-width:130px}
+
+/* tags: full names, never cut; up to three, then a focusable "+N",
+   then the edit button sits right after them */
+.nx-c-tags{min-width:300px}
+.nx-table td.nx-c-email{min-width:262px}
+.nx-tags{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+/* the last pill, the +N and the edit button travel together, so the button never sits alone on a line */
+.nx-tags-end{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.nx-tag{display:inline-flex;align-items:center;height:26px;padding:0 10px;border:1px solid var(--border);border-radius:999px;background:var(--surface);color:var(--t1);font-size:12.5px;font-weight:500;line-height:1;white-space:nowrap}
+.nx-tag--ws{border-color:#cfdae7;background:var(--primary-tint);color:var(--primary)}
+.nx-more{position:relative;display:inline-flex;align-items:center;height:26px;padding:0 9px;border:1px dashed var(--border-strong);border-radius:999px;background:var(--bg);color:var(--t2);font-size:12.5px;font-weight:600;line-height:1;cursor:default}
+.nx-more::before{content:"";position:absolute;inset:-5px -2px}
+.nx-more:hover,.nx-more:focus-visible{border-color:var(--primary-line);color:var(--primary)}
+.nx-more[data-tip]:hover::after,.nx-more[data-tip]:focus-visible::after,.nx-more.is-tip::after{content:attr(data-tip);position:absolute;z-index:6;left:50%;bottom:calc(100% + 9px);transform:translateX(-50%);width:max-content;max-width:260px;padding:7px 11px;border-radius:7px;background:var(--t1);color:#fff;font-size:12.5px;font-weight:500;line-height:1.4;white-space:normal;text-align:left;box-shadow:0 8px 20px -8px rgba(0,0,0,.4);pointer-events:none}
+.nx-tagedit{position:relative;display:inline-grid;place-items:center;flex:none;width:32px;height:32px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--t2);transition:border-color .15s,color .15s,background-color .15s}
+.nx-tagedit::before{content:"";position:absolute;inset:-2px}
+.nx-tagedit:hover{border-color:var(--primary-line);color:var(--primary);background:var(--primary-tint)}
+.nx-addtag{position:relative;display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px 0 9px;border:1px dashed var(--primary-line);border-radius:999px;background:var(--surface);color:var(--primary-light);font-size:13px;font-weight:600;white-space:nowrap}
+.nx-addtag::before{content:"";position:absolute;inset:-2px}
+.nx-addtag .nx-ic{width:14px;height:14px}
+.nx-addtag:hover{border-style:solid;background:var(--primary-tint)}
+
+/* pagination */
+.nx-foot{display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px;padding:10px 16px;border-top:1px solid var(--border);color:var(--t2);font-size:13.5px}
+.nx-selectbox{position:relative;display:inline-flex;align-items:center}
+.nx-selectbox select{height:36px;padding:0 32px 0 12px;border:1px solid var(--border);border-radius:8px;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2356647b' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.5 9.5L12 15l5.5-5.5'/%3E%3C/svg%3E") right 9px center/15px no-repeat;color:var(--t1);font-size:13.5px;font-weight:600;-webkit-appearance:none;appearance:none;cursor:pointer}
+.nx-selectbox select:hover{border-color:var(--primary-line)}
+.nx-foot-range{margin-left:auto;color:var(--t1)}
+.nx-pager{display:flex;gap:2px}
+.nx-iconbtn{display:inline-grid;place-items:center;flex:none;width:36px;height:36px;border:1px solid transparent;border-radius:8px;color:var(--t2);transition:border-color .15s,color .15s,background-color .15s}
+.nx-iconbtn:hover{border-color:var(--border);background:var(--surface);color:var(--primary)}
+.nx-iconbtn:disabled{opacity:.38}
+.nx-iconbtn:disabled:hover{border-color:transparent;background:none;color:var(--t2)}
+.nx-iconbtn--boxed{border-color:var(--border);background:var(--surface)}
+
+/* card-mode controls (shown below 900px) */
+.nx-cardbar{display:none}
+
+/* ---------- selection dock ----------
+   Sticky inside the content scroller: it rides 20px above the bottom edge
+   while rows scroll under it, and comes to rest in flow below the sheet, so
+   the space it needs is reserved and the last row is never covered.
+   It slides up (translateY 16px -> 0, 200ms ease-out) when the first person is ticked. */
+.nx-dock{position:sticky;bottom:20px;z-index:30;display:flex;align-items:center;gap:10px;width:max-content;max-width:100%;margin:20px auto 0;padding:10px 10px 10px 22px;border-radius:14px;background:var(--primary);color:#fff;box-shadow:0 22px 46px -14px rgba(14,32,52,.55),0 2px 6px rgba(14,32,52,.2)}
+.nx-dock-count{display:flex;align-items:center;gap:10px;padding-right:16px;margin-right:4px;border-right:1px solid rgba(255,255,255,.16);white-space:nowrap}
+.nx-dock-num{font:600 22px/1 'DM Sans',sans-serif;letter-spacing:-.01em;font-variant-numeric:lining-nums tabular-nums}
+.nx-dock-label{color:#cdd7e4;font-size:13.5px}
+.nx-dock-label b{color:#fff;font-weight:600}
+.nx-dock-link{display:inline-flex;align-items:center;min-height:36px;padding:0 8px;border-radius:7px;color:var(--accent-on-navy);font-size:13.5px;font-weight:600;text-decoration:underline;text-decoration-color:rgba(220,195,145,.5);text-underline-offset:3px;white-space:nowrap}
+.nx-dock-link:hover{background:rgba(255,255,255,.08);text-decoration-color:currentColor}
+.nx-dock-hidden{position:relative;display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border:1px solid rgba(220,195,145,.45);border-radius:999px;color:var(--accent-on-navy);font-size:12.5px;font-weight:500}
+.nx-dock-hidden .nx-ic{width:14px;height:14px}
+.nx-dock-hidden::before{content:"";position:absolute;inset:-4px 0}
+.nx-dbtn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 15px;border:1px solid rgba(200,169,110,.6);border-radius:9px;color:#fff;font-size:13.5px;font-weight:500;white-space:nowrap;transition:background-color .15s,border-color .15s}
+.nx-dbtn .nx-ic{color:var(--accent-on-navy)}
+.nx-dbtn:hover{background:rgba(200,169,110,.12);border-color:var(--accent)}
+.nx-dbtn--primary{background:#fff;color:var(--primary);border-color:#fff;font-weight:600}
+.nx-dbtn--primary .nx-ic{color:var(--accent-ink)}
+.nx-dbtn--primary:hover{background:var(--accent-tint);border-color:var(--accent-tint)}
+.nx-dbtn.is-open{background:rgba(255,255,255,.1);border-color:var(--accent)}
+.nx-dbtn .nx-chev{width:14px;height:14px;opacity:.85}
+.nx-dbtn:disabled{border-color:rgba(255,255,255,.14);color:rgba(255,255,255,.5);background:none}
+.nx-dbtn:disabled .nx-ic{color:rgba(255,255,255,.4)}
+.nx-dbtn--primary:disabled{background:rgba(255,255,255,.14);border-color:transparent}
+.nx-dclear{display:inline-grid;place-items:center;width:40px;height:40px;margin-left:2px;border:1px solid rgba(255,255,255,.2);border-radius:9px;color:#cdd7e4}
+.nx-dclear:hover{border-color:rgba(255,255,255,.45);color:#fff}
+.nx-dock :focus-visible{outline-color:var(--accent-on-navy)}
+
+/* ==========================================================================
+   Laptop (container narrower than 1320px): tighter ledger, same columns
+   ========================================================================== */
+@container nx (max-width:1320px){
+  .nx-page{padding:30px 28px 36px}
+  .nx-table th{padding:0 11px}
+  .nx-table td{padding:12px 11px}
+  .nx-table .nx-c-select{width:50px;padding-left:8px;padding-right:0}
+  .nx-person{min-width:150px;gap:10px}
+  .nx-mono{width:32px;height:32px}
+  .nx-email{max-width:225px}
+  .nx-table td.nx-c-email{min-width:0}
+  .nx-c-ref{white-space:normal;min-width:120px}
+  .nx-c-tags{min-width:270px}
+}
+
+/* ==========================================================================
+   Below 900px: pills fold into one Filters button, rows become dense cards,
+   a Sort select replaces the column headers, the dock spans the width
+   ========================================================================== */
+@container nx (max-width:899px){
+  .nx-page{padding:22px 16px 28px}
+  .nx-head{flex-direction:column;align-items:stretch;gap:16px;margin-bottom:18px}
+  .nx-root .nx-title{font-size:32px}
+  .nx-rule{margin:12px 0 10px}
+  .nx-head-aside{flex-wrap:wrap}
+  .nx-figure{flex-direction:row;align-items:baseline;gap:8px;margin-right:auto;padding-right:0;border-right:0}
+  .nx-figure-num{font-size:24px}
+  .nx-figure-label{margin-top:0}
+  .nx-bar{padding:12px}
+  .nx-search{flex:1 1 200px;max-width:none;min-width:0}
+  .nx-bar > .nx-vr,.nx-pills{display:none}
+  .nx-filters-btn{display:inline-flex}
+  .nx-bar-end{margin-left:0}
+  .nx-readout{padding:8px 12px 10px}
+  .nx-readout > .nx-vr{display:none}
+  .nx-readout .nx-count{flex:1 1 100%;order:-1;padding:4px 0 2px}
+  .nx-readout .nx-eyebrow{display:none}
+
+  .nx-cardbar{display:flex;align-items:center;gap:8px;min-height:52px;padding:6px 12px 6px 8px;border-top:1px solid var(--border);background:var(--head);color:var(--t2);font-size:13.5px;font-weight:600}
+  .nx-cardbar-sort{margin-left:auto;display:flex;align-items:center;gap:8px;font-weight:500}
+
+  .nx-table thead{display:none}
+  .nx-table,.nx-table tbody{display:block}
+  .nx-table tbody tr{position:relative;display:grid;grid-template-columns:44px 204px minmax(0,1fr) auto;grid-template-areas:"sel name name status" "sel phone email email" "sel created ref ref" "sel ws ws ws" "sel moved moved moved" "sel tags tags tags";column-gap:16px;padding:12px 14px 14px 8px;border-top:1px solid var(--border-light);background:var(--surface)}
+  .nx-table tbody tr:first-child{border-top:1px solid var(--border)}
+  .nx-table tbody tr.is-picked{background:var(--picked);box-shadow:inset 3px 0 0 var(--primary)}
+  .nx-table tbody tr.is-picked td,.nx-table tbody tr:hover td{background:transparent}
+  .nx-table tbody tr.is-picked td:first-child{box-shadow:none}
+  .nx-table td{display:block;min-width:0;padding:0;border:0;background:transparent;font-size:13.5px}
+  .nx-table td.nx-c-select{grid-area:sel;width:auto;padding:0;margin-top:-6px}
+  .nx-table td.nx-c-name{grid-area:name;align-self:center}
+  .nx-table td.nx-c-status{grid-area:status;align-self:center;justify-self:end}
+  .nx-table td.nx-c-phone{grid-area:phone;margin-top:4px}
+  .nx-table td.nx-c-email{grid-area:email;margin-top:4px}
+  .nx-table td.nx-c-created{grid-area:created;margin-top:3px}
+  .nx-table td.nx-c-ref{grid-area:ref;margin-top:3px;white-space:normal;min-width:0}
+  .nx-table td.nx-c-ws{grid-area:ws;margin-top:6px}
+  .nx-table td.nx-c-moved{grid-area:moved;margin-top:3px}
+  .nx-table td.nx-c-tags{grid-area:tags;margin-top:10px;min-width:0}
+  .nx-table td.is-empty{display:none}
+  .nx-table td[data-label]::before{content:attr(data-label) " ";color:var(--t3)}
+  .nx-person{min-width:0}
+  .nx-person .nx-mono{display:none}
+  .nx-name{font-size:15px}
+  .nx-email{max-width:none;color:var(--t2)}
+  .nx-time{display:inline;margin:0;font-size:inherit;color:var(--t1)}
+  .nx-time::before{content:", "}
+  .nx-date{white-space:normal}
+  .nx-status{font-size:13px}
+
+  .nx-foot{padding:10px 12px}
+  .nx-dock{flex-wrap:wrap;width:auto;margin:16px 0 0;bottom:12px;padding:10px 10px 10px 16px;gap:8px}
+  .nx-dock-count{flex:1 1 calc(100% - 56px);padding:0;margin:0;border-right:0;flex-wrap:wrap;row-gap:0}
+  .nx-dclear{order:1}
+  .nx-dbtn{order:2;flex:1 1 0;padding:0 10px}
+}
+@container nx (max-width:620px){
+  .nx-search{flex:1 1 0}
+  .nx-table tbody tr{grid-template-columns:44px minmax(0,1fr) auto;grid-template-areas:"sel name status" "sel phone phone" "sel email email" "sel created created" "sel ref ref" "sel ws ws" "sel moved moved" "sel tags tags";column-gap:10px}
+  .nx-table td.nx-c-email{margin-top:1px}
+  .nx-lbl-long{display:none}
+  .nx-lbl-short{display:inline}
+  .nx-tool-hide{display:none}
+  .nx-head-aside .nx-tool{padding:0 12px}
+  .nx-foot > span:first-child{display:none}
+  .nx-dbtn{padding:0 8px;gap:6px}
+  .nx-dbtn .nx-chev{display:none}
+}
+@container nx (max-width:480px){
+  .nx-search{flex:1 1 100%}
+  .nx-filters-btn{flex:1}
+}
+
+</style>
+</head>
+<body>
+<!-- Icon sprite: inline SVG symbols (no icon font) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
+  <symbol id="i-chev-down" viewBox="0 0 24 24"><path d="M6.5 9.5L12 15l5.5-5.5"/></symbol>
+  <symbol id="i-chev-up" viewBox="0 0 24 24"><path d="M6.5 14.5L12 9l5.5 5.5"/></symbol>
+  <symbol id="i-chev-left" viewBox="0 0 24 24"><path d="M14.5 6.5L9 12l5.5 5.5"/></symbol>
+  <symbol id="i-chev-right" viewBox="0 0 24 24"><path d="M9.5 6.5L15 12l-5.5 5.5"/></symbol>
+  <symbol id="i-first" viewBox="0 0 24 24"><path d="M16.5 6.5L11 12l5.5 5.5M7.5 6.5v11"/></symbol>
+  <symbol id="i-last" viewBox="0 0 24 24"><path d="M7.5 6.5L13 12l-5.5 5.5M16.5 6.5v11"/></symbol>
+  <symbol id="i-tag" viewBox="0 0 24 24"><path d="M3.8 12.6V5a1.2 1.2 0 0 1 1.2-1.2h7.6a1.2 1.2 0 0 1 .85.35l7.3 7.3a1.2 1.2 0 0 1 0 1.7l-7.6 7.6a1.2 1.2 0 0 1-1.7 0l-7.3-7.3a1.2 1.2 0 0 1-.35-.85z"/><circle cx="8.3" cy="8.3" r="1.3"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 9.8h17M8 3v4M16 3v4"/></symbol>
+  <symbol id="i-workshop" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M12 16v4.5M8 20.5h8M7 12l3-3 2.5 2 4-4"/></symbol>
+  <symbol id="i-convert" viewBox="0 0 24 24"><path d="M4 8.5h14l-3.5-3.5M20 15.5H6l3.5 3.5"/></symbol>
+  <symbol id="i-columns" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="1.5"/><path d="M9.2 4.5v15M14.8 4.5v15"/></symbol>
+  <symbol id="i-file-up" viewBox="0 0 24 24"><path d="M13.5 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8.5z"/><path d="M13.5 3.5v5h5M12 17.5v-6M9.5 14L12 11.5l2.5 2.5"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M4.5 19.5l1-4L15.8 5.2a2 2 0 0 1 2.8 0l.2.2a2 2 0 0 1 0 2.8L8.5 18.5z"/><path d="M14 7l3 3"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5.5v13M5.5 12h13"/></symbol>
+  <symbol id="i-arrow-down" viewBox="0 0 24 24"><path d="M12 5v14M6.5 13.5L12 19l5.5-5.5"/></symbol>
+  <symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="M12 19V5M6.5 10.5L12 5l5.5 5.5"/></symbol>
+  <symbol id="i-sort" viewBox="0 0 24 24"><path d="M8 9.5l4-4 4 4M8 14.5l4 4 4-4"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M20.5 3.5L10.2 13.8M20.5 3.5l-6.3 17-4-6.7-6.7-4z"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M6 12h12"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="13" rx="1.5"/><path d="M4 7l8 6 8-6"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M5.3 18.7l1-3.4A7.5 7.5 0 1 1 8.8 18z"/><path d="M9.4 9.4c.3 2.2 2.1 4 4.3 4.4l.9-1.1 1.6.7-.3 1.3c-3.1.2-6.4-2.9-6.3-6.1l1.3-.3.7 1.6z"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6.5 16.5v-5a5.5 5.5 0 0 1 11 0v5l1.5 1.5h-14z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="1.5"/><path d="M15.5 8.5V6A1.5 1.5 0 0 0 14 4.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="1.5"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3M12 14.5v2"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3.5l7 2.8v5.2c0 4.3-3 7.8-7 9-4-1.2-7-4.7-7-9V6.3z"/><path d="M9 12l2.2 2.2L15.5 10"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.5"/><path d="M3 19.5c.6-3.3 3-5 6-5s5.4 1.7 6 5"/><path d="M15.5 5.3a3.5 3.5 0 0 1 0 6.4M17.5 14.8c1.8.6 3 2.1 3.5 4.7"/></symbol>
+  <symbol id="i-search-off" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2M9 9l4 4M13 9l-4 4"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5.5M12 16.3v.2"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4h-4"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8v.2"/></symbol>
+  <symbol id="i-sheet" viewBox="0 0 24 24"><rect x="4" y="3.5" width="16" height="17" rx="1.5"/><path d="M4 9h16M4 14.5h16M10 3.5v17"/></symbol>
+  <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M3.5 3.5l17 17M10.6 6.2A9 9 0 0 1 12 6c5 0 8.4 4.4 9 6-.3.8-1.2 2.3-2.6 3.6M6.4 7.6C4.6 8.9 3.4 10.7 3 12c.6 1.6 4 6 9 6 1.4 0 2.7-.3 3.8-.9M9.9 10a3 3 0 0 0 4.1 4.1"/></symbol>
+  <symbol id="i-user-check" viewBox="0 0 24 24"><circle cx="10" cy="8.5" r="3.5"/><path d="M3.5 19.5c.6-3.3 3.2-5 6.5-5 1.4 0 2.6.3 3.6.9M15 17.5l2 2 4-4.5"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 7.5L5 11.5l4 4"/><path d="M5 11.5h9.5a4.5 4.5 0 0 1 0 9H11"/></symbol>
+</svg>
+
+
+<!-- One screen, three widths: open this file at 1440, 1280 and below 900px.
+     State: two filters on, 12 people match, 3 of them ticked. -->
+<main class="nx-root nx-shell">
+<div class="nx-page">
+
+  <!-- Header: Playfair title, fine gold rule, one-line description, total, page tools -->
+  <header class="nx-head">
+    <div>
+      <h1 class="nx-title">New Users</h1>
+      <span class="nx-rule" aria-hidden="true"></span>
+      <p class="nx-lede">People who signed up but are not participants yet. Filter, tag, export or message them.</p>
+    </div>
+    <div class="nx-head-aside">
+      <div class="nx-figure">
+        <span class="nx-figure-num">1,284</span>
+        <span class="nx-figure-label">New users in total</span>
+      </div>
+      <button class="nx-tool" type="button" title="Pick an Excel file of emails; the matching people get selected"><svg class="nx-ic" aria-hidden="true"><use href="#i-file-up"/></svg>Select from file</button>
+      <button class="nx-tool" type="button" title="Create and rename tags, copy segment links"><svg class="nx-ic" aria-hidden="true"><use href="#i-tag"/></svg>Manage tags</button>
+    </div>
+  </header>
+
+  <section class="nx-sheet" aria-label="New users">
+
+    <!-- Toolbar: search, short filter pills (label + count only), columns -->
+    <div class="nx-bar">
+      <label class="nx-search" role="search">
+        <span class="nx-sr">Search new users</span>
+        <svg class="nx-ic" aria-hidden="true"><use href="#i-search"/></svg>
+        <input type="search" placeholder="Search name, phone, email, tag or date">
+      </label>
+      <span class="nx-vr" aria-hidden="true"></span>
+      <div class="nx-pills" role="group" aria-label="Filters">
+        <button class="nx-fpill is-set" type="button" aria-haspopup="dialog" aria-label="Tags filter, 1 tag chosen"><svg class="nx-ic nx-ic--sm" aria-hidden="true"><use href="#i-tag"/></svg>Tags<span class="nx-fcount" aria-hidden="true">1</span><svg class="nx-ic nx-chev" aria-hidden="true"><use href="#i-chev-down"/></svg></button>
+        <button class="nx-fpill" type="button" aria-haspopup="dialog" aria-label="Workshops filter, off"><svg class="nx-ic nx-ic--sm" aria-hidden="true"><use href="#i-workshop"/></svg>Workshops<svg class="nx-ic nx-chev" aria-hidden="true"><use href="#i-chev-down"/></svg></button>
+        <button class="nx-fpill is-set" type="button" aria-haspopup="dialog" aria-label="Created date filter, on"><svg class="nx-ic nx-ic--sm" aria-hidden="true"><use href="#i-calendar"/></svg>Created<span class="nx-fdot" aria-hidden="true"></span><svg class="nx-ic nx-chev" aria-hidden="true"><use href="#i-chev-down"/></svg></button>
+        <button class="nx-fpill" type="button" aria-haspopup="menu" aria-label="Conversion filter, off"><svg class="nx-ic nx-ic--sm" aria-hidden="true"><use href="#i-convert"/></svg>Conversion<svg class="nx-ic nx-chev" aria-hidden="true"><use href="#i-chev-down"/></svg></button>
+      </div>
+      <!-- below 900px the four pills fold into this one button; it opens the filter sheet -->
+      <button class="nx-tool nx-filters-btn" type="button" aria-haspopup="dialog" aria-label="Filters, 2 on"><svg class="nx-ic" aria-hidden="true"><use href="#i-filter"/></svg>Filters<span class="nx-fcount" aria-hidden="true">2</span></button>
+      <div class="nx-bar-end">
+        <button class="nx-tool nx-tool--sm" type="button" aria-haspopup="dialog" aria-label="Columns, 7 of 7 shown"><svg class="nx-ic nx-ic--sm" aria-hidden="true"><use href="#i-columns"/></svg><span class="nx-tool-hide">Columns</span><span class="nx-tool-note nx-tool-hide">7 of 7</span></button>
+      </div>
+    </div>
+
+    <!-- Readout: the one place that spells out the result and every applied filter -->
+    <div class="nx-readout">
+      <p class="nx-count" aria-live="polite"><strong>12</strong> of 1,284 users</p>
+      <span class="nx-vr" aria-hidden="true"></span>
+      <span class="nx-eyebrow">Applied</span>
+      <span class="nx-chip"><span class="nx-chip-k">Tags, excluding</span><b>Corporate</b><button class="nx-chip-x" type="button" aria-label="Remove the tags filter"><svg class="nx-ic nx-ic--xs" aria-hidden="true"><use href="#i-x"/></svg></button></span>
+      <span class="nx-chip"><span class="nx-chip-k">Created</span><b>1 Oct – 15 Nov 2026</b><button class="nx-chip-x" type="button" aria-label="Remove the created date filter"><svg class="nx-ic nx-ic--xs" aria-hidden="true"><use href="#i-x"/></svg></button></span>
+      <button class="nx-link" type="button">Clear all filters</button>
+    </div>
+
+    <!-- below 900px: the header box becomes "Select all", and sorting moves into this select -->
+    <div class="nx-cardbar">
+      <label class="nx-cbhit"><input class="nx-cb is-mixed" type="checkbox" aria-label="Select all 12 matching people"></label>
+      <span>Select all 12</span>
+      <label class="nx-cardbar-sort"><span>Sort</span>
+        <span class="nx-selectbox"><select aria-label="Sort people">
+          <option selected>Newest first</option><option>Oldest first</option><option>Name A–Z</option><option>Name Z–A</option><option>Email A–Z</option><option>Status</option><option>Referred by</option>
+        </select></span>
+      </label>
+    </div>
+
+    <div class="nx-tablewrap">
+      <table class="nx-table" aria-label="New users, sorted by created date, newest first">
+        <thead><tr><th class="nx-c-select" scope="col"><label class="nx-cbhit" title="Select everyone who matches, on every page"><input class="nx-cb is-mixed" type="checkbox" aria-label="Select all 12 matching people"></label></th><th class="nx-c-name" scope="col"><button class="nx-th-sort" type="button">Name<svg class="nx-ic" aria-hidden="true"><use href="#i-sort"/></svg></button></th><th class="nx-c-phone" scope="col"><button class="nx-th-sort" type="button">Phone<svg class="nx-ic" aria-hidden="true"><use href="#i-sort"/></svg></button></th><th class="nx-c-email" scope="col"><button class="nx-th-sort" type="button">Email<svg class="nx-ic" aria-hidden="true"><use href="#i-sort"/></svg></button></th><th class="nx-c-created" scope="col" aria-sort="descending"><button class="nx-th-sort is-sorted" type="button">Created<svg class="nx-ic" aria-hidden="true"><use href="#i-arrow-down"/></svg></button></th><th class="nx-c-status" scope="col"><button class="nx-th-sort" type="button">Status<svg class="nx-ic" aria-hidden="true"><use href="#i-sort"/></svg></button></th><th class="nx-c-ref" scope="col"><button class="nx-th-sort" type="button">Referred by<svg class="nx-ic" aria-hidden="true"><use href="#i-sort"/></svg></button></th><th class="nx-c-tags" scope="col">Tags</th></tr></thead>
+        <tbody>
+<tr class="is-picked"><td class="nx-c-select"><label class="nx-cbhit"><input class="nx-cb" type="checkbox" checked aria-label="Select Aarav Krishnamurthy"></label></td><td class="nx-c-name"><div class="nx-person"><span class="nx-mono" aria-hidden="true">AK</span><span class="nx-name">Aarav Krishnamurthy</span></div></td><td class="nx-c-phone"><span class="nx-phone"><span class="nx-cc">+91</span>98401 23456</span></td><td class="nx-c-email"><span class="nx-email" title="aarav.krishnamurthy@gmail.com">aarav.krishnamurthy<wbr>@gmail.com</span></td><td class="nx-c-created" data-label="Created"><span class="nx-date">15 Nov 2026<span class="nx-time">6:48 PM</span></span></td><td class="nx-c-status"><span class="nx-status nx-status--on">Enabled</span></td><td class="nx-c-ref" data-label="Referred by">Meenakshi Sundaram</td><td class="nx-c-tags"><div class="nx-tags"><span class="nx-tag">Chennai Venue</span><span class="nx-tag">Gold Members</span><span class="nx-tags-end"><span class="nx-tag">Breakthrough 2026</span><button class="nx-more" type="button" data-tip="Early Bird, Webinar Leads" aria-label="2 more tags: Early Bird, Webinar Leads">+2</button><button class="nx-tagedit" type="button" aria-label="Edit tags for Aarav Krishnamurthy" title="Edit tags"><svg class="nx-ic nx-ic--sm" aria-hidden="true"><use href="#i-pencil"/></svg></button></span></div></td></tr>
+<tr class="is-picked"><td class="nx-c-select"><label class="nx-cbhit"><input class="nx-cb" type="checkbox" checked aria-label="Select Priya Venkataraman"></label></td><td class="nx-c-name"><div class="nx-person"><span class="nx-mono" aria-hidden="true">PV</span><span class="nx-name">Priya Venkataraman</span></div></td><td class="nx-c-phone"><span class="nx-phone"><span class="nx-cc">+91</span>94440 17823</span></td><td class="nx-c-email"><span class="nx-email" title="priya.v@outlook.com">priya.v<wbr>@outlook.com</span></td><td class="nx-c-created" data-label="Created"><span class="nx-date">14 Nov 2026<span class="nx-time">11:15 AM</span></span></td><td class="nx-c-status"><span class="nx-status nx-status--on">Enabled</span></td><td class="nx-c-ref"><span class="nx-sub">Subscriber</span></td><td class="nx-c-tags"><div class="nx-tags"><span class="nx-tags-end"><span class="nx-tag">Gold Members</span><button class="nx-tagedit" type="button" aria-label="Edit tags for Priya Venkataraman" title="Edit tags"><svg class="nx-ic nx-ic--sm" aria-hidden="true"><use href="#i-pencil"/></svg></button></span></div></td></tr>
+<tr><td class="nx-c-select"><label class="nx-cbhit"><input class="nx-cb" type="checkbox" aria-label="Select Mohammed Irfan Siddiqui"></label></td><td class="nx-c-name"><div class="nx-person"><span class="nx-mono" aria-hidden="true">MS</span><span class="nx-name">Mohammed Irfan Siddiqui</span></div></td><td class="nx-c-phone"><span class="nx-phone"><span class="nx-cc">+91</span>99620 55418</span></td><td class="nx-c-email"><span class="nx-email" title="irfan.siddiqui@yahoo.co.in">irfan.siddiqui<wbr>@yahoo.co.in</span></td><td class="nx-c-created" data-label="Created"><span class="nx-date">13 Nov 2026<span class="nx-time">9:02 PM</span></span></td><td class="nx-c-status"><span class="nx-status nx-status--on">Enabled</span></td><td class="nx-c-ref" data-label="Referred by">Ramesh Iyer</td><td class="nx-c-tags"><div class="nx-tags"><span class="nx-tag">Chennai Venue</span><span class="nx-tags-end"><span class="nx-tag">Follow-up Call</span><button class="nx-tagedit" type="button" aria-label="Edit tags for Mohammed Irfan Siddiqui" title="Edit tags"><svg class="nx-ic nx-ic--sm" aria-hidden="true"><use href="#i-pencil"/></svg></button></span></div></td></tr>
+<tr class="is-picked"><td class="nx-c-select"><label class="nx-cbhit"><input class="nx-cb" type="checkbox" checked aria-label="Select Lakshmi Narayanan Balasubramaniam"></label></td><td class="nx-c-name"><div class="nx-person"><span class="nx-mono" aria-hidden="true">LB</span><span class="nx-name">Lakshmi Narayanan Balasubramaniam</span></div></td><td class="nx-c-phone"><span class="nx-phone"><span class="nx-cc">+91</span>90030 88214</span></td><td class="nx-c-email"><span class="nx-email" title="lakshmi.narayanan.balasubramaniam@srinivasa-textiles.co.in">lakshmi.<wbr>narayanan.<wbr>balasubramaniam<wbr>@srinivasa-textiles.co.in</span></td><td class="nx-c-created" data-label="Created"><span class="nx-date">12 Nov 2026<span class="nx-time">4:02 PM</span></span></td><td class="nx-c-status"><span class="nx-status nx-status--on">Enabled</span></td><td class="nx-c-ref is-empty"><span class="nx-nil" aria-label="No referrer">—</span></td><td class="nx-c-tags"><div class="nx-tags"><span class="nx-tag">Chennai Venue</span><span class="nx-tag">Gold Members</span><span class="nx-tags-end"><span class="nx-tag">Breakthrough 2026</span><button class="nx-more" type="button" data-tip="Winning Heart Alumni" aria-label="1 more tag: Winning Heart Alumni">+1</button><button class="nx-tagedit" type="button" aria-label="Edit tags for Lakshmi Narayanan Balasubramaniam" title="Edit tags"><svg class="nx-ic nx-ic--sm" aria-hidden="true"><use href="#i-pencil"/></svg></button></span></div></td></tr>
+<tr><td class="nx-c-select"><label class="nx-cbhit"><input class="nx-cb" type="checkbox" aria-label="Select Ananya Reddy"></label></td><td class="nx-c-name"><div class="nx-person"><span class="nx-mono" aria-hidden="true">AR</span><span class="nx-name">Ananya Reddy</span></div></td><td class="nx-c-phone"><span class="nx-phone"><span class="nx-cc">+91</span>98490 31277</span></td><td class="nx-c-email"><span class="nx-email" title="ananya.reddy@gmail.com">ananya.reddy<wbr>@gmail.com</span></td><td class="nx-c-created" data-label="Created"><span class="nx-date">10 Nov 2026<span class="nx-time">8:30 AM</span></span></td><td class="nx-c-status"><span class="nx-status nx-status--off">Disabled</span></td><td class="nx-c-ref" data-label="Referred by">Kavitha Raman</td><td class="nx-c-tags"><div class="nx-tags"><span class="nx-tag">Gold Members</span><span class="nx-tags-end"><span class="nx-tag">Bengaluru Venue</span><button class="nx-tagedit" type="button" aria-label="Edit tags for Ananya Reddy" title="Edit tags"><svg class="nx-ic nx-ic--sm" aria-hidden="true"><use href="#i-pencil"/></svg></button></span></div></td></tr>
+<tr><td class="nx-c-select"><label class="nx-cbhit"><input class="nx-cb" type="checkbox" aria-label="Select Nandini Rao"></label></td><td class="nx-c-name"><div class="nx-person"><span class="nx-mono" aria-hidden="true">NR</span><span class="nx-name">Nandini Rao</span></div></td><td class="nx-c-phone"><span class="nx-phone"><span class="nx-cc">+91</span>99001 54738</span></td><td class="nx-c-email"><span class="nx-email" title="nandini.rao@yahoo.com">nandini.rao<wbr>@yahoo.com</span></td><td class="nx-c-created" data-label="Created"><span class="nx-date">9 Nov 2026<span class="nx-time">2:18 PM</span></span></td><td class="nx-c-status"><span class="nx-status nx-status--on">Enabled</span></td><td class="nx-c-ref is-empty"><span class="nx-nil" aria-label="No referrer">—</span></td><td class="nx-c-tags"><div class="nx-tags"><button class="nx-addtag" type="button" aria-label="Add a tag for Nandini Rao"><svg class="nx-ic" aria-hidden="true"><use href="#i-plus"/></svg>Add tag</button></div></td></tr>
+<tr><td class="nx-c-select"><label class="nx-cbhit"><input class="nx-cb" type="checkbox" aria-label="Select Rohan Mehta"></label></td><td class="nx-c-name"><div class="nx-person"><span class="nx-mono" aria-hidden="true">RM</span><span class="nx-name">Rohan Mehta</span></div></td><td class="nx-c-phone"><span class="nx-phone"><span class="nx-cc">+91</span>98200 64512</span></td><td class="nx-c-email"><span class="nx-email" title="rohan.mehta@icloud.com">rohan.mehta<wbr>@icloud.com</span></td><td class="nx-c-created" data-label="Created"><span class="nx-date">8 Nov 2026<span class="nx-time">7:21 PM</span></span></td><td class="nx-c-status"><span class="nx-status nx-status--on">Enabled</span></td><td class="nx-c-ref" data-label="Referred by">Priya Venkataraman</td><td class="nx-c-tags"><div class="nx-tags"><span class="nx-tags-end"><span class="nx-tag">Chennai Venue</span><button class="nx-tagedit" type="button" aria-label="Edit tags for Rohan Mehta" title="Edit tags"><svg class="nx-ic nx-ic--sm" aria-hidden="true"><use href="#i-pencil"/></svg></button></span></div></td></tr>
+<tr><td class="nx-c-select"><label class="nx-cbhit"><input class="nx-cb" type="checkbox" aria-label="Select Divya Subramanian"></label></td><td class="nx-c-name"><div class="nx-person"><span class="nx-mono" aria-hidden="true">DS</span><span class="nx-name">Divya Subramanian</span></div></td><td class="nx-c-phone"><span class="nx-phone"><span class="nx-cc">+91</span>97899 40026</span></td><td class="nx-c-email"><span class="nx-email" title="divya.subramanian@gmail.com">divya.subramanian<wbr>@gmail.com</span></td><td class="nx-c-created" data-label="Created"><span class="nx-date">5 Nov 2026<span class="nx-time">12:47 PM</span></span></td><td class="nx-c-status"><span class="nx-status nx-status--on">Enabled</span></td><td class="nx-c-ref" data-label="Referred by">Arjun Pillai</td><td class="nx-c-tags"><div class="nx-tags"><span class="nx-tag">Gold Members</span><span class="nx-tag">Winning Heart Alumni</span><span class="nx-tags-end"><span class="nx-tag">Referral Programme</span><button class="nx-more" type="button" data-tip="Early Bird, Hindi Batch" aria-label="2 more tags: Early Bird, Hindi Batch">+2</button><button class="nx-tagedit" type="button" aria-label="Edit tags for Divya Subramanian" title="Edit tags"><svg class="nx-ic nx-ic--sm" aria-hidden="true"><use href="#i-pencil"/></svg></button></span></div></td></tr>
+<tr><td class="nx-c-select"><label class="nx-cbhit"><input class="nx-cb" type="checkbox" aria-label="Select Karthik Raghunathan"></label></td><td class="nx-c-name"><div class="nx-person"><span class="nx-mono" aria-hidden="true">KR</span><span class="nx-name">Karthik Raghunathan</span></div></td><td class="nx-c-phone"><span class="nx-phone"><span class="nx-cc">+91</span>99401 72203</span></td><td class="nx-c-email"><span class="nx-email" title="karthik.r@zohomail.in">karthik.r<wbr>@zohomail.in</span></td><td class="nx-c-created" data-label="Created"><span class="nx-date">1 Nov 2026<span class="nx-time">10:05 AM</span></span></td><td class="nx-c-status"><span class="nx-status nx-status--on">Enabled</span></td><td class="nx-c-ref is-empty"><span class="nx-nil" aria-label="No referrer">—</span></td><td class="nx-c-tags"><div class="nx-tags"><span class="nx-tag">Chennai Venue</span><span class="nx-tags-end"><span class="nx-tag">Webinar Leads</span><button class="nx-tagedit" type="button" aria-label="Edit tags for Karthik Raghunathan" title="Edit tags"><svg class="nx-ic nx-ic--sm" aria-hidden="true"><use href="#i-pencil"/></svg></button></span></div></td></tr>
+<tr><td class="nx-c-select"><label class="nx-cbhit"><input class="nx-cb" type="checkbox" aria-label="Select Sneha Kulkarni"></label></td><td class="nx-c-name"><div class="nx-person"><span class="nx-mono" aria-hidden="true">SK</span><span class="nx-name">Sneha Kulkarni</span></div></td><td class="nx-c-phone"><span class="nx-phone"><span class="nx-cc">+91</span>98220 19384</span></td><td class="nx-c-email"><span class="nx-email" title="sneha.kulkarni@gmail.com">sneha.kulkarni<wbr>@gmail.com</span></td><td class="nx-c-created" data-label="Created"><span class="nx-date">27 Oct 2026<span class="nx-time">5:56 PM</span></span></td><td class="nx-c-status"><span class="nx-status nx-status--on">Enabled</span></td><td class="nx-c-ref" data-label="Referred by">Meenakshi Sundaram</td><td class="nx-c-tags"><div class="nx-tags"><span class="nx-tag">Gold Members</span><span class="nx-tags-end"><span class="nx-tag">Breakthrough 2026</span><button class="nx-tagedit" type="button" aria-label="Edit tags for Sneha Kulkarni" title="Edit tags"><svg class="nx-ic nx-ic--sm" aria-hidden="true"><use href="#i-pencil"/></svg></button></span></div></td></tr>
+<tr><td class="nx-c-select"><label class="nx-cbhit"><input class="nx-cb" type="checkbox" aria-label="Select Venkataraghavan Srinivasan Iyengar"></label></td><td class="nx-c-name"><div class="nx-person"><span class="nx-mono" aria-hidden="true">VI</span><span class="nx-name">Venkataraghavan Srinivasan Iyengar</span></div></td><td class="nx-c-phone"><span class="nx-phone"><span class="nx-cc">+91</span>98845 11092</span></td><td class="nx-c-email"><span class="nx-email" title="venkataraghavan.iyengar@tatacommunications.com">venkataraghavan.iyengar<wbr>@tatacommunications.com</span></td><td class="nx-c-created" data-label="Created"><span class="nx-date">21 Oct 2026<span class="nx-time">3:14 PM</span></span></td><td class="nx-c-status"><span class="nx-status nx-status--on">Enabled</span></td><td class="nx-c-ref"><span class="nx-sub">Subscriber</span></td><td class="nx-c-tags"><div class="nx-tags"><span class="nx-tag">Coimbatore Venue</span><span class="nx-tags-end"><span class="nx-tag">Follow-up Call</span><button class="nx-tagedit" type="button" aria-label="Edit tags for Venkataraghavan Srinivasan Iyengar" title="Edit tags"><svg class="nx-ic nx-ic--sm" aria-hidden="true"><use href="#i-pencil"/></svg></button></span></div></td></tr>
+<tr><td class="nx-c-select"><label class="nx-cbhit"><input class="nx-cb" type="checkbox" aria-label="Select Fathima Begum"></label></td><td class="nx-c-name"><div class="nx-person"><span class="nx-mono" aria-hidden="true">FB</span><span class="nx-name">Fathima Begum</span></div></td><td class="nx-c-phone"><span class="nx-phone"><span class="nx-cc">+91</span>95000 26790</span></td><td class="nx-c-email"><span class="nx-email" title="fathima.begum@gmail.com">fathima.begum<wbr>@gmail.com</span></td><td class="nx-c-created" data-label="Created"><span class="nx-date">12 Oct 2026<span class="nx-time">9:40 AM</span></span></td><td class="nx-c-status"><span class="nx-status nx-status--on">Enabled</span></td><td class="nx-c-ref is-empty"><span class="nx-nil" aria-label="No referrer">—</span></td><td class="nx-c-tags"><div class="nx-tags"><span class="nx-tags-end"><span class="nx-tag">Webinar Leads</span><button class="nx-tagedit" type="button" aria-label="Edit tags for Fathima Begum" title="Edit tags"><svg class="nx-ic nx-ic--sm" aria-hidden="true"><use href="#i-pencil"/></svg></button></span></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <footer class="nx-foot">
+      <span>Rows per page</span>
+      <span class="nx-selectbox"><select aria-label="Rows per page"><option selected>20</option><option>50</option><option>100</option></select></span>
+      <span class="nx-foot-range">1–12 of 12</span>
+      <div class="nx-pager">
+        <button class="nx-iconbtn" type="button" disabled aria-label="First page"><svg class="nx-ic" aria-hidden="true"><use href="#i-first"/></svg></button>
+        <button class="nx-iconbtn" type="button" disabled aria-label="Previous page"><svg class="nx-ic" aria-hidden="true"><use href="#i-chev-left"/></svg></button>
+        <button class="nx-iconbtn" type="button" disabled aria-label="Next page"><svg class="nx-ic" aria-hidden="true"><use href="#i-chev-right"/></svg></button>
+        <button class="nx-iconbtn" type="button" disabled aria-label="Last page"><svg class="nx-ic" aria-hidden="true"><use href="#i-last"/></svg></button>
+      </div>
+    </footer>
+  </section>
+
+  <!-- Selection dock: sticky 20px above the bottom of the scroller while anyone is ticked -->
+  <div class="nx-dock" role="region" aria-label="Selection actions">
+    <div class="nx-dock-count">
+      <span class="nx-dock-num">3</span><span class="nx-dock-label">selected</span>
+      <button class="nx-dock-link" type="button">Select all 12 matching</button>
+    </div>
+    <button class="nx-dbtn nx-dbtn--primary" type="button"><svg class="nx-ic" aria-hidden="true"><use href="#i-tag"/></svg>Edit tags</button>
+    <button class="nx-dbtn" type="button" aria-haspopup="dialog" aria-expanded="false"><svg class="nx-ic" aria-hidden="true"><use href="#i-download"/></svg>Export<svg class="nx-ic nx-chev" aria-hidden="true"><use href="#i-chev-up"/></svg></button>
+    <button class="nx-dbtn" type="button" aria-haspopup="dialog" aria-expanded="false"><svg class="nx-ic" aria-hidden="true"><use href="#i-send"/></svg><span class="nx-lbl-long">Send communication</span><span class="nx-lbl-short">Send</span><svg class="nx-ic nx-chev" aria-hidden="true"><use href="#i-chev-up"/></svg></button>
+    <button class="nx-dclear" type="button" aria-label="Clear selection" title="Clear selection"><svg class="nx-ic" aria-hidden="true"><use href="#i-x"/></svg></button>
+  </div>
+
+</div>
+</main>
+</body>
+</html>

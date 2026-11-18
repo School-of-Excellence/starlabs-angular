@@ -1,461 +1,233 @@
-.tags-wrap {
-  width: 100%;
-  box-sizing: border-box;
-  background: #ffffff;
+/* ==========================================================================
+   Tag dialogs · Heritage Ledger (design 2026-11-16, section 5)
+   ViewEncapsulation.None. The dialog renders in the CDK overlay, outside the
+   page, so it carries its own copy of the design tokens and rules. Every rule
+   below is rooted in .atd-root (the dialog's own root) or in the overlay pane
+   class 'atd-dialog-panel', so nothing here can restyle the page or another
+   dialog. The page's global nx- rules may reach in; the rules here are one
+   class more specific, so the dialog keeps its own look.
+   Sources: redesign shared.css (tokens, hardening, helpers) and states.css
+   (buttons, spinner, kbd, the dialogs block and segment links).
+   ========================================================================== */
+
+/* ---------- Material surface (pane opened with panelClass 'atd-dialog-panel') ---------- */
+.cdk-overlay-pane.atd-dialog-panel{
+  --mdc-dialog-container-shape:16px;
+  --mdc-dialog-container-color:#fff;
+  --mat-dialog-container-elevation-shadow:0 30px 60px -22px rgba(16,28,44,.5),0 2px 8px rgba(16,28,44,.12);
+  --mat-dialog-container-max-width:calc(100vw - 32px);
+  --mat-dialog-container-small-max-width:calc(100vw - 32px);
+}
+.cdk-overlay-pane.atd-dialog-panel .mat-mdc-dialog-surface{
+  border-radius:16px;
+  background:#fff;
+  overflow:hidden;
+  box-shadow:0 30px 60px -22px rgba(16,28,44,.5),0 2px 8px rgba(16,28,44,.12);
+}
+app-assign-tags-dialog{display:block}
+
+/* ---------- tokens + pinned typography (on the dialog root, never :root) ---------- */
+.atd-root{
+  --primary:#1a3c5e; --primary-light:#2a5a8e; --primary-deep:#14304b; --primary-tint:#eef3f9; --primary-line:#b8c7d9;
+  --accent:#c8a96e; --accent-ink:#7d5f26; --accent-tint:#fbf7ee; --accent-line:#e6d6b2; --accent-on-navy:#dcc391;
+  --bg:#f4f6f9; --surface:#fff; --head:#fafbfc; --hover:#fafbfd; --picked:#f4f7fb;
+  --border:#dde3ec; --border-light:#edf0f5; --border-strong:#c4cdd9;
+  --t1:#1a2535; --t2:#56647b; --t3:#617086;
+  --success:#2e7d52; --success-bg:#e8f5ed; --success-line:#bfe0cb;
+  --danger:#c0392b; --danger-bg:#fdecea; --danger-line:#f1c4be;
+  --warn:#a8630f; --warn-ink:#8a510b; --warn-bg:#fff4e0; --warn-line:#f0d7ab;
+  --ring:0 0 0 3px rgba(42,90,142,.2);
+  --shadow-pop:0 24px 48px -20px rgba(26,37,53,.34),0 2px 6px rgba(26,37,53,.06);
+  font:400 14px/1.45 'DM Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  color:var(--t1);letter-spacing:normal;text-align:left;
+  font-variant-numeric:lining-nums tabular-nums;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+  /* the surface carries the radius and shadow; the root lays out head / tabs / body / foot */
+  display:flex;flex-direction:column;width:100%;max-height:90vh;background:var(--surface);
 }
 
-/* ---- header ---- */
-.tags-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 20px 16px 0 24px;
-}
+/* ---------- hardening against the global sheets (Bootstrap reboot, Material typography) ---------- */
+:where(.atd-root),:where(.atd-root) *,:where(.atd-root) *::before,:where(.atd-root) *::after{box-sizing:border-box}
+:where(.atd-root) :where(button,input,select,textarea){font:inherit;color:inherit;letter-spacing:inherit;margin:0}
+:where(.atd-root) :where(button){cursor:pointer;-webkit-appearance:none;appearance:none;background:none;border:0;padding:0;text-transform:none}
+:where(.atd-root) :where(button:disabled){cursor:not-allowed}
+.atd-root table{border-collapse:separate;border-spacing:0;caption-side:top}
+.atd-root :is(th,td){text-align:left}
+.atd-root.atd-root :is(h1,h2,h3,h4,h5,h6,p){margin:0;letter-spacing:normal}
+.atd-root label{white-space:normal}
+.atd-root :focus-visible{outline:2px solid var(--primary-light);outline-offset:2px}
 
-.tags-head-text {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
+/* ---------- icons + helpers ---------- */
+.atd-root .nx-ic{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;vertical-align:middle}
+.atd-root .nx-ic--sm{width:15px;height:15px}
+.atd-root .nx-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.atd-root .nx-eyebrow{font:600 11px/1.2 'DM Sans',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--t3)}
+.atd-root .nx-count{color:var(--t2);font-size:13.5px;white-space:nowrap}
+.atd-root .nx-count strong{color:var(--t1);font-weight:700}
+.atd-root .nx-iconbtn{display:inline-grid;place-items:center;flex:none;width:36px;height:36px;border:1px solid transparent;border-radius:8px;color:var(--t2);transition:border-color .15s,color .15s,background-color .15s}
+.atd-root .nx-iconbtn:hover{border-color:var(--border);background:var(--surface);color:var(--primary)}
+.atd-root .nx-iconbtn:disabled{opacity:.38}
+.atd-root .nx-iconbtn:disabled:hover{border-color:transparent;background:none;color:var(--t2)}
+.atd-root .nx-mono{flex:none;display:grid;place-items:center;width:34px;height:34px;border-radius:50%;border:1px solid var(--border);background:#f5f7fa;color:var(--primary);font:600 11.5px/1 'DM Sans',sans-serif;letter-spacing:.06em}
 
-.avatar {
-  flex: 0 0 auto;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  color: #fff;
-  font-weight: 700;
-  font-size: 1rem;
-}
+.atd-root .nx-cbhit{display:inline-grid;place-items:center;width:36px;height:36px;border-radius:8px;cursor:pointer;vertical-align:middle}
+.atd-root .nx-cbhit:hover{background:var(--border-light)}
+.atd-root .nx-cb{-webkit-appearance:none;appearance:none;display:block;width:18px;height:18px;margin:0;border:1.5px solid #7c8a9e;border-radius:4px;background:#fff center/13px no-repeat;cursor:pointer;transition:background-color .12s,border-color .12s}
+.atd-root .nx-cb:checked,.atd-root .nx-cb.is-mixed{background-color:var(--primary);border-color:var(--primary)}
+.atd-root .nx-cb:checked{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E")}
+.atd-root .nx-cb.is-mixed{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round'%3E%3Cpath d='M6 12h12'/%3E%3C/svg%3E")}
+.atd-root .nx-cb:disabled{opacity:.45;cursor:not-allowed}
+.atd-root .nx-cb:focus-visible{outline:2px solid var(--primary-light);outline-offset:2px}
 
-.avatar mat-icon {
-  font-size: 20px;
-  height: 20px;
-  width: 20px;
-}
+/* ---------- buttons, spinner, key cap ---------- */
+.atd-root .nx-primary{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 18px;border:1px solid var(--primary);border-radius:9px;background:var(--primary);color:#fff;font-size:13.5px;font-weight:600;white-space:nowrap}
+.atd-root .nx-primary:hover{background:var(--primary-deep)}
+.atd-root .nx-primary .nx-ic{color:var(--accent-on-navy)}
+.atd-root .nx-primary:disabled{background:#e9edf3;border-color:var(--border);color:#6f7d90}
+.atd-root .nx-primary:disabled .nx-ic{color:#6f7d90}
+.atd-root .nx-quiet{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:38px;padding:0 15px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--t1);font-size:13.5px;font-weight:600;white-space:nowrap}
+.atd-root .nx-quiet:hover{border-color:var(--primary-line)}
+.atd-root .nx-quiet:disabled{color:#6f7d90}
+.atd-root .nx-spin{display:inline-block;flex:none;width:16px;height:16px;border:2px solid #d3dde9;border-top-color:var(--primary);border-radius:50%;animation:atd-rot .8s linear infinite;vertical-align:-3px}
+@keyframes atd-rot{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.atd-root .nx-spin{animation:none}}
+.atd-root .nx-kbd{display:inline-grid;place-items:center;min-width:22px;height:20px;padding:0 5px;border:1px solid var(--border);border-bottom-width:2px;border-radius:5px;background:#fff;font:500 11px 'DM Mono',monospace;color:var(--t2)}
 
-.tags-head-text h2 {
-  margin: 0;
-  font-family: inherit;
-  font-size: 1.12rem;
-  line-height: 1.4;
-  letter-spacing: normal;
-  font-weight: 600;
-  color: #1f2937;
-}
+/* ---------- dialog shell ---------- */
+.atd-root .nx-dialog-head{flex:none;display:flex;align-items:flex-start;gap:14px;padding:22px 14px 16px 24px}
+.atd-root .nx-dialog-titles{flex:1 1 auto;min-width:0}
+/* Playfair Display is loaded at 600 only (index.html), so the title uses 600 rather than the mockup's 500. */
+.atd-root .nx-dialog-title{font:600 23px/1.2 'Playfair Display',Georgia,serif;color:var(--primary)}
+.atd-root.atd-root .nx-dialog-sub{margin-top:4px;color:var(--t2);font-size:13.5px;overflow-wrap:anywhere}
+.atd-root .nx-dialog-head > .nx-iconbtn{margin-left:auto;margin-top:-4px}
+.atd-root .nx-dialog-head .nx-mono{width:44px;height:44px;font-size:14px}
+.atd-root .nx-dialog-mark{display:grid;place-items:center;flex:none;width:44px;height:44px;border-radius:50%;border:1px solid var(--accent-line);background:var(--accent-tint);color:var(--accent-ink)}
+.atd-root .nx-tabs{flex:none;display:flex;gap:28px;padding:0 24px;border-bottom:1px solid var(--border)}
+.atd-root .nx-tabbtn{height:44px;margin-bottom:-1px;border-bottom:2px solid transparent;color:var(--t2);font-size:13.5px;font-weight:500}
+.atd-root .nx-tabbtn:hover{color:var(--t1)}
+.atd-root .nx-tabbtn.is-on{border-bottom-color:var(--primary);color:var(--primary);font-weight:600}
+.atd-root .nx-dialog-body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:18px 24px 22px}
+.atd-root .nx-dialog-foot{flex:none;display:flex;align-items:center;gap:10px;padding:14px 24px;border-top:1px solid var(--border-light);background:var(--head)}
+.atd-root .nx-grow{flex:1;min-width:0;color:var(--t2);font-size:13px}
+.atd-root .nx-grow strong{color:var(--t1);font-weight:600}
 
-.tags-head-text p {
-  margin: 1px 0 0 0;
-  color: #6b7280;
-  font-size: 0.82rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+/* loading + empty */
+.atd-root .atd-loading{display:flex;align-items:center;justify-content:center;gap:10px;min-height:120px;color:var(--t2);font-size:13.5px}
+.atd-root .atd-empty{display:flex;flex-direction:column;align-items:center;gap:10px;padding:28px 16px 12px;text-align:center;color:var(--t3)}
+.atd-root .atd-empty .nx-ic{width:26px;height:26px;stroke-width:1.4}
+.atd-root.atd-root .atd-empty p{color:var(--t2);font-size:13.5px;max-width:320px}
 
-.tags-body {
-  padding-top: 12px !important;
-}
+/* ---------- search or create ---------- */
+.atd-root .nx-input{position:relative;display:block}
+.atd-root .nx-input > .nx-ic{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--t3);pointer-events:none}
+.atd-root .nx-input input{display:block;width:100%;height:42px;padding:0 42px 0 38px;border:1px solid var(--border);border-radius:9px;background:#fff;font-size:14px;-webkit-appearance:none;appearance:none;outline-offset:0;transition:border-color .15s,box-shadow .15s}
+.atd-root .nx-input input::placeholder{color:var(--t3);opacity:1}
+.atd-root .nx-input input::-webkit-search-cancel-button,
+.atd-root .nx-input input::-webkit-search-decoration{-webkit-appearance:none;appearance:none;display:none}
+.atd-root .nx-input input:focus{outline:none;border-color:var(--primary-light);box-shadow:var(--ring)}
+.atd-root .nx-input .nx-iconbtn{position:absolute;right:3px;top:3px}
+.atd-root .nx-create{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;margin-top:10px;padding:0 14px;border:1px dashed var(--primary-line);border-radius:9px;background:var(--primary-tint);color:var(--primary);font-size:13.5px;text-align:left}
+.atd-root .nx-create:hover{border-style:solid}
+.atd-root .nx-create:disabled{cursor:progress}
+.atd-root .nx-create b{font-weight:700}
+.atd-root .nx-create-text{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
+.atd-root .nx-create .nx-kbd,.atd-root .nx-create .nx-spin{margin-left:auto}
 
-.loading {
-  display: flex;
-  justify-content: center;
-  padding: 40px 0;
-}
+/* ---------- chip clouds ---------- */
+.atd-root .nx-cloudlabel{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:18px 0 10px}
+.atd-root .nx-cloudlabel > span:last-child{color:var(--t2);font-size:12.5px;text-align:right}
+.atd-root .nx-cloud{display:flex;flex-wrap:wrap;gap:8px}
+/* names are shown in full: a very long one wraps inside its chip instead of running out of the dialog */
+.atd-root .nx-tchip{display:inline-flex;align-items:center;gap:7px;height:auto;min-height:36px;max-width:100%;padding:4px 14px 4px 11px;border:1px solid var(--border);border-radius:999px;background:#fff;color:var(--t1);font-size:13px;font-weight:500;line-height:1.3;white-space:nowrap;text-align:left;transition:border-color .15s,background-color .15s,box-shadow .15s}
+.atd-root .nx-tchip .nx-ic{width:14px;height:14px;color:var(--t3)}
+.atd-root .nx-tchip:hover{border-color:var(--primary-line)}
+.atd-root .nx-tchip.is-on{background:var(--primary);border-color:var(--primary);color:#fff}
+.atd-root .nx-tchip.is-on .nx-ic{color:var(--accent-on-navy);stroke-width:2.4}
+.atd-root .nx-tchip.is-part{background:var(--primary-tint);border-color:var(--primary-line);color:var(--primary)}
+.atd-root .nx-tchip.is-part .nx-ic{color:var(--primary);stroke-width:2.4}
+/* gold ring: a change not yet saved */
+.atd-root .nx-tchip.is-changed{box-shadow:0 0 0 2px #fff,0 0 0 3.5px var(--accent)}
+.atd-root .nx-tchip-name{min-width:0;white-space:normal;overflow-wrap:anywhere}
+.atd-root .nx-tchip-n{display:inline-block;color:var(--t2);font-size:12px;font-weight:500}
+.atd-root .nx-tchip.is-on .nx-tchip-n{color:#cdd7e4}
+.atd-root .nx-tchip.is-part .nx-tchip-n{color:var(--primary-light)}
+.atd-root .nx-tchip--sm{padding:4px 12px 4px 10px;font-size:12.5px}
+/* a tag being removed: only the name is struck, never its count */
+.atd-root .nx-tchip.is-off{color:var(--t2)}
+.atd-root .nx-tchip.is-off .nx-tchip-name{text-decoration:line-through;text-decoration-color:var(--t3)}
 
-/* ---- search ---- */
-.search-box {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 10px;
-  height: 44px;
-  border: 1px solid #e4e7ee;
-  border-radius: 12px;
-  background: #f8fafc;
-  transition: border-color 120ms, background 120ms;
-}
+/* legend (Edit tags) */
+.atd-root .nx-key{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:16px;padding-top:14px;border-top:1px solid var(--border-light);color:var(--t2);font-size:12.5px}
+.atd-root .nx-key > span{display:inline-flex;align-items:center;gap:7px}
+.atd-root .nx-dot{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;border:1px solid var(--border);background:#fff;color:var(--t3)}
+.atd-root .nx-dot--on{background:var(--primary);border-color:var(--primary);color:var(--accent-on-navy)}
+.atd-root .nx-dot--part{background:var(--primary-tint);border-color:var(--primary-line);color:var(--primary)}
+.atd-root .nx-dot--changed{box-shadow:0 0 0 1.5px #fff,0 0 0 3px var(--accent)}
+.atd-root .nx-dot .nx-ic{width:11px;height:11px;stroke-width:3}
 
-.search-box:focus-within {
-  border-color: #a5b4fc;
-  background: #ffffff;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
-}
+/* footer summary: what Save / Apply will do */
+.atd-root .nx-change{display:flex;flex-direction:column;gap:2px;color:var(--t2);font-size:13px;line-height:1.45}
+.atd-root .nx-change b{color:var(--t1);font-weight:600}
 
-.search-box > mat-icon {
-  color: #9aa2b1;
-  font-size: 20px;
-  height: 20px;
-  width: 20px;
-}
+/* ---------- tag ledger (Manage tags) ---------- */
+.atd-root .nx-ledger{margin-top:14px;border:1px solid var(--border);border-radius:10px;overflow:clip}
+.atd-root .nx-ledger-row{display:flex;align-items:center;gap:12px;min-height:48px;padding:0 6px 0 14px;border-top:1px solid var(--border-light);font-size:13.5px}
+.atd-root .nx-ledger-row:first-child{border-top:0}
+.atd-root .nx-ledger-btn{width:100%;background:#fff;color:var(--t1);text-align:left;transition:background-color .12s}
+.atd-root .nx-ledger-btn:hover{background:var(--hover)}
+.atd-root .nx-ledger-btn:focus-visible{outline-offset:-2px}
+.atd-root .nx-ledger-name{min-width:0;padding:6px 0;font-weight:500;color:var(--t1);overflow-wrap:anywhere}
+.atd-root .nx-ledger-n{flex:none;color:var(--t3);font-size:12.5px;white-space:nowrap}
+.atd-root .nx-ledger-pen{display:inline-grid;place-items:center;flex:none;width:36px;height:36px;margin-left:auto;border:1px solid transparent;border-radius:8px;color:var(--t2);transition:border-color .15s,color .15s,background-color .15s}
+.atd-root .nx-ledger-btn:hover .nx-ledger-pen{border-color:var(--border);background:var(--surface);color:var(--primary)}
+.atd-root .nx-ledger-row.is-editing{flex-wrap:wrap;gap:6px;padding:8px 6px 10px 8px;background:var(--danger-bg)}
+.atd-root .nx-ledger-row.is-editing.is-ok{background:var(--primary-tint)}
+.atd-root .nx-rename{flex:1;min-width:0;display:block}
+.atd-root .nx-rename input{display:block;width:100%;height:38px;padding:0 12px;border:1.5px solid var(--danger);border-radius:8px;background:#fff;font-size:13.5px;box-shadow:0 0 0 3px rgba(192,57,43,.12);outline:none}
+.atd-root .is-ok .nx-rename input{border-color:var(--primary-light);box-shadow:var(--ring)}
+.atd-root .nx-rename input:disabled{color:var(--t2);background:#f7f9fb}
+.atd-root .nx-rename-ok{display:inline-grid;place-items:center;flex:none;width:36px;height:36px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--primary)}
+.atd-root .nx-rename-ok:hover{border-color:var(--primary-line)}
+.atd-root .nx-rename-ok.is-off{background:#e9edf3;color:#6f7d90;cursor:not-allowed}
+.atd-root .nx-rename-ok:disabled{cursor:progress}
+.atd-root .nx-ledger-row .nx-iconbtn{margin-left:auto}
+.atd-root .nx-fielderr{flex:1 1 100%;display:flex;align-items:center;gap:7px;padding:2px 4px 0;color:var(--danger);font-size:13px;font-weight:500}
+.atd-root .nx-fielderr .nx-ic{width:16px;height:16px}
 
-.search-box input {
-  flex: 1;
-  border: none;
-  outline: none;
-  background: transparent;
-  font-size: 0.92rem;
-  color: #1f2937;
-}
+/* ---------- segment links ---------- */
+.atd-root .nx-linkbox{display:flex;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;background:var(--head)}
+.atd-root .nx-linkbox > .nx-ic{margin-top:2px;color:var(--t3)}
+.atd-root .nx-linkbox-text{min-width:0}
+.atd-root .nx-linkbox b{display:block;margin-bottom:3px;font-size:12.5px;font-weight:600;color:var(--t1)}
+.atd-root .nx-url{display:block;font:400 12px/1.55 'DM Mono',monospace;color:var(--t2);overflow-wrap:anywhere}
+.atd-root .nx-url-hl{border-radius:3px;padding:0 2px;background:var(--accent-tint);color:var(--accent-ink)}
+.atd-root .nx-segbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:16px 0 10px}
+.atd-root .nx-segwrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px}
+.atd-root .nx-segtable{width:100%;min-width:440px}
+.atd-root .nx-segtable th{height:40px;padding:0 12px;background:var(--head);border-bottom:1px solid var(--border);font:600 11.5px 'DM Sans',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--t2);white-space:nowrap;vertical-align:middle}
+.atd-root .nx-segtable td{height:48px;padding:0 12px;border-bottom:1px solid var(--border-light);font-size:13.5px;color:var(--t1);vertical-align:middle;background:#fff}
+.atd-root .nx-segtable tbody tr:last-child td{border-bottom:0}
+.atd-root .nx-segtable tr.is-picked td{background:var(--picked)}
+.atd-root .nx-segtable .nx-c-select{width:52px;padding:0 0 0 8px}
+.atd-root .nx-segtable .nx-c-name{overflow-wrap:anywhere}
+.atd-root .nx-segtable .nx-c-copy{width:60px;padding:0 8px 0 0;text-align:right}
+.atd-root .nx-code{font:400 12px 'DM Mono',monospace;color:var(--t2);background:var(--bg);padding:3px 7px;border-radius:5px;white-space:nowrap}
+.atd-root.atd-root .atd-segempty{padding:18px 14px;color:var(--t2);font-size:13.5px;text-align:center}
+.atd-root .nx-confirm{display:inline-flex;align-items:center;gap:8px;min-height:36px;max-width:100%;padding:6px 14px 6px 12px;border-radius:8px;background:var(--t1);color:#fff;font-size:13px;font-weight:500;line-height:1.35}
+.atd-root .nx-confirm .nx-ic{width:15px;height:15px;color:var(--accent-on-navy);stroke-width:2.2}
 
-.clear-search {
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  color: #9aa2b1;
-  display: flex;
-  padding: 2px;
-  border-radius: 50%;
-}
-
-.clear-search mat-icon {
-  font-size: 18px;
-  height: 18px;
-  width: 18px;
-}
-
-/* ---- create ---- */
-.create-chip {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  margin-top: 10px;
-  padding: 10px 12px;
-  border: 1px dashed #c7d2fe;
-  border-radius: 12px;
-  background: #eef2ff;
-  color: #4338ca;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: background 120ms;
-}
-
-.create-chip:hover {
-  background: #e3e9ff;
-}
-
-.create-chip mat-icon {
-  font-size: 20px;
-  height: 20px;
-  width: 20px;
-}
-
-.create-chip strong {
-  font-weight: 700;
-}
-
-/* ---- section label ---- */
-.section-label {
-  margin: 16px 2px 8px 2px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #6b7280;
-}
-
-.section-label .muted {
-  font-weight: 500;
-  text-transform: none;
-  letter-spacing: 0;
-  color: #b0b6c2;
-}
-
-/* ---- chip cloud ---- */
-.chip-cloud {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  max-height: 300px;
-  overflow-y: auto;
-  padding: 2px;
-}
-
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 7px 13px 7px 9px;
-  border: 1px solid #e2e6ee;
-  border-radius: 999px;
-  background: #ffffff;
-  color: #475467;
-  font-size: 0.86rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 120ms ease;
-}
-
-.chip:hover {
-  border-color: #c7d2fe;
-  background: #f5f7ff;
-}
-
-.chip.selected {
-  border-color: #6366f1;
-  background: #6366f1;
-  color: #ffffff;
-  font-weight: 600;
-}
-
-.chip-ic {
-  font-size: 16px;
-  height: 16px;
-  width: 16px;
-  color: #9aa2b1;
-}
-
-.chip.selected .chip-ic {
-  color: #ffffff;
-}
-
-.chip-name {
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* ---- empty ---- */
-.cloud-empty {
-  text-align: center;
-  color: #9ca3af;
-  padding: 28px 16px;
-}
-
-.cloud-empty mat-icon {
-  font-size: 34px;
-  height: 34px;
-  width: 34px;
-  color: #d1d5e0;
-}
-
-.cloud-empty p {
-  margin: 8px 0 0 0;
-  font-size: 0.86rem;
-}
-
-/* ---- actions ---- */
-.tags-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 24px 16px 24px;
-}
-
-.tags-actions .count {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 0.82rem;
-  color: #6b7280;
-  font-weight: 500;
-}
-
-.tags-actions .count mat-icon {
-  font-size: 17px;
-  height: 17px;
-  width: 17px;
-  color: #9aa2b1;
-}
-
-.tags-actions .spacer {
-  flex: 1;
-}
-
-/* ---- tabs ---- */
-.tags-tabs {
-  --mat-tab-header-active-label-text-color: #4f46e5;
-  --mat-tab-header-active-indicator-color: #4f46e5;
-  --mdc-tab-indicator-active-indicator-color: #4f46e5;
-}
-/* Not `.tab-pane`: Bootstrap hides `.tab-content > .tab-pane` globally. */
-.atd-pane {
-  padding-top: 14px;
-}
-
-/* ---- manage mode: rename a tag in place ---- */
-.rename-box {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 4px 3px 12px;
-  border: 1px solid #6366f1;
-  border-radius: 999px;
-  background: #ffffff;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
-}
-
-.rename-input {
-  width: 200px;
-  max-width: 50vw;
-  border: none;
-  outline: none;
-  background: transparent;
-  font: inherit;
-  font-size: 0.86rem;
-  line-height: 1.4;
-  color: #1f2937;
-}
-
-.rename-act {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: transparent;
-  color: #6b7280;
-  cursor: pointer;
-}
-
-.rename-act:hover:not(:disabled) {
-  background: #f1f3f6;
-  color: #374151;
-}
-
-.rename-act.rename-save {
-  background: #6366f1;
-  color: #ffffff;
-}
-
-.rename-act.rename-save:hover:not(:disabled) {
-  background: #4f46e5;
-  color: #ffffff;
-}
-
-.rename-act:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
-.rename-act mat-icon {
-  font-size: 18px;
-  height: 18px;
-  width: 18px;
-}
-
-.rename-error {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 10px;
-  color: #b42318;
-  font-size: 0.82rem;
-  line-height: 1.4;
-}
-
-.rename-error mat-icon {
-  font-size: 18px;
-  height: 18px;
-  width: 18px;
-}
-
-/* ---- segment hint ---- */
-.segment-hint {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px 12px;
-  border: 1px solid #dfe4fb;
-  border-radius: 10px;
-  background: #eef2ff;
-  margin-bottom: 12px;
-}
-.segment-hint > mat-icon {
-  color: #4f46e5;
-  flex: 0 0 auto;
-}
-.hint-body {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.hint-title {
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  color: #4338ca;
-}
-.hint-url {
-  font-size: 0.78rem;
-  color: #4b5563;
-  word-break: break-all;
-  margin-top: 2px;
-}
-
-/* ---- segment toolbar ---- */
-.segment-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-.seg-count {
-  font-size: 0.82rem;
-  color: #6b7280;
-  font-weight: 500;
-}
-.segment-toolbar button mat-icon {
-  vertical-align: middle;
-  margin-right: 4px;
-  font-size: 18px;
-  height: 18px;
-  width: 18px;
-}
-
-/* ---- segment table ---- */
-.segment-table-wrap {
-  border: 1px solid #eceff4;
-  border-radius: 10px;
-  overflow: hidden;
-  max-height: 360px;
-  overflow-y: auto;
-}
-.segment-table {
-  width: 100%;
-  background: transparent;
-}
-.segment-table th.mat-mdc-header-cell {
-  background: #f9fafb;
-  color: #6b7280;
-  font-weight: 600;
-  font-size: 0.74rem;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-}
-.segment-table td.mat-mdc-cell {
-  color: #374151;
-  font-size: 0.88rem;
-  border-bottom-color: #f0f2f6;
-}
-.seg-select-col { width: 44px; }
-.seg-copy-col { width: 120px; text-align: center; }
-.seg-name { font-weight: 600; color: #1f2937; }
-.id-code {
-  font-size: 0.78rem;
-  color: #4f46e5;
-  background: #f5f6fb;
-  padding: 2px 6px;
-  border-radius: 5px;
-}
-.seg-copy-btn { color: #4f46e5; }
-.seg-empty {
-  padding: 24px;
-  text-align: center;
-  color: #9ca3af;
-  font-size: 0.86rem;
+/* ---------- narrow dialogs (phones): tighter padding, the summary sits above the buttons ----------
+   The pane is min(580px, 100vw - 32px) wide, so a viewport under 552px means a dialog under 520px. */
+@media (max-width:551px){
+  .atd-root .nx-dialog-head{padding:18px 8px 14px 16px;gap:12px}
+  .atd-root .nx-dialog-title{font-size:21px}
+  .atd-root .nx-dialog-head .nx-mono,.atd-root .nx-dialog-mark{width:40px;height:40px}
+  .atd-root .nx-tabs{padding:0 16px;gap:22px}
+  .atd-root .nx-dialog-body{padding:14px 16px 18px}
+  .atd-root .nx-dialog-foot{flex-wrap:wrap;padding:12px 16px}
+  .atd-root .nx-dialog-foot .nx-grow{flex:1 1 100%}
+  .atd-root .nx-dialog-foot .nx-quiet{margin-left:auto}
+  .atd-root .nx-segbar{flex-wrap:wrap}
+  .atd-root .nx-cloudlabel{flex-wrap:wrap}
+  .atd-root .nx-cloudlabel > span:last-child{text-align:left}
 }
