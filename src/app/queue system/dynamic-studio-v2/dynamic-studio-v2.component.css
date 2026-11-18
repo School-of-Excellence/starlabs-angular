@@ -4563,3 +4563,8 @@
   /* Invited-studio buttons: let them stack full width instead of dangling. */
   .otherstudio .mat-mdc-outlined-button { width: 100%; margin-right: 0 !important; margin-bottom: 8px; }
 }
+.wait-token__btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}

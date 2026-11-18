@@ -1292,7 +1292,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   }
   const timeMap = new Map<string, { count: number; title?: string; timeRange: string; sortTime: number }>();
   this.allTokensData.forEach(token => {
-    const slotData = token.selectedstageslot;
+    const slotData = token.bookedslot;
     if (!slotData) return;
 
     Object.values(slotData).forEach((slot: any) => {
@@ -2288,13 +2288,13 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
         filteredTokens = filteredTokens.filter(token => this.hasNoBookedSlot(token));
       } else {
         filteredTokens = filteredTokens.filter(token => {
-          if (!token.selectedstageslot) return false;
+          if (!token.bookedslot) return false;
 
           let hasStage = false;
           let matchesDateRange = false;
           let matchesTimeSlot = false;
 
-          Object.values(token.selectedstageslot).forEach((slot: any) => {
+          Object.values(token.bookedslot).forEach((slot: any) => {
             if (slot && this.stageSlotMatches(slot.stagename)) {
               hasStage = true;
 
@@ -2684,9 +2684,9 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   }
 
   getBookedSlot(token: any): { start: Date; end: Date; stagename: string } | null { //dharshan
-    if (!this.isStageSlotFilterActive || !token.selectedstageslot) return null;
+    if (!this.isStageSlotFilterActive || !token.bookedslot) return null;
 
-    const slots = Object.values(token.selectedstageslot) as any[];
+    const slots = Object.values(token.bookedslot) as any[];
     const matchedSlot = slots.find(slot => this.stageSlotMatches(slot?.stagename));
 
     if (!matchedSlot?.startdate) return null;
@@ -2769,7 +2769,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       if (tokenStageIndex > currentStageIndex) return false;
       if (tokenStageIndex < checkFromStageIndex) return false;
 
-      const hasConfirmedThisStage = (token.selectedstageslot || {})[stagename] != null;
+      const hasConfirmedThisStage = (token.bookedslot || {})[stagename] != null;
       return !hasConfirmedThisStage;
     });
   }

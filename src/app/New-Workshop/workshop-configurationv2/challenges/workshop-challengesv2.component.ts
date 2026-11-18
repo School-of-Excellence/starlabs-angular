@@ -346,7 +346,8 @@ export class WorkshopChallengesv2Component implements OnInit, AfterViewInit, OnD
       uploadtype: [''],
       zoomlinkchallenge: [''],
       meetdate: [''],
-      finalbeforeafter: [false]
+      finalbeforeafter: [false],
+      allowedit: [false]
     });
   }
 
@@ -439,6 +440,7 @@ export class WorkshopChallengesv2Component implements OnInit, AfterViewInit, OnD
       'notehead', 'notedescription', 'assignmenttopic', 'assignmentdescription', 'submissionformat', 'uploadtype']
       .forEach(k => challengeGroup.get(k)?.setValue(null));
     challengeGroup.get('quizref')?.setValue([]);
+    challengeGroup.get('allowedit')?.setValue(false);   // boolean, so false rather than null
     this.rebuildActivityIds();   // keeps the evolution counter honest after a mapped VideoAsk changes type
   }
 
@@ -516,7 +518,8 @@ export class WorkshopChallengesv2Component implements OnInit, AfterViewInit, OnD
           uploadtype: [c.uploadtype || ''],
           zoomlinkchallenge: [c.zoomlinkchallenge || ''],
           meetdate: [this.convertTimestamp(c.meetdate) || ''],
-          finalbeforeafter: [c.finalbeforeafter || false]
+          finalbeforeafter: [c.finalbeforeafter || false],
+          allowedit: [c.allowedit === true]
         }));
       });
       challengesArray.push(curriculumGroup);
@@ -721,7 +724,7 @@ export class WorkshopChallengesv2Component implements OnInit, AfterViewInit, OnD
     const hadTypeData = ['contentref', 'thumbnail', 'assignmenttype', 'reviewassignemnt', 'previewvideo', 'uploadedresource',
       'uploadedresourcetitle', 'rewardhead', 'rewarddescription', 'rewardlink', 'evolutionmappingtitle', 'evolutionmappingdescription',
       'finalevolution', 'notehead', 'notedescription', 'assignmenttopic', 'assignmentdescription', 'submissionformat', 'uploadtype',
-      'zoomlinkchallenge', 'meetdate'].some(k => { const v = sub.get(k)?.value; return Array.isArray(v) ? v.length > 0 : !!v; })
+      'zoomlinkchallenge', 'meetdate', 'allowedit'].some(k => { const v = sub.get(k)?.value; return Array.isArray(v) ? v.length > 0 : !!v; })
       || (sub.get('quizref')?.value || []).length > 0;
     if (hadTypeData) {
       const ok = await this.confirm({
@@ -738,6 +741,8 @@ export class WorkshopChallengesv2Component implements OnInit, AfterViewInit, OnD
   setAssignmentType(sub: AbstractControl, t: 'form' | 'question'): void {
     if (sub.get('assignmenttype')?.value === t) return;
     sub.get('assignmenttype')?.setValue(t); sub.get('assignmenttype')?.markAsDirty();
+    // Allow edit belongs to Question only; a Form assignment never carries it as true.
+    if (t !== 'question') sub.get('allowedit')?.setValue(false);
   }
   setSubmissionFormat(sub: AbstractControl, f: 'upload' | 'text'): void {
     if (sub.get('submissionformat')?.value === f) return;

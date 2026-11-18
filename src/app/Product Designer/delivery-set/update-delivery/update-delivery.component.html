@@ -33,10 +33,11 @@
         </mat-form-field>
         <br>
 
-        <mat-checkbox formControlName="ischangeworkrequired">Is Changework Required</mat-checkbox>
+        <mat-checkbox data-testid="ud-appt-changework" formControlName="ischangeworkrequired" (change)="onAppointmentCheckboxChange()">Is Changework Required</mat-checkbox>
         <br>
 
-        <mat-checkbox formControlName="groupappointment">Mark as Group Appointment</mat-checkbox>
+        <mat-checkbox data-testid="ud-appt-group" formControlName="groupappointment" (change)="onAppointmentCheckboxChange()">Mark as Group Appointment</mat-checkbox>
+        <mat-checkbox formControlName="queueappointment">Mark as Queue Appointment</mat-checkbox>
         <div *ngIf="appointmentform.get('groupappointment').value">
           <mat-form-field class="textField" appearance="outline">
             <mat-label>Maximum Slots</mat-label>
@@ -48,7 +49,7 @@
         </div>
         <div class="btnRow">
           <button data-testid="ud-close-dialog-2" type="button" mat-stroked-button class="cancelbtn" (click)="closeDialog()" [disabled]="loading">Cancel</button>
-          <button data-testid="ud-submit-appointment-3" type="submit" mat-stroked-button class="successbtn" (click)="submitAppointment(appointmentform.value)" [disabled]="loading">Submit</button>
+          <button data-testid="ud-submit-appointment-3" type="submit" mat-stroked-button class="successbtn" (click)="submitAppointment(appointmentform.getRawValue())" [disabled]="loading">Submit</button>
         </div>
       </form>
     </div>
@@ -203,6 +204,8 @@
                 <mat-chip-grid #chipList formControlName="options">
                   <mat-chip-row
                     *ngFor="let Options of formarray.controls[i].get('options').value;let j = index"
+                    class="fb-chip"
+                    [title]="Options"
                     [value]="Options"
                     (removed)="remove(i,j,optInput)"
                   >
@@ -214,6 +217,9 @@
                 </mat-chip-grid>
                 <mat-hint *ngIf="formarray.controls[i].get('type')?.value == 'video'">For YouTube, use the embed form: "https://www.youtube.com/embed/placeholder_id"</mat-hint>
               </mat-form-field>
+              <ng-container *ngIf="['video','audio'].includes(formarray.controls[i].get('type')?.value)">
+                <ng-container *ngTemplateOutlet="mediaTools; context: { $implicit: formarray.controls[i] }"></ng-container>
+              </ng-container>
 
               <div class="fb-card-foot" *ngIf="!['array','video','audio'].includes(formarray.controls[i].get('type')?.value)">
                 <mat-slide-toggle formControlName="required">Required</mat-slide-toggle>
@@ -249,6 +255,8 @@
                       <mat-chip-grid #chipList2 formControlName="options">
                         <mat-chip-row
                           *ngFor="let Options of formarray.controls[i].get('flippingquestion').get('options').value;let j = index"
+                          class="fb-chip"
+                          [title]="Options"
                           [value]="Options"
                           (removed)="removeFlippingQuestionOption(i,j,flipOptInput)"
                         >
@@ -289,6 +297,8 @@
                           <mat-chip-grid #chipList3 formControlName="options">
                             <mat-chip-row
                               *ngFor="let Options of getSubFormArray(i).controls[subindex].get('options').value;let k = index"
+                              class="fb-chip"
+                              [title]="Options"
                               [value]="Options"
                               (removed)="removeSubFormOption(i,subindex,k,subOptionInput)"
                             >
@@ -299,6 +309,9 @@
                                     (matChipInputTokenEnd)="addSubFormOption($event,i,subindex)">
                           </mat-chip-grid>
                         </mat-form-field>
+                        <div class="fb-colspan" *ngIf="['video','audio'].includes(getSubFormArray(i).controls[subindex].get('type')?.value)">
+                          <ng-container *ngTemplateOutlet="mediaTools; context: { $implicit: getSubFormArray(i).controls[subindex] }"></ng-container>
+                        </div>
                       </div>
                       <div class="fb-subrow-foot">
                         <mat-slide-toggle formControlName="required">Required</mat-slide-toggle>
@@ -438,3 +451,29 @@
     </div>
   </div>
 </div>
+
+<!-- Copy / play the pasted media URL of a video or audio field (top-level fields and sub-fields) -->
+<ng-template #mediaTools let-ctrl>
+  <div class="fb-media" *ngIf="mediaUrl(ctrl) as url">
+    <div class="fb-media-actions">
+      <button data-testid="ud-copy-media-url-25" mat-stroked-button type="button" class="fb-media-btn" (click)="copyMediaUrl(ctrl)">
+        <mat-icon>content_copy</mat-icon> Copy link
+      </button>
+      <button data-testid="ud-toggle-media-26" mat-stroked-button type="button" class="fb-media-btn" (click)="toggleMedia(ctrl)">
+        <mat-icon>{{ isMediaOpen(ctrl) ? 'stop_circle' : 'play_circle' }}</mat-icon> {{ isMediaOpen(ctrl) ? 'Hide player' : 'Play' }}
+      </button>
+    </div>
+    <div class="fb-media-player" *ngIf="isMediaOpen(ctrl)">
+      <ng-container *ngIf="ctrl.get('type')?.value === 'video'; else audioPlayer">
+        <iframe *ngIf="mediaEmbed(ctrl) as embed; else videoFile" data-testid="ud-media-embed-27" class="fb-media-frame" [src]="embed"
+          title="Video preview" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>
+        <ng-template #videoFile>
+          <video data-testid="ud-media-video-28" class="fb-media-video" controls [src]="url">Your browser can't play this video.</video>
+        </ng-template>
+      </ng-container>
+      <ng-template #audioPlayer>
+        <audio data-testid="ud-media-audio-29" class="fb-media-audio" controls [src]="url">Your browser can't play this audio.</audio>
+      </ng-template>
+    </div>
+  </div>
+</ng-template>

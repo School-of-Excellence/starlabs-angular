@@ -4300,6 +4300,22 @@ table.specialist-table tr:hover td {
   /* Motion */
   --t-fast: 140ms cubic-bezier(0.16, 1, 0.3, 1);
   --t-med: 260ms cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Delivery stage ramp — Init -> Await -> Started -> Ongoing -> Done.
+     Sequential and strictly descending in luminance, because the five stages are
+     ORDERED: the eye should read progression without consulting the legend.
+     Built in OKLCH at hue 278 (the --accent family) with L from 0.88 to 0.24.
+     Adjacent WCAG ratios 1.76 / 1.89 / 1.96 / 1.76 — evenly spaced, spread 0.20 —
+     and the lightest still sits 1.32:1 against the --c-surface-2 track.
+
+     Replaces a zinc ramp that was NOT monotonic: its luminances ran
+     0.660 -> 0.167 -> 0.051 -> 0.003 -> 0.117, so Done came out lighter than
+     Ongoing and the bar read backwards at the final step. */
+  --dd-stage-1: #ced5fe;
+  --dd-stage-2: #939cf1;
+  --dd-stage-3: #646bbd;
+  --dd-stage-4: #3d4179;
+  --dd-stage-5: #1b1d32;
 }
 
 /* ----- Base canvas -------------------------------------------------------- */
@@ -11191,23 +11207,23 @@ table.specialist-table tr:hover td {
 }
 
 :host .dd-app .dd-bg-s1 {
-  background: var(--z-300);
+  background: var(--dd-stage-1);
 }
 
 :host .dd-app .dd-bg-s2 {
-  background: var(--z-500);
+  background: var(--dd-stage-2);
 }
 
 :host .dd-app .dd-bg-s3 {
-  background: var(--z-700);
+  background: var(--dd-stage-3);
 }
 
 :host .dd-app .dd-bg-s4 {
-  background: var(--text);
+  background: var(--dd-stage-4);
 }
 
 :host .dd-app .dd-bg-s5 {
-  background: var(--accent);
+  background: var(--dd-stage-5);
 }
 
 /* TAB STRIP — override existing dd-tab-group inside .dd-app */
@@ -11457,10 +11473,13 @@ table.specialist-table tr:hover td {
   border-color: var(--border);
 }
 
+/* The Done pill also carries .done from the template. The nth-child(5) rule below
+   wins on !important either way; pointing this at the ramp as well keeps the two
+   rules from disagreeing about what Done looks like. */
 :host .dd-app .dd-fstep__pill.done {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--text-inv);
+  background: var(--dd-stage-5);
+  border-color: var(--dd-stage-5);
+  color: #ffffff;
 }
 
 :host .dd-app .dd-fstep__lbl {
@@ -14824,7 +14843,9 @@ table.specialist-table tr:hover td {
   right: 10% !important;
   top: 50% !important;
   height: 1px !important;
-  background: linear-gradient(90deg, #fbbf24, #38bdf8, #818cf8, #34d399, #2563eb) !important;
+  /* The connector reads left-to-right under the pills, so it carries the same
+     ramp they do. It was a gradient of the old five unrelated hues. */
+  background: linear-gradient(90deg, var(--dd-stage-1), var(--dd-stage-2), var(--dd-stage-3), var(--dd-stage-4), var(--dd-stage-5)) !important;
   z-index: 0 !important;
   opacity: 0.35 !important;
 }
@@ -14875,34 +14896,47 @@ table.specialist-table tr:hover td {
   color: #cbd5e1 !important;
 }
 
-/* Step 1: INIT — amber */
+/* Pills share the stage ramp with the bar beneath them.
+   They were amber / sky / indigo / emerald / blue — five unrelated hues for five
+   ORDERED stages, which encoded them as unrelated categories and disagreed with the
+   stage-mix bar in the same cell. Now pill N and segment N are the same colour, and
+   the row carries one colour system instead of two.
+
+   Pill order IS the journey order: Yet to Start -> Init -> Started -> Ongoing -> Done.
+   (The deleted "Delivery Pipeline by Product" panel listed Init before Await; the
+   pills were right and the panel was wrong, so the bar was reordered to match.)
+
+   Ink: stages 1-2 are light enough for the darkest ramp stop (11.49:1, 6.52:1),
+   stages 3-5 need white (4.79:1, 9.41:1, 16.56:1). All AA for bold 14px. */
+
+/* Step 1: YET TO START */
 :host .dd-app .dd-prow__funnel .dd-fstep:nth-child(1) .dd-fstep__pill:not(.empty) {
-  background: #fef3c7 !important;
-  color: #92400e !important;
+  background: var(--dd-stage-1) !important;
+  color: var(--dd-stage-5) !important;
 }
 
-/* Step 2: AWAIT — sky */
+/* Step 2: INIT */
 :host .dd-app .dd-prow__funnel .dd-fstep:nth-child(2) .dd-fstep__pill:not(.empty) {
-  background: #e0f2fe !important;
-  color: #075985 !important;
+  background: var(--dd-stage-2) !important;
+  color: var(--dd-stage-5) !important;
 }
 
-/* Step 3: STARTED — indigo */
+/* Step 3: STARTED */
 :host .dd-app .dd-prow__funnel .dd-fstep:nth-child(3) .dd-fstep__pill:not(.empty) {
-  background: #e0e7ff !important;
-  color: #3730a3 !important;
+  background: var(--dd-stage-3) !important;
+  color: #ffffff !important;
 }
 
-/* Step 4: ONGOING — emerald */
+/* Step 4: ONGOING */
 :host .dd-app .dd-prow__funnel .dd-fstep:nth-child(4) .dd-fstep__pill:not(.empty) {
-  background: #d1fae5 !important;
-  color: #065f46 !important;
+  background: var(--dd-stage-4) !important;
+  color: #ffffff !important;
 }
 
-/* Step 5: DONE — blue solid */
+/* Step 5: DONE */
 :host .dd-app .dd-prow__funnel .dd-fstep:nth-child(5) .dd-fstep__pill:not(.empty) {
-  background: #2563eb !important;
-  color: #fff !important;
+  background: var(--dd-stage-5) !important;
+  color: #ffffff !important;
 }
 
 :host .dd-app .dd-fstep__lbl {
@@ -15235,7 +15269,9 @@ table.specialist-table tr:hover td {
   right: 10% !important;
   top: 14px !important;
   height: 1px !important;
-  background: linear-gradient(90deg, #fbbf24, #38bdf8, #818cf8, #34d399, #2563eb) !important;
+  /* The connector reads left-to-right under the pills, so it carries the same
+     ramp they do. It was a gradient of the old five unrelated hues. */
+  background: linear-gradient(90deg, var(--dd-stage-1), var(--dd-stage-2), var(--dd-stage-3), var(--dd-stage-4), var(--dd-stage-5)) !important;
   z-index: 0 !important;
   opacity: 0.4 !important;
 }
@@ -18011,3 +18047,820 @@ i.seat-chip {
   background: #fff7ed;
   color: #c2703d;
 }
+
+/* Unknown waiting period: no onboarding date on record. Deliberately neutral --
+   it must not read as "fresh" (green) nor as "overdue" (red). */
+.pm-days-badge.days-unknown {
+    background: #f1f5f9;
+    color: #64748b;
+    letter-spacing: 0.08em;
+}
+
+
+/* "Not recorded" reads at the KPI value size but muted: it is an absence, not a number.
+   Replaces a fake "0d", which read as "completes same-day". */
+.dd-kcell__not-recorded {
+    font-size: 0.62em;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: var(--amber, #a15c07);
+    white-space: nowrap;
+}
+
+
+/* ============================================================================
+ * DELIVERY FUNNEL / PRODUCT STRIP / DELIVERY SPEED
+ * ----------------------------------------------------------------------------
+ * Appended block. Three new sections:
+ *   1. .dd-funnel-*  -- the funnel that replaces the old KPI grid (page centrepiece)
+ *   2. .dd-strip-*   -- the horizontally scrollable product chip strip
+ *   3. .dd-speed-*   -- average delivery speed (figure + gauge)
+ *
+ * House rules observed here:
+ *   - every selector is prefixed `:host .dd-app `
+ *   - only the tokens declared on :host (--ff-*, --c-*, --r-*, --shadow-*, --t-*)
+ *   - no new custom properties, no :root/:host block, no dark-mode rules
+ *   - figures are var(--ff-mono) + tabular-nums
+ *   - only transform/opacity are animated; no filter/backdrop-filter/perspective
+ *   - .dd-gauge-track / .dd-gauge-fill / .dd-gauge-target are REUSED from the
+ *     existing gauge rules above (~line 10988) and are NOT redefined here.
+ *   - .dd-section-head / .dd-section-title / .dd-section-sub are reused as-is.
+ * ========================================================================== */
+
+/* --- 1. FUNNEL ------------------------------------------------------------ */
+
+:host .dd-app .dd-funnel-sec {
+  margin: 0 0 22px;
+}
+
+:host .dd-app .dd-funnel-hero {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-2);
+  padding: 20px 22px 18px;
+}
+
+:host .dd-app .dd-funnel__eyebrow {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--c-text-muted);
+  margin-bottom: 2px;
+}
+
+:host .dd-app .dd-funnel__cap {
+  display: block;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--c-text-soft);
+  margin-bottom: 18px;
+  max-width: 62ch;
+}
+
+:host .dd-app .dd-funnel {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  align-items: stretch;
+}
+
+:host .dd-app .dd-fnl-step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-1);
+  transition: border-color var(--t-fast), box-shadow var(--t-fast);
+}
+
+:host .dd-app .dd-fnl-step:hover {
+  border-color: var(--c-accent);
+  box-shadow: var(--shadow-hover);
+}
+
+/* Left-to-right progression: a hairline chevron sitting in the grid gap.
+   Rotation lives on the pseudo-element only -- never on an ancestor of a
+   position:fixed overlay. */
+:host .dd-app .dd-fnl-step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 0;
+  width: 7px;
+  height: 7px;
+  border-top: 1.5px solid var(--c-border);
+  border-right: 1.5px solid var(--c-border);
+  transform: translate(calc(100% + 3px), -50%) rotate(45deg);
+  pointer-events: none;
+}
+
+:host .dd-app .dd-fnl-step--delivery {
+  border-color: var(--c-accent-soft);
+  background: var(--c-accent-tint);
+  box-shadow: var(--shadow-2);
+}
+
+/* The clickable surface: a button reset so it reads as a card, not a control. */
+:host .dd-app .dd-fnl-step__body {
+  appearance: none;
+  -webkit-appearance: none;
+  background: none;
+  border: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  padding: 16px 16px 14px;
+  color: inherit;
+  border-radius: var(--r-md);
+}
+
+:host .dd-app .dd-fnl-step__body:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+}
+
+:host .dd-app .dd-fnl-step__lbl {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--c-text-muted);
+}
+
+:host .dd-app .dd-fnl-step__val {
+  font-family: var(--ff-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 34px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--c-text);
+}
+
+:host .dd-app .dd-fnl-step__sub {
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--c-text-soft);
+}
+
+/* "Not recorded" -- an absence, not a number. Mirrors .dd-kcell__not-recorded
+   at the end of this file, but as a self-contained amber caption. */
+:host .dd-app .dd-fnl-step__nr {
+  align-self: flex-start;
+  font-family: var(--ff-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  color: var(--c-warn);
+  background: var(--c-warn-soft);
+  border-radius: var(--r-pill);
+  padding: 3px 9px;
+}
+
+:host .dd-app .dd-fnl-step__open {
+  margin-top: auto;
+  padding-top: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--c-accent);
+  opacity: 0.5;
+  transition: opacity var(--t-fast), transform var(--t-fast);
+}
+
+:host .dd-app .dd-fnl-step:hover .dd-fnl-step__open,
+:host .dd-app .dd-fnl-step__body:focus-visible .dd-fnl-step__open {
+  opacity: 1;
+  transform: translateX(2px);
+}
+
+
+
+
+/* Flags live beside the body button (never inside it -- no nested buttons). */
+:host .dd-app .dd-fnl-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 16px 14px;
+  margin-top: -4px;
+}
+
+:host .dd-app .dd-fnl-flag {
+  appearance: none;
+  -webkit-appearance: none;
+  background: none;
+  border: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  background: var(--c-surface-2);
+  border: 1px solid var(--c-border-soft);
+  color: var(--c-text-soft);
+  transition: opacity var(--t-fast), transform var(--t-fast);
+}
+
+:host .dd-app .dd-fnl-flag:hover {
+  transform: translateY(-1px);
+}
+
+:host .dd-app .dd-fnl-flag:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+}
+
+:host .dd-app .dd-fnl-flag--hot {
+  background: var(--c-danger-soft);
+  border-color: var(--c-danger-soft);
+  color: var(--c-danger);
+}
+
+:host .dd-app .dd-fnl-flag__n {
+  font-family: var(--ff-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--c-text);
+}
+
+:host .dd-app .dd-fnl-flag--hot .dd-fnl-flag__n {
+  color: var(--c-danger);
+}
+
+:host .dd-app .dd-fnl-flag__t {
+  font-size: 11px;
+  letter-spacing: 0.01em;
+}
+
+/* A step with nothing in it should not compete for attention. */
+:host .dd-app .dd-fnl-step.is-zero {
+  opacity: 0.55;
+  box-shadow: none;
+}
+
+:host .dd-app .dd-fnl-step.is-zero .dd-fnl-step__val {
+  color: var(--c-text-muted);
+}
+
+:host .dd-app .dd-funnel__note {
+  margin: 14px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--c-text-muted);
+}
+
+/* --- 2. PRODUCT STRIP ----------------------------------------------------- */
+
+:host .dd-app .dd-strip-sec {
+  margin: 0 0 22px;
+}
+
+:host .dd-app .dd-strip-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+:host .dd-app .dd-strip__title {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--c-text-soft);
+}
+
+:host .dd-app .dd-strip__hint {
+  font-size: 11px;
+  color: var(--c-text-muted);
+}
+
+:host .dd-app .dd-strip {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding-bottom: 2px;
+}
+
+:host .dd-app .dd-strip::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+:host .dd-app .dd-pchip {
+  appearance: none;
+  -webkit-appearance: none;
+  background: none;
+  border: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  flex: 0 0 auto;
+  min-width: 132px;
+  max-width: 200px;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 11px 13px 10px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-1);
+  color: var(--c-text);
+  transition: border-color var(--t-fast), box-shadow var(--t-fast), transform var(--t-fast);
+}
+
+:host .dd-app .dd-pchip:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-2);
+}
+
+:host .dd-app .dd-pchip:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+}
+
+:host .dd-app .dd-pchip.is-sel {
+  border-color: var(--c-accent);
+  background: var(--c-accent-tint);
+  box-shadow: var(--shadow-2);
+}
+
+:host .dd-app .dd-pchip.is-zero {
+  opacity: 0.5;
+  box-shadow: none;
+}
+
+:host .dd-app .dd-pchip__nm {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--c-text-soft);
+}
+
+:host .dd-app .dd-pchip.is-sel .dd-pchip__nm {
+  color: var(--c-text);
+}
+
+:host .dd-app .dd-pchip__v {
+  font-family: var(--ff-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 19px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--c-text);
+}
+
+:host .dd-app .dd-pchip__t {
+  height: 3px;
+  border-radius: var(--r-pill);
+  background: var(--c-surface-2);
+  overflow: hidden;
+}
+
+:host .dd-app .dd-pchip__t i {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: var(--c-accent);
+  opacity: 0.55;
+}
+
+:host .dd-app .dd-pchip.is-sel .dd-pchip__t i {
+  opacity: 1;
+}
+
+/* --- 3. DELIVERY SPEED ---------------------------------------------------- */
+
+:host .dd-app .dd-speed-sec {
+  margin: 0 0 22px;
+}
+
+:host .dd-app .dd-speed {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  gap: 24px;
+  align-items: center;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1);
+  padding: 18px 22px;
+}
+
+:host .dd-app .dd-speed__figure {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+:host .dd-app .dd-speed__lbl {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--c-text-muted);
+}
+
+:host .dd-app .dd-speed__val {
+  font-family: var(--ff-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 40px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.045em;
+  color: var(--c-text);
+}
+
+:host .dd-app .dd-speed__unit {
+  font-family: var(--ff-mono);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--c-text-muted);
+  margin-left: 3px;
+}
+
+/* Same amber absence treatment as .dd-fnl-step__nr. */
+:host .dd-app .dd-speed__nr {
+  align-self: flex-start;
+  font-family: var(--ff-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  color: var(--c-warn);
+  background: var(--c-warn-soft);
+  border-radius: var(--r-pill);
+  padding: 4px 10px;
+}
+
+:host .dd-app .dd-speed__sub {
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--c-text-soft);
+  max-width: 34ch;
+}
+
+/* Gauge column. The track/fill/target inside are the EXISTING
+   .dd-gauge-track / .dd-gauge-fill / .dd-gauge-target rules -- reused, untouched. */
+:host .dd-app .dd-speed__gauge {
+  min-width: 0;
+  padding-top: 2px;
+}
+
+:host .dd-app .dd-gauge-marks {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  font-family: var(--ff-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  color: var(--c-text-muted);
+}
+
+/* --- Responsive ----------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  :host .dd-app .dd-funnel {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  /* Progression arrows only make sense while the steps read left-to-right. */
+  :host .dd-app .dd-fnl-step:not(:last-child)::after {
+    display: none;
+  }
+
+  :host .dd-app .dd-funnel-hero {
+    padding: 18px 16px 16px;
+  }
+
+  :host .dd-app .dd-fnl-step__val {
+    font-size: 30px;
+  }
+}
+
+@media (max-width: 760px) {
+  :host .dd-app .dd-speed {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    align-items: stretch;
+    padding: 16px;
+  }
+
+  :host .dd-app .dd-speed__sub {
+    max-width: none;
+  }
+}
+
+@media (max-width: 600px) {
+
+  :host .dd-app .dd-funnel-sec,
+  :host .dd-app .dd-strip-sec,
+  :host .dd-app .dd-speed-sec {
+    margin-bottom: 18px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  :host .dd-app .dd-funnel-hero {
+    padding: 16px;
+    border-radius: var(--r-md);
+  }
+
+  :host .dd-app .dd-funnel__cap {
+    margin-bottom: 14px;
+  }
+
+  :host .dd-app .dd-pchip {
+    min-width: 124px;
+  }
+
+  :host .dd-app .dd-speed__val {
+    font-size: 34px;
+  }
+}
+
+/* ========================================================================== */
+/* STAGE MIX — the bar from the deleted "Delivery Pipeline by Product" panel,  */
+/* re-homed into the Products row beside the counts it describes.              */
+/* It is a second grid row inside .dd-prow__funnel, spanning all five columns,  */
+/* placed after the pills so the connector ::before still aligns with them.     */
+/* ========================================================================== */
+
+:host .dd-app .dd-stagemix {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 6px;
+  margin-top: 10px;
+  border-radius: var(--r-pill);
+  overflow: hidden;
+  background: var(--c-surface-2);
+}
+
+:host .dd-app .dd-stagemix__seg {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  display: block;
+  height: 100%;
+  min-width: 3px;
+  cursor: pointer;
+  transition: opacity var(--t-fast);
+}
+
+:host .dd-app .dd-stagemix__seg:hover {
+  opacity: 0.72;
+}
+
+:host .dd-app .dd-stagemix__seg:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 1px;
+}
+
+:host .dd-app .dd-stagemix__empty {
+  flex: 1;
+  font-size: 10px;
+  line-height: 6px;
+  color: var(--c-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Legend — sits beside the "Journey Funnel" column label. */
+:host .dd-app .dd-mixleg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-left: 10px;
+  font-weight: 400;
+}
+
+:host .dd-app .dd-mixleg__i {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--c-text-muted);
+  white-space: nowrap;
+}
+
+:host .dd-app .dd-mixleg__i i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+@media (max-width: 900px) {
+  :host .dd-app .dd-mixleg {
+    display: none;
+  }
+}
+
+/* Needs-attention row — Stuck and Not-consuming sit BESIDE the funnel, not inside
+   the In-delivery step. They are not a subset of it: In delivery is status
+   'ongoing', Stuck is 'initiated' OR 'ongoing' stalled, and Not-consuming is
+   'initiated' only, so it is disjoint from In delivery by construction. */
+:host .dd-app .dd-funnel-alerts {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--c-border-soft);
+}
+
+:host .dd-app .dd-funnel-alerts__lbl {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--c-text-muted);
+}
+
+:host .dd-app .dd-funnel-alerts__note {
+  font-size: 11px;
+  color: var(--c-text-muted);
+  margin-left: auto;
+}
+
+@media (max-width: 760px) {
+  :host .dd-app .dd-funnel-alerts__note {
+    margin-left: 0;
+    flex-basis: 100%;
+  }
+}
+
+/* The pills above the bar carry their own pre-existing pastel colours, so the
+   legend has to say which of the two it describes or it reads as labelling both. */
+:host .dd-app .dd-mixleg__for {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--c-text-muted);
+  opacity: 0.75;
+}
+
+/* Stuck Cases: DAYS STUCK counted from the last ATTENDED appointment where one exists.
+   The asterisk marks the rows that fell back to the status-change date, so a reader can
+   tell the two bases apart instead of assuming every number means the same thing. */
+:host .dd-app .pm-days-basis {
+  margin-left: 2px;
+  font-weight: 700;
+  opacity: 0.55;
+}
+
+/* Lookup-failure banner. Amber, not red: the data is stale, nothing is broken. */
+:host .dd-app .pm-data-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--c-warn);
+  border-left-width: 3px;
+  border-radius: var(--r-sm);
+  background: var(--c-warn-soft);
+  color: var(--c-text);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════════
+   CONTROL ALIGNMENT (operator 2026-11-18) — every select, search box and toolbar button in the
+   dashboard is one 40px row. Before this, the Participants filter selects reserved a validation
+   strip under the field (no subscriptSizing="dynamic") so their box sat higher than the search box
+   and buttons beside them, and three stacked overrides (min-height 36 / padding 6px 0 / 7px 14px)
+   pushed the text off-centre. Height goes through Material's own token, so the outlined floating
+   label is re-centred by Material itself rather than by more padding hacks.
+   ═══════════════════════════════════════════════════════════════════════════════════════════════ */
+:host { --dd-ctl-h: 40px; }
+
+/* selects / date-range fields (product-select-field is the hidden trigger inside the Products button — untouched) */
+:host ::ng-deep .mat-mdc-form-field:not(.product-select-field) {
+  --mat-form-field-container-height: var(--dd-ctl-h);
+  --mat-form-field-container-vertical-padding: 8px;
+  --mat-form-field-container-text-size: 13px;
+  --mat-form-field-outlined-label-text-size: 13px;
+  --mdc-outlined-text-field-label-text-size: 13px;   /* the token this Material version's label actually reads */
+  --mdc-outlined-text-field-input-text-size: 13px;
+  --mat-select-trigger-text-size: 13px;
+  vertical-align: middle;
+}
+:host ::ng-deep .mat-mdc-form-field:not(.product-select-field) .mat-mdc-text-field-wrapper {
+  padding: 0 10px 0 12px;   /* an older rule zeroed this, which pushed the arrow onto the border */
+  min-height: 0;
+}
+/* label: same 13px as the value (it rendered at Material's default 16px and was cut off: "Customer Sta…") */
+:host ::ng-deep .mat-mdc-form-field:not(.product-select-field) .mdc-floating-label,
+:host ::ng-deep .mat-mdc-form-field:not(.product-select-field) .mat-mdc-floating-label {
+  font-size: 13px;
+  letter-spacing: normal;
+}
+:host ::ng-deep .mat-mdc-form-field:not(.product-select-field) .mat-mdc-select-value { font-size: 13px; }
+:host ::ng-deep .mat-mdc-form-field:not(.product-select-field) .mat-mdc-select-arrow-wrapper { padding-left: 6px; }
+:host ::ng-deep .mat-mdc-form-field:not(.product-select-field) .mat-mdc-form-field-infix {
+  min-height: var(--dd-ctl-h);
+  padding: 8px 0;
+  display: flex;
+  align-items: center;
+}
+:host ::ng-deep .mat-mdc-form-field:not(.product-select-field) .mat-mdc-select { line-height: 22px; }
+:host ::ng-deep .mat-mdc-form-field:not(.product-select-field) .mat-mdc-form-field-icon-suffix { padding: 0 4px 0 0; }
+
+/* search boxes: Participants search + Stages search */
+:host .pm-search-wrap,
+:host .search-container .search-field {
+  box-sizing: border-box;
+  height: var(--dd-ctl-h);
+  padding-top: 0;
+  padding-bottom: 0;
+  display: flex;
+  align-items: center;
+}
+:host .pm-search-input,
+:host .search-container input { padding-top: 0; padding-bottom: 0; height: 100%; }
+/* same skin as the outlined selects beside them (was a grey, borderless pill) */
+:host .pm-search-wrap,
+:host .search-container .search-field {
+  background: transparent;
+  border: 1px solid rgba(0, 0, 0, 0.38);
+  border-radius: 4px;
+}
+:host .pm-search-wrap:focus-within,
+:host .search-container .search-field:focus-within { border-color: var(--c-accent, #4f46e5); }
+:host .pm-search-input,
+:host .search-container input { background: transparent; font-size: 13px; }
+
+/* toolbar buttons that sit in the same rows */
+:host .pm-btn-primary {
+  box-sizing: border-box;
+  height: var(--dd-ctl-h);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+/* rows that hold them line everything up on the same centre line */
+:host .pm-search-and-filters,
+:host .pm-actions { align-items: center; }
+
+/* the search box inside every select panel (ngx-mat-select-search) */
+::ng-deep .mat-mdc-select-panel .dd-opt-search { position: sticky; top: 0; z-index: 2; }
+/* panels grow to the longest option (panelWidth="") — but never narrower than a sensible list */
+::ng-deep .mat-mdc-select-panel:has(.dd-opt-search) { min-width: 220px; max-width: 420px; }
+/* Weekly Report product picker: product names are long ("WiSH Diagnostics And Implementation") */
+:host .pm-filter-field--wide { width: 280px; min-width: 280px; }
+/* Stages header: Export (30px) sat lower than the 40px participant search beside it */
+:host .flow-section .header-right { display: flex; align-items: center; gap: 10px; }
+:host .flow-section .header-right .dd-btn { box-sizing: border-box; height: var(--dd-ctl-h); display: inline-flex; align-items: center; gap: 6px; }

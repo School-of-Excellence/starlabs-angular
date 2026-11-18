@@ -14,6 +14,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 import { Router } from '@angular/router';
 import * as XLSX from 'xlsx';
 import { MatDatepickerModule } from '@angular/material/datepicker';
@@ -21,6 +22,7 @@ import { MatNativeDateModule } from '@angular/material/core';
 import { MatInputModule } from '@angular/material/input';
 import { limit } from '@angular/fire/firestore';  // add 'limit' to the existing firestore import
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatTableModule } from '@angular/material/table';
 // Pure business rules — thresholds, bands, date maths, funnel arithmetic and label rules — live in a
 // dependency-free sibling engine so they can be unit-tested without this component's Firestore stack.
 // Extracted 2026-09-10; see delivery-dashboard.engine.ts for what moved and why.
@@ -177,6 +179,7 @@ interface UtilizationRow {
         MatDialogModule,
         MatIconModule,
         MatTooltipModule,
+        NgxMatSelectSearchModule,
         MatFormFieldModule,
         MatSelectModule,
         MatButtonModule,
@@ -186,7 +189,8 @@ interface UtilizationRow {
         MatSlideToggleModule,
         ProfilePictureComponent,
         FormOverlayViewComponent,
-        SpecialistAppointmentSlotsComponent   
+        SpecialistAppointmentSlotsComponent,
+        MatTableModule 
     ],
     providers: [DatePipe],
     templateUrl: './delivery-dashboard-clone.component.html',
@@ -282,6 +286,35 @@ export class DeliveryDashboardCloneComponent {
     funnelModalProfiles: { [profileId: string]: any[] } = {};
     notEligible: any = [];
     stageModalOpen = false;
+
+    // weekly report declarations
+    weeklyReportCardId = '';
+    weeklyReportRows: any[] = [];
+    weeklyReportLoading = false;
+
+    weeklyReportParticipants: any[] = [];
+    weeklyStatusFilter = 'all';
+    weeklyInitiatedRange = new FormGroup({
+        start: new FormControl<Date | null>(null),
+        end: new FormControl<Date | null>(null),
+    });
+    weeklyAppointmentRange = new FormGroup({
+        start: new FormControl<Date | null>(null),
+        end: new FormControl<Date | null>(null),
+    });
+    weeklyColumns = [
+        { key: 'sno', label: 'S.NO', perParticipant: true },
+        { key: 'name', label: 'PARTICIPANT NAME', perParticipant: true },
+        { key: 'diagnosticsSpecialist', label: 'DIAGNOSTICS SPECIALIST', perParticipant: true },
+        { key: 'implementationSpecialist', label: 'IMPLEMENTATION SPECIALIST', perParticipant: true },
+        { key: 'initiatedLabel', label: 'INITIATION DATE', perParticipant: true },
+        { key: 'appointmentDate', label: 'APPOINTMENT DATE & TIME', perParticipant: false },
+        { key: 'stage', label: 'STAGE', perParticipant: false },
+        { key: 'status', label: 'STATUS', perParticipant: false },
+    ];
+    weeklyColumnKeys = this.weeklyColumns.map(col => col.key);
+    private readonly weeklyStatusLabels: { [key: string]: string } = { booked: 'Booked', completed: 'Completed' };
+    private eisRoleTypeMap: { [roleId: string]: 'diagnostics' | 'implementation' } = {};
 
     // Hidden products (by name)
     hiddenProductNames: Set<string> = new Set([
@@ -2429,6 +2462,13 @@ export class DeliveryDashboardCloneComponent {
                         }
                     }
                     this.allMatchedProductsRaw = Array.from(productMap.values());
+                    // Journey onboarding date is only a FALLBACK for DAYS WAITING: needed just for
+                    // not-yet-initiated products that have no product onboarding call booked.
+                    await this.loadJourneyProductMapFor(
+                        this.allMatchedProductsRaw
+                            .filter((i: any) => !(i?.['status'] || '').toString().trim() && !i?.['productonboardingscheduled'])
+                            .map((i: any) => i?.['profileid'])
+                    );
                     await this.applyDateFilter();
                     if (this.selectedProductLabel) {
                         this.selectProduct(this.selectedProductLabel);
@@ -3272,9 +3312,22 @@ export class DeliveryDashboardCloneComponent {
             )
         );
     }
+    /**
+     * In-delivery headcount.
+     *
+     * Spans visible AND hidden products. Hiding a product is a Products-table display
+     * preference, not a filter on people: populateActionableCohorts (Awaiting / Ready /
+     * Stuck / Not-consuming) never consults hiddenProductIds, and getCompletionSummary
+     * already sums both lists. Iterating visibleCardIds alone made this the one funnel
+     * number computed over a smaller population than the ones beside it, so a participant
+     * in a hidden product could be counted as Stuck but not as In delivery.
+     *
+     * Product-filter scoping is unaffected: both visibleCardIds and hiddenCardIds are
+     * built from allProductIdsFromRaw, which applies itemPassesProductFilter.
+     */
     get kpiOngoingTotal(): number {
         return this.memoGet('kpiOG', () =>
-            this.visibleCardIds.reduce(
+            [...this.visibleCardIds, ...this.hiddenCardIds].reduce(
                 (sum, id) => sum + (this.getCardFunnel(id)?.ongoing?.length || 0), 0
             )
         );
@@ -3299,6 +3352,17 @@ export class DeliveryDashboardCloneComponent {
     }
     get kpiAvgComplete(): number {
         return this.getCompletionSummary().avgStartToDone;
+    }
+
+    /**
+     * Is there actually an average to show?
+     *
+     * avgStartToDone falls back to 0 when nothing completed (see getCompletionSummary), and "0d"
+     * reads as "completes same-day" rather than "no completions to measure". Same fake-zero the
+     * DAYS WAITING fix removed; the tile says "Not recorded" instead.
+     */
+    get hasAvgCompleteData(): boolean {
+        return this.getCompletionSummary().totalCompleted > 0;
     }
     // get hasSpecialistData(): boolean {
     //     return (this.slotOverview?.totalSlots || 0) > 0;
@@ -3395,7 +3459,29 @@ export class DeliveryDashboardCloneComponent {
         return productMonogram(name);
     }
 
-    // Per-product pipeline total for the Action Center mini-funnel rows
+    /**
+     * Spoken form of a product's stage mix, for the bar's title and aria-label.
+     *
+     * The bar carries no text of its own, so without this the split is only available
+     * to someone who can see and hover five coloured segments. Order matches the legend
+     * and the segment order, which came across from the deleted
+     * "Delivery Pipeline by Product" panel.
+     */
+    stageMixLabel(cardId: string): string {
+        const f = this.getCardFunnel(cardId);
+        const parts: Array<[string, number]> = [
+            ['Yet to Start', f?.awaiting?.length || 0],
+            ['Init', f?.initiated?.length || 0],
+            ['Started', f?.started?.length || 0],
+            ['Ongoing', f?.ongoing?.length || 0],
+            ['Done', f?.completed?.length || 0],
+        ];
+        const total = parts.reduce((sum, [, n]) => sum + n, 0);
+        if (total === 0) return 'No participants in the pipeline yet';
+        return parts.map(([k, n]) => k + ' ' + n).join(', ') + ' (total ' + total + ')';
+    }
+
+    // Per-product pipeline total, also the stage-mix bar's "is there anything here" test
     getCardPipelineTotal(cardId: string): number {
         const f = this.getCardFunnel(cardId);
         return (f?.initiated?.length || 0)
@@ -3405,44 +3491,82 @@ export class DeliveryDashboardCloneComponent {
             + (f?.completed?.length || 0);
     }
 
-    // Sparkline data: per-product counts for each KPI (cached per filter/visible set)
-    private _sparkCacheKey = '';
-    private _sparkCache: { ready: number[]; stuck: number[]; completed: number[] } = { ready: [], stuck: [], completed: [] };
-    private buildSparkData() {
-        const ids = this.visibleCardIds;
-        const key = ids.join('|') + ':' + this.selectedTimeFilter;
-        if (this._sparkCacheKey === key) return this._sparkCache;
-        const ready: number[] = [];
-        const stuck: number[] = [];
-        const completed: number[] = [];
-        const stuckByProfile = new Set((this.originalData?.['stuckCases']?.data || []).map((d: any) => d?.profileid));
-        const readyByProfile = new Set((this.originalData?.['readyForInitiation']?.data || []).map((d: any) => d?.profileid));
-        for (const id of ids) {
-            const pids = this.getCardProductIds(id);
-            const items = pids.flatMap(p => this.groupedFiltered?.[p] || []);
-            const profileSet = new Set(items.map((i: any) => i?.profileid));
-            let r = 0, s = 0;
-            profileSet.forEach((pid) => {
-                if (readyByProfile.has(pid)) r++;
-                if (stuckByProfile.has(pid)) s++;
-            });
-            ready.push(r);
-            stuck.push(s);
-            completed.push(this.getCardFunnel(id)?.completed?.length || 0);
-        }
-        this._sparkCache = { ready, stuck, completed };
-        this._sparkCacheKey = key;
-        return this._sparkCache;
-    }
-    get sparkReady(): number[] { return this.buildSparkData().ready; }
-    get sparkStuck(): number[] { return this.buildSparkData().stuck; }
-    get sparkCompleted(): number[] { return this.buildSparkData().completed; }
-    sparkMax(arr: number[]): number { return sparkMax(arr); }
 
     // Avg-time gauge benchmark
     avgTimeTarget = 30;
     get avgTimePct(): number {
         return avgTimePct(this.kpiAvgComplete || 0, this.avgTimeTarget);
+    }
+
+    // ===== v4 layout: product strip, funnel caption, delivery-speed gauge ==========
+    //
+    // The strip is a one-click VIEW of productFilterControl, not a second filter.
+    // Multi-select stays in the Products dropdown; both render from the same control,
+    // so they cannot disagree. Scoping itself still rides on itemPassesProductFilter
+    // (via allProductIdsFromRaw) and populateActionableCohorts' label check - no third
+    // mechanism is introduced here.
+
+    /**
+     * The multi-select label for a card id.
+     *
+     * Mirrors cardLabelForProductId, which is what availableCardLabels is built from and
+     * what populateActionableCohorts matches on, so a chip click resolves a product the
+     * same way every other part of the board does.
+     */
+    private cardFilterLabel(cardId: string): string {
+        if (cardId.startsWith('group:')) return cardId.slice('group:'.length);
+        return this.cardLabelForProductId(cardId);
+    }
+
+    /** True when the filter is narrowed to exactly this one product. */
+    isStripSelected(cardId: string): boolean {
+        if (!this.productFilterActive) return false;
+        const sel = (this.productFilterControl?.value as string[]) || [];
+        return sel.length === 1 && sel[0] === this.cardFilterLabel(cardId);
+    }
+
+    /** True when nothing is narrowed - the "All products" chip is the active one. */
+    get isStripAllSelected(): boolean {
+        return !this.productFilterActive;
+    }
+
+    /** Strip click -> write the product filter, then run the normal change path. */
+    async selectProductFromStrip(cardId: string | null): Promise<void> {
+        const next = cardId === null
+            ? [...this.availableCardLabels]
+            : [this.cardFilterLabel(cardId)].filter(Boolean);
+        this.productFilterControl?.setValue(next);
+        await this.onProductMultiFilterChange();
+    }
+
+    /**
+     * Delivery-speed gauge: a 0-90 day scale with the target marked inside it, rather
+     * than a bar where 100% IS the target. A 45-day average against a 30-day target reads
+     * as "past the mark, with road left", not as an uninterpretable 150%.
+     */
+    readonly avgGaugeMaxDays = 90;
+    get avgGaugePct(): number {
+        const v = this.kpiAvgComplete || 0;
+        return Math.max(0, Math.min(100, Math.round((v / this.avgGaugeMaxDays) * 100)));
+    }
+    get avgTargetMarkPct(): number {
+        return Math.round((this.avgTimeTarget / this.avgGaugeMaxDays) * 100);
+    }
+
+    /** Scope captions - say out loud what the numbers below are counting. */
+    get speedScopeLabel(): string {
+        if (!this.productFilterActive) return 'Across all products';
+        const sel = (this.productFilterControl?.value as string[]) || [];
+        return sel.length === 1 ? 'Scoped to ' + sel[0] : 'Scoped to ' + sel.length + ' products';
+    }
+    get funnelScopeCaption(): string {
+        if (this.productFilterActive) {
+            const sel = (this.productFilterControl?.value as string[]) || [];
+            const who = sel.length === 1 ? sel[0] + ' participants' : 'these participants';
+            return 'Where ' + who + ' currently sit, from payment through to delivered.';
+        }
+        return 'Where everyone currently sits, from payment through to delivered - across '
+            + this.visibleCardIds.length + ' active products.';
     }
 
     // Live "last updated" stamp — stored string so Angular's double-check pass sees the same value.
@@ -4063,9 +4187,13 @@ export class DeliveryDashboardCloneComponent {
                     minimumpayment: this.minimumPayment,
                     tentativestart: this.tentativeStartDate,
                     deliverytype: this.selectedDeliveryType,
-                    statusdate: {
-                        initiated: serverTimestamp()
-                    }
+                    // Dot path, NOT `statusdate: { initiated: ... }`. updateDoc REPLACES a map
+                    // value, so the object form silently destroyed statusdate.started / .ongoing /
+                    // .completed — the very fields this dashboard reads to compute lastActivity.
+                    // Re-initiating a mid-flow participant wiped their history and dropped them out
+                    // of Stuck Cases. Matches queue-planning-review.component.ts:5606 and
+                    // product-funnel.component.ts:1031, which both already use this form.
+                    'statusdate.initiated': serverTimestamp()
                 })
             );
             await Promise.all(updatePromises);
@@ -4282,9 +4410,7 @@ export class DeliveryDashboardCloneComponent {
                 { key: 'appointmentstatus', label: 'APPOINTMENT STATUS', type: 'text', width: '130px' },
                 { key: 'issuetype', label: 'ISSUE TYPE', width: '10%', type: 'text' },
                 { key: 'date', label: 'APPOINTMENT DATE', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
-                { key: 'waitingperiod', label: 'DAYS STUCK', width: '10%', type: 'number' },
-                { key: 'recentappointmentdate', label: 'LAST APPOINTMENT DATE', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
-                { key: 'actualstuckdays', label: 'DAYS', width: '10%', type: 'number' },
+                { key: 'stuckdays', label: 'DAYS STUCK', width: '10%', type: 'number' },
                 { key: 'subscriptionstart', label: 'SUBSCRIPTION START', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
                 { key: 'subscriptionend', label: 'SUBSCRIPTION END', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
                 { key: 'lastaction', label: 'LAST ACTION', width: '10%', type: 'text' },
@@ -4983,6 +5109,12 @@ export class DeliveryDashboardCloneComponent {
         return waitingDaysSince(onboardedtime);
     }
 
+    // A wait of null/undefined means "we have no onboarding date", which is NOT
+    // the same as "waited zero days". The table shows an em dash for the former.
+    isKnownWait(value: any): boolean {
+        return value !== null && value !== undefined && !isNaN(Number(value));
+    }
+
     getWaitingPeriod(participant: any): number {
         return waitingPeriodFor({
             waitingperiod: participant.waitingperiod,
@@ -5474,7 +5606,7 @@ export class DeliveryDashboardCloneComponent {
         }
 
         if (header.key === 'waitingperiod') {
-            return `${value || 0} DAYS`;
+            return (value === null || value === undefined) ? '\u2014' : `${value} DAYS`;
         }
 
         if (header.key === 'actualstuckdays') {
@@ -6967,13 +7099,130 @@ export class DeliveryDashboardCloneComponent {
     // categorizes every actionable participant into one of three buckets, mapped to
     // the PM table's column shape.
 
+    /**
+     * Hover text explaining the rule behind each count (operator 2026-11-18). One source for the funnel,
+     * the Needs-attention flags, the Participants tabs and the Products Overview stages, so they never
+     * disagree. Keep in step with populateActionableCohorts / the card funnel / getRecentAppointmentDetails.
+     */
+    readonly logicTip = {
+        awaiting: 'Awaiting Initiation — products not initiated yet (no status), for participants whose mode is not installation event / event / integration. One row per participant. Days waiting count from the product onboarding call, else the onboarding of their ongoing journey.',
+        ready: 'Ready to Start — products not initiated yet where the participant is Active, finance is Regular or Fully paid, has no parallel product, and has paid at least the product minimum (or owes nothing). One row per participant.',
+        inDelivery: 'In delivery — every product with status "ongoing" (delivery has started), across all products including hidden ones. Not limited by the date filter.',
+        delivered: 'Delivered — products with status "completed" whose completion date falls in the selected period, across all products.',
+        needsAttention: 'Stuck and Not consuming are separate lists — they are not a slice of In delivery.',
+        stuck: 'Stuck — status "ongoing" in Priority Mode, more than 15 days since the last attended appointment (no attended appointment yet: since delivery went ongoing), and no appointment booked ahead. Longest first.',
+        idle: 'Initiated – Not Consuming — status "initiated" for 7 days or more without moving to ongoing.',
+        yetToStart: 'Yet to Start — no status yet; participant Active, finance Regular or Fully paid, no parallel product, minimum paid.',
+        init: 'Init — status "initiated", initiated within the selected period (eligible participants: mode allowed, minimum paid).',
+        started: 'Started — status "ongoing" whose delivery began (went ongoing) within the selected period (eligible participants). A part of Ongoing.',
+        ongoing: 'Ongoing — every product currently in delivery (status "ongoing"), whenever it started.',
+        done: 'Done — status "completed", completed within the selected period.',
+    };
+
+    // ===== Search inside every mat-select (ngx-mat-select-search, operator 2026-11-18) =====
+    /** Text typed into each select's search box, keyed by select. */
+    optSearch: Record<string, string> = {};
+    /** Options whose visible label contains the typed text (case-insensitive); all of them when the box is empty. */
+    filterOpts<T>(list: T[] | null | undefined, key: string, label: (x: T) => string = (x: any) => String(x ?? '')): T[] {
+        const q = (this.optSearch[key] || '').trim().toLowerCase();
+        const arr = list || [];
+        return q ? arr.filter(x => (label(x) || '').toLowerCase().includes(q)) : arr;
+    }
+    /** Same test for a fixed (non-ngFor) option. */
+    optMatch(key: string, label: string): boolean {
+        const q = (this.optSearch[key] || '').trim().toLowerCase();
+        return !q || label.toLowerCase().includes(q);
+    }
+    readonly eventOptLabel = (e: any): string => e?.name ?? '';
+    readonly cardOptLabel = (cardId: string): string => this.getCardName(cardId);
+
     private readonly IDLE_DAYS = 7;
     private readonly STUCK_DAYS = 15;
     private stuckCasesCache: any[] = [];
     private stuckKey = '';
 
-    private daysSinceTs(ts: any): number {
-        return daysSince(ts);
+    // Returns null (not 0) when there is no usable timestamp, so the table can show
+    // "-" instead of a fake "0 DAYS" that reads as "onboarded today".
+    private daysSinceTs(ts: any): number | null {
+        const d = this.toDateOrNull(ts);
+        if (!d) return null;
+        return Math.max(0, Math.floor((Date.now() - d.getTime()) / (24 * 60 * 60 * 1000)));
+    }
+
+    private toDateOrNull(ts: any): Date | null {
+        if (!ts) return null;
+        const d = ts?.toDate ? ts.toDate() : (ts instanceof Date ? ts : new Date(ts));
+        return d && !isNaN(d.getTime()) ? d : null;
+    }
+
+    private tsMillis(ts: any): number {
+        const d = this.toDateOrNull(ts);
+        return d ? d.getTime() : Number.POSITIVE_INFINITY;
+    }
+
+    // DAYS WAITING (Awaiting / Ready) counts from the PRODUCT onboarding call
+    // (participantsproduct.productonboardingscheduled). Only when no product call is booked does it
+    // fall back to the JOURNEY onboarding call (participantjourneyproduct.onboardedtime) — and then only
+    // the participant's ONGOING journey (journeystatus == 'ongoing'), matched to the row's journey.
+    // Fetched for those fallback profiles only, chunks of 30, cached per profile for the session.
+    // journeyProductMap: { [profileid]: ongoing participantjourneyproduct docs[] }
+    private journeyProductFetched = new Set<string>();
+
+    private async loadJourneyProductMapFor(profileIds: string[]): Promise<void> {
+        const missing = Array.from(new Set(profileIds))
+            .filter((pid) => !!pid && !this.journeyProductFetched.has(pid));
+        if (missing.length === 0) return;
+
+        const chunks: string[][] = [];
+        for (let i = 0; i < missing.length; i += 30) chunks.push(missing.slice(i, i + 30));
+
+        const snaps = await Promise.all(
+            chunks.map((chunk) =>
+                runInInjectionContext(this.injector, () =>
+                    getDocs(query(
+                        collection(this.firestore, 'participantjourneyproduct'),
+                        where('profileid', 'in', chunk),
+                        where('journeystatus', '==', 'ongoing')
+                    ))
+                )
+            )
+        );
+
+        for (const snap of snaps) {
+            for (const d of snap.docs) {
+                const data: any = d.data();
+                const pid = data?.['profileid'];
+                if (!pid) continue;
+                (this.journeyProductMap[pid] ??= []).push(data);
+            }
+        }
+        for (const pid of missing) this.journeyProductFetched.add(pid);
+    }
+
+    /** Journey onboarding time of the participant's ONGOING journey that matches `journeyId`.
+     *  Without a journey id on the row, use the ongoing journey only when there is exactly one. */
+    private journeyOnboardedTime(profileId: string, journeyId: string | null | undefined): any {
+        const docs: any[] = this.journeyProductMap?.[profileId] || [];
+        const match = journeyId
+            ? docs.find((d) => d?.['journeyref']?.id === journeyId)
+            : (docs.length === 1 ? docs[0] : null);
+        return match?.['onboardedtime'] || null;
+    }
+
+    // Awaiting / Ready rows are participant-level decisions (the row carries no product
+    // column and the bulk actions act on a person), so one profile must yield one row.
+    // Keep the earliest-onboarded row: the longest wait is the one worth surfacing.
+    private dedupeByParticipant(rows: any[]): any[] {
+        const byProfile = new Map<string, any>();
+        for (const row of rows) {
+            const pid = row?.profileid;
+            if (!pid) continue;
+            const kept = byProfile.get(pid);
+            if (!kept || this.tsMillis(row['onboardedtime']) < this.tsMillis(kept['onboardedtime'])) {
+                byProfile.set(pid, row);
+            }
+        }
+        return Array.from(byProfile.values());
     }
 
     populateActionableCohorts(selectedLabels: string[] = []): void {
@@ -7012,7 +7261,10 @@ export class DeliveryDashboardCloneComponent {
             const journeyName = this.mapjourneyname?.[journeyId] || 'N/A';
 
             const sd = item?.statusdate || {};
-            const onboarded = meta['onboardedtime'] || sd['initiated'] || null;
+            // product onboarding call first, then the ongoing journey's onboarding call (row's journey)
+            const onboarded = item?.productonboardingscheduled
+                || this.journeyOnboardedTime(profileId, item?.journeyref?.id || meta['activejourney'])
+                || sd['initiated'] || null;
             const initiated = sd['initiated'] || null;
             const lastActivity = sd['ongoing'] || sd['started'] || sd['initiated'] || onboarded;
             const lastPayment = meta['lastpaymentdate'] || meta['lastpayment'] || null;
@@ -7056,7 +7308,11 @@ export class DeliveryDashboardCloneComponent {
             // Development's cohort split (readyForInitiation vs awaiting) supersedes the engine's
             // classifyCohorts, so the stuck predicate is inlined here to match. escalationLevel() and
             // stuckIssueType() below still delegate — those two rules are unchanged on both sides.
-            if (status === 'initiated' || status === 'ongoing') { 
+            // Stuck rule from mahalakshmi-development delivery-dashboard-new (operator, 2026-11-12):
+            // candidates are IN DELIVERY = status 'ongoing' AND product mode 'priority mode'. Membership is
+            // decided in getRecentAppointmentDetails (last attended appointment, no future booking).
+            const productMode = (item?.mode || '').toString().toLowerCase().trim();
+            if (status === 'ongoing' && productMode === 'priority mode') {
                 const days = daysSinceActivity;
                 const escalation = escalationLevel(days);
                 stuck.push({
@@ -7064,19 +7320,28 @@ export class DeliveryDashboardCloneComponent {
                     activejourney: journeyName,
                     parallelproduct: parallelProduct, 
                     product: productName || 'N/A',
-                    appointment: 'N/A',
-                    appointmentstatus: 'N/A',
-                    issuetype: stuckIssueType(status),
-                    date: lastActivity,
-                    waitingperiod: days,
-                    lastaction: status,
+                    // The three appointment columns below were hardcoded 'N/A' / a status date.
+                    // getRecentAppointmentDetails() overwrites them from the participant's most
+                    // recent ATTENDED appointment; these are the values shown when there is none.
+                    appointment: 'No attended appointment',
+                    appointmentstatus: '—',
+                    issuetype: status === 'ongoing' ? 'Stuck mid-flow' : 'Initiated · stalled',
+                    date: null,
                     assignedto: 'Unassigned',
+                    // waitingperiod stays the status-derived figure, unchanged, and is the
+                    // fallback basis for DAYS STUCK when no attendance is on record.
+                    waitingperiod: days,
+                    stuckdays: days,
+                    stuckdaysbasis: 'status',
+                    lastaction: status,
                     escalationlevel: escalation,
                     generalnotes: [],
                     participantproductid: item?.docid || null,
                     recentappointmentdate: null,
                     actualstuckdays: null,
-                    subscriptionstart: item?.subscriptionstart || null,   
+                    ongoingdate: sd['ongoing'] || null,
+                    hasfutureappointment: false,
+                    subscriptionstart: item?.subscriptionstart || null,
                     subscriptionend: item?.subscriptionend || null, 
                 });
             }
@@ -7084,12 +7349,15 @@ export class DeliveryDashboardCloneComponent {
 
         const yetToStart: any[] = [];
         for (const cardId of this.visibleCardIds) {
-            yetToStart.push(...this.getCardFunnel(cardId).awaiting);   
+            yetToStart.push(...this.getCardFunnel(cardId).awaiting);
         }
 
         const readyToStart = yetToStart.map(item => {
         const meta = this.mapMetaData[item.profileid] || {};
-        const onboarded = item.productonboardingscheduled || meta['onboardedtime'] || null;
+        // product onboarding call first, then the ongoing journey's onboarding call (row's journey)
+        const onboarded = item.productonboardingscheduled
+            || this.journeyOnboardedTime(item.profileid, item.journeyref?.id || meta['activejourney'])
+            || null;
         return {
             profileid: item.profileid,
             journey: this.mapjourneyname[item.journeyref?.id || meta['activejourney']] || 'N/A',
@@ -7106,10 +7374,15 @@ export class DeliveryDashboardCloneComponent {
         };
     });
 
-        this.originalData['awaitingInitiation'].data = awaiting;
-        this.originalData['awaitingInitiation'].count = awaiting.length;
-        this.originalData['readyForInitiation'].data = readyToStart;
-        this.originalData['readyForInitiation'].count = readyToStart.length;
+        // One row per participant on the person-level tabs (Joshua 00b0fce8): a participant
+        // holding N products used to produce N identical rows.
+        const awaitingUnique = this.dedupeByParticipant(awaiting);
+        const readyUnique = this.dedupeByParticipant(readyToStart);
+
+        this.originalData['awaitingInitiation'].data = awaitingUnique;
+        this.originalData['awaitingInitiation'].count = awaitingUnique.length;
+        this.originalData['readyForInitiation'].data = readyUnique;
+        this.originalData['readyForInitiation'].count = readyUnique.length;
         this.originalData['currentJourneyInitiated'].data = idle;
         this.originalData['currentJourneyInitiated'].count = idle.length;
         const participantChangeKey = stuck.map(item => item.participantproductid).sort().join(',');
@@ -7134,19 +7407,39 @@ export class DeliveryDashboardCloneComponent {
         this.calculatePagination();
     }
 
+    /**
+     * Stuck Cases: who is stuck, and the appointment columns.
+     *
+     * WHO (rule from mahalakshmi-development delivery-dashboard-new, operator 2026-11-12): candidates are
+     * IN DELIVERY (status 'ongoing' + product mode 'priority mode', chosen in populateActionableCohorts);
+     * stuck = more than STUCK_DAYS (15) since the last ATTENDED appointment (none → since statusdate.ongoing)
+     * AND no future appointment booked. Longest stuck first.
+     *
+     * COLUMNS (joshua-development 0bb85765, operator 2026-11-18): APPOINTMENT / APPOINTMENT STATUS /
+     * APPOINTMENT DATE / ASSIGNED TO come from that most recent attended appointment instead of 'N/A' and a
+     * status date; DAYS STUCK says which basis it used (data-basis + '*' when it fell back to the ongoing date).
+     * A failed lookup is shown as a banner, not disguised as "no appointment".
+     */
+    stuckAppointmentsError: string | null = null;
+
     private async getRecentAppointmentDetails(stuckItems: any[]): Promise<void> {
         const requestId = ++this.uniqueTicketId;
+        this.stuckAppointmentsError = null;
 
         const participantProductIds = Array.from(new Set(stuckItems.map(item => item.participantproductid).filter(Boolean)));
         if (participantProductIds.length === 0) {
             this.stuckCasesCache = [];
             this.originalData['stuckCases'].data = [];
             this.originalData['stuckCases'].count = 0;
-            this.populateActionableCohorts(this.currentSelectedLabels);  
+            this.populateActionableCohorts(this.currentSelectedLabels);
             return;
         }
 
-        const recentAppointmentMap = new Map<string, any>();
+        // Read ALL appointments of the candidate products and split them like her buckets:
+        //   cancelled → ignored · attended → keep the latest (by end) · scheduled with start > now → future booking
+        const lastAttendedMap = new Map<string, { end: Date; appt: any }>();
+        const hasFutureMap = new Map<string, boolean>();
+        const now = Date.now();
         const chunkSize = 30;
 
         for (let i = 0; i < participantProductIds.length; i += chunkSize) {
@@ -7155,41 +7448,234 @@ export class DeliveryDashboardCloneComponent {
                 const snap = await runInInjectionContext(this.injector, () =>
                     getDocs(query(
                         collection(this.firestore, 'appointments'),
-                        where('participantproductid', 'in', chunk),
-                        where('attended', '==', true),
-                        orderBy('endtime', 'desc')
+                        where('participantproductid', 'in', chunk)
                     ))
                 );
 
                 for (const appointmentDoc of snap.docs) {
-                    const appointment = appointmentDoc.data();
-                    const participantProductId = appointment['participantproductid'];
-                    const alreadyHasLatest = recentAppointmentMap.has(participantProductId);
-                    if (!alreadyHasLatest) {
-                        recentAppointmentMap.set(participantProductId, appointment);
+                    const a = appointmentDoc.data();
+                    const ppId = a['participantproductid'];
+                    if (a['cancelled'] === true) continue;
+                    const start = this.toDateOrNull(a['starttime']) || this.toDateOrNull(a['appointmentstart']);
+                    const end = this.toDateOrNull(a['endtime']) || this.toDateOrNull(a['appointmentend']) || start;
+                    if (a['attended'] === true) {
+                        const kept = lastAttendedMap.get(ppId);
+                        if (end && (!kept || end.getTime() > kept.end.getTime())) lastAttendedMap.set(ppId, { end, appt: a });
+                    } else if (start && start.getTime() > now) {
+                        hasFutureMap.set(ppId, true);
                     }
                 }
             } catch (err) {
-                console.error('Error fetching recent completed appointments for stuck cases:', err);
+                console.error('Stuck cases: appointment lookup failed', err);
+                this.stuckAppointmentsError = 'Last appointment data is unavailable right now.';
             }
         }
 
+        // A newer refresh started while we were awaiting — its results win.
         const isStaleRequest = requestId !== this.uniqueTicketId;
         if (isStaleRequest) return;
 
         for (const item of stuckItems) {
-            const recentAppointment = recentAppointmentMap.get(item.participantproductid);
-            if (!recentAppointment) continue;
-            item.recentappointmentdate = recentAppointment['endtime'];
-            item.actualstuckdays = daysSince(recentAppointment['endtime']);
+            const last = lastAttendedMap.get(item.participantproductid) || null;
+            // No attended appointment yet → count from when delivery went ongoing.
+            const lastActivity = last?.end || this.toDateOrNull(item.ongoingdate);
+            item.recentappointmentdate = last?.end || null;
+            item.actualstuckdays = lastActivity ? this.daysSinceTs(lastActivity) : null;
+            item.stuckdays = item.actualstuckdays;
+            item.stuckdaysbasis = last ? 'appointment' : 'status';
+            item.hasfutureappointment = hasFutureMap.get(item.participantproductid) === true;
+            if (last) {
+                const appt = last.appt;
+                item.date = appt['endtime'] ?? last.end;
+                item.appointment = this.resolveAppointmentType(appt) || 'Appointment';
+                // Every kept row passed attended == true, so the status is not a guess.
+                item.appointmentstatus = 'Attended';
+                // Wired but usually inert: the coach is most likely in the appointment's `hosts`
+                // array rather than a flat `assignedto` field (Joshua's note, 0bb85765).
+                item.assignedto = appt['assignedto'] || item.assignedto || 'Unassigned';
+            }
         }
 
-        this.stuckCasesCache = stuckItems.filter(item => item.actualstuckdays >= this.STUCK_DAYS);
+        // Stuck = more than STUCK_DAYS (15) since last activity AND nothing booked ahead; longest first.
+        this.stuckCasesCache = stuckItems
+            .filter(item => item.actualstuckdays !== null && item.actualstuckdays > this.STUCK_DAYS && !item.hasfutureappointment)
+            .sort((x, y) => (y.actualstuckdays ?? 0) - (x.actualstuckdays ?? 0));
         this.originalData['stuckCases'].data = this.stuckCasesCache;
         this.originalData['stuckCases'].count = this.stuckCasesCache.length;
 
-        this.populateActionableCohorts(this.currentSelectedLabels); 
+        this.populateActionableCohorts(this.currentSelectedLabels);
         this.cdr.detectChanges();
+    }
+
+    private async loadEisRoles(): Promise<void> {
+        const alreadyLoaded = Object.keys(this.eisRoleTypeMap).length > 0;
+        if (alreadyLoaded) return;
+
+        const snap = await runInInjectionContext(this.injector, () =>
+            getDocs(collection(this.firestore, 'eisroles'))
+        );
+        for (const roleDoc of snap.docs) {
+            const roleName = (roleDoc.data()['role'] || '').toLowerCase();
+            if (roleName.includes('implementation')) this.eisRoleTypeMap[roleDoc.id] = 'implementation';
+            else if (roleName.includes('diagnostics')) this.eisRoleTypeMap[roleDoc.id] = 'diagnostics';
+        }
+    }
+
+    async loadWeeklyReport() {
+        if (!this.weeklyReportCardId) return;
+        this.weeklyReportLoading = true;
+        try {
+            await this.loadEisRoles();
+
+            const productIds = new Set(this.getCardProductIds(this.weeklyReportCardId));
+            const participantProducts = this.allMatchedProductsRaw.filter(item =>
+                productIds.has(item?.productref?.id) && item?.statusdate?.initiated
+            );
+            const docIds = participantProducts.map(item => item.docid);
+            const appointmentsByProduct = await this.fetchAppointments(docIds);
+
+            this.weeklyReportParticipants = participantProducts.map(item => this.weeklyParticipants(item, appointmentsByProduct));
+            this.applyWeeklyFilters();
+        } finally {
+            this.weeklyReportLoading = false;
+        }
+    }
+
+    private async fetchAppointments(docIds: string[]): Promise<Map<string, any[]>> {
+        const requests = [];
+        for (let i = 0; i < docIds.length; i += 30) {
+            const chunk = docIds.slice(i, i + 30);
+            requests.push(runInInjectionContext(this.injector, () =>
+                getDocs(query(
+                    collection(this.firestore, 'appointments'),
+                    where('participantproductid', 'in', chunk),
+                    where('cancelled', '==', false)
+                ))
+            ));
+        }
+        const snaps = await Promise.all(requests);
+        const appointments = snaps.flatMap(snap => snap.docs.map(d => d.data()));
+
+        const appointmentsByProduct = new Map<string, any[]>();
+        for (const appointment of appointments) {
+            const productDocId = appointment['participantproductid'];
+            if (!appointmentsByProduct.has(productDocId)) appointmentsByProduct.set(productDocId, []);
+            appointmentsByProduct.get(productDocId).push(appointment);
+        }
+        return appointmentsByProduct;
+    }
+
+    private weeklyParticipants(item: any, appointmentsByProduct: Map<string, any[]>) {
+        const appointments = (appointmentsByProduct.get(item.docid) || []).sort((a, b) => a['starttime'].toMillis() - b['starttime'].toMillis());
+
+        return {
+            name: this.mapMetaData[item.profileid]?.['name'] || item.profileid,
+            diagnosticsSpecialist: this.getSpecialistNames(appointments, 'diagnostics'),
+            implementationSpecialist: this.getSpecialistNames(appointments, 'implementation'),
+            initiatedDate: this.getDateFromFieldPublic(item.statusdate.initiated),
+            initiatedLabel: this.formatDate(item.statusdate.initiated),
+            appointments: appointments.map(a => this.buildWeeklyAppointment(a)),
+        };
+    }
+
+    private buildWeeklyAppointment(appointment: any) {
+        let statusKey = 'booked';
+        if (appointment['attended']) statusKey = 'completed';
+
+        return {
+            start: appointment['starttime'].toDate(),
+            appointmentDate: this.formatDateTime(appointment['starttime']),
+            stage: this.resolveAppointmentType(appointment) || '-',
+            statusKey,
+            status: this.weeklyStatusLabels[statusKey],
+        };
+    }
+
+    applyWeeklyFilters() {
+        const appointmentFiltersOn = this.isRangeSet(this.weeklyAppointmentRange) || this.weeklyStatusFilter !== 'all';
+        const rows: any[] = [];
+        let sno = 0;
+
+        for (const participant of this.weeklyReportParticipants) {
+            const initiatedMatches = this.isWithinRange(participant.initiatedDate, this.weeklyInitiatedRange);
+            if (!initiatedMatches) continue;
+
+            const appointments = participant.appointments.filter((a: any) => {
+                const inRange = this.isWithinRange(a.start, this.weeklyAppointmentRange);
+                const statusMatches = this.weeklyStatusFilter === 'all' || this.weeklyStatusFilter === a.statusKey;
+                return inRange && statusMatches;
+            });
+            const noMatchingAppointments = appointmentFiltersOn && appointments.length === 0;
+            if (noMatchingAppointments) continue;
+
+            sno++;
+            rows.push(...this.toTableRows(participant, appointments, sno));
+        }
+        this.weeklyReportRows = rows;
+    }
+
+    clearWeeklyFilters() {
+        this.weeklyInitiatedRange.reset();
+        this.weeklyAppointmentRange.reset();
+        this.weeklyStatusFilter = 'all';
+        this.applyWeeklyFilters();
+    }
+
+    exportWeeklyReport() {
+        const rows = this.weeklyReportRows.map(row => ({
+            'S.No': row.sno,
+            'Participant Name': row.name,
+            'Diagnostics Specialist': row.diagnosticsSpecialist,
+            'Implementation Specialist': row.implementationSpecialist,
+            'Initiation Date': row.initiatedLabel,
+            'Appointment Date & Time': row.appointmentDate,
+            'Stage': row.stage,
+            'Status': row.status,
+        }));
+        this.downloadExcel(rows, `${this.getCardName(this.weeklyReportCardId)}_Weekly_Report`);
+    }
+
+    // helper functions
+    private toTableRows(participant: any, appointments: any[], sno: number): any[] {
+        if (appointments.length === 0) {
+            return [{ ...participant, sno, isFirst: true, appointmentDate: '-', stage: '-', status: '-' }];
+        }
+        return appointments.map((appointment, index) => ({
+            ...participant, ...appointment, sno, isFirst: index === 0
+        }));
+    }
+
+    private isRangeSet(range: FormGroup): boolean {
+        const { start, end } = range.value;
+        return !!start && !!end;
+    }
+
+    private isWithinRange(date: Date | null, range: FormGroup): boolean {
+        if (!this.isRangeSet(range)) return true;
+        if (!date) return false;
+
+        const { start, end } = range.value;
+        const endOfDay = new Date(end);
+        endOfDay.setHours(23, 59, 59, 999);
+        return date >= start && date <= endOfDay;
+    }
+
+    private getSpecialistNames(appointments: any[], type: 'diagnostics' | 'implementation'): string {
+        const names = new Set<string>();
+
+        for (const appointment of appointments) {
+            const roles = Object.entries<any[]>(appointment['hostRole'] || {});
+            const hostIdsOf = (roleType: string) => roles
+                .filter(([rolePath]) => this.eisRoleTypeMap[rolePath.split('/').pop()] === roleType)
+                .flatMap(([, hosts]) => hosts.map(host => host.id));
+
+            const implementationIds = hostIdsOf('implementation');
+            const hostIds = type === 'implementation' ? implementationIds : hostIdsOf('diagnostics').filter(id => !implementationIds.includes(id));
+
+            hostIds.forEach(id => names.add(this.mapprofile[id] || id));
+        }
+
+        return Array.from(names).join(', ') || '-';
     }
 
     openParticipant(profileId: string) {

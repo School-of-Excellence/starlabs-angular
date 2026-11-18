@@ -186,6 +186,11 @@
                       <mat-icon class="ic">push_pin</mat-icon>
                       Preassigned to you
                     </div>
+                    <div class="wait-token__preassigned"
+                         *ngIf="token.bookedslot?.[stage.stagename]?.slottype == 'appointment'">
+                      <mat-icon class="ic">event</mat-icon>
+                         Booked your slot · {{ token.bookedslot[stage.stagename].startdate.toDate() | date:'d MMM, h:mm a' }}
+                    </div>
                   </div>
                 </div>
 
@@ -234,6 +239,7 @@
                   <button *ngIf="!tokenInvitedByOther[token.docid] && !tokenInvitedBySelf[token.docid]"
                           type="button"
                           class="wait-token__btn"
+                          [disabled]="!canBringToStudio(token, stage.stagename)"
                           (click)="sendStudioInvitation(token)" data-testid="studio-bring-btn">
                     Bring To Studio
                     <mat-icon class="ic">arrow_forward</mat-icon>

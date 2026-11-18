@@ -4,10 +4,14 @@
  * Two independent layers decide what a person may do:
  *
  *  1. **Global lists** (one document, shared by every workshop). Someone on the
- *     dashboard-admin list can do everything on every workshop dashboard; the
- *     other two lists gate the workshop editor and the new-users screen.
+ *     dashboard-admin list can do everything on every workshop dashboard except
+ *     Clear; the clear list gives Clear on every dashboard the person can open;
+ *     the other two lists gate the workshop editor and the new-users screen.
  *  2. **Per-workshop grants** (one document per workshop, same id as the
  *     workshop). A person gets exactly the actions ticked for them.
+ *
+ * **Clear comes only from the clear list or the workshop's own Clear tick**
+ * (operator 2026-11-12) — full dashboard access does not include it.
  *
  * **Nothing is open by default, with no exceptions.** A person who has not been
  * picked gets nothing: an empty list blocks everyone, not no-one. There is no
@@ -91,12 +95,15 @@ export interface WorkshopAdminLists {
   editAccess: string[];
   /** May open the new users screen. */
   newUsersAccess: string[];
+  /** May use Clear on every dashboard they can open. Read-only here: the editor never writes it. */
+  clearWorkshop: string[];
 }
 
 export const EMPTY_ADMIN_LISTS: WorkshopAdminLists = {
   dashboardAdmins: [],
   editAccess: [],
   newUsersAccess: [],
+  clearWorkshop: [],
 };
 
 /** profileid → the actions ticked for that person on one workshop. */
@@ -119,6 +126,7 @@ export function readAdminLists(data: any): WorkshopAdminLists {
     dashboardAdmins: asIdList(data?.workshopdashboardadmin),
     editAccess: asIdList(data?.workshopeditaccess),
     newUsersAccess: asIdList(data?.workshopnewusersaccess),
+    clearWorkshop: asIdList(data?.clearworkshop),
   };
 }
 
@@ -155,30 +163,36 @@ export class WorkshopAccess {
   readonly profileId: string;
   private readonly granted: ReadonlySet<string>;
   readonly admins: readonly string[];
+  private readonly clearList: readonly string[];
 
-  constructor(profileId: string | null | undefined, grants: WorkshopAccessGrants, admins: string[]) {
+  constructor(profileId: string | null | undefined, grants: WorkshopAccessGrants, admins: string[], clearList: string[] = []) {
     this.profileId = (profileId || '').toString();
     this.admins = admins || [];
+    this.clearList = clearList || [];
     this.granted = new Set(this.profileId ? (grants?.[this.profileId] || []) : []);
   }
 
-  /** Everything on this dashboard, on every workshop. Only the picked people. */
+  /** Everything on this dashboard except Clear, on every workshop. Only the picked people. */
   get isAdmin(): boolean {
     return !!this.profileId && this.admins.includes(this.profileId);
   }
 
   can(key: WorkshopAccessKey): boolean {
+    // Clear: only the clear list or this workshop's own tick — never full dashboard access.
+    if (key === 'clear') return this.granted.has('clear') || (!!this.profileId && this.clearList.includes(this.profileId));
     if (this.isAdmin) return true;
     return this.granted.has(key);
   }
 
   /** Everything this person may do — for the "no access" explanation on screen. */
   get keys(): WorkshopAccessKey[] {
-    if (this.isAdmin) return WORKSHOP_ACCESS_KEYS.map(k => k.key);
-    return WORKSHOP_ACCESS_KEYS.filter(k => this.granted.has(k.key)).map(k => k.key);
+    return WORKSHOP_ACCESS_KEYS.filter(k => this.can(k.key)).map(k => k.key);
   }
 
-  /** Nothing at all on this dashboard: the screen itself is closed to them. */
+  /**
+   * Nothing at all on this dashboard: the screen itself is closed to them. The clear list
+   * does not open a dashboard on its own — it only adds Clear where the person can already get in.
+   */
   get isLockedOut(): boolean { return !this.isAdmin && this.granted.size === 0; }
 
   /** Some, but not all, of the dashboard. */

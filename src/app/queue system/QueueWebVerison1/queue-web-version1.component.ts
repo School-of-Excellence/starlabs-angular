@@ -513,7 +513,7 @@ export class QueueWebVersion1Component implements OnInit, OnDestroy {
   async checkStageHasOpenSlot(stageName: string, participantSegments: string[]): Promise<boolean> {
     const queueId = this.profileJourneyProduct['queueData']['docid'];
     const variationId = this.profileJourneyProduct['queuetoken']['variationid'] ?? null;
-    const selectedSlots = this.profileJourneyProduct['queuetoken']['selectedstageslot'] || {};
+    const selectedSlots = this.profileJourneyProduct['queuetoken']['bookedslot'] || {};
     const now = new Date();
 
     const alreadyBooked = selectedSlots[stageName] != null;
@@ -707,7 +707,7 @@ export class QueueWebVersion1Component implements OnInit, OnDestroy {
       resetOpen(); resetBooked(); return false;
     }
 
-    const selectedSlots = queueToken['selectedstageslot'] || {};
+    const selectedSlots = queueToken['bookedslot'] || {};
     const bookedSlot    = selectedSlots[nextSlotStage.stageName];
 
     if (bookedSlot != null) {

@@ -75,10 +75,23 @@ export type ConvertedFilter = '' | 'converted' | 'notconverted';
 export class NewusersprofileComponent implements OnInit, OnDestroy {
   dataSource = new MatTableDataSource<any>([]);
   loading = true;
-  private readonly baseColumns =
-    ['select', 'name', 'phonenumber', 'email', 'created', 'enable', 'referredby', 'tags'];
-  // The `workshop` column appears only while the workshop filter is active.
-  displayedColumns = [...this.baseColumns];
+  // ---- column chooser (operator 2026-11-12) ----
+  // The table columns a viewer can show or hide, in table order. Workshop and Moved On are not here:
+  // they still appear on their own while their filters are on.
+  readonly columnOptions: { key: string; label: string }[] = [
+    { key: 'name', label: 'Name' },
+    { key: 'phonenumber', label: 'Phone' },
+    { key: 'email', label: 'Email' },
+    { key: 'created', label: 'Created' },
+    { key: 'enable', label: 'Status' },
+    { key: 'referredby', label: 'Referred by' },
+    { key: 'tags', label: 'Tags' },
+  ];
+  private static readonly DEFAULT_COLUMNS = ['name', 'phonenumber', 'email', 'created', 'tags'];
+  /** Remembered per browser only: a viewing preference, not shared data. */
+  private static readonly COLUMNS_STORAGE_KEY = 'newusersprofile.columns.v1';
+  visibleColumns = new Set<string>(NewusersprofileComponent.loadSavedColumns());
+  displayedColumns = this.buildColumns();
   // Keyed by user id so selection survives live data refreshes.
   selection = new SelectionModel<string>(true, []);
   applyingBulk = false;
@@ -127,7 +140,9 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   // Table renders behind *ngIf, so wire sort/paginator via setter ViewChild.
   @ViewChild(MatSort) set matSort(ms: MatSort) {
     if (ms) this.dataSource.sort = ms;
+    this.sortRef = ms;
   }
+  private sortRef?: MatSort;
   @ViewChild(MatPaginator) set matPaginator(mp: MatPaginator) {
     if (mp) this.dataSource.paginator = mp;
   }
@@ -234,6 +249,8 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
           .map(r => ({ id: r.id, name: (r.name || '').toString() }))
           .filter(t => t.name)
           .sort((a, b) => a.name.localeCompare(b.name));
+        // The search matches tag names: after a rename, re-run it (same filter, no jump back to page 1).
+        if (this.dataSource.filter) this.dataSource.filter = this.dataSource.filter;
       },
       error: (err) => console.error('Error loading tags:', err)
     });
@@ -284,6 +301,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
           u.phonenumber,
           u.email,
           this.datePipe.transform(this.toDate(u.created), 'medium'),
+          this.datePipe.transform(this.toDate(u.created), 'd MMM y, h:mm a'),   // as the column shows it
           u.enable ? 'enabled active' : 'disabled inactive',
           this.referredBy(u),
           this.tagNames(u).join(' ')
@@ -539,11 +557,14 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   clearSelection(): void {
     this.selection.clear();
     this.showExport = false;
+    this.showComm = false;
   }
 
   // ---- export ----
+  // Export and Send open one panel at a time above the selection bar.
   toggleExport(): void {
     this.showExport = !this.showExport;
+    if (this.showExport) this.showComm = false;
   }
 
   selectAllExportColumns(): void {
@@ -902,13 +923,92 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
     this.updateDisplayedColumns();
   }
 
+  /** The chosen columns, saved earlier in this browser, or the defaults. Unknown keys are dropped. */
+  private static loadSavedColumns(): string[] {
+    const known = new Set(['name', 'phonenumber', 'email', 'created', 'enable', 'referredby', 'tags']);
+    try {
+      const saved = JSON.parse(localStorage.getItem(NewusersprofileComponent.COLUMNS_STORAGE_KEY) || 'null');
+      if (Array.isArray(saved)) {
+        const keys = saved.filter((k: unknown) => typeof k === 'string' && known.has(k));
+        if (keys.length) return keys;
+      }
+    } catch { /* storage blocked or bad value: use the defaults */ }
+    return [...NewusersprofileComponent.DEFAULT_COLUMNS];
+  }
+
+  private buildColumns(): string[] {
+    return ['select', ...this.columnOptions.filter(c => this.visibleColumns.has(c.key)).map(c => c.key)];
+  }
+
+  isColumnOn(key: string): boolean {
+    return this.visibleColumns.has(key);
+  }
+
+  /** The last visible column can't be hidden, or the table would have nothing to show. */
+  isLastColumn(key: string): boolean {
+    return this.visibleColumns.size === 1 && this.visibleColumns.has(key);
+  }
+
+  get columnsAreDefault(): boolean {
+    const d = NewusersprofileComponent.DEFAULT_COLUMNS;
+    return this.visibleColumns.size === d.length && d.every(k => this.visibleColumns.has(k));
+  }
+
+  toggleColumn(key: string): void {
+    if (this.visibleColumns.has(key)) {
+      if (this.isLastColumn(key)) return;
+      this.visibleColumns.delete(key);
+      this.clearSortIfHidden(key);
+    } else {
+      this.visibleColumns.add(key);
+    }
+    this.saveColumns();
+    this.updateDisplayedColumns();
+  }
+
+  resetColumns(): void {
+    this.visibleColumns = new Set(NewusersprofileComponent.DEFAULT_COLUMNS);
+    this.saveColumns();
+    this.updateDisplayedColumns();
+    // Judge by what is on screen now: Workshop / Moved On are not chooser columns but may still be showing.
+    const active = this.sortRef?.active;
+    if (active && !this.displayedColumns.includes(active)) this.clearSortIfHidden(active);
+  }
+
+  /** Sorting by a column that is no longer on screen would order rows with no visible reason: drop it. */
+  private clearSortIfHidden(key: string): void {
+    const sort = this.sortRef;
+    if (!sort || sort.active !== key) return;
+    sort.active = '';
+    sort.direction = '';
+    sort.sortChange.emit({ active: '', direction: '' });
+  }
+
+  private saveColumns(): void {
+    try {
+      localStorage.setItem(NewusersprofileComponent.COLUMNS_STORAGE_KEY, JSON.stringify([...this.visibleColumns]));
+    } catch { /* storage blocked: the choice still holds for this visit */ }
+  }
+
+  clearSearch(): void {
+    this.searchText = '';
+    this.refreshFilter();
+  }
+
+  /** Selected people the current filters or search are hiding — they still get any bulk action. */
+  get hiddenSelectedCount(): number {
+    if (!this.selection.hasValue()) return 0;
+    const shown = new Set(this.dataSource.filteredData.map(u => this.rowId(u)));
+    return this.selection.selected.filter(id => !shown.has(id)).length;
+  }
+
   private updateDisplayedColumns(): void {
     // The Workshop column/export only means something in include mode — in
     // exclude mode every visible row is by definition not enrolled.
     const filterActive = this.selectedWorkshopIds.size > 0;
     const columnActive = filterActive && this.workshopFilterMode === 'include';
 
-    const cols = [...this.baseColumns];
+    const cols = this.buildColumns();
     const exportCols = [...this.exportColumns];
     if (columnActive) {
       cols.push('workshop');
@@ -962,6 +1062,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
 
   toggleComm(): void {
     this.showComm = !this.showComm;
+    if (this.showComm) this.showExport = false;
   }
 
   // ============ Send communication (ported verbatim from workshop-dashboard) ============

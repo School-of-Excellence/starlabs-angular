@@ -37,6 +37,15 @@
                 <mat-label>Description</mat-label>
                 <textarea rows="3" matInput formControlName="description" placeholder="Briefly describe this banner..."></textarea>
               </mat-form-field>
+
+              <mat-form-field appearance="outline" class="full">
+                <mat-label>Show Text</mat-label>
+                <mat-select data-testid="eb-showtext" formControlName="showtext">
+                  <mat-option data-testid="eb-showtext-video" value="video">Video</mat-option>
+                  <mat-option data-testid="eb-showtext-image" value="image">Image</mat-option>
+                  <mat-option data-testid="eb-showtext-both" value="both">Both</mat-option>
+                </mat-select>
+              </mat-form-field>
             </div>
           </section>
           <div class="section-divider"></div>

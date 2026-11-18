@@ -437,6 +437,8 @@
                             <ng-container [ngTemplateOutlet]="refPicker" [ngTemplateOutletContext]="{ control: act.get('contentref'), pid: 'af:' + actId(act), items: filteredForms, placeholder: 'Select a form…' }"></ng-container>
                           </div>
                           <ng-container *ngIf="act.get('assignmenttype')?.value === 'question'">
+                            <div class="input tog"><span class="tog-label">Allow edit</span><button data-testid="wc1-toggle-allowedit" type="button" class="toggle" [class.on]="act.get('allowedit')?.value" (click)="toggleBool(act.get('allowedit'))" aria-label="Allow edit"></button></div>
+                            <div class="help">{{ h('challenges[].challenges[].allowedit') }}</div>
                             <div class="grid2">
                               <div class="field">
                                 <div class="label"><span>Topic</span></div>
