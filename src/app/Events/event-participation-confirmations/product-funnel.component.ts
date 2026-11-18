@@ -404,7 +404,7 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       rows: [
         { key: 'approved', depth: 0 },
         { key: 'attended', depth: 1 },
-        { key: 'noShow', depth: 1 },
+        // { key: 'noShow', depth: 1 },
         { key: 'unattended', depth: 1 },
         { key: 'revoked', depth: 1 },
       ],
@@ -556,7 +556,7 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       type: 'none',
       defaultHtml: '',
       defaultColumn: true,
-      visible: () => this.showSelect,
+      visible: () => true,
       showFilter: false,
     },
     name: {
@@ -758,6 +758,14 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       defaultHtml: '—',
       defaultColumn: false,
       visible: () => true,
+      showFilter: true,
+    },
+    segment: {
+      label: 'Segment',
+      type: 'text',
+      defaultHtml: '—',
+      defaultColumn: false,
+      visible: () => false,
       showFilter: true,
     },
   };
@@ -1633,9 +1641,9 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
             counts[bucket].push(pid);
             break;
         }
-        if (req['attendance_state'] === 'no_show') {
-          counts['noShow'].push(pid)
-        }
+        // if (req['attendance_state'] === 'no_show') {
+        //   counts['noShow'].push(pid)
+        // }
       }
     }
 
@@ -2178,17 +2186,7 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
   // ================================== Selection =========================
 
   // ---- Selection: approve on Eligible + Not requested, attendance on Approved/Attended/No-show ----
-  get selectionMode(): 'approve' | 'attend' | 'checklist' |'none' {
-    if (this.segment === 'eligible' || this.segment === 'notRequested') return 'approve';
-    if (this.segment === 'approved' || this.segment === 'noShow' || this.segment === 'attended') return 'attend';
-    if (this.segment === 'overallRequested' || this.segment === 'revoked') return 'checklist' 
-    return 'none';
-  }
-
-  get showSelect() {
-    return this.selectionMode !== 'none';
-  }
-
+  
   // An owner is approvable whether or not they requested (matches initiate-event-product).
   private isApprovable(pid: string) {
     return (this.segmentList['eligible'].includes(pid) || this.segmentList['notRequested'].includes(pid)) && this.participantProductMap[pid];
@@ -2201,37 +2199,26 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     this.selection;
   }
 
-  // function to check a participant can be selected
-  isSelectable(pid: string) {
-    if (this.selectionMode === 'approve') return this.isApprovable(pid);
-    if (this.selectionMode === 'attend') return this.segmentList['approved'].includes(pid); // approved rows; attended ones can still be marked unattended
-    if (this.selectionMode === 'checklist') return true; 
-    return false;
-  }
-
   // function to toggle a row selection
   toggleRow(pid: string) {
-    if (this.isSelectable(pid)) this.selection.toggle(pid);
+    this.selection.toggle(pid);
   }
 
-  private get selectableInView() {
-    return this.segmentRows.filter((r) => this.isSelectable(r));
-  }
 
   // function to check all rows in view are selected
   isAllSelected() {
-    const v = this.selectableInView;
+    const v = this.segmentRows;
     return v.length > 0 && v.every((r) => this.selection.isSelected(r));
   }
 
   // function to check any row in view is selected
   hasSelectionInView() {
-    return this.selectableInView.some((r) => this.selection.isSelected(r));
+    return this.segmentRows.some((r) => this.selection.isSelected(r));
   }
 
   // function to toggle select all rows in view
   masterToggle() {
-    const v = this.selectableInView;
+    const v = this.segmentRows;
     if (this.isAllSelected()) v.forEach((r) => this.selection.deselect(r));
     else v.forEach((r) => this.selection.select(r));
   }
@@ -2251,6 +2238,26 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
   // Requested (not yet approved) rows that have an actual request doc to revoke.
   get selectedToRevokeRequested() {
     return this.selection.selected.filter((pid: string) => this.segmentList['requested'].includes(pid) && !this.segmentList['approved'].includes(pid));
+  }
+
+  canRequestRevoke(){
+    return ['requested', 'eligible','upgrade','addon','continuity','noteligible'].includes(this.segment)
+  }
+
+  showApprove(){
+    return ['eligible' , 'notRequested'].includes(this.segment);
+  }
+
+  showAttendence(){
+    return ['approved'].includes(this.segment)
+  }
+
+  showCheckList(){
+    return !['potential' , 'notRequested' , 'inQueue'].includes(this.segment)
+  }
+
+  showAttendenceStatus(){
+    return ['attended' , 'unattended'].includes(this.segment)
   }
 
   // ================================== Approve =========================
@@ -2447,7 +2454,10 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
   // ================================== Attendance & Revoke =========================
 
   // ---- Attendance ----
-  async markAttended(plist: string[]) {
+  async markAttended(plist: string[] , restoreProduct = false) {
+    if(!confirm(restoreProduct
+      ? "Sure, would you like to update the selection? The selected list will be marked as attended and their cancelled product will be restored."
+      : "Sure, would you like to update the selection? The selected list will be marked as attended.")) return
     const targets = plist
       .map((pid) => {
         const reqDoc = this.getRecentRequestData(this.participantRequestMap[pid] ?? []);
@@ -2455,9 +2465,6 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       })
       .filter((r) => r.approvedRequestId && !r.attended);
     if (!targets.length) return;
-    // const wasNoShow = targets.filter(
-    //   (r) => r.attendanceState === 'no_show',
-    // ).length;
     this.progress = {
       msg: 'Marking attended...',
       value: 0,
@@ -2476,6 +2483,11 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       targets.forEach((r, i) => {
         batch.update(refList[i], {
           status: 'attended',
+          statuslog: arrayUnion({
+            status: "attended",
+            updatedby: this.loggedInProfile['profile_ref']?.id,
+            updatedon: Timestamp.now()
+          })
         });
         batch.set(doc(collection(this.firestore, 'events_profiles')), {
           event_ref: this.arena['eventref'],
@@ -2488,15 +2500,17 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       for (let i = 0; i < refList.length; i += 10) {
         const sub = refList.slice(i, i + 10);
         const delSnap = await getDocs(query(collection(this.firestore, 'deliverables'), where('fileref', 'array-contains-any', sub)));
-        delSnap.docs.forEach((d) => batch.update(d.ref, { status: 'completed' }));
+        delSnap.docs.forEach((d) => {
+          var deliverableData = d.data();
+          if (restoreProduct && deliverableData["participantproductid"]) {
+            batch.update(doc(this.firestore, "participantsproduct", deliverableData["participantproductid"]), {
+              status: null
+            })
+          }
+          batch.update(d.ref, { status: 'completed' })
+        });
       }
       await batch.commit();
-      // targets.forEach((r) => {
-      //   r.attended = true;
-      //   r.attendanceState = 'attended';
-      // });
-      // this.counts.attended += targets.length;
-      // this.counts.noShow = Math.max(0, this.counts.noShow - wasNoShow);
       this.selection.clear();
       this.snackbar.open(`Marked ${targets.length} attended`, 'OK', {
         duration: 4000,
@@ -2507,6 +2521,14 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     } finally {
       pref.close();
     }
+  }
+
+  get selectedToAttend(){
+    return this.selection.selected.filter((pid)=>this.segmentList['approved'].includes(pid) || this.segmentList['unattended'].includes(pid))
+  }
+
+  get selectedToUnAttend(){
+    return this.selection.selected.filter((pid)=>this.segmentList['approved'].includes(pid) || this.segmentList['attended'].includes(pid))
   }
 
   // ---- Mark not attended (destructive): status -> 'unattended' AND cancel the product ----
@@ -2550,7 +2572,15 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       const batch = writeBatch(this.firestore);
       const reqRefs = targets.map((r) => doc(this.firestore, 'event participation request', r.approvedRequestId!));
       targets.forEach((r, i) => {
-        batch.update(reqRefs[i], { status: 'unattended' });
+        batch.update(reqRefs[i], 
+        { 
+          status: 'unattended' , 
+          statuslog: arrayUnion({
+            status: "unattended",
+            updatedby: this.loggedInProfile['profile_ref']?.id,
+            updatedon: Timestamp.now()
+          }) 
+        });
       });
       // Delete the events_profiles record for each (profile + event).
       for (const r of targets) {
@@ -2902,11 +2932,11 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
         const chunk = targets.slice(i, i + 400);
         const batch = writeBatch(this.firestore);
         chunk.forEach((r) => {
-          batch.update(doc(this.firestore, 'event participation request', r.approvedRequestId!), {
-            attendance_state: 'no_show',
-            attendance_source: 'manual',
-            attendance_marked_at: serverTimestamp(),
-          });
+          // batch.update(doc(this.firestore, 'event participation request', r.approvedRequestId!), {
+          //   attendance_state: 'no_show',
+          //   attendance_source: 'manual',
+          //   attendance_marked_at: serverTimestamp(),
+          // });
         });
         await batch.commit();
         this.progress.value = Math.round((Math.min(i + chunk.length, targets.length) / targets.length) * 100);
@@ -2924,6 +2954,7 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
         upgrade: this.segmentList['upgrade'].length,
         addon: this.segmentList['addon'].length,
         continuity: this.segmentList['continuity'].length,
+        noteligible: this.segmentList['noteligible'].length,
         inQueue: this.segmentList['inQueue'].length,
         approved: this.segmentList['approved'].length,
         attended: this.segmentList['attended'].length,
@@ -3344,10 +3375,15 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
 
     try {
       // name , email and phone are always exported , then the columns shown in the table
+      // const exception = ['segment']
       const columns = ['name', 'email', 'phonenumber'];
       for (const column of this.tableColumns) {
         if (column === 'select' || columns.includes(column)) continue;
         columns.push(column);
+      }
+
+      if (['requested' , 'overallRequested'].includes(this.segment)) {
+        columns.push('segment')
       }
 
       const data: any[] = [];
@@ -3390,7 +3426,7 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
 
       const ws = XLSX.utils.json_to_sheet(data, { cellDates: true, dateNF: 'yyyy-mm-dd' });
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Participants');
+      XLSX.utils.book_append_sheet(wb, ws, this.segment);
       XLSX.writeFile(wb, `${this.productName}_${this.segment}.xlsx`);
 
       this.snackbar.open(`Exported ${rows.length} rows`, 'OK', { duration: 3000 });
@@ -3676,11 +3712,37 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       } else if (this.segment === 'notRequested') {
         return 'not requested';
       }
+    } else if (column === 'segment') {
+      value = this.getPidIn(pid);
     } else {
       value = meta[column]; // customerstatus, financialstatus, atccount, participantmode, paymentplan
     }
 
     return value ?? null;
+  }
+
+  getPidIn(profileId : string){
+    if (this.segmentList['revoked'].includes(profileId)) {
+      return 'revoked'
+    } else if (this.segmentList['unattended'].includes(profileId)) {
+      return 'unattended'
+    } else if (this.segmentList['attended'].includes(profileId)) {
+      return 'attended'
+    } else if (this.segmentList['approved'].includes(profileId)) {
+      return 'approved'
+    } else if (this.segmentList['noteligible'].includes(profileId)) {
+      return 'noteligible'
+    } else if (this.segmentList['continuity'].includes(profileId)) {
+      return 'continuity'
+    } else if (this.segmentList['upgrade'].includes(profileId)) {
+      return 'upgrade'
+    } else if (this.segmentList['addon'].includes(profileId)) {
+      return 'addon'
+    } else if (this.segmentList['eligible'].includes(profileId)) {
+      return 'eligible'
+    } else {
+      return 'none'
+    }
   }
 
   // function to get up! product count of a participant
@@ -3742,7 +3804,7 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
 
     if (config.type === 'enum') {
       const options = new Map();
-      for (const row of this.segmentMembers()) {
+      for (const row of this.segmentRows) {
         const value = this.getColumnValue(column, row);
         if (this.isEmpty(value)) continue;
         const label = column === 'current journey' ? (this.mapJourney[value] ?? String(value)) : String(value);

@@ -801,3 +801,16 @@
 .sx-bd-gbtn:focus-visible { outline: 2px solid #1f5bd8; outline-offset: 2px; }
 .sx-bd-gbtn.on { background: #7a4fc2; color: #fff; }
 .sx-bd-gbtn-icon { width: 14px; height: 14px; font-size: 14px; line-height: 14px; }
+
+.greenbtn{
+  margin-right: 15px;
+  color: green;
+  border: 1px solid green;
+  background-color: white;
+}
+
+.redbtn{
+  color: red;
+  border: 1px solid red;
+  background-color: white;
+}

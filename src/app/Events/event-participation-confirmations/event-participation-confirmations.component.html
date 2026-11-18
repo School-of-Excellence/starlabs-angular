@@ -94,7 +94,20 @@
                     <div class="ov-evt" [class.child-event]="!row?.arena?.heroevent && !event?.isQueueEvent">
                       <span class="ov-av" [style.background]="row.avatarColor">{{ row.initial }}</span>
                       <span class="ov-evt-txt">
-                        <span class="ov-name">{{ row.productName }}</span>
+                        <div class="ov-name-row">
+                          <p class="ov-name">{{ row.productName }}</p>
+                          <button *ngIf="!event?.isQueueEvent && event.end > currentDate.getTime()"
+                                  type="button"
+                                  class="ov-copy-btn"
+                                  mat-icon-button
+                                  title="Copy event id"
+                                  aria-label="Copy event id"
+                                  (click)="copyToClipboard(event['docid']); $event.stopPropagation()"
+                                  [disabled]="row?.arena?.delete"
+                                  (keydown)="$event.stopPropagation()">
+                            <mat-icon>content_copy</mat-icon>
+                          </button>
+                        </div>
                         <span class="ov-prod">{{ row.eventName }}</span>
                       </span>
                     </div>

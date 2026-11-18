@@ -380,6 +380,8 @@
       <button data-testid="pf-bar-import" mat-stroked-button class="sx-ghost" (click)="handleImportClick()" *ngIf="showSelect">Import</button>
       <input data-testid="pf-import-file" type="file" #inputFile (change)="onChange($event)" style="display: none;">
 
+      <button data-testid="pf-bar-export" mat-stroked-button class="sx-ghost" (click)="exportList()"><mat-icon>download</mat-icon> Export</button>
+      
       <button data-testid="pf-bar-finalize" mat-flat-button class="sx-approve" *ngIf="canFinalize" (click)="finalizeAttendance()"
         matTooltipClass="sx-tip" matTooltip="Close the event: mark no-show on approved participants who did not attend, and lock the final numbers">
         <mat-icon>how_to_reg</mat-icon> Finalize attendance<span *ngIf="pendingNoShow.length"> ({{ pendingNoShow.length }})</span>
@@ -387,7 +389,7 @@
 
       <ng-container *ngIf="selection.selected.length > 0">
 
-        <ng-container *ngIf="selectionMode === 'approve'">
+        <ng-container *ngIf="showApprove()">
           <mat-form-field appearance="outline" class="sx-seq" subscriptSizing="dynamic">
             <mat-label>Delivery sequence</mat-label>
             <mat-select data-testid="pf-bar-delivery-set" [(ngModel)]="selectedDeliverySet" required>
@@ -406,20 +408,31 @@
             [matTooltip]="approveDisabledReason()" matTooltipClass="sx-tip" (click)="approveSelected()">
             <mat-icon>check</mat-icon> Approve {{ readyCount }}
           </button>
-          <button data-testid="pf-bar-revoke-requested" mat-stroked-button class="sx-danger" [disabled]="selectedToRevokeRequested.length === 0"
-            matTooltipClass="sx-tip" matTooltip="Revoke: cancel the selected participation request(s)"
-            (click)="markRevokedRequested(selectedToRevokeRequested)">
-            <mat-icon>block</mat-icon> Revoke {{ selectedToRevokeRequested.length }}
-          </button>
           <span class="sx-hint" *ngIf="approveDisabledReason()">{{ approveDisabledReason() }}</span>
         </ng-container>
 
-        <ng-container *ngIf="selectionMode === 'attend'">
+        <ng-container *ngIf="canRequestRevoke()">
+          <button data-testid="pf-bar-revoke-requested" mat-stroked-button class="sx-danger" [disabled]="selectedToRevokeRequested.length === 0"
+            matTooltipClass="sx-tip" matTooltip="Revoke: cancel the selected participation request(s)"
+            (click)="markRevokedRequested(selectedToRevokeRequested)">
+            <mat-icon>block</mat-icon> Request Revoke {{ selectedToRevokeRequested.length }}
+          </button>
+        </ng-container>
+
+        <ng-container *ngIf="showAttendence()">
           <!-- "Mark attended" / "Not attended" bulk buttons are hidden per operator request -->
           <button data-testid="pf-bar-revoke-attend" mat-stroked-button class="sx-danger" [disabled]="selectedToRevoke.length === 0" (click)="markRevoked(selectedToRevoke)"
             matTooltipClass="sx-tip" matTooltip="Revoke: cancel the product, then assign a new one (destructive)">
-            <mat-icon>block</mat-icon> Revoke {{ selectedToRevoke.length }}
+            <mat-icon>block</mat-icon> Approved Request Revoke {{ selectedToRevoke.length }}
           </button>
+        </ng-container>
+
+        <ng-container>
+          <div>
+            <button class="greenbtn" mat-stroked-button data-testid="epa-attend-mark-attended" (click)="markAttended(selectedToAttend)" *ngIf="segment === 'approved' && selectedToAttend.length > 0">Mark as Attended ({{selectedToAttend.length}})</button>
+            <button class="greenbtn" mat-stroked-button data-testid="epa-attend-mark-attended" (click)="markAttended(selectedToAttend , true)" *ngIf="segment === 'unattended' && selectedToAttend.length > 0">Mark as from Attended ({{selectedToAttend.length}})</button>
+            <button class="redbtn" mat-stroked-button data-testid="epa-attend-mark-notattended" (click)="markUnattended(selectedToUnAttend)" *ngIf="(segment === 'approved' || segment === 'attended' ) && selectedToUnAttend.length > 0">Mark as Not Attended ({{selectedToUnAttend.length}})</button>
+          </div>
         </ng-container>
 
         <button data-testid="pf-bar-send" mat-stroked-button class="sx-ghost" [matMenuTriggerFor]="sendMenu" [disabled]="!segmentRows.length"
@@ -432,10 +445,8 @@
           <button data-testid="pf-send-email" mat-menu-item (click)="sendEmail()"><mat-icon>mail</mat-icon> Email ({{ selection.selected.length }})</button>
         </mat-menu>
 
-        <button data-testid="pf-bar-export" mat-stroked-button class="sx-ghost" (click)="exportList()"><mat-icon>download</mat-icon> Export</button>
-
         <!-- Bulk manual-checklist update -->
-        <div class="bulk" *ngIf="selectionMode === 'checklist'">
+        <div class="bulk" *ngIf="showCheckList()">
           <span><b>{{ selection.selected?.length }} Selected</b></span>
           <select class="sel" #selectforbulk>
             <option *ngFor="let key of getManualChecklist()" [value]="key">{{ checkListMap[key]?.title }}</option>
@@ -498,7 +509,7 @@
 
                 <!-- status label changes with the segment -->
                 <ng-container *ngIf="column === 'status'">
-                  {{ (segment === 'noProduct' || segment === 'addon' || segment === 'inQueue') ? 'Reason' : (selectionMode === 'attend' ? 'Attendance' : 'Status') }}
+                  {{ (segment === 'noProduct' || segment === 'addon' || segment === 'inQueue') ? 'Reason' : (showAttendenceStatus() ? 'Attendance' : 'Status') }}
                 </ng-container>
 
                 <!-- columns with a filter -->
@@ -523,9 +534,8 @@
                 <ng-container *ngIf="{ value: getColumnValue(column, row) } as cell">
                   <ng-container [ngSwitch]="column">
 
-                    <mat-checkbox *ngSwitchCase="'select'" data-testid="pf-table-row-select" [checked]="selection.isSelected(row)" [disabled]="!isSelectable(row)"
-                      (change)="toggleRow(row)"
-                      [attr.aria-label]="isSelectable(row) ? ('Select ' + getColumnValue('name', row)) : ('Cannot select ' + getColumnValue('name', row) + (row?.reason ? ' — ' + row?.reason : ''))"></mat-checkbox>
+                    <mat-checkbox *ngSwitchCase="'select'" data-testid="pf-table-row-select" [checked]="selection.isSelected(row)"
+                      (change)="toggleRow(row)"></mat-checkbox>
 
                     <div *ngSwitchCase="'name'" class="sx-nmcell">
                       <app-profile-picture class="sx-ph" [profileId]="row" [name]="cell.value" [size]="30"></app-profile-picture>
@@ -603,14 +613,14 @@
                       </ng-container>
 
                       <!-- Attendance (approved / attended / no-show) -->
-                      <ng-container *ngIf="selectionMode === 'attend'">
+                      <ng-container *ngIf="showAttendenceStatus()">
                         <span class="sx-att" *ngIf="isAttended(row)">
                           <mat-icon>check</mat-icon> Attended <span class="sx-mut" *ngIf="row.scanned">· scanned</span>
                         </span>
-                        <ng-container *ngIf="!isAttended(row)">
+                        <!-- <ng-container *ngIf="!isAttended(row)">
                           <span class="sx-noshow" *ngIf="row.attendanceState === 'no_show'">No-show</span>
-                        </ng-container>
-                        <button data-testid="pf-row-revoke-attend" mat-button class="sx-mark-danger" (click)="markRevoked([row])">Revoke</button>
+                        </ng-container> -->
+                        <!-- <button data-testid="pf-row-revoke-attend" mat-button class="sx-mark-danger" (click)="markRevoked([row])">Revoke</button> -->
                       </ng-container>
 
                       <!-- Unattended segment -->
@@ -635,13 +645,15 @@
                         </span>
                       </ng-container>
                       <!-- Status (other segments) -->
-                      <span class="sx-mut" *ngIf="segment !== 'noProduct' && segment !== 'addon' && segment !== 'inQueue' && segment !== 'unattended' && segment !== 'revoked' && selectionMode !== 'attend'">
+                      <span class="sx-mut" *ngIf="segment !== 'noProduct' && segment !== 'addon' && segment !== 'inQueue' && segment !== 'unattended' && segment !== 'revoked' && !showAttendenceStatus()">
                         {{ cell.value }}
                       </span>
 
                       <!-- Revoke: requested -> status-only, approved -> full product-cancel path -->
                       <!-- <button data-testid="pf-row-revoke" mat-button class="sx-mark-danger" *ngIf="selectionMode !== 'attend' && segment !== 'unattended' && segment !== 'revoked' && ((row.isApproved && row.approvedRequestId) || (row.isRequested && !row.isApproved && row.requestData?.docid))"
                         (click)="revoke(row)">Revoke</button> -->
+                      <button data-testid="pf-row-revoke" mat-button class="sx-mark-danger" *ngIf="segmentList['requested'].includes(row) || segmentList['approved'].includes(row)"
+                        (click)="revoke(row)">Revoke</button>
                     </ng-container>
 
                     <!-- every other column: venue fee, checklists and all optional columns, chosen by registry type -->
