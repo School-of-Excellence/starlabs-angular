@@ -1,5 +1,6 @@
 import { CommonModule, DatePipe } from '@angular/common';
 import { Component, ViewChild } from '@angular/core';
+import { AtcAudioComponent } from '../atc-audio/atc-audio.component';
 import { collection, collectionChanges, collectionData, CollectionReference, collectionSnapshots, doc, docSnapshots, DocumentSnapshot, getFirestore, getDocs, limit, or, orderBy, Query, query, QueryDocumentSnapshot, QueryFieldFilterConstraint, QueryLimitConstraint, QueryOrderByConstraint, updateDoc, where } from '@angular/fire/firestore';
 import { MatDialog } from '@angular/material/dialog';
 import { MatPaginator, MatPaginatorModule, PageEvent } from '@angular/material/paginator';
@@ -32,6 +33,7 @@ import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
     MatSelectModule,
     MatPaginatorModule,
     MatListModule,
+    AtcAudioComponent,
   ],
   templateUrl: './view-assigned-atc.component.html',
   styleUrl: './view-assigned-atc.component.css'
@@ -81,6 +83,10 @@ export class ViewAssignedATCComponent {
 
   // ATC Notes
   mapATCnotes = {};
+
+  // Keeps an audio row's component alive across snapshots. Without it a document change
+  // destroys and recreates the player, stopping playback and losing the listener's place.
+  trackByMediaRef = (_: number, ref: string) => ref;
   mapNotesSubscription = {}
   
   // Metadata
