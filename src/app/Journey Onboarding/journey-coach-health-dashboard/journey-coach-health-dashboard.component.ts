@@ -9,7 +9,7 @@ import {
 import { Auth, authState } from '@angular/fire/auth';
 import { firstValueFrom } from 'rxjs';
 import { take } from 'rxjs/operators';
-
+import { environment } from '../../../environments/environment.development';
 import { MatTableModule, MatTableDataSource } from '@angular/material/table';
 import { MatPaginator, MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatSort, MatSortModule } from '@angular/material/sort';
@@ -28,7 +28,6 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
-
 import { AuthguardService } from '../../authguard.service';
 import { computeHealth, normalizeTier, recencyScore, HealthState, ParticipantSignals } from './health-score.engine';
 import { LogCallDialogComponent, LogCallResult } from './log-call-dialog.component';
@@ -836,7 +835,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     private datepipe: DatePipe,
     private router: Router,
     private auth: Auth,
-    private dialog: MatDialog,
+    private dialog: MatDialog
   ) {}
 
   get displayedColumns(): string[] {
@@ -1068,6 +1067,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.setProgress(88, 'Loaded details…');
 
     this.computeRows();
+    this.computeAhSummary();   // roster now known — scope the A&H card (loadAHSummary may have landed first)
     this.setProgress(100, 'Ready');
     void exactP.then(() => this.ensureDailySnapshot()).catch(() => {});   // daily trend snapshot
   }
@@ -1312,18 +1312,22 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         const snap = await getDocs(query(collection(this.firestore, 'appointments'), where('bookedby', 'in', refBatch)));
         snap.forEach(d => {
           const data: any = d.data();
+          if (data['journeycoach'] !== true) return;
+          // Every JC appointment feeds the Schedule / JC-pipeline cards: classifyJcAppt drops cancelled ones
+          // and splits booked (pending / overdue) from attended (done). Classifying ONLY attended docs here
+          // (Joshua's F3 port) left a coach's own Schedule at zero booked sessions (hub JCH-07, 2026-11-18).
+          this.classifyJcAppt(data, scoped);
           // cancelled JCs never count as contact, even when flagged attended (see loadContactEvents)
-          if (data['journeycoach'] !== true || data['attended'] !== true || data['cancelled'] === true) return;
+          if (data['attended'] !== true || data['cancelled'] === true) return;
           const pid = data['bookedby']?.id ?? (typeof data['profileid'] === 'string' ? data['profileid'] : null);
           const dt = this.toDate(data['starttime']) ?? this.toDate(data['date']);
           if (pid && dt) this.contactEventByProfile[pid] = Math.max(this.contactEventByProfile[pid] ?? 0, dt.getTime());
-          if (data['journeycoach'] === true) this.classifyJcAppt(data, scoped);
         });
       }
       // Coach (full) view never runs the base-wide loadContactEvents, so the Schedule / JC-pipeline cards
       // had no events (zeros + "loading…"). Feed them this roster's appointments instead (review F3).
       if (!this.pagedMode && !this.contactDataLoaded()) {
-        this.jcDoneEvents.update(a => [...a, ...scoped.events]);
+        this.jcDoneEvents.update(a => [...a, ...scoped.events.filter(e => this.isCoachingDone(e))]);
         this.jcPendingEvents.update(a => [...a, ...scoped.pending]);
         this.obDoneEvents.update(a => [...a, ...scoped.obDone]);
         this.contactEventsLoaded.set(true);
@@ -1443,6 +1447,9 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     for (const id of ids) this.llTagsByProfile[id] = { critical: false, attention: false, opportunity: false };
     const chunks: string[][] = [];
     for (let i = 0; i < ids.length; i += 30) chunks.push(ids.slice(i, i + 30));
+    // Same recent window as the analytics card and the base-wide loader: a years-old critical letter is
+    // not a live signal (charan-release fix, lost in the 2026-11-18 merge — hub JCH-03/08).
+    const llSince = Date.now() - 180 * 86400000;
     const collect = async (coll: string) => {
       for (const chunk of chunks) {
         try {
@@ -1450,6 +1457,9 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
           snap.forEach(d => {
             const data: any = d.data();
             if (data['resolved'] === true) return;               // resolved in the love-letter dashboard → cleared
+
+            const created = this.toDate(data['created']);
+            if (!created || created.getTime() < llSince) return;
             const t = this.llTagsByProfile[data['profileid']];
             if (!t) return;
             if (data['critical'] === true) t.critical = true;
@@ -1564,7 +1574,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     // in the JC-done list. Mirrors the journeycoach-dashboard rule ([null,undefined].includes(onboarding)).
     // Pending/overdue above is intentionally left untouched — the JC-vs-Onboarding schedule split
     // (doc item 1) is handled there separately.
-    if (data['onboarding'] === true) {
+    // Same discriminator as the Schedule split (isOnboardingAppt: flag, journeyid, PJP id, or onboarding
+    // appointment-type ref) — checking only `onboarding === true` let a legacy onboarding call count as a
+    // coaching session once attended (charan-release cef4e0bd, restored 2026-11-18).
+    if (isOnboarding) {
       // Overall Summary: an attended onboarding call = a completed onboarding. Exactly the docs the
       // JC-done rule drops here, so JC completed and Onboarding completed stay disjoint.
       acc.obDone.push({ profileid: pid, coachId: host, ms: dt.getTime(), onboarding: true });
@@ -1577,7 +1590,12 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     // test base, and they resolve to real journeycoach ids), so it attributes per coach.
     const hosts: any[] = Array.isArray(data['hosts']) ? data['hosts'] : [];
     const coachId = hosts.map(h => (typeof h === 'string' ? h : h?.id)).find(Boolean) ?? null;
-    acc.events.push({ profileid: pid, coachId, ms: dt.getTime() });
+    acc.events.push({ profileid: pid, coachId, ms: dt.getTime(), onboarding: false });
+  }
+  /** "JC done" = an attended COACHING session — never an onboarding call (revert guard: jc-pipeline spec).
+   *  Reads only its argument; a missing flag (older events) counts as coaching. */
+  isCoachingDone(e: { onboarding?: boolean }): boolean {
+    return e?.onboarding !== true;
   }
 
   private async loadContactEvents(): Promise<void> {
@@ -1601,7 +1619,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       console.warn('contact events load failed (non-fatal)', e);
     }
     this.contactEventByProfile = map;
-    this.jcDoneEvents.set(events);
+    this.jcDoneEvents.set(events.filter(e => this.isCoachingDone(e)));
     this.jcPendingEvents.set(pending);
     this.obDoneEvents.set(obDone);
     // Schedule cards are ready once the events are in, on the coach (full) path too (review F3).
@@ -1989,6 +2007,31 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       created: this.toDate(d['created'])?.getTime() ?? 0,
     });
     this.ahDocs = [...ask.map(d => mapDoc(d, 'ask')), ...love.map(d => mapDoc(d, 'love'))];
+
+    this.ahDocsReady = true;
+    this.computeAhSummary();
+  }
+  private ahDocsReady = false;
+
+  /** The Planning A&H card follows the Viewing selector like every other card (eac54b29, restored after the
+   *  2026-11-18 merge): ALL = the whole ecosystem; one coach / Unassigned = only docs on that roster, so a
+   *  coach never sees or drills into another coach's participants. Same scope as Overall's ovAhScope(). */
+  private ahScopeIds(): Set<string> | null {
+    if (this.selectedCoachId === this.ALL) return null;
+    return new Set(this.rosterIds());
+  }
+  /** A doc with no profileid cannot be attributed to a base, so it counts only in the unscoped ALL view. */
+  private ahDocsInScope(): typeof this.ahDocs {
+    const ids = this.ahScopeIds();
+    if (!ids) return this.ahDocs;
+    return this.ahDocs.filter(d => d.profileid && ids.has(d.profileid));
+  }
+  /** Recompute the card from the cached docs for the CURRENT scope — no re-read. */
+  private computeAhSummary(): void {
+    if (!this.ahDocsReady) return;   // the one read has not landed yet
+    const docs = this.ahDocsInScope();
+    const ask = docs.filter(d => d.coll === 'ask');
+    const love = docs.filter(d => d.coll === 'love');
     const count = (docs: any[]): AHFlagCounts => ({
       total: docs.length,
       tagged: docs.filter(d => d['tagged'] === true).length,
@@ -2026,8 +2069,9 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   ): void {
     const flagged = (d: { liked: boolean; tagged: boolean; opportunity: boolean; critical: boolean }) =>
       d.liked || d.tagged || d.opportunity || d.critical;
+    const sc = scope ?? this.ahScopeIds() ?? undefined;   // Planning card + Overall: the Viewing-as scope (ALL = no filter)
     const docs = this.ahDocs.filter(d => {
-      if (scope && !scope.has(d.profileid)) return false;   // Overall Summary: Viewing-as scope
+      if (sc && !sc.has(d.profileid)) return false;
       if (coll !== 'both' && d.coll !== coll) return false;
       if (resolvedOnly && !d.resolved) return false;
       switch (flag) {
@@ -2824,37 +2868,54 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     }
   }
 
-  // crmUrl = '/crmApi/v1/leads';
-  crmUrl = 'https://us-central1-salescrm-test-19.cloudfunctions.net/crmApi/v1/leads';
-  crmToken = 'scrm_test_t6pjsljjgmd5_A4bkEuR0UjPMVdM70DkpnXRXMZYdoA27WxLmwfr8P-M';
-  // crmPipelineId = 'XrDKtFBzAh8t0bL17yIb';
+    // crmUrl = 'https://us-central1-salescrm-test-19.cloudfunctions.net/crmApi/v1/leads';
+    private crmToken = '';
 
-  sendNoteToCrm(row: PortfolioRow, label: string, note: string, details: string = '') {
-    if (!row.email || !note.trim()) return;
+    private async getCrmToken(): Promise<string> {
+      if (this.crmToken) return this.crmToken;
+      const snap = await getDoc(doc(this.firestore, 'slack webhookurls', 'SalesCRM Update Secret'));
+      this.crmToken = String((snap.data() as any)?.['webhookurl'] ?? '').trim();
+      return this.crmToken;
+    }
 
-    const text = label + ': ' + note.trim()+ (details ? ' | ' + details : '');
+    async sendNoteToCrm(row: PortfolioRow, label: string, note: string, details: string = '') {
+      if (!row.email) {
+        this.guard.openSnackBar('CRM skipped: no email for ' + row.name, 'Close');
+        return;
+      }
+      if (!note || !note.trim()) return;
 
-    fetch(this.crmUrl, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': 'Bearer ' + this.crmToken,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        email: row.email,
-        // pipelineid: this.crmPipelineId,
-        note: text
-      })
-    })
-      .then(async res => {
-        console.log('CRM response', res.status, await res.text());
-        this.guard.openSnackBar('CRM status: ' + res.status, 'Close');
-      })
-      .catch(err => {
+      let url: string = '';
+      if (environment.firebase.projectId == 'starlabs-test') {
+        url = "https://us-central1-salescrm-test-19.cloudfunctions.net/crmApi/v1/leads";
+      } else if (environment.firebase.projectId == 'fir-sample-aae4a') {
+        url = "https://us-central1-salesleadcrm.cloudfunctions.net/crmApi/v1/leads"
+      }
+      if (!url) return;
+
+      const text = label + ': ' + note.trim() + (details ? ' | ' + details : '');
+
+      try {
+        const token = await this.getCrmToken();
+        if (!token) {
+          this.guard.openSnackBar('CRM token not found', 'Close');
+          return;
+        }
+        const res = await fetch(url, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ email: row.email, note: text })
+        });
+        console.log('CRM response', res.status);
+        if (!res.ok) this.guard.openSnackBar('CRM status: ' + res.status, 'Close');
+      } catch (err) {
         console.log('CRM failed', err);
-        this.guard.openSnackBar('CRM call failed, see console', 'Close');
-      });
-  }
+        this.guard.openSnackBar('CRM call failed', 'Close');
+      }
+    }
 
 
 
@@ -3976,6 +4037,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       if (this.paginator) this.paginator.firstPage();
       await this.loadFullPortfolio();   // roster is in memory; this only re-scopes the joins
     }
+    this.computeAhSummary();   // A&H card follows the Viewing scope (cached docs, no re-read)
     void this.ensureOvPlan();   // Overall plan grid follows Viewing as (no-op off Overall / for ALL)
     void this.loadFollowUps();  // follow-ups for the new scope (cached per id / base-wide once)
   }
@@ -4347,7 +4409,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       // a row matches if its state is selected, or 'Not assessed' is selected and it has no fresh state
       if (!(st ? this.healthFilters.includes(st) : this.healthFilters.includes('UNASSESSED'))) return false;
     }
-    if (this.financeFilters.length && !this.financeFilters.includes(r.financialstatus ?? '')) return false;
+    // case-insensitive: the data holds 'Defaulted' and 'defaulted' alike, the tiles count both (restored 2026-11-18)
+    if (this.financeFilters.length && !this.financeFilters.some(f => f.toLowerCase() === (r.financialstatus ?? '').toLowerCase())) return false;
     if (this.eventStatusFilters.length && !this.eventStatusFilters.includes((r.recentEventRequest?.status ?? '').toLowerCase())) return false;
     if (this.renewalWindowOnly && !r.renewalWindow) return false;
     if (this.goingQuietOnly && !this.isGoingQuietBucket(r)) return false;

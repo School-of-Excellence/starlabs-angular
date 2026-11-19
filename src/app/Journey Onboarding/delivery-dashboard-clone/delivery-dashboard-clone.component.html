@@ -32,7 +32,7 @@
             <path d="M11 2v3M5 2v3M2.5 7h11" stroke-linecap="round" />
           </svg>
           Date Range
-          <mat-form-field appearance="outline" class="date-range-field-hidden">
+          <mat-form-field subscriptSizing="dynamic" appearance="outline" class="date-range-field-hidden">
             <mat-date-range-input [formGroup]="range" [rangePicker]="picker">
               <input data-testid="ddc-inp-003" matStartDate formControlName="start" placeholder="Start date">
               <input data-testid="ddc-inp-004" matEndDate formControlName="end" placeholder="End date">
@@ -68,157 +68,152 @@
             <mat-select data-testid="ddc-msel-008" multiple [formControl]="productFilterControl" panelClass="product-panel"
               placeholder="All products">
               <mat-select-trigger>{{ productSelectTrigger }}</mat-select-trigger>
-              <mat-option *ngFor="let p of availableCardLabels" [value]="p">{{ p }}</mat-option>
+              <mat-option class="dd-opt-search"><ngx-mat-select-search [(ngModel)]="optSearch['products']" [ngModelOptions]="{standalone: true}" placeholderLabel="Search…" noEntriesFoundLabel="No match"></ngx-mat-select-search></mat-option>
+              <mat-option *ngFor="let p of filterOpts(availableCardLabels, 'products')" [value]="p">{{ p }}</mat-option>
             </mat-select>
           </mat-form-field>
         </button>
       </div>
     </header>
 
-    <!-- KPI BENTO (ported) =================================== -->
-    <section class="dd-kpi">
-      <div class="dd-hero">
-        <div class="dd-hero__head">
-          <span class="dd-hero__eyebrow">Active Delivery Pipeline</span>
-          <span class="dd-live"><span class="dd-live__dot"></span>Live</span>
-        </div>
-        <div class="dd-hero__row">
-          <span class="dd-hero__num">{{ kpiOngoingTotal | number }}</span>
-          <div class="dd-hero__meta">
-            <span class="dd-hero__delta-lbl">participants in progress</span>
-          </div>
-        </div>
-        <span class="dd-hero__sub">Total participants currently going through delivery — across {{ visibleCardIds.length
-          }} active products</span>
-        <div class="dd-hero__funnel">
-          <div class="dd-khf" *ngFor="let cardId of visibleCardIds">
-            <span class="dd-khf__name">{{ getCardName(cardId) }}</span>
-            <div class="dd-khf__bar">
-              <div class="dd-khf__fill" [style.width.%]="ongoingPctOfMax(cardId)"></div>
-            </div>
-            <span class="dd-khf__num">{{ ongoingByCard(cardId) }}</span>
-          </div>
-        </div>
-      </div>
+    <!-- DELIVERY FUNNEL ====================================== -->
+    <!-- The single home for every population count. The Key-metrics grid and the
+         "Needs Your Attention" tiles printed these same four numbers in different
+         clothes; their drill-downs moved here, onto the number itself. Stuck and
+         Not-consuming are flags on In delivery because that is what they are:
+         states of people already in delivery, not stages of their own. -->
+    <section class="dd-funnel-sec">
+      <div class="dd-funnel-hero">
+        <span class="dd-funnel__eyebrow">Delivery funnel</span>
+        <p class="dd-funnel__cap">{{ funnelScopeCaption }}</p>
 
-      <div class="dd-kpi-grid">
-        <div data-testid="ddc-div-009" class="dd-kcell dd-kcell--ready" [class.dd-kcell--empty]="kpiReadyToInitiate === 0"
-          (click)="navToAttention('ready')">
-          <span class="dd-kcell__label">Ready to Start</span>
-          <span class="dd-kcell__value">{{ kpiReadyToInitiate | number }}</span>
-          <span class="dd-kcell__delta">payment confirmed — not yet initiated</span>
-          <div class="dd-kcell__spark">
-            <div class="b" *ngFor="let v of sparkReady" [style.height.%]="(v / sparkMax(sparkReady)) * 100"
-              [class.empty]="v === 0"></div>
-          </div>
-        </div>
+        <div class="dd-funnel" data-testid="ddc-funnel">
 
-        <div data-testid="ddc-div-010" class="dd-kcell dd-kcell--stuck" [class.dd-kcell--alert]="kpiStuck > 0"
-          [class.dd-kcell--empty]="kpiStuck === 0" (click)="navToAttention('stuck')">
-          <span class="dd-kcell__label">Stuck Participants</span>
-          <span class="dd-kcell__value">{{ kpiStuck | number }}</span>
-          <span class="dd-kcell__delta">no progress in 14+ days — needs follow-up</span>
-          <div class="dd-kcell__spark">
-            <div class="b" *ngFor="let v of sparkStuck" [style.height.%]="(v / sparkMax(sparkStuck)) * 100"
-              [class.empty]="v === 0"></div>
+          <div class="dd-fnl-step" [class.is-zero]="kpiAwaitingTotal === 0">
+            <button class="dd-fnl-step__body" type="button" data-testid="ddc-btn-012" [matTooltip]="logicTip.awaiting" matTooltipPosition="above" [matTooltipShowDelay]="250"
+              (click)="navToAttention('awaiting')">
+              <span class="dd-fnl-step__lbl">Awaiting Initiation</span>
+              <span class="dd-fnl-step__val">{{ kpiAwaitingTotal | number }}</span>
+              <span class="dd-fnl-step__sub">payment not confirmed</span>
+              <span class="dd-fnl-step__open">Open list</span>
+            </button>
           </div>
-        </div>
 
-        <div class="dd-kcell dd-kcell--done">
-          <span class="dd-kcell__label">Fully Delivered</span>
-          <span class="dd-kcell__value">{{ kpiCompletedTotal | number }}</span>
-          <span class="dd-kcell__delta">participants who completed delivery in selected period</span>
-          <div class="dd-kcell__spark">
-            <div class="b" *ngFor="let v of sparkCompleted" [style.height.%]="(v / sparkMax(sparkCompleted)) * 100"
-              [class.empty]="v === 0"></div>
+          <div class="dd-fnl-step" [class.is-zero]="kpiReadyToInitiate === 0">
+            <button class="dd-fnl-step__body" type="button" data-testid="ddc-btn-013" [matTooltip]="logicTip.ready" matTooltipPosition="above" [matTooltipShowDelay]="250"
+              (click)="navToAttention('ready')">
+              <span class="dd-fnl-step__lbl">Ready to Start</span>
+              <span class="dd-fnl-step__val">{{ kpiReadyToInitiate | number }}</span>
+              <span class="dd-fnl-step__sub">payment confirmed &mdash; initiate now</span>
+              <span class="dd-fnl-step__open">Open list</span>
+            </button>
           </div>
+
+          <div class="dd-fnl-step dd-fnl-step--delivery" [class.is-zero]="kpiOngoingTotal === 0">
+            <button class="dd-fnl-step__body" type="button" data-testid="ddc-funnel-indelivery" [matTooltip]="logicTip.inDelivery" matTooltipPosition="above" [matTooltipShowDelay]="250"
+              (click)="outerTabIndex = 0">
+              <span class="dd-fnl-step__lbl">In delivery</span>
+              <span class="dd-fnl-step__val">{{ kpiOngoingTotal | number }}</span>
+              <span class="dd-fnl-step__sub">currently in progress</span>
+            </button>
+          </div>
+
+          <div class="dd-fnl-step" [class.is-zero]="kpiCompletedTotal === 0">
+            <button class="dd-fnl-step__body" type="button" data-testid="ddc-funnel-delivered" [matTooltip]="logicTip.delivered" matTooltipPosition="above" [matTooltipShowDelay]="250"
+              (click)="outerTabIndex = 1">
+              <span class="dd-fnl-step__lbl">Delivered</span>
+              <span class="dd-fnl-step__val">{{ kpiCompletedTotal | number }}</span>
+              <span class="dd-fnl-step__sub">completed in this period</span>
+            </button>
+          </div>
+
         </div>
 
-        <div class="dd-kcell dd-kcell--avg">
-          <span class="dd-kcell__label">Avg. Days to Complete</span>
-          <span class="dd-kcell__value">{{ kpiAvgComplete }}<span class="dd-kcell__unit">d</span></span>
-          <div class="dd-kcell__gauge">
-            <div class="dd-gauge-track">
-              <div class="dd-gauge-fill" [style.width.%]="avgTimePct"></div>
-              <div class="dd-gauge-target" [style.left.%]="100"></div>
-            </div>
-            <span class="dd-gauge-lbl">target {{ avgTimeTarget }}d to finish delivery</span>
-          </div>
+        <!-- Stuck and Not-consuming are NOT a subset of In delivery, so they cannot be
+             drawn inside it. In delivery counts status 'ongoing'. Stuck counts anyone
+             'initiated' OR 'ongoing' who has stalled, and Not-consuming counts only
+             'initiated' — which makes it disjoint from In delivery by construction.
+             Live starlabs-test data: Glimpse reads In delivery 0, Stuck 13, Not
+             consuming 13. Nesting them would have the board assert 13 people stuck
+             inside a population of zero. They sit alongside the funnel instead. -->
+        <div class="dd-funnel-alerts">
+          <span class="dd-funnel-alerts__lbl" [matTooltip]="logicTip.needsAttention" matTooltipPosition="above" [matTooltipShowDelay]="250">Needs attention</span>
+          <button class="dd-fnl-flag dd-fnl-flag--hot" type="button" data-testid="ddc-btn-011" [matTooltip]="logicTip.stuck" matTooltipPosition="above" [matTooltipShowDelay]="250"
+            [class.is-zero]="kpiStuck === 0" (click)="navToAttention('stuck')">
+            <span class="dd-fnl-flag__n">{{ kpiStuck | number }}</span>
+            <span class="dd-fnl-flag__t">stuck &gt;15d</span>
+          </button>
+          <button class="dd-fnl-flag" type="button" data-testid="ddc-btn-014" [matTooltip]="logicTip.idle" matTooltipPosition="above" [matTooltipShowDelay]="250"
+            [class.is-zero]="kpiInitiatedNotConsuming === 0" (click)="navToAttention('idle')">
+            <span class="dd-fnl-flag__n">{{ kpiInitiatedNotConsuming | number }}</span>
+            <span class="dd-fnl-flag__t">not consuming</span>
+          </button>
+          <span class="dd-funnel-alerts__note">spans Initiated and Ongoing &mdash; not a slice of In delivery</span>
         </div>
+
+        <p class="dd-funnel__note">Every number here counts the same population &mdash; all products matching the
+          current filter, hidden ones included. Hiding a product changes which rows the Products table shows, not
+          these figures. Click any number or flag to open its list.</p>
       </div>
     </section>
 
-    <!-- ACTION CENTER (ported) =============================== -->
-    <section class="dd-action">
-      <div>
-        <div class="dd-section-head">
-          <span class="dd-section-title">Needs Your Attention</span>
-          <span class="dd-section-sub">Participants requiring immediate follow-up — act on these first</span>
-        </div>
-        <div class="dd-attention">
-          <button data-testid="ddc-btn-011" class="dd-tile dd-tile--alert" [class.dd-tile--empty]="kpiStuck === 0"
-            (click)="navToAttention('stuck')">
-            <span class="dd-tile__num">{{ kpiStuck | number }}</span>
-            <span class="dd-tile__label">Stuck</span>
-            <span class="dd-tile__hint">No updates for 14+ days — follow up now</span>
-            <span class="dd-tile__arr">&rarr;</span>
-          </button>
-          <button data-testid="ddc-btn-014" class="dd-tile" [class.dd-tile--empty]="kpiInitiatedNotConsuming === 0"
-            (click)="navToAttention('idle')">
-            <span class="dd-tile__num">{{ kpiInitiatedNotConsuming | number }}</span>
-            <span class="dd-tile__label">Initiated – Not Consuming</span>
-            <span class="dd-tile__hint">Delivery started but participant hasn't been active</span>
-            <span class="dd-tile__arr">&rarr;</span>
-          </button>
-          <button data-testid="ddc-btn-012" class="dd-tile" [class.dd-tile--empty]="kpiAwaitingTotal === 0" (click)="navToAttention('awaiting')">
-            <span class="dd-tile__num">{{ kpiAwaitingTotal | number }}</span>
-            <span class="dd-tile__label">Awaiting Initiation</span>
-            <span class="dd-tile__hint">Payment not confirmed — delivery hasn't started yet</span>
-            <span class="dd-tile__arr">&rarr;</span>
-          </button>
-          <button data-testid="ddc-btn-013" class="dd-tile dd-tile--ok" [class.dd-tile--empty]="kpiReadyToInitiate === 0"
-            (click)="navToAttention('ready')">
-            <span class="dd-tile__num">{{ kpiReadyToInitiate | number }}</span>
-            <span class="dd-tile__label">Ready to Start</span>
-            <span class="dd-tile__hint">Payment confirmed — initiate their delivery now</span>
-            <span class="dd-tile__arr">&rarr;</span>
-          </button>
-        </div>
+    <!-- ONGOING BY PRODUCT (strip) ============================ -->
+    <!-- A one-click view of the Products dropdown, not a second filter: both write and
+         read the same productFilterControl. The dropdown stays the way to pick several. -->
+    <section class="dd-strip-sec">
+      <div class="dd-strip-head">
+        <span class="dd-strip__title">Ongoing by product</span>
+        <span class="dd-strip__hint">Click a product to filter the whole screen</span>
       </div>
+      <div class="dd-strip" data-testid="ddc-strip">
+        <button class="dd-pchip" type="button" data-testid="ddc-strip-all" [class.is-sel]="isStripAllSelected"
+          (click)="selectProductFromStrip(null)">
+          <span class="dd-pchip__nm">All products</span>
+          <!-- Total in delivery (same figure as the funnel's "In delivery": visible + hidden products).
+               Joshua's v4 left this as a dash; the old hero showed the total here. -->
+          <span class="dd-pchip__v">{{ kpiOngoingTotal | number }}</span>
+          <span class="dd-pchip__t"><i style="width:100%"></i></span>
+        </button>
+        <button class="dd-pchip" type="button" data-testid="ddc-strip-chip"
+          *ngFor="let cardId of visibleCardIds; trackBy: trackByCardId" [class.is-sel]="isStripSelected(cardId)"
+          [class.is-zero]="ongoingByCard(cardId) === 0" [title]="getCardName(cardId)"
+          (click)="selectProductFromStrip(cardId)">
+          <span class="dd-pchip__nm">{{ getCardName(cardId) }}</span>
+          <span class="dd-pchip__v">{{ ongoingByCard(cardId) | number }}</span>
+          <span class="dd-pchip__t"><i [style.width.%]="ongoingPctOfMax(cardId)"></i></span>
+        </button>
+      </div>
+    </section>
 
-      <div>
-        <div class="dd-section-head">
-          <span class="dd-section-title">Delivery Pipeline by Product</span>
-          <span class="dd-section-sub">How participants are spread across each delivery stage</span>
+    <!-- DELIVERY SPEED ======================================== -->
+    <!-- Its own section because it is the one measure the funnel does not carry:
+         every other headline figure is a headcount, this one is a duration. -->
+    <section class="dd-speed-sec">
+      <div class="dd-section-head">
+        <span class="dd-section-title">Delivery speed</span>
+        <span class="dd-section-sub">{{ speedScopeLabel }}</span>
+      </div>
+      <div class="dd-speed" data-testid="ddc-speed">
+        <div class="dd-speed__figure">
+          <span class="dd-speed__lbl">Avg. days to complete</span>
+          <span class="dd-speed__val" data-testid="ddc-kpi-avg-complete">
+            <span *ngIf="!hasAvgCompleteData" class="dd-speed__nr">Not recorded</span>
+            <ng-container *ngIf="hasAvgCompleteData">{{ kpiAvgComplete }}<span
+                class="dd-speed__unit">d</span></ng-container>
+          </span>
+          <span class="dd-speed__sub">{{ hasAvgCompleteData ? 'against a ' + avgTimeTarget + '-day target' : 'no
+            completions in this period to measure' }}</span>
         </div>
-        <div class="dd-pby">
-          <div class="dd-pby-legend">
-            <span class="dd-pby-legend__item"><span class="dd-pby-legend__sw dd-bg-s1"></span>Init</span>
-            <span class="dd-pby-legend__item"><span class="dd-pby-legend__sw dd-bg-s2"></span>Await</span>
-            <span class="dd-pby-legend__item"><span class="dd-pby-legend__sw dd-bg-s3"></span>Started</span>
-            <span class="dd-pby-legend__item"><span class="dd-pby-legend__sw dd-bg-s4"></span>Ongoing</span>
-            <span class="dd-pby-legend__item"><span class="dd-pby-legend__sw dd-bg-s5"></span>Done</span>
+        <div class="dd-speed__gauge">
+          <div class="dd-gauge-track">
+            <div class="dd-gauge-fill" [style.width.%]="hasAvgCompleteData ? avgGaugePct : 0"></div>
+            <div class="dd-gauge-target" [style.left.%]="avgTargetMarkPct"></div>
           </div>
-          <ng-container *ngFor="let cardId of visibleCardIds">
-            <ng-container *ngIf="getCardFunnel(cardId) as f">
-              <div class="dd-pby-row">
-                <span class="dd-pby-row__name" [title]="getCardName(cardId)">{{ getCardName(cardId) }}</span>
-                <div class="dd-pby-row__bar">
-                  <div class="dd-pby-row__seg dd-bg-s1" *ngIf="f.initiated.length > 0"
-                    [style.flex]="f.initiated.length"></div>
-                  <div class="dd-pby-row__seg dd-bg-s2" *ngIf="f.awaiting.length > 0" [style.flex]="f.awaiting.length">
-                  </div>
-                  <div class="dd-pby-row__seg dd-bg-s3" *ngIf="f.started.length > 0" [style.flex]="f.started.length">
-                  </div>
-                  <div class="dd-pby-row__seg dd-bg-s4" *ngIf="(f.ongoing?.length || 0) > 0"
-                    [style.flex]="f.ongoing?.length || 0"></div>
-                  <div class="dd-pby-row__seg dd-bg-s5" *ngIf="f.completed.length > 0"
-                    [style.flex]="f.completed.length"></div>
-                </div>
-                <span class="dd-pby-row__total">{{ getCardPipelineTotal(cardId) | number }}</span>
-              </div>
-            </ng-container>
-          </ng-container>
+          <div class="dd-gauge-marks">
+            <span>0d</span>
+            <span>{{ avgTimeTarget }}d target</span>
+            <span>{{ avgGaugeMaxDays }}d</span>
+          </div>
         </div>
       </div>
     </section>
@@ -246,11 +241,12 @@
               <span class="dd-products-sub">{{ visibleCardIds.length }} active &nbsp;&middot;&nbsp; <span
                   class="dd-meta-pulse-inline"></span> Live</span>
               <span class="up-confirmed">
-                <mat-form-field appearance="outline" class="event-select">
+                <mat-form-field subscriptSizing="dynamic" appearance="outline" class="event-select">
                   <mat-label>Select Event</mat-label>
-                  <mat-select data-testid="ddc-msel-018" [(value)]="selectedEvent" (selectionChange)="onEventChange($event.value)"
+                  <mat-select panelWidth="" data-testid="ddc-msel-018" [(value)]="selectedEvent" (selectionChange)="onEventChange($event.value)"
                     panelClass="event-dropdown">
-                    <mat-option *ngFor="let event of events" [value]="event">
+                    <mat-option class="dd-opt-search"><ngx-mat-select-search [(ngModel)]="optSearch['events']" [ngModelOptions]="{standalone: true}" placeholderLabel="Search…" noEntriesFoundLabel="No match"></ngx-mat-select-search></mat-option>
+                    <mat-option *ngFor="let event of filterOpts(events, 'events', eventOptLabel)" [value]="event">
                       {{ event.name }}
                     </mat-option>
                   </mat-select>
@@ -271,9 +267,18 @@
               </div>
             </div>
             <div class="dd-prow-colhead__cell dd-prow-colhead__cell--group">
-              <span class="dd-colhead__grp-lbl">Journey Funnel</span>
+              <span class="dd-colhead__grp-lbl">Journey Funnel
+                <span class="dd-mixleg" data-testid="ddc-stagemix-legend">
+                  <span class="dd-mixleg__for">bar:</span>
+                  <span class="dd-mixleg__i" [matTooltip]="logicTip.yetToStart" matTooltipPosition="above" [matTooltipShowDelay]="250"><i class="dd-bg-s1"></i>Yet to Start</span>
+                  <span class="dd-mixleg__i" [matTooltip]="logicTip.init" matTooltipPosition="above" [matTooltipShowDelay]="250"><i class="dd-bg-s2"></i>Init</span>
+                  <span class="dd-mixleg__i" [matTooltip]="logicTip.started" matTooltipPosition="above" [matTooltipShowDelay]="250"><i class="dd-bg-s3"></i>Started</span>
+                  <span class="dd-mixleg__i" [matTooltip]="logicTip.ongoing" matTooltipPosition="above" [matTooltipShowDelay]="250"><i class="dd-bg-s4"></i>Ongoing</span>
+                  <span class="dd-mixleg__i" [matTooltip]="logicTip.done" matTooltipPosition="above" [matTooltipShowDelay]="250"><i class="dd-bg-s5"></i>Done</span>
+                </span>
+              </span>
               <div class="dd-colhead__grp-tags">
-                <span>Yet to Start</span><span>Init</span><span>Started</span><span>Ongoing</span><span>Done</span>
+                <span [matTooltip]="logicTip.yetToStart" matTooltipPosition="above" [matTooltipShowDelay]="250">Yet to Start</span><span [matTooltip]="logicTip.init" matTooltipPosition="above" [matTooltipShowDelay]="250">Init</span><span [matTooltip]="logicTip.started" matTooltipPosition="above" [matTooltipShowDelay]="250">Started</span><span [matTooltip]="logicTip.ongoing" matTooltipPosition="above" [matTooltipShowDelay]="250">Ongoing</span><span [matTooltip]="logicTip.done" matTooltipPosition="above" [matTooltipShowDelay]="250">Done</span>
               </div>
             </div>
             <div class="dd-prow-colhead__cell">Avg. Time</div>
@@ -335,30 +340,60 @@
             <!-- 5. Journey Funnel -->
             <!-- 5. Journey Funnel -->
             <div class="dd-prow__funnel">
-              <div data-testid="ddc-div-025" class="dd-fstep" (click)="openCardFunnelModal(cardId, 'awaiting', $event)">
+              <div data-testid="ddc-div-025" class="dd-fstep" [matTooltip]="logicTip.yetToStart" matTooltipPosition="above" [matTooltipShowDelay]="250" (click)="openCardFunnelModal(cardId, 'awaiting', $event)">
                 <span class="dd-fstep__pill" [class.empty]="getCardFunnel(cardId).awaiting.length === 0">{{
                   getCardFunnel(cardId).awaiting.length | number }}</span>
                 <span class="dd-fstep__lbl">Yet to Start</span>
               </div>
-              <div data-testid="ddc-div-026" class="dd-fstep" (click)="openCardFunnelModal(cardId, 'initiated', $event)">
+              <div data-testid="ddc-div-026" class="dd-fstep" [matTooltip]="logicTip.init" matTooltipPosition="above" [matTooltipShowDelay]="250" (click)="openCardFunnelModal(cardId, 'initiated', $event)">
                 <span class="dd-fstep__pill" [class.empty]="getCardFunnel(cardId).initiated.length === 0">{{
                   getCardFunnel(cardId).initiated.length }}</span>
                 <span class="dd-fstep__lbl">Init</span>
               </div>
-              <div data-testid="ddc-div-027" class="dd-fstep" (click)="openCardFunnelModal(cardId, 'started', $event)">
+              <div data-testid="ddc-div-027" class="dd-fstep" [matTooltip]="logicTip.started" matTooltipPosition="above" [matTooltipShowDelay]="250" (click)="openCardFunnelModal(cardId, 'started', $event)">
                 <span class="dd-fstep__pill" [class.empty]="getCardFunnel(cardId).started.length === 0">{{
                   getCardFunnel(cardId).started.length }}</span>
                 <span class="dd-fstep__lbl">Started</span>
               </div>
-              <div data-testid="ddc-div-028" class="dd-fstep" (click)="openCardFunnelModal(cardId, 'ongoing', $event)">
+              <div data-testid="ddc-div-028" class="dd-fstep" [matTooltip]="logicTip.ongoing" matTooltipPosition="above" [matTooltipShowDelay]="250" (click)="openCardFunnelModal(cardId, 'ongoing', $event)">
                 <span class="dd-fstep__pill" [class.empty]="(getCardFunnel(cardId).ongoing?.length || 0) === 0">{{
                   getCardFunnel(cardId).ongoing?.length || 0 }}</span>
                 <span class="dd-fstep__lbl">Ongoing</span>
               </div>
-              <div data-testid="ddc-div-029" class="dd-fstep" (click)="openCardFunnelModal(cardId, 'completed', $event)">
+              <div data-testid="ddc-div-029" class="dd-fstep" [matTooltip]="logicTip.done" matTooltipPosition="above" [matTooltipShowDelay]="250" (click)="openCardFunnelModal(cardId, 'completed', $event)">
                 <span class="dd-fstep__pill done" [class.empty]="getCardFunnel(cardId).completed.length === 0">{{
                   getCardFunnel(cardId).completed.length }}</span>
                 <span class="dd-fstep__lbl">Done</span>
+              </div>
+
+              <!-- Stage mix: the bar that used to live in the standalone "Delivery Pipeline
+                   by Product" panel, now beside the counts it describes. The numbers above
+                   stay — the bar adds the shape, it does not replace the figures. Each
+                   segment opens the same list its pill does. -->
+              <div class="dd-stagemix" data-testid="ddc-stagemix" [attr.aria-label]="stageMixLabel(cardId)"
+                [title]="stageMixLabel(cardId)">
+                <button type="button" class="dd-stagemix__seg dd-bg-s1" data-testid="ddc-stagemix-awaiting"
+                  *ngIf="getCardFunnel(cardId).awaiting.length > 0"
+                  [style.flex]="getCardFunnel(cardId).awaiting.length"
+                  (click)="openCardFunnelModal(cardId, 'awaiting', $event)"></button>
+                <button type="button" class="dd-stagemix__seg dd-bg-s2" data-testid="ddc-stagemix-initiated"
+                  *ngIf="getCardFunnel(cardId).initiated.length > 0"
+                  [style.flex]="getCardFunnel(cardId).initiated.length"
+                  (click)="openCardFunnelModal(cardId, 'initiated', $event)"></button>
+                <button type="button" class="dd-stagemix__seg dd-bg-s3" data-testid="ddc-stagemix-started"
+                  *ngIf="getCardFunnel(cardId).started.length > 0"
+                  [style.flex]="getCardFunnel(cardId).started.length"
+                  (click)="openCardFunnelModal(cardId, 'started', $event)"></button>
+                <button type="button" class="dd-stagemix__seg dd-bg-s4" data-testid="ddc-stagemix-ongoing"
+                  *ngIf="(getCardFunnel(cardId).ongoing?.length || 0) > 0"
+                  [style.flex]="getCardFunnel(cardId).ongoing?.length || 0"
+                  (click)="openCardFunnelModal(cardId, 'ongoing', $event)"></button>
+                <button type="button" class="dd-stagemix__seg dd-bg-s5" data-testid="ddc-stagemix-completed"
+                  *ngIf="getCardFunnel(cardId).completed.length > 0"
+                  [style.flex]="getCardFunnel(cardId).completed.length"
+                  (click)="openCardFunnelModal(cardId, 'completed', $event)"></button>
+                <span class="dd-stagemix__empty" *ngIf="getCardPipelineTotal(cardId) === 0">No participants in
+                  the pipeline yet</span>
               </div>
             </div>
 
@@ -596,7 +631,7 @@
                     </div>
                   </div>
                   <div *ngIf="initiateProductOptions[pid]">
-                    <mat-form-field class="inputfield" appearance="outline">
+                    <mat-form-field subscriptSizing="dynamic" class="inputfield" appearance="outline">
                       <mat-label>Minimum Payment</mat-label>
                       <input data-testid="ddc-inp-055" matInput type="number" autocomplete="off" [(ngModel)]="minimumPayment"
                         #minimumPaymentRef="ngModel" required>
@@ -605,7 +640,7 @@
                       </mat-error>
                     </mat-form-field>
                     <!-- Tentative Start -->
-                    <mat-form-field class="inputfield" appearance="outline">
+                    <mat-form-field subscriptSizing="dynamic" class="inputfield" appearance="outline">
                       <mat-label>Tentative Start</mat-label>
                       <input data-testid="ddc-inp-056" matInput [matDatepicker]="picker" [(ngModel)]="tentativeStartDate"
                         #tentativeStartRef="ngModel" required autocomplete="off">
@@ -617,10 +652,11 @@
                       </mat-error>
                     </mat-form-field>
                     <!-- Delivery Option -->
-                    <mat-form-field appearance="outline">
+                    <mat-form-field subscriptSizing="dynamic" appearance="outline">
                       <mat-label>Delivery Option</mat-label>
-                      <mat-select data-testid="ddc-msel-057" [(ngModel)]="selectedDeliveryType" #deliveryTypeRef="ngModel" required>
-                        <mat-option *ngFor="let list of deliveryTypes" [value]="list">
+                      <mat-select panelWidth="" data-testid="ddc-msel-057" [(ngModel)]="selectedDeliveryType" #deliveryTypeRef="ngModel" required>
+                        <mat-option class="dd-opt-search"><ngx-mat-select-search [(ngModel)]="optSearch['delivery']" [ngModelOptions]="{standalone: true}" placeholderLabel="Search…" noEntriesFoundLabel="No match"></ngx-mat-select-search></mat-option>
+                        <mat-option *ngFor="let list of filterOpts(deliveryTypes, 'delivery')" [value]="list">
                           {{ list }}
                         </mat-option>
                       </mat-select>
@@ -935,6 +971,13 @@
                     (click)="selectProduct('Critical Support')">
                     <span class="stages-pchip-dot stages-pchip-dot-critical"></span>Critical Support
                   </button>
+                  <button data-testid="ddc-btn-ctd-appt" class="stages-pchip"
+                    *ngIf="!productFilterActive || (productFilterControl.value || []).includes('CTD Diagnostics & Implementation')"
+                    [class.active]="selectedProductLabel === 'CTD D&I (Appointment)'"
+                    matTooltip="Only the CTD Diagnostics & Implementation (Appointment) product — not the CTD queue, CTD Platinum or CTD Diagnostics (Appointment)." matTooltipPosition="above" [matTooltipShowDelay]="250"
+                    (click)="selectProduct('CTD D&I (Appointment)')">
+                    <span class="stages-pchip-dot stages-pchip-dot-ctd"></span>CTD D&amp;I (Appointment)
+                  </button>
                 </div>
               </div>
               <div class="header-right">
@@ -962,7 +1005,7 @@
 
             <div class="stages-empty" *ngIf="!selectedProductLabel && !stagesLoading">
               <div class="stages-empty-title">Pick a product to inspect stages</div>
-              <div class="stages-empty-hint">Choose EI Starter Pack or Critical Support above to drill into
+              <div class="stages-empty-hint">Choose a product above to drill into
                 stage-by-stage data.</div>
             </div>
 
@@ -993,7 +1036,7 @@
                     <div class="header-col">
                       <div data-testid="ddc-div-090" class="d-flex filter-asc" (click)="sortColumn(i)">
                         <div class="col-header-left">
-                          <span class="col-title">{{ col }}</span>
+                          <span class="col-title" [matTooltip]="stageColTip(col)" matTooltipPosition="above" [matTooltipShowDelay]="250">{{ col }}</span>
                         </div>
                         <div class="filter-asc ps-2">
                           <i class="fas text-black-50 filter-asc"
@@ -1001,7 +1044,7 @@
                           </i>
                         </div>
                       </div>
-                      <span class="col-badge">
+                      <span class="col-badge" [matTooltip]="stageColTip(col)" matTooltipPosition="above" [matTooltipShowDelay]="250">
                         {{ filteredCardsMap[i]?.length || 0 }}
                       </span>
                     </div>
@@ -1009,12 +1052,14 @@
                       <ng-container *ngIf="stageData[col.toLowerCase().trim()] as stage">
                         <div class="stage-stat-row">
                           <button data-testid="ddc-btn-091" type="button" class="stage-stat-card"
+                            [matTooltip]="stageStatTip(col, 'completed')" matTooltipPosition="above" [matTooltipShowDelay]="250"
                             (click)="openStageModal(col, 'Completed', getStageCompletedCards(col.toLowerCase().trim()))">
                             <span class="stage-stat-num stage-stat-num--completed">{{ getStageCompletedCards(col.toLowerCase().trim()).length || 0 }}</span>
                             <span class="stage-stat-arrow">›</span>
                             <span class="stage-stat-lbl">Completed</span>
                           </button>
                           <button data-testid="ddc-btn-092" type="button" class="stage-stat-card"
+                            [matTooltip]="stageStatTip(col, 'cancelled')" matTooltipPosition="above" [matTooltipShowDelay]="250"
                             (click)="openStageModal(col, 'Cancelled', stage.cancelled)">
                             <span class="stage-stat-num stage-stat-num--cancelled">{{ stage.cancelled.length || 0 }}</span>
                             <span class="stage-stat-arrow">›</span>
@@ -1025,10 +1070,13 @@
                         <ng-container *ngIf="getNotScheduledCards(col.toLowerCase().trim()) as notScheduledCards">
                           <div class="stage-tabs">
                             <button data-testid="ddc-btn-093" type="button" class="stage-tab" [class.is-active]="getStageTab(col) === 'all'"
-                            (click)="setStageTab(col, 'all')">All {{ (col.toLowerCase().trim() === 'onboarding' ? getScheduledOnboardingCards().length : stage.all.length) + notScheduledCards.length }}</button>
+                            [matTooltip]="stageStatTip(col, 'all')" matTooltipPosition="above" [matTooltipShowDelay]="250"
+                            (click)="setStageTab(col, 'all')">All {{ (col.toLowerCase().trim() === 'onboarding' ? getScheduledOnboardingCards().length : getStageScheduledCards(col.toLowerCase().trim()).length) + notScheduledCards.length }}</button>
                           <button data-testid="ddc-btn-094" type="button" class="stage-tab" [class.is-active]="getStageTab(col) === 'scheduled'"
-                            (click)="setStageTab(col, 'scheduled')">Scheduled {{ col.toLowerCase().trim() === 'onboarding' ? getScheduledOnboardingCards().length : stage.all.length }}</button>
+                            [matTooltip]="stageStatTip(col, 'scheduled')" matTooltipPosition="above" [matTooltipShowDelay]="250"
+                            (click)="setStageTab(col, 'scheduled')">Scheduled {{ col.toLowerCase().trim() === 'onboarding' ? getScheduledOnboardingCards().length : getStageScheduledCards(col.toLowerCase().trim()).length }}</button>
                             <button data-testid="ddc-btn-095" type="button" class="stage-tab" [class.is-active]="getStageTab(col) === 'waiting'"
+                              [matTooltip]="stageStatTip(col, 'waiting')" matTooltipPosition="above" [matTooltipShowDelay]="250"
                               (click)="setStageTab(col, 'waiting')">Waiting {{ notScheduledCards.length }}</button>
                           </div>
                         </ng-container>
@@ -1063,7 +1111,7 @@
                           </div>
                         </ng-container>
                         <ng-template #regularScheduledTpl>
-                          <div class="card" *ngFor="let app of stage.all; trackBy: trackByCard">
+                          <div class="card" *ngFor="let app of getStageScheduledCards(col.toLowerCase().trim()); trackBy: trackByCard">
                             <div class="card-top">
                               <div class="card-info">
                                 <div class="card-name">{{ mapMetaData[getStageModalProfileId(app)]?.name || getStageModalProfileId(app) }}</div>
@@ -1190,7 +1238,7 @@
                         </div>
                       </ng-container>
 
-                      <div class="no-data-card" *ngIf="stage.all.length === 0 && getNotScheduledCards(col.toLowerCase().trim()).length === 0">
+                      <div class="no-data-card" *ngIf="getStageScheduledCards(col.toLowerCase().trim()).length === 0 && getNotScheduledCards(col.toLowerCase().trim()).length === 0">
                         No Data Yet
                       </div>
                     </ng-container>
@@ -1519,7 +1567,9 @@
                 </div>
 
                 <ng-container *ngIf="!specialistLoading">
-                  <ng-container *ngIf="specialistData.length > 0; else utilEmpty">
+                  <!-- specialistData was commented out of the ts in d88d9736 (2026-09-08) but this block stayed live:
+                       guard it so the Analytics tab shows the empty state instead of throwing. -->
+                  <ng-container *ngIf="(specialistData?.length || 0) > 0; else utilEmpty">
                     <div class="spec-util-table">
                       <div class="spec-util-head">
                         <span class="spec-util-col spec-util-col--name">Specialist</span>
@@ -1592,49 +1642,54 @@
                     <button data-testid="ddc-btn-105" *ngIf="filterForm.value.search" (click)="clearSearch()" class="pm-clear-search"
                       title="Clear search">✕</button>
                   </div>
-                  <mat-form-field appearance="outline" class="pm-filter-field">
+                  <mat-form-field subscriptSizing="dynamic" appearance="outline" class="pm-filter-field">
                     <mat-label>Customer Status</mat-label>
-                    <mat-select data-testid="ddc-msel-125" [formControl]="customerStatusFilterControl"
+                    <mat-select panelWidth="" data-testid="ddc-msel-125" [formControl]="customerStatusFilterControl"
                       (selectionChange)="filterTableData()" multiple>
-                      <mat-option value="active">Active</mat-option>
-                      <mat-option value="non active">Non-active</mat-option>
+                      <mat-option class="dd-opt-search"><ngx-mat-select-search [(ngModel)]="optSearch['cust']" [ngModelOptions]="{standalone: true}" placeholderLabel="Search…" noEntriesFoundLabel="No match"></ngx-mat-select-search></mat-option>
+                      <mat-option *ngIf="optMatch('cust', 'Active')" value="active">Active</mat-option>
+                      <mat-option *ngIf="optMatch('cust', 'Non-active')" value="non active">Non-active</mat-option>
                     </mat-select>
                   </mat-form-field>
 
-                  <mat-form-field appearance="outline" class="pm-filter-field">
+                  <mat-form-field subscriptSizing="dynamic" appearance="outline" class="pm-filter-field">
                     <mat-label>Financial Status</mat-label>
-                    <mat-select data-testid="ddc-msel-126" [formControl]="financialStatusFilterControl"
+                    <mat-select panelWidth="" data-testid="ddc-msel-126" [formControl]="financialStatusFilterControl"
                       (selectionChange)="filterTableData()" multiple>
-                      <mat-option value="regular">Regular</mat-option>
-                      <mat-option value="fully paid">Fully paid</mat-option>
-                      <mat-option value="locked">Locked</mat-option>
-                      <mat-option value="defaulted">Defaulted</mat-option>
+                      <mat-option class="dd-opt-search"><ngx-mat-select-search [(ngModel)]="optSearch['fin']" [ngModelOptions]="{standalone: true}" placeholderLabel="Search…" noEntriesFoundLabel="No match"></ngx-mat-select-search></mat-option>
+                      <mat-option *ngIf="optMatch('fin', 'Regular')" value="regular">Regular</mat-option>
+                      <mat-option *ngIf="optMatch('fin', 'Fully paid')" value="fully paid">Fully paid</mat-option>
+                      <mat-option *ngIf="optMatch('fin', 'Locked')" value="locked">Locked</mat-option>
+                      <mat-option *ngIf="optMatch('fin', 'Defaulted')" value="defaulted">Defaulted</mat-option>
                     </mat-select>
                   </mat-form-field>
 
-                  <mat-form-field appearance="outline" class="pm-filter-field">
+                  <mat-form-field subscriptSizing="dynamic" appearance="outline" class="pm-filter-field">
                     <mat-label>Parallel Product</mat-label>
-                    <mat-select data-testid="ddc-msel-127" [formControl]="parallelFilterControl"
+                    <mat-select panelWidth="" data-testid="ddc-msel-127" [formControl]="parallelFilterControl"
                       (selectionChange)="filterTableData()">
-                      <mat-option value="all">All</mat-option>
-                      <mat-option value="has">Parallel Product Available</mat-option>
-                      <mat-option value="none">No Parallel Product</mat-option>
+                      <mat-option class="dd-opt-search"><ngx-mat-select-search [(ngModel)]="optSearch['parallel']" [ngModelOptions]="{standalone: true}" placeholderLabel="Search…" noEntriesFoundLabel="No match"></ngx-mat-select-search></mat-option>
+                      <mat-option *ngIf="optMatch('parallel', 'All')" value="all">All</mat-option>
+                      <mat-option *ngIf="optMatch('parallel', 'Parallel Product Available')" value="has">Parallel Product Available</mat-option>
+                      <mat-option *ngIf="optMatch('parallel', 'No Parallel Product')" value="none">No Parallel Product</mat-option>
                     </mat-select>
                   </mat-form-field>
-                  <mat-form-field appearance="outline" class="pm-filter-field">
+                  <mat-form-field subscriptSizing="dynamic" appearance="outline" class="pm-filter-field">
                     <mat-label>Journey</mat-label>
-                    <mat-select data-testid="ddc-msel-106" placeholder="Select Journey" formControlName="journey"
+                    <mat-select panelWidth="" data-testid="ddc-msel-106" placeholder="Select Journey" formControlName="journey"
                       (selectionChange)="filterTableData()" multiple>
-                      <mat-option *ngFor="let journey of getUniqueJourneysForCurrentTab()" [value]="journey">{{
+                      <mat-option class="dd-opt-search"><ngx-mat-select-search [(ngModel)]="optSearch['journey']" [ngModelOptions]="{standalone: true}" placeholderLabel="Search…" noEntriesFoundLabel="No match"></ngx-mat-select-search></mat-option>
+                      <mat-option *ngFor="let journey of filterOpts(getUniqueJourneysForCurrentTab(), 'journey')" [value]="journey">{{
                         journey}}</mat-option>
                     </mat-select>
                   </mat-form-field>
-                <mat-form-field appearance="outline" class="pm-filter-field"
+                <mat-form-field subscriptSizing="dynamic" appearance="outline" class="pm-filter-field"
                   [class.pm-filter-field--hidden]="!(currentTabIndex === 2 || activeFilter === 'todayActivity' || activeFilter === 'last7DaysActivity' || activeFilter === 'last30DaysActivity' || activeFilter === 'thisMonthActivity')">
                   <mat-label>Product</mat-label>
-                  <mat-select data-testid="ddc-msel-107" placeholder="Select Product" [formControl]="productTableFilterControl"
+                  <mat-select panelWidth="" data-testid="ddc-msel-107" placeholder="Select Product" [formControl]="productTableFilterControl"
                     (selectionChange)="filterTableData()" multiple>
-                    <mat-option *ngFor="let product of getUniqueProductsForCurrentTab()" [value]="product">{{ product }}</mat-option>
+                    <mat-option class="dd-opt-search"><ngx-mat-select-search [(ngModel)]="optSearch['product']" [ngModelOptions]="{standalone: true}" placeholderLabel="Search…" noEntriesFoundLabel="No match"></ngx-mat-select-search></mat-option>
+                    <mat-option *ngFor="let product of filterOpts(getUniqueProductsForCurrentTab(), 'product')" [value]="product">{{ product }}</mat-option>
                   </mat-select>
                 </mat-form-field>
                 </form>
@@ -1672,7 +1727,7 @@
                 </div>
               </mat-tab>
               <mat-tab>
-                <ng-template mat-tab-label><span class="pm-tab-text">Awaiting Initiation</span><span
+                <ng-template mat-tab-label><span class="pm-tab-text" [matTooltip]="logicTip.awaiting" matTooltipPosition="above" [matTooltipShowDelay]="250">Awaiting Initiation</span><span
                     class="pm-tab-count">{{
                     originalData['awaitingInitiation'].count }}</span></ng-template>
                 <div *ngIf="isFilterActive()" class="pm-filter-indicator">
@@ -1698,7 +1753,7 @@
                 </div>
               </mat-tab>
               <mat-tab>
-                <ng-template mat-tab-label><span class="pm-tab-text">Initiated – Not Consuming</span><span
+                <ng-template mat-tab-label><span class="pm-tab-text" [matTooltip]="logicTip.idle" matTooltipPosition="above" [matTooltipShowDelay]="250">Initiated – Not Consuming</span><span
                     class="pm-tab-count">{{ originalData['currentJourneyInitiated'].count }}</span></ng-template>
                 <div *ngIf="isFilterActive()" class="pm-filter-indicator">
                   <span class="pm-filter-text"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"
@@ -1723,7 +1778,7 @@
                 </div>
               </mat-tab>
               <mat-tab>
-                <ng-template mat-tab-label><span class="pm-tab-text">Stuck Cases</span><span class="pm-tab-count">{{
+                <ng-template mat-tab-label><span class="pm-tab-text" [matTooltip]="logicTip.stuck" matTooltipPosition="above" [matTooltipShowDelay]="250">Stuck Cases</span><span class="pm-tab-count">{{
                     originalData['stuckCases'].count }}</span></ng-template>
                 <div *ngIf="isFilterActive()" class="pm-filter-indicator">
                   <span class="pm-filter-text"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"
@@ -1732,6 +1787,13 @@
                     </svg>{{ getFilterDisplayText() }}<span class="pm-filter-count" *ngIf="getActiveFilterCount()"> ({{
                       getActiveFilterCount() }})</span></span>
                   <button data-testid="ddc-btn-114" class="pm-clear-filter-btn" (click)="clearActiveFilter()">✕ Clear Filter</button>
+                </div>
+                <!-- A missing composite index fails every chunk of the attended-appointment
+                     lookup. Say so: blank columns must not read as "no appointment". -->
+                <div *ngIf="stuckAppointmentsError" class="pm-data-warning"
+                  data-testid="ddc-stuck-appointments-error">
+                  <span>{{ stuckAppointmentsError }} APPOINTMENT, APPOINTMENT DATE and DAYS STUCK fall back to
+                    status data below because the lookup failed, not because there is no appointment.</span>
                 </div>
                 <div class="pm-table-container">
                   <table class="pm-data-table">
@@ -1761,9 +1823,6 @@
                     <span *ngIf="header.type === 'mapped' && header.key !== 'checkbox' && header.key !== 'priority'"
                       [ngClass]="{'pm-participant-name': header.mapValue === 'name'}">{{
                       mapMetaData[participant[header.key]]?.[header.mapValue] || 'N/A' }}</span>
-                    <span *ngIf="header.key === 'waitingperiod'" class="pm-days-badge"
-                      [ngClass]="{'days-red': participant[header.key] >= 14, 'days-amber': participant[header.key] >= 7 && participant[header.key] < 14, 'days-green': participant[header.key] < 7}">{{
-                      participant[header.key] }} DAYS</span>
                     <span *ngIf="header.key === 'actualstuckdays'" class="pm-days-badge"
                       [ngClass]="{'days-red': participant[header.key] >= 14, 'days-amber': participant[header.key] >= 7 && participant[header.key] < 14, 'days-green': participant[header.key] < 7}">{{
                       participant[header.key] != null ? (participant[header.key] + ' DAYS') : 'N/A' }}</span>
@@ -1773,6 +1832,18 @@
                     <span
                       *ngIf="header.type === 'text' && header.key !== 'checkbox' && header.key !== 'priority' && header.key !== 'addnotes' && header.key !== 'waitingperiod'">{{
                       participant[header.key] || 'N/A' }}</span>
+                    <span *ngIf="header.key === 'waitingperiod'" class="pm-days-badge"
+                      [ngClass]="{'days-red': isKnownWait(participant[header.key]) && participant[header.key] >= 14, 'days-amber': isKnownWait(participant[header.key]) && participant[header.key] >= 7 && participant[header.key] < 14, 'days-green': isKnownWait(participant[header.key]) && participant[header.key] < 7, 'days-unknown': !isKnownWait(participant[header.key])}">{{
+                      isKnownWait(participant[header.key]) ? participant[header.key] + ' DAYS' : '\u2014' }}</span>
+                    <span *ngIf="header.key === 'stuckdays'" class="pm-days-badge"
+                      data-testid="ddc-stuck-days"
+                      [attr.data-basis]="participant['stuckdaysbasis']"
+                      [title]="participant['stuckdaysbasis'] === 'appointment'
+                        ? 'Days since this participant last attended an appointment'
+                        : 'No attended appointment on record \u2014 counting from the last status change'"
+                      [ngClass]="{'days-red': isKnownWait(participant['stuckdays']) && participant['stuckdays'] >= 14, 'days-amber': isKnownWait(participant['stuckdays']) && participant['stuckdays'] >= 7 && participant['stuckdays'] < 14, 'days-green': isKnownWait(participant['stuckdays']) && participant['stuckdays'] < 7, 'days-unknown': !isKnownWait(participant['stuckdays'])}">{{
+                      isKnownWait(participant['stuckdays']) ? participant['stuckdays'] + ' DAYS' : '\u2014'
+                      }}<span class="pm-days-basis" *ngIf="participant['stuckdaysbasis'] !== 'appointment'">*</span></span>
                     <span *ngIf="header.key === 'addnotes'">
                       <div data-testid="ddc-div-117" (click)="addNotes(participant)"><mat-icon class="pm-edit-icon">edit_note</mat-icon></div>
                     </span>
@@ -1837,15 +1908,16 @@
             <div class="pm-header">
               <h2 class="pm-title">Weekly Report</h2>
 
-              <mat-form-field appearance="outline" class="pm-filter-field">
+              <mat-form-field subscriptSizing="dynamic" appearance="outline" class="pm-filter-field pm-filter-field--wide">
                 <mat-label>Choose a product</mat-label>
-                <mat-select data-testid="ddc-msel-131" [(ngModel)]="weeklyReportCardId" (selectionChange)="loadWeeklyReport()">
-                  <mat-option *ngFor="let cardId of visibleCardIds" [value]="cardId">{{ getCardName(cardId) }}</mat-option>
+                <mat-select panelWidth="" data-testid="ddc-msel-131" [(ngModel)]="weeklyReportCardId" (selectionChange)="loadWeeklyReport()">
+                  <mat-option class="dd-opt-search"><ngx-mat-select-search [(ngModel)]="optSearch['weekly']" [ngModelOptions]="{standalone: true}" placeholderLabel="Search…" noEntriesFoundLabel="No match"></ngx-mat-select-search></mat-option>
+                  <mat-option *ngFor="let cardId of filterOpts(visibleCardIds, 'weekly', cardOptLabel)" [value]="cardId">{{ getCardName(cardId) }}</mat-option>
                 </mat-select>
               </mat-form-field>
 
               <ng-container *ngIf="weeklyReportCardId">
-                <mat-form-field appearance="outline" class="pm-filter-field">
+                <mat-form-field subscriptSizing="dynamic" appearance="outline" class="pm-filter-field">
                   <mat-label>Initiated Date Range</mat-label>
                   <mat-date-range-input [formGroup]="weeklyInitiatedRange" [rangePicker]="initiatedPicker">
                     <input data-testid="ddc-inp-132" matStartDate formControlName="start" placeholder="From">
@@ -1855,7 +1927,7 @@
                   <mat-date-range-picker #initiatedPicker></mat-date-range-picker>
                 </mat-form-field>
 
-                <mat-form-field appearance="outline" class="pm-filter-field">
+                <mat-form-field subscriptSizing="dynamic" appearance="outline" class="pm-filter-field">
                   <mat-label>Appointment Date Range</mat-label>
                   <mat-date-range-input [formGroup]="weeklyAppointmentRange" [rangePicker]="appointmentPicker">
                     <input data-testid="ddc-inp-134" matStartDate formControlName="start" placeholder="From">
@@ -1865,12 +1937,13 @@
                   <mat-date-range-picker #appointmentPicker></mat-date-range-picker>
                 </mat-form-field>
 
-                <mat-form-field appearance="outline" class="pm-filter-field">
+                <mat-form-field subscriptSizing="dynamic" appearance="outline" class="pm-filter-field">
                   <mat-label>Status</mat-label>
-                  <mat-select data-testid="ddc-msel-136" [(ngModel)]="weeklyStatusFilter" (selectionChange)="applyWeeklyFilters()">
-                    <mat-option value="all">All</mat-option>
-                    <mat-option value="booked">Booked</mat-option>
-                    <mat-option value="completed">Completed</mat-option>
+                  <mat-select panelWidth="" data-testid="ddc-msel-136" [(ngModel)]="weeklyStatusFilter" (selectionChange)="applyWeeklyFilters()">
+                    <mat-option class="dd-opt-search"><ngx-mat-select-search [(ngModel)]="optSearch['wstatus']" [ngModelOptions]="{standalone: true}" placeholderLabel="Search…" noEntriesFoundLabel="No match"></ngx-mat-select-search></mat-option>
+                    <mat-option *ngIf="optMatch('wstatus', 'All')" value="all">All</mat-option>
+                    <mat-option *ngIf="optMatch('wstatus', 'Booked')" value="booked">Booked</mat-option>
+                    <mat-option *ngIf="optMatch('wstatus', 'Completed')" value="completed">Completed</mat-option>
                   </mat-select>
                 </mat-form-field>
 

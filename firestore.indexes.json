@@ -1076,6 +1076,20 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "participantplanning",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "monthstartdate",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

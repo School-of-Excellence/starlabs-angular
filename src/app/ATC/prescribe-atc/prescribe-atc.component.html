@@ -506,7 +506,9 @@
         <h2 class="section-heading">CHANGEWORK BRIEF</h2>
         <div class="audio-container">
           <div *ngFor="let audio of audioBlobURL; let i = index" class="audio-item">
-            <audio data-testid="patc-audio-item" controls class="audio-player" [src]="audio"></audio>
+            <!-- Same compact player as everywhere else (no download menu). `audio` is a local
+                 blob: preview, which the player plays as-is — nothing is signed. -->
+            <app-atc-audio compact data-testid="patc-audio-item" class="audio-player" [path]="audio"></app-atc-audio>
             <button class="remove-button" mat-icon-button (click)="removeAudio(i)">
               <mat-icon>close</mat-icon>
             </button>

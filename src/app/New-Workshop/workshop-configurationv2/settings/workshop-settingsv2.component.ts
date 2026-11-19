@@ -1,7 +1,7 @@
 import { Component, Input, OnInit, OnDestroy, AfterViewInit, HostListener, NgZone, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, FormArray, FormControl, AbstractControl, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
-import { Firestore, doc, updateDoc, collection, collectionSnapshots, getDocs, query, where, orderBy } from '@angular/fire/firestore';
+import { Firestore, doc, updateDoc, collection, collectionSnapshots, getDocs, query, where, orderBy, getDoc, setDoc, deleteField } from '@angular/fire/firestore';
 import { Storage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
@@ -21,6 +21,22 @@ import {
   WorkshopAccessKey,
   WorkshopAdminLists,
 } from '../../workshop-access/workshop-access.model';
+import {
+  MAIL_SOURCES,
+  MAIL_TEMPLATES_COLLECTION,
+  WORKSHOP_SETTINGS_COLLECTION,
+  MailEmailData,
+  MailSource,
+  MailTemplateOption,
+  buildEmailData,
+  emptyStaticCount,
+  mailFingerprint,
+  readEmailData,
+  reservedVariables,
+  storedMailFingerprint,
+  templateFromDoc,
+  unsetCount,
+} from './mail-template-map';
 
 /** The three lists that live in one shared document and apply to every workshop. */
 type AdminListKey = keyof WorkshopAdminLists;
@@ -62,6 +78,7 @@ export class WorkshopSettingsv2Component implements OnInit, AfterViewInit, OnDes
       this.hasInitializedForm = true;
       setTimeout(() => this.onScroll());
     }
+    if (v) this.ensureMailLoaded();
   }
   get workshopData(): any { return this._data; }
   private _isNew = false;
@@ -164,6 +181,7 @@ export class WorkshopSettingsv2Component implements OnInit, AfterViewInit, OnDes
     // Warm the people list in the background so Dashboard Access opens ready.
     // It is cached for ten minutes, so this normally costs nothing at all.
     this.accessService.getParticipantDirectory().catch(() => { });
+    this.ensureMailLoaded();
     this.settingsForm.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => {
       if (this.justSaved && this.settingsForm.dirty) this.justSaved = false;
       if (this.saveError && this.settingsForm.dirty) this.saveError = false;
@@ -180,6 +198,8 @@ export class WorkshopSettingsv2Component implements OnInit, AfterViewInit, OnDes
     this.destroy$.complete();
     Object.values(this.cpwelcomeeditors).forEach(e => e?.destroy());
     if (this.savedTimer) clearTimeout(this.savedTimer);
+    if (this.mailSavedTimer) clearTimeout(this.mailSavedTimer);
+    this.mailDestroyed = true;
   }
 
   @HostListener('document:click', ['$event'])
@@ -907,7 +927,7 @@ export class WorkshopSettingsv2Component implements OnInit, AfterViewInit, OnDes
   // Settings, and it must stay usable on a workshop that has not been saved yet.
   readonly accessKeys = WORKSHOP_ACCESS_KEYS;
   readonly accessListDefs: { key: AdminListKey; title: string; hint: string }[] = [
-    { key: 'dashboardAdmins', title: 'Full dashboard access', hint: 'Everything on every workshop dashboard. People here are not given actions one by one.' },
+    { key: 'dashboardAdmins', title: 'Full dashboard access', hint: 'Everything on every workshop dashboard except Clear. People here are not given actions one by one.' },
     { key: 'editAccess', title: 'Workshop editing', hint: 'Create, edit and duplicate a workshop, and change its Active, Web Active and Completed switches.' },
     { key: 'newUsersAccess', title: 'New users screen', hint: 'Open the new users screen from the workshops list.' },
   ];
@@ -940,7 +960,7 @@ export class WorkshopSettingsv2Component implements OnInit, AfterViewInit, OnDes
       this.zone.run(() => {
         this.accessPeople = people;
         this.accessNameMap = people.reduce((acc: Record<string, string>, p) => { acc[p.id] = p.name; return acc; }, {});
-        this.adminLists = { dashboardAdmins: [...lists.dashboardAdmins], editAccess: [...lists.editAccess], newUsersAccess: [...lists.newUsersAccess] };
+        this.adminLists = { dashboardAdmins: [...lists.dashboardAdmins], editAccess: [...lists.editAccess], newUsersAccess: [...lists.newUsersAccess], clearWorkshop: [...lists.clearWorkshop] };
         this.accessGrants = Object.keys(grants).reduce((acc: WorkshopAccessGrants, id) => { acc[id] = [...grants[id]]; return acc; }, {});
         this.accessRows = Object.keys(this.accessGrants).sort((a, b) => this.accessNameFor(a).localeCompare(this.accessNameFor(b)));
         this.accessDirty = false;
@@ -1075,6 +1095,273 @@ export class WorkshopSettingsv2Component implements OnInit, AfterViewInit, OnDes
       this.zone.run(() => { this.accessError = 'Could not save access. Please try again.'; });
     } finally {
       this.zone.run(() => { this.accessSaving = false; });
+    }
+  }
+
+  // ═══════════════════════════ Mail template · email template ═══════════════════════════
+  // Which approved email template this workshop sends, and what fills each of its
+  // variables. Stored as `mail` in workshopsettings/{workshop id} (see mail-template-map.ts).
+  // Like Dashboard Access it saves itself: it writes a different document from the
+  // Save Settings bar, which only ever writes workshopconfiguration.
+  readonly mailSources = MAIL_SOURCES;
+  /** Active, approved templates, read the first time the picker opens. */
+  mailTemplates: MailTemplateOption[] = [];
+  mailTemplatesLoading = false;
+  mailTemplatesLoaded = false;
+  mailTemplatesError = '';
+  /** The stored choice, read once with the page. */
+  mailLoading = false;
+  mailLoaded = false;
+  mailLoadError = '';
+  /** Chosen template id ('' = none). Kept apart from the details: a saved template may have been deleted. */
+  mailTemplateId = '';
+  mailTemplate: MailTemplateOption | null = null;
+  mailTemplateMissing = false;
+  /** The saved template could not be read (as opposed to: it no longer exists). */
+  mailTemplateUnreadable = false;
+  mailData: MailEmailData = {};
+  mailSaving = false;
+  mailJustSaved = false;
+  mailSaveError = '';
+  /** What is stored, every key included (storedMailFingerprint). Unsaved = the screen differs from it. */
+  private mailSavedPrint = '';
+  /** What the screen showed on arrival. Differs from mailSavedPrint when the stored map has drifted. */
+  private mailLoadPrint = '';
+  private mailSavedTimer: any = null;
+  private mailLoadStarted = false;
+  private mailDestroyed = false;
+
+  /**
+   * Read what is stored for this workshop. Called with the page; runs once per component
+   * instance (the parent reads the workshop id once, from the route snapshot).
+   */
+  async ensureMailLoaded(): Promise<void> {
+    if (this.mailLoadStarted || !this.workshopId) return;
+    this.mailLoadStarted = true;
+    this.mailLoading = true;
+    this.mailLoadError = '';
+    const workshopId = this.workshopId;
+    try {
+      const snap = await getDoc(doc(this.firestore, WORKSHOP_SETTINGS_COLLECTION, workshopId));
+      const mail: any = snap.exists() ? (snap.data() as any)?.mail : null;
+      const templateId = typeof mail?.templateid === 'string' ? mail.templateid.trim() : '';
+      let template: MailTemplateOption | null = null;
+      let missing = false;
+      let unreadable = false;
+      if (templateId) {
+        // Its own try: a template that cannot be read must not lock the section. The screen
+        // then offers another template, or Remove, like it does for a deleted one.
+        try {
+          const t = await getDoc(doc(this.firestore, MAIL_TEMPLATES_COLLECTION, templateId));
+          if (t.exists()) template = templateFromDoc(t.id, t.data());
+          else missing = true;
+        } catch (err) {
+          console.warn('Could not read the saved email template:', err);
+          missing = true;
+          unreadable = true;
+        }
+      }
+      if (this.mailDestroyed) return;
+      const variables = template?.variables || [];
+      const data = readEmailData(mail?.emailData, variables);
+      const shown = mailFingerprint(templateId, variables, data);
+      this.zone.run(() => {
+        this.mailTemplateId = templateId;
+        this.mailTemplate = template;
+        this.mailTemplateMissing = missing;
+        this.mailTemplateUnreadable = unreadable;
+        this.mailData = data;
+        this.mailLoadPrint = shown;
+        // With the template at hand, compare against the map as stored, so entries the template no
+        // longer has (or an older shape) show as unsaved and Save can write it clean. Without it
+        // there is nothing to compare the stored keys with.
+        this.mailSavedPrint = template ? storedMailFingerprint(templateId, mail?.emailData) : shown;
+        this.mailLoaded = true;
+      });
+    } catch (err) {
+      console.error('Could not read the email template settings:', err);
+      this.mailLoadStarted = false;   // Try again may run it once more
+      if (!this.mailDestroyed) this.zone.run(() => { this.mailLoadError = 'Could not read the saved email template.'; });
+    } finally {
+      if (!this.mailDestroyed) this.zone.run(() => { this.mailLoading = false; });
+    }
+  }
+
+  async ensureMailTemplatesLoaded(): Promise<void> {
+    if (this.mailTemplatesLoaded || this.mailTemplatesLoading) return;
+    this.mailTemplatesLoading = true;
+    this.mailTemplatesError = '';
+    try {
+      const snap = await getDocs(query(collection(this.firestore, MAIL_TEMPLATES_COLLECTION), where('active', '==', true)));
+      const list = snap.docs
+        .map(d => templateFromDoc(d.id, d.data()))
+        .filter(t => t.approved)
+        .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+      if (this.mailDestroyed) return;
+      this.zone.run(() => { this.mailTemplates = list; this.mailTemplatesLoaded = true; });
+    } catch (err) {
+      console.error('Could not read the email templates:', err);
+      if (!this.mailDestroyed) this.zone.run(() => { this.mailTemplatesError = 'Could not load the templates.'; });
+    } finally {
+      if (!this.mailDestroyed) this.zone.run(() => { this.mailTemplatesLoading = false; });
+    }
+  }
+
+  openMailTemplatePicker(): void {
+    this.togglePopover('mailtemplate');
+    if (this.openPopover === 'mailtemplate') this.ensureMailTemplatesLoaded();
+  }
+
+  get filteredMailTemplates(): MailTemplateOption[] {
+    const q = this.popSearch.trim().toLowerCase();
+    return q ? this.mailTemplates.filter(t => t.name.toLowerCase().includes(q)) : this.mailTemplates;
+  }
+
+  get mailVariables(): string[] { return this.mailTemplate?.variables || []; }
+
+  get mailTemplateLabel(): string {
+    if (this.mailTemplate) return this.mailTemplate.name;
+    if (this.mailTemplateUnreadable) return 'Saved template (could not be read)';
+    if (this.mailTemplateMissing) return 'Deleted template';
+    return 'Choose a template…';
+  }
+
+  /** Why the saved template would not be offered today, if it would not. */
+  get mailTemplateWarning(): string {
+    if (this.mailTemplateUnreadable) return 'Could not read the saved template. Choose another, or remove it.';
+    if (this.mailTemplateMissing) return 'The saved template has been deleted. Choose another, or remove it.';
+    const t = this.mailTemplate;
+    if (!t) return '';
+    if (!t.active && !t.approved) return 'This template is no longer active or approved.';
+    if (!t.active) return 'This template is no longer active.';
+    if (!t.approved) return 'This template is no longer approved.';
+    return '';
+  }
+
+  pickMailTemplate(t: MailTemplateOption): void {
+    if (t.id !== this.mailTemplateId) {
+      // Keep what was already chosen for any variable the new template shares.
+      const next: MailEmailData = {};
+      for (const v of t.variables) if (this.mailData[v]) next[v] = { ...this.mailData[v] };
+      this.mailTemplateId = t.id;
+      this.mailTemplate = t;
+      this.mailTemplateMissing = false;
+      this.mailTemplateUnreadable = false;
+      this.mailData = next;
+      this.markMailChanged();
+    }
+    this.closePopover();
+  }
+
+  removeMailTemplate(): void {
+    this.mailTemplateId = '';
+    this.mailTemplate = null;
+    this.mailTemplateMissing = false;
+    this.mailTemplateUnreadable = false;
+    this.mailData = {};
+    this.markMailChanged();
+  }
+
+  mailSourceOf(variable: string): MailSource | null { return this.mailData[variable]?.type || null; }
+  mailSourceLabel(variable: string): string {
+    const type = this.mailSourceOf(variable);
+    return type ? (this.mailSources.find(s => s.key === type)?.label || type) : 'Choose…';
+  }
+  mailSourceHint(variable: string): string {
+    const type = this.mailSourceOf(variable);
+    return type ? (this.mailSources.find(s => s.key === type)?.hint || '') : '';
+  }
+  mailStaticText(variable: string): string { return this.mailData[variable]?.value ?? ''; }
+  /** How the variable is written in the template body. */
+  mailToken(variable: string): string { return '{{' + variable + '}}'; }
+
+  setMailSource(variable: string, type: MailSource): void {
+    const cur = this.mailData[variable];
+    const next = type === 'static'
+      ? { type, value: cur?.type === 'static' ? (cur.value ?? '') : '' }
+      : { type };
+    this.mailData = { ...this.mailData, [variable]: next };
+    this.markMailChanged();
+    this.closePopover();
+  }
+
+  setMailStatic(variable: string, text: string): void {
+    this.mailData = { ...this.mailData, [variable]: { type: 'static', value: text ?? '' } };
+    this.markMailChanged();
+  }
+
+  get mailUnset(): number { return unsetCount(this.mailVariables, this.mailData); }
+  get mailEmptyStatic(): number { return emptyStaticCount(this.mailVariables, this.mailData); }
+  /** Variables that are ready to send: chosen, and a Static value only once it has text. */
+  get mailSetCount(): number { return this.mailVariables.length - this.mailUnset - this.mailEmptyStatic; }
+
+  private get mailPrint(): string { return mailFingerprint(this.mailTemplateId, this.mailVariables, this.mailData); }
+
+  get mailDirty(): boolean { return this.mailLoaded && this.mailPrint !== this.mailSavedPrint; }
+
+  /** Untouched since arrival, yet saving would change what is stored: the stored map has drifted. */
+  get mailOutOfDate(): boolean {
+    return this.mailDirty && this.mailLoadPrint !== this.mailSavedPrint && this.mailPrint === this.mailLoadPrint;
+  }
+
+  /**
+   * Show what stops Save while editing, and also for a saved choice that is incomplete
+   * (say the template gained a variable since), so it is not left looking finished.
+   */
+  get mailShowBlocker(): boolean { return !!this.mailBlocker && (this.mailDirty || !!this.mailTemplate); }
+
+  /** What still stops Save, in words; '' when nothing does. */
+  get mailBlocker(): string {
+    if (this.isNew || !this.workshopId) return this.blockedReason;
+    if (!this.mailTemplateId) return '';
+    if (!this.mailTemplate) return 'Choose another template, or remove it.';
+    if (!this.mailTemplate.variablesRecorded) return "This template's variables were not recorded";
+    const reserved = reservedVariables(this.mailVariables);
+    if (reserved.length) {
+      return `${reserved.map(v => this.mailToken(v)).join(', ')} cannot be stored: names that begin and end with __ are reserved. Rename ${reserved.length === 1 ? 'it' : 'them'} in the template`;
+    }
+    const n = this.mailUnset;
+    if (n) return `Choose a value for ${n} ${n === 1 ? 'variable' : 'variables'}`;
+    const s = this.mailEmptyStatic;
+    if (s) return `Type the text for ${s} static ${s === 1 ? 'value' : 'values'}`;
+    return '';
+  }
+
+  get mailCanSave(): boolean { return this.mailDirty && !this.mailSaving && !this.mailBlocker; }
+
+  private markMailChanged(): void {
+    this.mailJustSaved = false;
+    this.mailSaveError = '';
+  }
+
+  async saveMailTemplate(): Promise<void> {
+    if (!this.mailCanSave || !this.workshopId) return;
+    const workshopId = this.workshopId;
+    const templateId = this.mailTemplateId;
+    const variables = [...this.mailVariables];
+    const emailData = buildEmailData(variables, this.mailData);
+    this.mailSaving = true;
+    this.mailSaveError = '';
+    try {
+      // mergeFields: `mail` is replaced whole, so variables the template no longer has drop
+      // out, and Dashboard Access in the same document is left exactly as it is.
+      await setDoc(
+        doc(this.firestore, WORKSHOP_SETTINGS_COLLECTION, workshopId),
+        { workshopid: workshopId, mail: templateId ? { templateid: templateId, emailData } : deleteField() },
+        { mergeFields: ['workshopid', 'mail'] },
+      );
+      this.zone.run(() => {
+        this.mailSavedPrint = this.mailLoadPrint = mailFingerprint(templateId, variables, emailData);
+        this.mailJustSaved = true;
+        if (this.mailSavedTimer) clearTimeout(this.mailSavedTimer);
+        this.mailSavedTimer = setTimeout(() => { this.mailJustSaved = false; }, 4000);
+        this.snackBar.open(templateId ? 'Email template saved' : 'Email template removed', 'Close', { duration: 2000, panelClass: 'sx-snack' });
+      });
+    } catch (err) {
+      console.error('Error saving the email template:', err);
+      this.zone.run(() => { this.mailSaveError = 'Could not save the email template. Please try again.'; });
+    } finally {
+      this.zone.run(() => { this.mailSaving = false; });
     }
   }
 }

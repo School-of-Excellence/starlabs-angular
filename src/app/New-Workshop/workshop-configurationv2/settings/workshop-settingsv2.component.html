@@ -597,6 +597,86 @@
 <div class="help">{{ h('description') }}</div></div>
             <div class="field"><div class="label"><span>Live call text</span></div><div class="input textarea"><textarea class="txt" formControlName="liveCallText" rows="3"></textarea></div></div>
           </div>
+
+          <!-- Email template: which approved template is sent, and what fills each variable. Saves on its own. -->
+          <div class="mt-map" data-testid="ws-mail-map">
+            <div class="mt-head">
+              <div class="label"><span>Email template</span><span class="counter" *ngIf="mailTemplate?.variablesRecorded">{{ mailSetCount }} of {{ mailVariables.length }} set</span></div>
+              <div class="help">Only active, approved templates are offered. Choose what fills each of its variables.</div>
+            </div>
+
+            <div class="help" data-testid="ws-mail-loading" *ngIf="mailLoading">Getting the saved template&hellip;</div>
+            <div class="help warn" data-testid="ws-mail-load-error" *ngIf="mailLoadError">
+              {{ mailLoadError }}
+              <button data-testid="ws-mail-load-retry" type="button" class="btn btn-ghost btn-sm" (click)="ensureMailLoaded()">Try again</button>
+            </div>
+
+            <ng-container *ngIf="mailLoaded">
+              <div class="mt-pick-row">
+                <div class="field pop-anchor mt-pick" data-pop>
+                  <button data-testid="ws-mail-template-pick" type="button" class="input pick" (click)="openMailTemplatePicker()" [attr.aria-label]="'Email template: ' + mailTemplateLabel" aria-haspopup="listbox" [attr.aria-expanded]="openPopover === 'mailtemplate'">
+                    <span class="txt" [class.ph]="!mailTemplate">{{ mailTemplateLabel }}</span><span class="caret"><ng-container [ngTemplateOutlet]="icChevDown"></ng-container></span>
+                  </button>
+                  <div class="pop mt-pop" data-testid="ws-mail-template-pop" *ngIf="openPopover === 'mailtemplate'">
+                    <div class="input sm"><span class="caret"><ng-container [ngTemplateOutlet]="icSearch"></ng-container></span><input data-testid="ws-mail-template-search" class="txt" type="text" [(ngModel)]="popSearch" [ngModelOptions]="{standalone: true}" placeholder="Search templates&hellip;" aria-label="Search templates"></div>
+                    <div class="help pad" data-testid="ws-mail-templates-loading" *ngIf="mailTemplatesLoading">Getting the templates&hellip;</div>
+                    <div class="help warn pad" data-testid="ws-mail-templates-error" *ngIf="mailTemplatesError">
+                      {{ mailTemplatesError }}
+                      <button data-testid="ws-mail-templates-retry" type="button" class="btn btn-ghost btn-sm" (click)="ensureMailTemplatesLoaded()">Try again</button>
+                    </div>
+                    <div class="pop-list" role="listbox" *ngIf="mailTemplatesLoaded">
+                      <button data-testid="ws-mail-template-option" type="button" class="pop-row" role="option" *ngFor="let t of filteredMailTemplates" [class.sel]="t.id === mailTemplateId" [attr.aria-selected]="t.id === mailTemplateId" (click)="pickMailTemplate(t)">
+                        <span class="box"><ng-container *ngIf="t.id === mailTemplateId" [ngTemplateOutlet]="icCheck"></ng-container></span>
+                        <span class="n">{{ t.name }}</span>
+                        <span class="c">{{ t.variablesRecorded ? t.variables.length + (t.variables.length === 1 ? ' variable' : ' variables') : 'Variables not recorded' }}</span>
+                      </button>
+                    </div>
+                    <div class="help pad" data-testid="ws-mail-template-empty" *ngIf="mailTemplatesLoaded && !filteredMailTemplates.length">{{ mailTemplates.length ? 'No template matches.' : 'No active, approved templates yet.' }}</div>
+                  </div>
+                </div>
+                <button data-testid="ws-mail-template-remove" type="button" class="btn btn-sm btn-danger-o" *ngIf="mailTemplateId" (click)="removeMailTemplate()">Remove</button>
+              </div>
+
+              <div class="help warn mt-warn" data-testid="ws-mail-template-warn" *ngIf="mailTemplateWarning"><ng-container [ngTemplateOutlet]="icAlert"></ng-container>{{ mailTemplateWarning }}</div>
+
+              <ng-container *ngIf="mailTemplate">
+                <div class="help warn mt-warn" data-testid="ws-mail-vars-unknown" *ngIf="!mailTemplate.variablesRecorded"><ng-container [ngTemplateOutlet]="icAlert"></ng-container>This template's variables were not recorded, so they cannot be filled here. Open it in the template editor and save it again, then choose it here.</div>
+                <div class="help" data-testid="ws-mail-no-vars" *ngIf="mailTemplate.variablesRecorded && !mailVariables.length">This template has no variables to fill.</div>
+                <div class="mt-rows" data-testid="ws-mail-vars" *ngIf="mailVariables.length">
+                  <div class="mt-row" data-testid="ws-mail-var-row" *ngFor="let v of mailVariables" [class.unset]="!mailSourceOf(v)">
+                    <div class="mt-var"><span class="mt-token" data-testid="ws-mail-var-name" [title]="mailToken(v)">{{ mailToken(v) }}</span></div>
+                    <div class="field pop-anchor" data-pop>
+                      <button data-testid="ws-mail-var-pick" type="button" class="input pick" (click)="togglePopover('mailvar:' + v)" [attr.aria-label]="'Value for ' + v + ': ' + mailSourceLabel(v)" aria-haspopup="listbox" [attr.aria-expanded]="openPopover === 'mailvar:' + v">
+                        <span class="txt" [class.ph]="!mailSourceOf(v)">{{ mailSourceLabel(v) }}</span><span class="caret"><ng-container [ngTemplateOutlet]="icChevDown"></ng-container></span>
+                      </button>
+                      <div class="pop menu" *ngIf="openPopover === 'mailvar:' + v"><div class="pop-list" role="listbox">
+                        <button data-testid="ws-mail-var-option" type="button" class="pop-row" role="option" *ngFor="let s of mailSources" [class.sel]="mailSourceOf(v) === s.key" [attr.aria-selected]="mailSourceOf(v) === s.key" (click)="setMailSource(v, s.key)"><span class="n">{{ s.label }}</span></button>
+                      </div></div>
+                    </div>
+                    <div class="mt-value">
+                      <div class="input textarea mt-static" *ngIf="mailSourceOf(v) === 'static'; else srcHint" [class.error]="!mailStaticText(v).trim()">
+                        <textarea data-testid="ws-mail-var-static" class="txt" rows="2" [ngModel]="mailStaticText(v)" (ngModelChange)="setMailStatic(v, $event)" [ngModelOptions]="{standalone: true}" placeholder="Type the text to send&hellip;" [attr.aria-label]="'Text for ' + v"></textarea>
+                      </div>
+                      <ng-template #srcHint><span class="help">{{ mailSourceHint(v) }}</span></ng-template>
+                    </div>
+                  </div>
+                </div>
+              </ng-container>
+
+              <div class="acc-save mt-save">
+                <span class="pill pill-warn" data-testid="ws-mail-dirty" *ngIf="mailDirty">{{ mailOutOfDate ? 'Saved choice is out of date' : 'Unsaved template changes' }}</span>
+                <span class="pill pill-ok" data-testid="ws-mail-saved" *ngIf="!mailDirty && mailJustSaved">Template saved</span>
+                <span class="help warn" data-testid="ws-mail-blocker" *ngIf="mailShowBlocker">{{ mailBlocker }}</span>
+                <span class="help warn" data-testid="ws-mail-save-error" *ngIf="mailSaveError">{{ mailSaveError }}</span>
+                <span class="grow"></span>
+                <span class="help">Saves on its own &mdash; the Save Settings button below does not include it.</span>
+                <button data-testid="ws-mail-save" type="button" class="btn btn-primary" [disabled]="!mailCanSave" (click)="saveMailTemplate()">
+                  <span class="spin" *ngIf="mailSaving"></span>
+                  <span>{{ mailSaving ? 'Saving' : 'Save template' }}</span>
+                </button>
+              </div>
+            </ng-container>
+          </div>
         </div>
       </section>
 
@@ -732,7 +812,7 @@
                   </div>
                   <div class="hrow between"><span class="help">{{ accessPickerTruncated ? 'Showing the first matches \u2014 keep typing to narrow it' : 'Participants only' }}</span><button data-testid="ws-access-admins-done" type="button" class="link" (click)="closePopover()">Done</button></div>
                 </div>
-                <div class="help">Everything on every workshop dashboard. People here are not given actions one by one.</div>
+                <div class="help" data-testid="ws-access-admins-help">Everything on every workshop dashboard except Clear. People here are not given actions one by one.</div>
               </div>
 
               <div class="field pop-anchor" data-pop>

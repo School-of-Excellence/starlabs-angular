@@ -18,6 +18,7 @@ import { UpdateEventDetailComponent } from '../event-list/update-event-detail/up
 import { MatDialog } from '@angular/material/dialog';
 import { EventCtaConfigComponent } from '../event-list/event-cta-config/event-cta-config.component';
 import { ProductFunnelComponent } from './product-funnel.component';
+import { Clipboard, ClipboardModule } from '@angular/cdk/clipboard';
 
 interface OverviewRow {
   arena: any;
@@ -61,7 +62,7 @@ const PAST_WINDOW_MS = 180 * 86400000;
   standalone: true,
   imports: [
     CommonModule, FormsModule, MatTabsModule, MatButtonModule, MatIconModule, MatTooltipModule,
-    MatFormFieldModule, MatInputModule, MatPaginatorModule, ProductFunnelComponent
+    MatFormFieldModule, MatInputModule, MatPaginatorModule, ProductFunnelComponent , ClipboardModule
   ],
   providers: [
     { provide: MAT_SELECT_CONFIG, useValue: { overlayPanelClass: 'sx-select-pane' } }
@@ -79,6 +80,7 @@ export class EventParticipationConfirmationsComponent {
   loadError = false;
   searchOverview = '';
   mode: 'upcoming' | 'past' = 'upcoming';
+  currentDate : Date = new Date();
 
   pageIndex = 0;
   pageSize = 5;
@@ -87,7 +89,7 @@ export class EventParticipationConfirmationsComponent {
   participantMetadata = {};
   eventMap = {};
 
-  constructor(public firestore: Firestore, public guard: AuthguardService , private dialog : MatDialog) {
+  constructor(public firestore: Firestore, public guard: AuthguardService , private dialog : MatDialog , public clipboard: Clipboard,) {
     this.loadOverview();
 
     getDocs(collection(this.firestore , 'participant metadata')).then((participantMetadataSnap)=>{
@@ -180,7 +182,15 @@ export class EventParticipationConfirmationsComponent {
         rows.push(eventRow)
       }
 
-      rows.sort((x, y) => (y.end - x.end) || x.name.localeCompare(y.name));
+      rows.sort((x, y) =>{
+        if (this.mode == 'upcoming') {
+          return x?.start - y?.start
+        } else if (this.mode === 'past') {
+          return y?.end - x?.end
+        } else {
+          return x.name.localeCompare(y.name)
+        }
+      });
       // console.log('overview rows : ' , this.overviewRows)
       this.eventMap = mapEvent;
       this.overviewRows = rows;
@@ -220,7 +230,10 @@ export class EventParticipationConfirmationsComponent {
       row.requested = snap['requested'] ?? null;
       row.approved = snap['approved'] ?? null;
       row.eligible = snap['eligible'] ?? null;
-      row.notEligible = (snap['noProduct'] ?? 0) + (snap['inQueue'] ?? 0);
+      row.upgrade = snap['upgrade'] ?? null;
+      row.addon = snap['addon'] ?? null;
+      row.continuity = snap['continuity'] ?? null;
+      row.notEligible = snap['noteligible'] ?? null;
       row.frozen = true;
       row.eligibleLoaded = true;
     }
@@ -537,5 +550,10 @@ export class EventParticipationConfirmationsComponent {
       maxWidth: "90vw",
       minWidth : "60vw"
     });
+  }
+
+  copyToClipboard(eventid){
+    var url = `https://breakthroughs.app/calendar/event/${eventid}`
+    this.clipboard.copy(url)
   }
 }
