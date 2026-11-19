@@ -484,3 +484,59 @@ textarea{
     display: none;
   }
 }
+
+/* --- media URL tools (copy / inline play) --- */
+.fb-media {
+  margin: -6px 0 14px;
+}
+
+.fb-media-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fb-media-btn {
+  --mdc-outlined-button-label-text-color: var(--fb-accent);
+  --mdc-outlined-button-outline-color: var(--fb-border);
+  border-radius: 999px;
+}
+
+.fb-media-player {
+  margin-top: 10px;
+  max-width: 560px;
+}
+
+.fb-media-frame,
+.fb-media-video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  border-radius: var(--fb-radius-md);
+  background: #000;
+}
+
+.fb-media-audio {
+  display: block;
+  width: 100%;
+}
+
+/* --- long chip values (pasted URLs, long options): stay inside the field, ellipsis, full value on hover --- */
+.fb-chip {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.fb-chip ::ng-deep .mdc-evolution-chip__cell--primary,
+.fb-chip ::ng-deep .mdc-evolution-chip__action--primary {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.fb-chip ::ng-deep .mdc-evolution-chip__text-label {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -8,16 +8,22 @@
 </div>
 
 <!-- Server Check -->
-<div *ngIf="!room() && meetingRoomStatus == 'servercheck'" class="text-center mt-3">
-  Wating for server response...
+<div *ngIf="!room() && meetingRoomStatus == 'servercheck'" class="text-center mt-3" data-testid="lkj-server-check">
+  Checking the video server...
 </div>
 
-<div *ngIf="!room() && meetingRoomStatus == 'serverstarting'" class="text-center mt-3">
-  Booting up server. This might take some time...
+<!-- 2026-11-14 plan item 2.1: the server is off or still booting. The 5-minute job starts it for
+     this room; this tab moves on to the pre-join screen by itself once a media server is ready. -->
+<div *ngIf="!room() && meetingRoomStatus == 'serverstarting'" class="server-wait" data-testid="lkj-server-starting">
+  <div class="server-wait-spinner" aria-hidden="true"></div>
+  <div class="server-wait-title">Starting the video server, about 10 minutes…</div>
+  <div class="server-wait-note">Keep this tab open, the call opens by itself when the server is ready.</div>
+  <div class="server-wait-elapsed" data-testid="lkj-server-wait-elapsed">Waiting {{ waitElapsed(serverWaitStartedAt) }}</div>
 </div>
 
-<div *ngIf="!room() && meetingRoomStatus == 'serverfailed'" class="text-center mt-3">
-  Server Failed to start. Try again later.
+<div *ngIf="!room() && meetingRoomStatus == 'serverfailed'" class="server-wait" data-testid="lkj-server-failed">
+  <div class="server-wait-title">The video server didn't start in time.</div>
+  <div class="server-wait-note">Please refresh this page to try again, or contact support if it keeps happening.</div>
 </div>
 
 <!-- Preview - Not Joined the meeting -->
@@ -86,12 +92,26 @@
 </div>
 
 <!-- Connecting to the Meeting -->
-<div *ngIf="!loading && meetingRoomStatus == 'connecting'" class="text-center w-100 p-5 fw-700 fs-4">
-  Connecting the Call...
+<div *ngIf="!loading && meetingRoomStatus == 'connecting'" class="text-center w-100 p-5 fw-700 fs-4" data-testid="lkj-connecting">
+  <ng-container *ngIf="!tokenWaitStartedAt; else tokenWait">Connecting the Call...</ng-container>
+  <!-- 2026-11-14 plan item 2.1b: a media server is booting or all are busy — keep retrying. -->
+  <ng-template #tokenWait>
+    <div class="server-wait-spinner" aria-hidden="true"></div>
+    <div>Getting a video server ready for you…</div>
+    <div class="server-wait-note">This can take a few minutes. Keep this tab open.</div>
+    <div class="server-wait-elapsed" data-testid="lkj-token-wait-elapsed">Waiting {{ waitElapsed(tokenWaitStartedAt) }}</div>
+  </ng-template>
 </div>
 
 <!-- Connected to the Meeting -->
 <div #meetingContainer *ngIf="room() && meetingRoomStatus == 'connected'" class="zoom-container" data-testid="joinroom-connected">
+
+  <!-- 2026-11-14 plan item 2.2: the browser blocked sound until a tap (Safari / iPhone). -->
+  <button *ngIf="audioBlocked" class="sound-blocked-btn" (click)="enableSound()" data-testid="lkj-enablesound">
+    <mat-icon>volume_up</mat-icon> Tap to enable sound
+  </button>
+  <!-- 2026-11-15 test: mute / remove cold-start for a few seconds — show that it is working. -->
+  <div *ngIf="hostActionNote" class="host-action-note" role="status">{{ hostActionNote }}</div>
   
 
   <!-- Zoom-style Header -->
@@ -170,17 +190,17 @@
             <span class="material-icons">more_vert</span>
           </button>
           <mat-menu #spotlightRemoteMenu="matMenu">
-            <button data-testid="lkj-toggleparticipantmute" mat-menu-item *ngIf="!isRemoteAudioMuted(remote.participantIdentity)" (click)="toggleParticipantMute(remote.participantIdentity, remote.participantName, false)">
+            <button data-testid="lkj-toggleparticipantmute" mat-menu-item *ngIf="!isRemoteAudioMuted(remote.participantIdentity)" [disabled]="!!hostActionBusy[remote.participantIdentity]" (click)="toggleParticipantMute(remote.participantIdentity, remote.participantName, false)">
               <mat-icon>mic_off</mat-icon>
-              <span>Mute</span>
+              <span>{{ hostActionBusy[remote.participantIdentity] === 'muting' ? 'Muting…' : 'Mute' }}</span>
             </button>
             <button data-testid="lkj-button" mat-menu-item disabled *ngIf="isRemoteAudioMuted(remote.participantIdentity)">
               <mat-icon>mic_off</mat-icon>
               <span>Already Muted</span>
             </button>
-            <button data-testid="lkj-removepanticipant" mat-menu-item class="text-danger" (click)="removePanticipant(remote.participantIdentity, remote.participantName)">
+            <button data-testid="lkj-removepanticipant" mat-menu-item class="text-danger" [disabled]="!!hostActionBusy[remote.participantIdentity]" (click)="removePanticipant(remote.participantIdentity, remote.participantName)">
               <mat-icon>person_remove</mat-icon>
-              <span>Remove from Call</span>
+              <span>{{ hostActionBusy[remote.participantIdentity] === 'removing' ? 'Removing…' : 'Remove from Call' }}</span>
             </button>
           </mat-menu>
 
@@ -375,17 +395,17 @@
           <span class="material-icons">more_vert</span>
         </button>
         <mat-menu #remoteTileMenu="matMenu">
-          <button data-testid="lkj-toggleparticipantmute-2" mat-menu-item *ngIf="!isRemoteAudioMuted(remote.participantIdentity)" (click)="toggleParticipantMute(remote.participantIdentity, remote.participantName, false)">
+          <button data-testid="lkj-toggleparticipantmute-2" mat-menu-item *ngIf="!isRemoteAudioMuted(remote.participantIdentity)" [disabled]="!!hostActionBusy[remote.participantIdentity]" (click)="toggleParticipantMute(remote.participantIdentity, remote.participantName, false)">
             <mat-icon>mic_off</mat-icon>
-            <span>Mute</span>
+            <span>{{ hostActionBusy[remote.participantIdentity] === 'muting' ? 'Muting…' : 'Mute' }}</span>
           </button>
           <button data-testid="lkj-button-2" mat-menu-item disabled *ngIf="isRemoteAudioMuted(remote.participantIdentity)">
             <mat-icon>mic_off</mat-icon>
             <span>Already Muted</span>
           </button>
-          <button data-testid="lkj-removepanticipant-2" mat-menu-item class="text-danger" (click)="removePanticipant(remote.participantIdentity, remote.participantName)">
+          <button data-testid="lkj-removepanticipant-2" mat-menu-item class="text-danger" [disabled]="!!hostActionBusy[remote.participantIdentity]" (click)="removePanticipant(remote.participantIdentity, remote.participantName)">
             <mat-icon>person_remove</mat-icon>
-            <span>Remove from Call</span>
+            <span>{{ hostActionBusy[remote.participantIdentity] === 'removing' ? 'Removing…' : 'Remove from Call' }}</span>
           </button>
         </mat-menu>
 
@@ -417,7 +437,8 @@
   <ng-container *ngFor="let remote of returnRemoteParticipantTrack()">
     <app-openvidu-audio-element
       *ngIf="remote.trackPublication.kind === 'audio'"
-      [track]="remote.trackPublication.audioTrack">
+      [track]="remote.trackPublication.audioTrack"
+      (playbackBlocked)="audioBlocked = true">
     </app-openvidu-audio-element>
   </ng-container>
 
@@ -579,9 +600,14 @@
 </div>
 
 <div *ngIf="!loading && meetingRoomStatus == 'left'" class="text-center w-100 p-5 fw-700 fs-4">
-  You left the Meeting.
-  <br>
-  Refresh to Join the Call again.
+  <ng-container *ngIf="!joinError; else joinFailed">
+    You left the Meeting.
+    <br>
+    Refresh to Join the Call again.
+  </ng-container>
+  <ng-template #joinFailed>
+    <div data-testid="lkj-join-error">{{ joinError }}</div>
+  </ng-template>
 </div>
 
 <div *ngIf="!loading && meetingRoomStatus == 'ended'" class="text-center w-100 p-5 fw-700 fs-4">

@@ -41,6 +41,7 @@ describe('WorkshopDashboard — Exist Users Enrolled', () => {
     c.selectedCategoryFilters = [];
     c.selectedEnrollmentStatusFilters = [];
     c.selectedNotStartedTypeFilters = [];
+    c.selectedTagFilters = [];
     c.selectedSubscriberCode = [];
     c.showReferredOnly = false;
     c.workshopData = { categorybased: false };
@@ -311,7 +312,7 @@ describe('WorkshopDashboard — Enrolled via <platform> opens the side panel', (
     c.participantWorkshopCategoryMap = new Map(); c.participantCohortMap = new Map(); c.categoryNamesMap = new Map();
     c.workshopData = { categorybased: false };
     c.selectedTierFilters = []; c.selectedCategoryFilters = []; c.selectedEnrollmentStatusFilters = [];
-    c.selectedNotStartedTypeFilters = []; c.selectedSubscriberCode = []; c.showReferredOnly = false;
+    c.selectedNotStartedTypeFilters = []; c.selectedTagFilters = []; c.selectedSubscriberCode = []; c.showReferredOnly = false;
     c.JourneyMap = {}; c.filteredParticipants = []; c.mapProfileNew = {};
     c.showParticipantPanel = false;
     return c;
@@ -375,6 +376,7 @@ describe('WorkshopDashboard — Users Not in Chat Group', () => {
     c.notInChatParticipants = [];
     c.profileUserRefs = new Map(); c.profileUserRefsPending = new Set();
     c.resolveProfileUserRefs = async () => {};      // the Firestore fallback is exercised separately
+    c.newUserDataState = 'ready';                    // new users' uids come from new_user_data
     Object.assign(c, over);
     return c;
   }
@@ -420,6 +422,18 @@ describe('WorkshopDashboard — Users Not in Chat Group', () => {
       expect(ids(full.notInChatParticipants)).toEqual(['e4', 'n2']);   // no uid → still not in the group
       const none = make({ supportChatMembers: new Set(['uid-e1', 'uid-e2', 'uid-e3', 'uid-n1']), enrolledParticipants: [{ profileid: 'e1' }] });
       none.recomputeNotInChat(); expect(none.showNotInChatCard).toBe(false);
+    });
+
+    it('lists nobody and hides the card until new_user_data has landed, and when that read failed', () => {
+      // A new user's uid is on new_user_data: without it every new user would count as missing from the group.
+      for (const state of ['loading', 'failed']) {
+        const c = make({ newUserDataState: state }); const asked: string[][] = [];
+        c.resolveProfileUserRefs = async (ids: string[]) => { asked.push(ids); };
+        c.recomputeNotInChat();
+        expect(c.notInChatParticipants).withContext(state).toEqual([]);
+        expect(c.showNotInChatCard).withContext(state).toBe(false);
+        expect(asked).withContext(`${state}: no profile_data lookups either`).toEqual([]);
+      }
     });
 
     it('is empty without a group, and until the group document has been read', () => {

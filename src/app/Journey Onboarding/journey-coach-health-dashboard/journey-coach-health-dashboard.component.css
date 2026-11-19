@@ -1963,7 +1963,7 @@ td.mat-mdc-cell span {
 /* --- Row grids: rows 1 & 3 share the SAME template so one center gutter
        runs down the screen; all three rows use a 12px gap + equal heights. --- */
 .ios2-top { display: grid; grid-template-columns: 1.2fr 1fr; gap: var(--gap); margin-bottom: var(--gap); align-items: stretch; }
-.ios2-tiles { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: var(--gap); align-items: stretch; }
+.ios2-tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--gap); align-items: stretch; }
 .ios2-bot { display: grid; grid-template-columns: 1.2fr 1fr; gap: var(--gap); margin-top: var(--gap); align-items: stretch; }
 
 /* --- One card: radius / padding / shadow / equal-height flex column --- */
@@ -2008,6 +2008,24 @@ td.mat-mdc-cell span {
 .ios2-tile .ios2-app { grid-column: 1; grid-row: 1; margin: 0; }
 .ios2-n { grid-column: 2; grid-row: 1; justify-self: end; align-self: center; font-size: var(--fs-700); font-weight: var(--fw-bold); line-height: 1; color: var(--ink); font-variant-numeric: tabular-nums; }
 .ios2-l { grid-column: 1 / -1; grid-row: 2; font-size: var(--fs-200); color: var(--ink-3); margin: 0; }
+
+/* Finance-collapse: Defaulted + Payments locked folded under the Needs-attention hero. */
+.ios2-hero-col { display: flex; flex-direction: column; gap: var(--gap); min-width: 0; }
+.ios2-hero-col > .ios2-hero { flex: 1 1 auto; }
+.ios2-hero-finance { display: flex; align-items: center; gap: var(--stack); flex-wrap: wrap;
+  background: var(--surface); border: 1px solid var(--border-2); border-radius: var(--card-radius); padding: 10px var(--card-pad); }
+.ios2-fin-label { font-size: var(--fs-100); font-weight: var(--fw-semibold); color: var(--ink-3);
+  text-transform: uppercase; letter-spacing: .04em; margin-right: 2px; }
+.ios2-fin-chip { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px 6px 9px;
+  border-radius: 999px; border: 1px solid var(--border-2); background: var(--surface-2); color: var(--ink);
+  cursor: pointer; transition: background .15s ease, box-shadow .15s ease; }
+.ios2-fin-chip:hover { background: var(--fill-hover); box-shadow: var(--card-shadow-hover); }
+.ios2-fin-chip:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.ios2-fin-chip mat-icon { font-size: var(--fs-400); width: 15px; height: 15px; line-height: 15px; }
+.ios2-fin-chip.fin-defaulted mat-icon { color: var(--sem-purple); }
+.ios2-fin-chip.fin-locked mat-icon { color: var(--sem-red-strong); }
+.ios2-fin-n { font-weight: var(--fw-bold); font-variant-numeric: tabular-nums; }
+.ios2-fin-l { font-size: var(--fs-200); color: var(--ink-2); }
 
 /* --- Row-1 status band: sub-tiles go FLAT (no gray inset), share the 24px metric --- */
 .ios2-card .sb-bar { height: 10px; margin: var(--gap) 0; }
@@ -2447,7 +2465,7 @@ td.mat-mdc-cell span {
 }
 .jchd-table.ios-grid-t .cell-person .cp-email {
   font-size: var(--fs-200);
-  color: rgba(60, 60, 67, 0.7);
+  color: var(--ink-2);
   margin-top: 1px;
   line-height: 1.25;
 }
@@ -2993,7 +3011,7 @@ td.mat-mdc-cell span {
   align-items: center;
   gap: 6px;
   font-size: var(--fs-300);
-  color: rgba(60, 60, 67, 0.7);
+  color: var(--ink-2);
 }
 .health-card .hl-item b {
   color: var(--ink);
@@ -3080,7 +3098,7 @@ td.mat-mdc-cell span {
 .jcp-p { font-size: var(--fs-300); color: var(--ink); font-weight: var(--fw-medium); }
 .jcp-c { font-size: var(--fs-200); color: var(--ink-2); }
 .jcp-when { font-size: var(--fs-200); color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.jcp-range { display: block; font-size: var(--fs-100); color: var(--ink-4); margin-top: 2px; font-variant-numeric: tabular-nums; }
+.jcp-range { display: block; font-size: var(--fs-100); color: var(--ink-3); margin-top: 2px; font-variant-numeric: tabular-nums; }
 
 /* Coach card: JC pipeline block + clickable coach name (doc item 9). */
 .coach-name-btn { border: none; background: none; font: inherit; padding: 0; cursor: pointer; text-align: left; color: inherit; }
@@ -3132,3 +3150,133 @@ td.mat-mdc-cell span {
   text-overflow: ellipsis; }
 .ahd-date { font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
 .ahd-chev { color: var(--ink-4); font-size: 18px; }
+
+/* ================================================================================
+   Origin-only rules carried over when the token/type remap (b76bbc6a + 48f2d0ff /
+   fe2eeab0 / 93c9633e) replaced this stylesheet. These classes exist in origin's
+   template additions and had no counterpart in joshua-development's CSS.
+   ================================================================================ */
+.sb-nostatus { background: repeating-linear-gradient(45deg, #d1d1d6 0 5px, #e9e9ed 5px 10px); }
+.sb-dot.dot-nostatus { background: #fff; box-shadow: inset 0 0 0 2px #c7c7cc; }
+
+/* ─── Journey Experience top-level tabs (Overall / Onboarding / Ev. Preparation / Journey Planning) ─── */
+.jx-tabbar { display: flex; gap: 6px; padding: 4px 0 16px; flex-wrap: wrap; }
+.jx-tab { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 999px;
+  border: 1px solid var(--border-2); background: var(--surface); color: var(--ink-2);
+  font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+  transition: background .15s ease, color .15s ease, border-color .15s ease; }
+.jx-tab:hover { background: var(--surface-2); color: var(--ink); }
+.jx-tab.on { background: var(--blue); color: #fff; border-color: var(--blue); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.jx-tab-step { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px;
+  border-radius: 999px; font-size: 12px; font-weight: 700; background: color-mix(in srgb, currentColor 16%, transparent); }
+.jx-tab.on .jx-tab-step { background: rgba(255,255,255,.25); }
+.jx-tab-panel { padding: 4px 0 40px; }
+.jx-placeholder { border: 1px dashed var(--border-2); border-radius: var(--card-radius); padding: 48px 24px;
+  text-align: center; color: var(--ink-3); background: var(--surface); }
+.jx-placeholder h2 { margin: 0 0 8px; color: var(--ink); font-size: 18px; }
+.jx-placeholder p { margin: 0; font-size: 14px; }
+@media (max-width: 640px) { .jx-tab { padding: 9px 13px; font-size: 13px; } }
+
+/* ═══ Overall Summary tab (operator spec 2026-11-11) — built from the dashboard's own tokens ═══ */
+.jx-offstage { display: none; }   /* shared Onboarding dashboard kept alive off its tab */
+.ov-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: var(--gap); }
+.ov-seg { display: inline-flex; background: var(--tile); border-radius: var(--r-pill); padding: 3px; }
+.ov-seg button { border: 0; background: transparent; font: inherit; font-size: var(--fs-200); font-weight: var(--fw-semibold);
+  color: var(--ink-2); padding: 6px 12px; border-radius: var(--r-pill); cursor: pointer; }
+.ov-seg button.on { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.ov-pill { display: inline-flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--border-2);
+  border-radius: var(--r-pill); padding: 4px 10px; font-size: var(--fs-300); color: var(--ink); }
+.ov-pill select, .ov-in { border: 0; background: transparent; font: inherit; color: var(--ink); color-scheme: light dark; }
+.ov-ico { border: 0; background: transparent; color: var(--ink-2); cursor: pointer; display: inline-flex; padding: 2px; border-radius: 50%; }
+.ov-ico:hover { background: var(--tile-hover); }
+.ov-ico mat-icon { font-size: 18px; width: 18px; height: 18px; }
+.ov-dash { color: var(--ink-3); }
+.ov-range { font-size: var(--fs-200); color: var(--ink-3); }
+.ov-viewing { margin-left: auto; padding: 8px 14px; }
+.ov-vk { color: var(--ink-3); font-weight: var(--fw-medium); }
+.ov-viewing select { font-weight: var(--fw-semibold); max-width: 220px; }
+
+.ov-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--gap); }
+.ov-card { min-width: 0; display: flex; flex-direction: column; }
+.ov-s12 { grid-column: span 12; } .ov-s7 { grid-column: span 7; } .ov-s6 { grid-column: span 6; } .ov-s5 { grid-column: span 5; }
+@media (max-width: 960px) { .ov-s7, .ov-s6, .ov-s5 { grid-column: span 12; } }
+.ov-scope { margin-left: auto; font-size: var(--fs-100); font-weight: var(--fw-bold); text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--ink-3); background: var(--tile); border-radius: var(--r-pill); padding: 3px 8px; white-space: nowrap; }
+.ov-scope-coach { color: var(--blue-fg); background: var(--blue-08); }
+.ios2-head .fb-hint + .ov-scope { margin-left: 8px; }
+.ov-foot { font-size: var(--fs-200); color: var(--ink-3); margin: 10px 0 0; }
+.ov-sub { font-size: var(--fs-200); color: var(--ink-3); margin: -4px 0 8px; }
+.ov-sub b { color: var(--ink); }
+.ov-muted { color: var(--ink-3) !important; font-weight: var(--fw-regular) !important; }
+.ov-strong { font-weight: var(--fw-bold); }
+
+.ov-tiles { display: grid; gap: 8px; }
+.ov-t4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.ov-t3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 560px) { .ov-t4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.ov-tiles .jcp-tile.ov-hero { box-shadow: inset 0 0 0 2px var(--blue); }
+.ov-tiles .jcp-tile.ov-warn .jcp-num { color: var(--sem-orange-fg); }
+.ov-tiles .jcp-tile.ov-good .jcp-num { color: var(--sem-green-fg); }
+.ov-avg { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; background: var(--surface-2);
+  border-radius: 12px; padding: 10px 14px; font-size: var(--fs-300); color: var(--ink-2); }
+.ov-avg b { font-size: var(--fs-600); color: var(--ink); font-variant-numeric: tabular-nums; }
+.ov-srow { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 10px; align-items: center; }
+.ov-srow + .ov-srow { margin-top: 10px; }
+@media (max-width: 560px) { .ov-srow { grid-template-columns: 1fr; } }
+
+.ov-pending { border: 1px dashed var(--border-2); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px;
+  font-size: var(--fs-200); color: var(--ink-3); }
+.ov-ghost td { color: var(--ink-4); }
+
+.ov-legend { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.ov-legend button { display: flex; align-items: center; justify-content: space-between; gap: 6px; background: var(--tile); border: 0;
+  border-radius: 10px; padding: 8px 10px; font: inherit; font-size: var(--fs-300); color: var(--ink); cursor: pointer; }
+.ov-legend button:hover { background: var(--tile-hover); }
+.ov-legend button span { display: inline-flex; align-items: center; gap: 6px; }
+.ov-legend b { font-variant-numeric: tabular-nums; }
+@media (max-width: 560px) { .ov-legend { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.ov-seg button:focus-visible, .ov-ico:focus-visible, .ov-legend button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.ap-green { background: var(--sem-green); }
+
+/* Follow-ups (item 5): row chip + Schedule card group */
+.jchd-due { display: inline-block; width: fit-content; margin-top: 2px; padding: 1px 7px; border-radius: 999px;
+  font-size: var(--fs-100); font-weight: var(--fw-semibold); color: var(--blue-fg); background: rgba(0,122,255,0.12); }
+.jchd-due.is-overdue { color: var(--sem-red); background: rgba(255,59,48,0.14); }
+.jcs-fu { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--hairline); }
+.jcs-tag-fu { background: rgba(255,149,0,0.14); color: var(--sem-orange-fg); }
+.jcp-when.is-overdue { color: var(--sem-red); font-weight: var(--fw-semibold); }
+
+/* Daily trend + new since yesterday (item 6) */
+.jchd-trend { display: inline-flex; align-items: center; gap: 5px; vertical-align: middle; }
+.jchd-delta { font-size: var(--fs-100); font-weight: var(--fw-bold); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.jchd-delta.up { color: var(--sem-red); }
+.jchd-delta.down { color: var(--sem-green-fg); }
+.jchd-spark { width: 52px; height: 14px; overflow: visible; }
+.jchd-spark polyline { fill: none; stroke: var(--ink-3); stroke-width: 1.4; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.jchd-new { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: var(--fs-100); font-weight: var(--fw-semibold);
+  color: var(--sem-red); background: rgba(255,59,48,0.12); white-space: nowrap; }
+.jchd-new-row { margin-left: 4px; }
+.ios2-tile .jchd-trend-row { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+.ios-mini-summary .ios-mini-card .mc-trend { display: flex; align-items: center; gap: 6px; min-height: 0; }
+.ios-mini-summary .ios-mini-card .mc-trend:empty { display: none; }
+.ios-mini-summary .ios-mini-card .mc-dot.dot-purple { background: var(--sem-purple); }
+.jchd-table .jchd-data-row.jchd-row-new td.mat-mdc-cell { background: rgba(255,59,48,0.05); }
+
+/* ═══ Shared Journey Experience theme tokens (jc-health-ux-review T1) ═══
+   Resolved here for the current light/dark mode and inherited (through view encapsulation) by the embedded
+   journeycoach-dashboard and the Ev. Prep board, so every tab reads ONE palette. */
+.jchd-wrap {
+  --jx-canvas: var(--canvas); --jx-surface: var(--surface); --jx-surface-2: var(--surface-2);
+  --jx-tile: var(--tile); --jx-tile-hover: var(--tile-hover);
+  --jx-ink: var(--ink); --jx-ink-2: var(--ink-2); --jx-ink-3: var(--ink-3);
+  --jx-line: var(--hairline); --jx-line-2: var(--hairline-2); --jx-stripe: color-mix(in srgb, var(--ink) 2%, transparent);
+  --jx-blue: var(--blue); --jx-blue-soft: color-mix(in srgb, var(--blue) 14%, var(--surface));
+  --jx-green: var(--sem-green-fg); --jx-green-soft: color-mix(in srgb, var(--sem-green) 16%, var(--surface));
+  --jx-amber: var(--sem-orange-fg); --jx-amber-soft: color-mix(in srgb, var(--sem-orange) 16%, var(--surface));
+  --jx-red: var(--sem-red); --jx-red-soft: color-mix(in srgb, var(--sem-red-strong) 14%, var(--surface));
+  --jx-indigo: var(--sem-indigo-fg); --jx-indigo-soft: color-mix(in srgb, var(--sem-indigo) 14%, var(--surface));
+  --jx-teal: var(--sem-teal); --jx-teal-soft: color-mix(in srgb, var(--sem-teal) 14%, var(--surface));
+  --jx-radius: var(--card-radius); --jx-shadow: var(--card-shadow);
+}
+.jx-tabbar { align-items: center; }
+.jx-theme-toggle { margin-left: auto; }

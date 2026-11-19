@@ -78,8 +78,9 @@
   font-weight: 700; font-size: 14px; letter-spacing: -.02em; display: flex; align-items: center;
   justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,.12) inset; }
 .ov-evt-txt { display: flex; flex-direction: column; min-width: 0; }
-.ov-name { font-weight: 600; letter-spacing: -.01em; }
-.ov-prod { font-size: 12.5px; color: rgba(60,60,67,.5); }
+.ov-name-row { display: flex; align-items: flex-start; gap: 4px; }
+.ov-name { margin: 0; min-width: 0; font-size: 14px; font-weight: 600; line-height: 1.35; color: #1d2330; }
+.ov-prod { display: block; margin-top: 2px; font-size: 12px; line-height: 1.3; color: #8a90a0; }
 .ov-today { font-size: 11px; font-weight: 600; color: #fff; background: #007aff;
   padding: 1.5px 8px; border-radius: 999px; margin-left: 6px; }
 .ov-num { font-weight: 600; }
@@ -93,6 +94,22 @@
 .ov-c-go { width: 36px; text-align: right; }
 .ov-chev { color: rgba(60,60,67,.45); font-size: 20px; }
 .ov-empty { text-align: center; color: rgba(60,60,67,.5); font-style: italic; padding: 26px; }
+
+.ov-copy-btn.mat-mdc-icon-button {
+  --mdc-icon-button-state-layer-size: 22px;
+  --mdc-icon-button-icon-size: 14px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin: -2px 0 0 2px;
+  padding: 0;
+  color: #8a90a0;
+}
+.ov-copy-btn:hover { color: #1f5bd8; }
+.ov-copy-btn .mat-icon { width: 14px; height: 14px; font-size: 14px; line-height: 14px; }
 
 /* child */
 
@@ -185,3 +202,28 @@
 .ev-edit-btn:hover { background: #eaf1ff; border-color: #cfdcf7; color: #1f5bd8; }
 .ev-edit-btn:focus-visible { outline: 2px solid #1f5bd8; outline-offset: 2px; }
 .ev-edit-btn:disabled { background: #f3f4f6; color: #b5bac4; cursor: default; }
+
+.ov-deleted { cursor: default; }
+.ov-deleted:hover td { background: transparent; }
+
+/* grey out every cell except the one with the Edit button */
+.ov-deleted td:not(.ev-act) { opacity: .5; filter: grayscale(1); }
+
+.ov-deleted .ov-name { text-decoration: line-through; text-decoration-color: #b9bec9; }
+.ov-deleted .ov-chev { visibility: hidden; }
+
+/* queue event: purple bar on the left edge + "Queue" tag after the name */
+.ov-queue td:first-child { box-shadow: inset 3px 0 0 #7a4fc2; }
+
+.ov-queue .ov-name::after {
+  content: 'Queue';
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #efe9fb;
+  color: #7a4fc2;
+  font-size: 10px;
+  font-weight: 600;
+  vertical-align: 2px;
+}

@@ -19,6 +19,9 @@ import {
   collectionData,
   doc,
   deleteDoc,
+  getCountFromServer,
+  query,
+  where,
   writeBatch
 } from '@angular/fire/firestore';
 import { CreateupcomingworkshopsComponent } from './createupcomingworkshops/createupcomingworkshops.component';
@@ -128,6 +131,7 @@ export class UpcomingworkshopsComponent implements OnInit {
         this.comingsoonData.data = data
           .filter(w => w.widgettype === 'comingsoon')
           .sort((a, b) => this.orderOf(a) - this.orderOf(b));
+        void this.refreshResponseCounts();
 
         this.adsData.data = data
           .filter(w => w.widgettype === 'ads')
@@ -163,7 +167,7 @@ export class UpcomingworkshopsComponent implements OnInit {
         w.location,
         w.buttonname,
         w.unlimitedseat ? 'unlimited' : (w.totalseats ?? ''),
-        w.confirmed != null ? w.confirmed : 0,
+        this.responseCount(w) ?? '',
         w.showconfirmedseat ? 'confirmed seats yes' : 'confirmed seats no',
         w.show ? 'visible' : 'hidden'
       ]
@@ -180,7 +184,7 @@ export class UpcomingworkshopsComponent implements OnInit {
         case 'seats':
           return w.unlimitedseat ? Number.MAX_SAFE_INTEGER : (w.totalseats ?? 0);
         case 'confirmed':
-          return w.confirmed ?? 0;
+          return this.responseCount(w) ?? -1;
         default:
           return (w[id] ?? '').toString().toLowerCase();
       }
@@ -353,8 +357,52 @@ export class UpcomingworkshopsComponent implements OnInit {
     });
   }
 
+  // ---- Confirmed column (operator 2026-11-13) ----
+  // Counted from the responses themselves — the same people the View dialog lists — instead of the number
+  // stored on the widget. That stored number is what EiFlix shows participants; it is left exactly as it is.
+  responseCounts: Record<string, number> = {};
+  countsLoading = false;
+  private countsToken = 0;
+
+  private widgetId(w: any): string {
+    return (w?.docid || w?.id || '').toString();
+  }
+
+  /** The number of responses for a row, or null while it is being counted or when the count failed. */
+  responseCount(w: any): number | null {
+    const id = this.widgetId(w);
+    return id && id in this.responseCounts ? this.responseCounts[id] : null;
+  }
+
+  /** One server-side count per Upcoming Workshops row: a single read each, the responses are not downloaded. */
+  private async refreshResponseCounts(): Promise<void> {
+    const token = ++this.countsToken;
+    const ids = [...new Set(this.comingsoonData.data.map(w => this.widgetId(w)).filter(Boolean))];
+    this.countsLoading = true;
+    const results = await Promise.all(ids.map(async id => {
+      try {
+        const snap = await getCountFromServer(query(
+          collection(this.firestore, 'upcomingworkshopsresponse'),
+          where('upcomingworkshopref', '==', doc(this.firestore, 'eiflixhomewidgets', id))
+        ));
+        return [id, snap.data().count] as [string, number];
+      } catch (err) {
+        console.error('Could not count responses for upcoming workshop', id, err);
+        return [id, null] as [string, null];
+      }
+    }));
+    if (token !== this.countsToken) return;   // a newer refresh started meanwhile
+    const counts: Record<string, number> = {};
+    for (const [id, n] of results) if (n !== null) counts[id] = n;
+    this.responseCounts = counts;
+    this.countsLoading = false;
+    // Sort and search read the counts: let the table apply them.
+    this.comingsoonData.data = this.comingsoonData.data;
+  }
+
   openResponses(workshop: any): void {
-    this.dialog.open(UpcomingworkshopresponsesComponent, {
+    // Responses may have come in since the counts were read: count again when the list closes.
+    const ref = this.dialog.open(UpcomingworkshopresponsesComponent, {
       width: '95vw',
       maxWidth: '1200px',
       maxHeight: '90vh',
@@ -365,6 +413,7 @@ export class UpcomingworkshopsComponent implements OnInit {
         title: workshop.title || ''
       }
     });
+    ref.afterClosed().subscribe(() => void this.refreshResponseCounts());
   }
 
   async deleteWidget(widget: any): Promise<void> {

@@ -166,7 +166,8 @@ export class ListOpenviduRoomComponent {
         }
       })
 
-      // TODO: Check Server
+      // Server check lives in /joinroom (it waits for a ready media server) and the 5-minute job
+      // wakes a stopped server for this room — 2026-11-14 OpenVidu plan items 1.2 / 2.1.
 
       loading.close()
 

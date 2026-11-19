@@ -887,3 +887,22 @@
   .sb-root .gn-sub{display:none}
   .sb-root .gn-link{padding:6px 10px}
 }
+
+/* ---- Import & move (board level): list → manual segment, with a review list (2026-11-11) ---- */
+.sb-root #imvDlg{width:min(960px,calc(100% - 32px))}
+.sb-root #imvDlg select{width:100%}
+.sb-root .imv-tiles{grid-template-columns:repeat(4,minmax(0,1fr))}
+.sb-root .cmp-tile.imv-tick b,.sb-root .cmp-tile.imv-moved b{color:var(--ok)}
+.sb-root .cmp-tile.imv-untick b{color:var(--text-2)}
+.sb-root .cmp-tile.imv-there b{color:var(--manual)}
+.sb-root .cmp-tile.imv-nomatch b{color:var(--danger)}
+.sb-root .imv-wrap{max-height:min(46vh,460px);overflow:auto;border:1px solid var(--border);border-radius:8px}
+.sb-root table.imv-t thead th{position:sticky;top:0;background:var(--surface);z-index:1}
+.sb-root table.imv-t td,.sb-root table.imv-t th{vertical-align:top;padding:8px 10px}
+.sb-root table.imv-t .imv-c{width:34px}
+.sb-root table.imv-t .chip{white-space:nowrap}
+.sb-root .chip.ok{background:var(--ok-bg);color:var(--ok)}
+.sb-root .info.ok{background:var(--ok-bg);color:var(--ok)}
+@media (max-width:700px){.sb-root .imv-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.sb-root .imv-up{display:flex;align-items:flex-end;justify-content:space-between;gap:8px}
+.sb-root .imv-up .btn{margin-bottom:4px}

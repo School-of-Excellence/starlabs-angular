@@ -106,7 +106,7 @@ jobs:
         run: npm install
 
       - name: Install Firebase CLI
-        run: npm install -g firebase-tools@14.4.0
+        run: npm install -g firebase-tools@15.36.0
 
       - name: Install Angular CLI
         run: npm install -g @angular/cli@19.2.13

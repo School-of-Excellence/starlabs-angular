@@ -65,7 +65,7 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
   ociInfraStatus: InfrastructureStatus | null = null;
   // Which cloud is allowed to act (openvidu server/mediaprovider). Drives which cards
   // render, which controls are live, and both CF controllers' lifecycle gates.
-  activeProvider: 'aws' | 'oci' = 'aws';
+  activeProvider: 'aws' | 'oci' = 'oci';
   infraActionInProgress = false;
   // Separate in-progress flag so OCI clicks don't disable AWS buttons (and vice versa).
   ociActionInProgress = false;
