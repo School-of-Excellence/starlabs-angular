@@ -2879,43 +2879,48 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     }
 
     async sendNoteToCrm(row: PortfolioRow, label: string, note: string, details: string = '') {
-      if (!row.email) {
-        this.guard.openSnackBar('CRM skipped: no email for ' + row.name, 'Close');
+    if (!row.email) {
+      this.guard.openSnackBar('CRM skipped: no email for ' + row.name, 'Close');
+      return;
+    }
+    if (!note || !note.trim()) return;
+
+    let url: string = '';
+    if (environment.firebase.projectId == 'starlabs-test') {
+      url = 'https://us-central1-salescrm-test-19.cloudfunctions.net/crmApi/v1/leads';
+    } else if (environment.firebase.projectId == 'fir-sample-aae4a') {
+      url = 'https://us-central1-salesleadcrm.cloudfunctions.net/crmApi/v1/leads';
+    }
+    if (!url) return;
+
+    const text = label + ': ' + note.trim() + (details ? ' | ' + details : '');
+    const body = { email: row.email, note: text };
+    console.log('CRM body', body);
+
+    try {
+      const token = await this.getCrmToken();
+      if (!token) {
+        this.guard.openSnackBar('CRM token not found', 'Close');
         return;
       }
-      if (!note || !note.trim()) return;
-
-      let url: string = '';
-      if (environment.firebase.projectId == 'starlabs-test') {
-        url = "https://us-central1-salescrm-test-19.cloudfunctions.net/crmApi/v1/leads";
-      } else if (environment.firebase.projectId == 'fir-sample-aae4a') {
-        url = "https://us-central1-salesleadcrm.cloudfunctions.net/crmApi/v1/leads"
-      }
-      if (!url) return;
-
-      const text = label + ': ' + note.trim() + (details ? ' | ' + details : '');
-
-      try {
-        const token = await this.getCrmToken();
-        if (!token) {
-          this.guard.openSnackBar('CRM token not found', 'Close');
-          return;
-        }
-        const res = await fetch(url, {
-          method: 'PATCH',
-          headers: {
-            'Authorization': 'Bearer ' + token,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ email: row.email, note: text })
-        });
-        console.log('CRM response', res.status);
-        if (!res.ok) this.guard.openSnackBar('CRM status: ' + res.status, 'Close');
-      } catch (err) {
-        console.log('CRM failed', err);
-        this.guard.openSnackBar('CRM call failed', 'Close');
-      }
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Content-Type': 'application/json',
+          'X-System': 'breakthroughs',
+        },
+        body: JSON.stringify(body)
+      });
+      console.log('body', body);
+      console.log('url:', url);
+      console.log('CRM response', res.status);
+      if (!res.ok) this.guard.openSnackBar('CRM status: ' + res.status, 'Close');
+    } catch (err) {
+      console.log('CRM failed', err);
+      this.guard.openSnackBar('CRM call failed', 'Close');
     }
+  }
 
 
 
