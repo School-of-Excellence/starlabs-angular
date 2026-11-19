@@ -9636,6 +9636,10 @@ table.specialist-table tr:hover td {
   background: var(--p-amber);
 }
 
+:host .stages-pchip-dot-ctd {
+  background: var(--p-teal);
+}
+
 :host .stages-pchip.active .stages-pchip-dot {
   box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.04);
 }

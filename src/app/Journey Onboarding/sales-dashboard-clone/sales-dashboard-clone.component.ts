@@ -643,7 +643,8 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
           this.dfuJourneys.push(element['id']);
         }
       }
-      this.journeyList.sort((a, b) => a.name.localeCompare(b.name));
+      // nameless journey docs sort last instead of throwing (and aborting the whole journey-name load)
+      this.journeyList.sort((a, b) => (a.name ?? '\uffff').localeCompare(b.name ?? '\uffff'));
       this.initializeSalesLeadsColumns();
       this.initializeTableConfigs();
       this.loadingStates.journeyNames = true;
