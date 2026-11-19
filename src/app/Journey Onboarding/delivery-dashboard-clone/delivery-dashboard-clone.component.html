@@ -971,6 +971,13 @@
                     (click)="selectProduct('Critical Support')">
                     <span class="stages-pchip-dot stages-pchip-dot-critical"></span>Critical Support
                   </button>
+                  <button data-testid="ddc-btn-ctd-appt" class="stages-pchip"
+                    *ngIf="!productFilterActive || (productFilterControl.value || []).includes('CTD Diagnostics & Implementation')"
+                    [class.active]="selectedProductLabel === 'CTD D&I (Appointment)'"
+                    matTooltip="Only the CTD Diagnostics & Implementation (Appointment) product — not the CTD queue, CTD Platinum or CTD Diagnostics (Appointment)." matTooltipPosition="above" [matTooltipShowDelay]="250"
+                    (click)="selectProduct('CTD D&I (Appointment)')">
+                    <span class="stages-pchip-dot stages-pchip-dot-ctd"></span>CTD D&amp;I (Appointment)
+                  </button>
                 </div>
               </div>
               <div class="header-right">
@@ -998,7 +1005,7 @@
 
             <div class="stages-empty" *ngIf="!selectedProductLabel && !stagesLoading">
               <div class="stages-empty-title">Pick a product to inspect stages</div>
-              <div class="stages-empty-hint">Choose EI Starter Pack or Critical Support above to drill into
+              <div class="stages-empty-hint">Choose a product above to drill into
                 stage-by-stage data.</div>
             </div>
 
@@ -1029,7 +1036,7 @@
                     <div class="header-col">
                       <div data-testid="ddc-div-090" class="d-flex filter-asc" (click)="sortColumn(i)">
                         <div class="col-header-left">
-                          <span class="col-title">{{ col }}</span>
+                          <span class="col-title" [matTooltip]="stageColTip(col)" matTooltipPosition="above" [matTooltipShowDelay]="250">{{ col }}</span>
                         </div>
                         <div class="filter-asc ps-2">
                           <i class="fas text-black-50 filter-asc"
@@ -1037,7 +1044,7 @@
                           </i>
                         </div>
                       </div>
-                      <span class="col-badge">
+                      <span class="col-badge" [matTooltip]="stageColTip(col)" matTooltipPosition="above" [matTooltipShowDelay]="250">
                         {{ filteredCardsMap[i]?.length || 0 }}
                       </span>
                     </div>
@@ -1045,12 +1052,14 @@
                       <ng-container *ngIf="stageData[col.toLowerCase().trim()] as stage">
                         <div class="stage-stat-row">
                           <button data-testid="ddc-btn-091" type="button" class="stage-stat-card"
+                            [matTooltip]="stageStatTip(col, 'completed')" matTooltipPosition="above" [matTooltipShowDelay]="250"
                             (click)="openStageModal(col, 'Completed', getStageCompletedCards(col.toLowerCase().trim()))">
                             <span class="stage-stat-num stage-stat-num--completed">{{ getStageCompletedCards(col.toLowerCase().trim()).length || 0 }}</span>
                             <span class="stage-stat-arrow">›</span>
                             <span class="stage-stat-lbl">Completed</span>
                           </button>
                           <button data-testid="ddc-btn-092" type="button" class="stage-stat-card"
+                            [matTooltip]="stageStatTip(col, 'cancelled')" matTooltipPosition="above" [matTooltipShowDelay]="250"
                             (click)="openStageModal(col, 'Cancelled', stage.cancelled)">
                             <span class="stage-stat-num stage-stat-num--cancelled">{{ stage.cancelled.length || 0 }}</span>
                             <span class="stage-stat-arrow">›</span>
@@ -1061,10 +1070,13 @@
                         <ng-container *ngIf="getNotScheduledCards(col.toLowerCase().trim()) as notScheduledCards">
                           <div class="stage-tabs">
                             <button data-testid="ddc-btn-093" type="button" class="stage-tab" [class.is-active]="getStageTab(col) === 'all'"
-                            (click)="setStageTab(col, 'all')">All {{ (col.toLowerCase().trim() === 'onboarding' ? getScheduledOnboardingCards().length : stage.all.length) + notScheduledCards.length }}</button>
+                            [matTooltip]="stageStatTip(col, 'all')" matTooltipPosition="above" [matTooltipShowDelay]="250"
+                            (click)="setStageTab(col, 'all')">All {{ (col.toLowerCase().trim() === 'onboarding' ? getScheduledOnboardingCards().length : getStageScheduledCards(col.toLowerCase().trim()).length) + notScheduledCards.length }}</button>
                           <button data-testid="ddc-btn-094" type="button" class="stage-tab" [class.is-active]="getStageTab(col) === 'scheduled'"
-                            (click)="setStageTab(col, 'scheduled')">Scheduled {{ col.toLowerCase().trim() === 'onboarding' ? getScheduledOnboardingCards().length : stage.all.length }}</button>
+                            [matTooltip]="stageStatTip(col, 'scheduled')" matTooltipPosition="above" [matTooltipShowDelay]="250"
+                            (click)="setStageTab(col, 'scheduled')">Scheduled {{ col.toLowerCase().trim() === 'onboarding' ? getScheduledOnboardingCards().length : getStageScheduledCards(col.toLowerCase().trim()).length }}</button>
                             <button data-testid="ddc-btn-095" type="button" class="stage-tab" [class.is-active]="getStageTab(col) === 'waiting'"
+                              [matTooltip]="stageStatTip(col, 'waiting')" matTooltipPosition="above" [matTooltipShowDelay]="250"
                               (click)="setStageTab(col, 'waiting')">Waiting {{ notScheduledCards.length }}</button>
                           </div>
                         </ng-container>
@@ -1099,7 +1111,7 @@
                           </div>
                         </ng-container>
                         <ng-template #regularScheduledTpl>
-                          <div class="card" *ngFor="let app of stage.all; trackBy: trackByCard">
+                          <div class="card" *ngFor="let app of getStageScheduledCards(col.toLowerCase().trim()); trackBy: trackByCard">
                             <div class="card-top">
                               <div class="card-info">
                                 <div class="card-name">{{ mapMetaData[getStageModalProfileId(app)]?.name || getStageModalProfileId(app) }}</div>
@@ -1226,7 +1238,7 @@
                         </div>
                       </ng-container>
 
-                      <div class="no-data-card" *ngIf="stage.all.length === 0 && getNotScheduledCards(col.toLowerCase().trim()).length === 0">
+                      <div class="no-data-card" *ngIf="getStageScheduledCards(col.toLowerCase().trim()).length === 0 && getNotScheduledCards(col.toLowerCase().trim()).length === 0">
                         No Data Yet
                       </div>
                     </ng-container>

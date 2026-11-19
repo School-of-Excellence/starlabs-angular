@@ -436,7 +436,7 @@
 
         <form [formGroup]="messageform">
           <div class="bottom"
-            *ngIf="(currentIssueData['status']['status']?.toLowerCase() == 'open' && currentIssueData['assign'].includes(loggedinprofile_id)) || (currentIssueData['status']['status']?.toLowerCase() == 'open' && currentIssueData['peopleinvolved']?.includes(loggedinprofile_id)) && !['website'].includes(currentIssueData['ticketfrom'])">
+            *ngIf="(currentIssueData['status']['status']?.toLowerCase() == 'open' && currentIssueData['assign']?.includes(loggedinprofile_id)) || (currentIssueData['status']['status']?.toLowerCase() == 'open' && currentIssueData['peopleinvolved']?.includes(loggedinprofile_id)) && !['website']?.includes(currentIssueData['ticketfrom'])">
             <div class="message">
               <textarea matInput formControlName="message" data-testid="ccs-message-input" placeholder="Type your message" cdkTextareaAutosize
                 #autosize="cdkTextareaAutosize" cdkAutosizeMaxRows="6" cdkAutosizeMinRows="6"></textarea>
@@ -651,7 +651,7 @@
                 [ngStyle]="log['status']['status']?.toLowerCase() == 'open' ? {'color':'#22AE4B'} : {'color': 'red'}">
                 {{log['status']['status']?.toUpperCase() }}</p>
               <!-- <p class="chat-tile">{{ ![null, undefined,""].includes(log['priority']) ? log['priority'].toUpperCase() : 'NO PRIORITY'}}</p> -->
-              <p class="chat-tile">{{log['category'].toUpperCase()}}</p>
+              <p class="chat-tile">{{log['category']?.toUpperCase()}}</p>
             </div>
           </div>
         </div>

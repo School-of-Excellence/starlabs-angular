@@ -482,6 +482,14 @@ export class DeliveryDashboardCloneComponent {
             "Celebration Call"
         ],
 
+        "ctdAppointment": [
+            "Total Eligible",
+            "Diagnostics",
+            "Implementation",
+            "Review",
+            "Completion"
+        ],
+
         "criticalSupport": [
             "Total Eligible",
             "Request",
@@ -495,6 +503,8 @@ export class DeliveryDashboardCloneComponent {
 
         "eiCustomSolutions": [
             "Total Eligible",
+            "This Month",
+            "Next Month",
             "Onboarding",
             "Diagnostics",
             "Implementation",
@@ -511,7 +521,9 @@ export class DeliveryDashboardCloneComponent {
         {
             label: 'Critical Support',
             value: 'Critical Support Diagnostics and Implementation'
-        }
+        },
+        // Exact product (not the merged "CTD Diagnostics & Implementation" card) — operator 2026-11-18: appointment product only.
+        { label: 'CTD D&I (Appointment)', value: 'CTD Diagnostics & Implementation (Appointment)' }
     ];
 
     stagesConfig: any = {
@@ -528,6 +540,11 @@ export class DeliveryDashboardCloneComponent {
             'Implementation',
             'Post Session Check-in',
             'Celebration Call'
+        ],
+        'CTD D&I (Appointment)': [
+            'Diagnostics',
+            'Implementation',
+            'Review'
         ]
     };
 
@@ -688,6 +705,11 @@ export class DeliveryDashboardCloneComponent {
             diagnostics: 'preprocess',
             implementation: 'diagnostics',
             review: 'implementation'
+        },
+        ctdAppointment: {
+            diagnostics: 'totalEligible',
+            implementation: 'diagnostics',
+            review: 'implementation'
         }
     };
 
@@ -711,16 +733,19 @@ export class DeliveryDashboardCloneComponent {
 
     productData: any = {
         eiStarterPack: {
-            totalEligible: [], onBoarding: [], preprocess: [], diagnostics: [],
+            totalEligible: [], pastMonth: [], thisMonth: [], nextMonth: [], onBoarding: [], preprocess: [], diagnostics: [],
             implementation: [], reports: [], celebrationCall: []
         },
         eiCustomSolutions: {
-            totalEligible: [], onBoarding: [], diagnostics: [], implementation: [],
+            totalEligible: [], thisMonth: [], nextMonth: [], onBoarding: [], diagnostics: [], implementation: [],
             review: [], celebrationCall: []
         },
         criticalSupport: {
             totalEligible: [], request: [], preprocess: [], diagnostics: [],
             implementation: [], review: [], postForm: [], completion: []
+        },
+        ctdAppointment: {
+            totalEligible: [], diagnostics: [], implementation: [], review: [], completion: []
         }
     };
 
@@ -937,7 +962,7 @@ export class DeliveryDashboardCloneComponent {
 
             const scheduledCards = stage.all || [];
             const completedCards = this.getStageCompletedCards(stageKey);
-            const waitingCards = this.getNotScheduledCards(stageKey);
+            const waitingCards = this.getNotScheduledCards(stageKey, false);
 
             for (const app of scheduledCards) {
                 const profileId = this.getStageModalProfileId(app);
@@ -988,7 +1013,7 @@ export class DeliveryDashboardCloneComponent {
         if (!appointmentTypeName) return 'N/A';
 
         const match = this.allAppointments.find((app: any) =>
-            app.appointmentTypeName === appointmentTypeName &&
+            this.ctdStageType(app.appointmentTypeName) === appointmentTypeName &&
             this.getStageModalProfileId(app) === profileId
         );
         if (!match?.hosts?.length) return 'N/A';
@@ -1500,9 +1525,10 @@ export class DeliveryDashboardCloneComponent {
         this.participantLoading = true;
         // Clear previous product's data immediately so stale cards don't show while loading
         this.productData = {
-            eiStarterPack: { totalEligible: [], onBoarding: [], preprocess: [], diagnostics: [], implementation: [], reports: [], celebrationCall: [] },
-            eiCustomSolutions: { totalEligible: [], onBoarding: [], diagnostics: [], implementation: [], review: [], celebrationCall: [] },
-            criticalSupport: { totalEligible: [], request: [], preprocess: [], diagnostics: [], implementation: [], review: [], postForm: [], completion: [] }
+            eiStarterPack: { totalEligible: [], pastMonth: [], thisMonth: [], nextMonth: [], onBoarding: [], preprocess: [], diagnostics: [], implementation: [], reports: [], celebrationCall: [] },
+            eiCustomSolutions: { totalEligible: [], thisMonth: [], nextMonth: [], onBoarding: [], diagnostics: [], implementation: [], review: [], celebrationCall: [] },
+            criticalSupport: { totalEligible: [], request: [], preprocess: [], diagnostics: [], implementation: [], review: [], postForm: [], completion: [] },
+            ctdAppointment: { totalEligible: [], diagnostics: [], implementation: [], review: [], completion: [] }
         };
         const productId = this.getCardIdForProduct(product);
         this.selectedProductLabel = product;
@@ -1526,6 +1552,10 @@ export class DeliveryDashboardCloneComponent {
             this.selectedColumns = this.columns.criticalSupport;
             await this.filterProductData('criticalSupport', product, productId);
             await this.filterStageData('criticalSupport');
+        } else if (product === 'CTD D&I (Appointment)') {
+            this.selectedColumns = this.columns.ctdAppointment;
+            await this.filterProductData('ctdAppointment', product, productId);
+            await this.filterStageData('ctdAppointment');
         }
         this.participantLoading = false;
         this.stagesLoading = false;
@@ -1643,16 +1673,19 @@ export class DeliveryDashboardCloneComponent {
     async filterProductData(productType: string, product: string, productId: string) {
         let productData: any = {
             eiStarterPack: {
-                totalEligible: [], onBoarding: [], preprocess: [], diagnostics: [],
+                totalEligible: [], pastMonth: [], thisMonth: [], nextMonth: [], onBoarding: [], preprocess: [], diagnostics: [],
                 implementation: [], reports: [], celebrationCall: []
             },
             eiCustomSolutions: {
-                totalEligible: [], onBoarding: [], diagnostics: [], implementation: [],
+                totalEligible: [], thisMonth: [], nextMonth: [], onBoarding: [], diagnostics: [], implementation: [],
                 review: [], celebrationCall: []
             },
             criticalSupport: {
                 totalEligible: [], request: this.ticketRequest.length ? this.ticketRequest : [],
                 preprocess: [], diagnostics: [], implementation: [], review: [], postForm: [], completion: []
+            },
+            ctdAppointment: {
+                totalEligible: [], diagnostics: [], implementation: [], review: [], completion: []
             }
         };
 
@@ -1677,6 +1710,20 @@ export class DeliveryDashboardCloneComponent {
             }
             else if (this.selectedProductType === 'eiCustomSolutions') {
                 productData.eiCustomSolutions.totalEligible.push(...totalEligible);
+            }
+            else if (this.selectedProductType === 'ctdAppointment') {
+                productData.ctdAppointment.totalEligible.push(...totalEligible);
+            }
+
+            // Past / This / Next Month columns: not-started products by the tentative start set in journey
+            // planning (participantsproduct.tentativestart), by calendar month from today. A view of Total Eligible,
+            // not a move out of it — they stay there too, so Onboarding's Waiting pool is unchanged.
+            const monthBuckets = productData[this.selectedProductType];
+            if (this.selectedProductType === 'eiStarterPack' || this.selectedProductType === 'eiCustomSolutions') {
+                for (const item of totalEligible) {
+                    const bucket = this.tentativeStartMonthBucket(item?.tentativestart);
+                    if (bucket && monthBuckets[bucket]) monthBuckets[bucket].push(item);
+                }
             }
 
             // Total Eligible
@@ -1707,6 +1754,8 @@ export class DeliveryDashboardCloneComponent {
                         productData.eiStarterPack.totalEligible.push(mergedData);
                     } else if (this.selectedProductType === 'eiCustomSolutions') {
                         productData.eiCustomSolutions.totalEligible.push(mergedData);
+                    } else if (this.selectedProductType === 'ctdAppointment') {
+                        productData.ctdAppointment.totalEligible.push(mergedData);
                     }
                 }
                 else if (attendedAppointments.length > 0) {
@@ -1741,7 +1790,7 @@ export class DeliveryDashboardCloneComponent {
                                 ...diagnosticsAppointment
                             });
                         } else if (onboardedAppointment) {
-                            productData.eiCustomSolutions.onBoarded.push({
+                            productData.eiCustomSolutions.onBoarding.push({
                                 ...mergedData,
                                 ...onboardedAppointment
                             });
@@ -1830,6 +1879,26 @@ export class DeliveryDashboardCloneComponent {
                             });
                         }
                     }
+                    // ========================= CTD D&I (APPOINTMENT) =========================
+                    // Furthest attended CTD stage wins. Alias types fold into their stage (ctdStageType).
+                    else if (this.selectedProductType === 'ctdAppointment') {
+                        const attendedOf = (type: string) =>
+                            attendedAppointments.find(app => this.ctdStageType(app.appointmentTypeName) === type);
+                        const reviewAppointment = attendedOf('CTD Review');
+                        const implementationAppointment = attendedOf('CTD Implementation');
+                        const diagnosticsAppointment = attendedOf('CTD Diagnostics');
+
+                        if (reviewAppointment) {
+                            productData.ctdAppointment.review.push({ ...mergedData, ...reviewAppointment });
+                        } else if (implementationAppointment) {
+                            productData.ctdAppointment.implementation.push({ ...mergedData, ...implementationAppointment });
+                        } else if (diagnosticsAppointment) {
+                            productData.ctdAppointment.diagnostics.push({ ...mergedData, ...diagnosticsAppointment });
+                        } else {
+                            // Attended something, but no CTD stage session yet → still waiting to start.
+                            productData.ctdAppointment.totalEligible.push(mergedData);
+                        }
+                    }
                 }
             }
 
@@ -1850,6 +1919,8 @@ export class DeliveryDashboardCloneComponent {
                     productData.criticalSupport.completion.push(data);
                 } else if (productType === 'eiCustomSolutions') {
                     productData.eiCustomSolutions.celebrationCall.push(data);
+                } else if (productType === 'ctdAppointment') {
+                    productData.ctdAppointment.completion.push(data);
                 }
             }
             Object.assign(this.productData, productData);
@@ -2055,6 +2126,12 @@ export class DeliveryDashboardCloneComponent {
                 { key: 'review', appointmentType: 'EI Review' },
                 { key: 'celebration call', appointmentType: 'EI Celebration Call' }
             ];
+        } else if (product === 'ctdAppointment') {
+            stageConfig = [
+                { key: 'diagnostics', appointmentType: 'CTD Diagnostics' },
+                { key: 'implementation', appointmentType: 'CTD Implementation' },
+                { key: 'review', appointmentType: 'CTD Review' }
+            ];
         }
 
         stageConfig.forEach(stage => {
@@ -2063,7 +2140,24 @@ export class DeliveryDashboardCloneComponent {
         });
     }
 
-    getNotScheduledCards(stageKey: string): any[] {
+    /** Stages search box: does this participant's name contain the typed text? Empty box matches everyone. */
+    private matchesStageSearch(profileId: string): boolean {
+        const q = (this.searchText || '').toLowerCase().trim();
+        if (!q) return true;
+        return (this.mapMetaData?.[profileId]?.name || '').toLowerCase().includes(q);
+    }
+
+    /** Scheduled appointments of a stage column, narrowed by the Stages search box. */
+    getStageScheduledCards(stageKey: string): any[] {
+        return (this.stageData?.[stageKey]?.all || []).filter((app: any) => this.matchesStageSearch(this.getStageModalProfileId(app)));
+    }
+
+    getNotScheduledCards(stageKey: string, applySearch = true): any[] {
+        const cards = this.getNotScheduledCardsAll(stageKey);
+        return applySearch ? cards.filter((c: any) => this.matchesStageSearch(c?.profileid || c?.clientid)) : cards;
+    }
+
+    private getNotScheduledCardsAll(stageKey: string): any[] {
         const productType = this.selectedProductType;
         const populationSourceKey = this.stagePopulationSource[productType]?.[stageKey];
         const appointmentTypeName = this.stageAppointmentTypeMap[stageKey];
@@ -2097,6 +2191,7 @@ export class DeliveryDashboardCloneComponent {
         const populationPool = this.productData?.[productType]?.[populationSourceKey] || [];
         return populationPool
             .filter((card: any) => !!card?.productonboarding || !!card?.productonboardingscheduled)
+            .filter((card: any) => this.matchesStageSearch(card?.profileid || card?.clientid))
             .map((card: any) => {
                 const hostRef = card?.productonboardedby?.[0];
                 const hostId = (hostRef?.id || hostRef?.path?.split('/')?.pop()) ?? null;
@@ -2145,12 +2240,25 @@ export class DeliveryDashboardCloneComponent {
     private getBookedProfileIdsForAppointmentType(appointmentTypeName: string): Set<string> {
         const bookedProfileIds = new Set<string>();
         for (const appointment of this.allAppointments) {
-            const isMatchingType = appointment.appointmentTypeName === appointmentTypeName;
+            const isMatchingType = this.ctdStageType(appointment.appointmentTypeName) === appointmentTypeName;
             if (!isMatchingType) continue;
             const profileId = appointment.profileid || appointment.clientid || appointment.bookedby?.id;
             if (profileId) bookedProfileIds.add(profileId);
         }
         return bookedProfileIds;
+    }
+
+    /**
+     * CTD has two extra appointment types that belong to an existing stage. Fold them in so
+     * "CTD Implementation Appointment" counts as Implementation and "CTD Review/Validation" as Review.
+     * Every other type name passes through unchanged, so other products are not affected.
+     */
+    private static readonly CTD_STAGE_ALIASES: Record<string, string> = {
+        'CTD Implementation Appointment': 'CTD Implementation',
+        'CTD Review/Validation': 'CTD Review',
+    };
+    ctdStageType(appointmentTypeName: string): string {
+        return DeliveryDashboardCloneComponent.CTD_STAGE_ALIASES[appointmentTypeName] ?? appointmentTypeName;
     }
 
     getStageModalProfileId(app: any): string {
@@ -2186,7 +2294,7 @@ export class DeliveryDashboardCloneComponent {
         } = this.getTodayAndTomorrowRange();
 
         const appointmentsForType = this.allAppointments
-            .filter(app => app.appointmentTypeName === appointmentTypeName);
+            .filter(app => this.ctdStageType(app.appointmentTypeName) === appointmentTypeName);
 
         const scheduledAppointments = appointmentsForType
             .filter(app => app.attended === false && !app.cancelled);
@@ -2231,25 +2339,35 @@ export class DeliveryDashboardCloneComponent {
     updateFilteredCards() {
         const search = this.searchText?.toLowerCase().trim() || '';
         let sources: any = {};
+        // Drop indexes left over from a product with more columns (filteredCardsMap is reused across products).
+        Object.keys(this.filteredCardsMap).forEach(k => delete this.filteredCardsMap[k as any]);
         if (this.selectedProductType === 'eiStarterPack') {
             sources = {
+                // Index = position in columns.eiStarterPack. The three month columns used to be skipped,
+                // shifting every later column by three (Next Month showed Diagnostics, etc.).
                 0: this.productData.eiStarterPack.totalEligible || [],
-                1: this.productData.eiStarterPack.onBoarding || [],
-                2: this.productData.eiStarterPack.preprocess || [],
-                3: this.productData.eiStarterPack.diagnostics || [],
-                4: this.productData.eiStarterPack.implementation || [],
-                5: this.productData.eiStarterPack.reports || [],
-                6: this.productData.eiStarterPack.celebrationCall || []
+                1: this.productData.eiStarterPack.pastMonth || [],
+                2: this.productData.eiStarterPack.thisMonth || [],
+                3: this.productData.eiStarterPack.nextMonth || [],
+                4: this.productData.eiStarterPack.onBoarding || [],
+                5: this.productData.eiStarterPack.preprocess || [],
+                6: this.productData.eiStarterPack.diagnostics || [],
+                7: this.productData.eiStarterPack.implementation || [],
+                8: this.productData.eiStarterPack.reports || [],
+                9: this.productData.eiStarterPack.celebrationCall || []
             };
         }
         else if (this.selectedProductType === 'eiCustomSolutions') {
             sources = {
+                // Index = position in columns.eiCustomSolutions.
                 0: this.productData.eiCustomSolutions.totalEligible || [],
-                1: this.productData.eiCustomSolutions.onBoarding || [],
-                2: this.productData.eiCustomSolutions.diagnostics || [],
-                3: this.productData.eiCustomSolutions.implementation || [],
-                4: this.productData.eiCustomSolutions.review || [],
-                5: this.productData.eiCustomSolutions.celebrationCall || []
+                1: this.productData.eiCustomSolutions.thisMonth || [],
+                2: this.productData.eiCustomSolutions.nextMonth || [],
+                3: this.productData.eiCustomSolutions.onBoarding || [],
+                4: this.productData.eiCustomSolutions.diagnostics || [],
+                5: this.productData.eiCustomSolutions.implementation || [],
+                6: this.productData.eiCustomSolutions.review || [],
+                7: this.productData.eiCustomSolutions.celebrationCall || []
             };
         }
         else if (this.selectedProductType === 'criticalSupport') {
@@ -2262,6 +2380,15 @@ export class DeliveryDashboardCloneComponent {
                 5: this.productData.criticalSupport.review || [],
                 6: this.productData.criticalSupport.postForm || [],
                 7: this.productData.criticalSupport.completion || []
+            };
+        }
+        else if (this.selectedProductType === 'ctdAppointment') {
+            sources = {
+                0: this.productData.ctdAppointment.totalEligible || [],
+                1: this.productData.ctdAppointment.diagnostics || [],
+                2: this.productData.ctdAppointment.implementation || [],
+                3: this.productData.ctdAppointment.review || [],
+                4: this.productData.ctdAppointment.completion || []
             };
         }
 
@@ -3855,6 +3982,15 @@ export class DeliveryDashboardCloneComponent {
 
     isDateInNextMonth(date: Date): boolean {
         return isDateInNextMonth(date);
+    }
+
+    /** Which month column a tentative start lands in, by calendar month from today; null when outside all three. */
+    private tentativeStartMonthBucket(ts: any): 'pastMonth' | 'thisMonth' | 'nextMonth' | null {
+        const d = this.toDateOrNull(ts);
+        if (!d) return null;
+        const now = new Date();
+        const diff = (d.getFullYear() - now.getFullYear()) * 12 + (d.getMonth() - now.getMonth());
+        return diff === -1 ? 'pastMonth' : diff === 0 ? 'thisMonth' : diff === 1 ? 'nextMonth' : null;
     }
 
     isDateInRange(date: Date | null): boolean {
@@ -7118,6 +7254,80 @@ export class DeliveryDashboardCloneComponent {
         ongoing: 'Ongoing — every product currently in delivery (status "ongoing"), whenever it started.',
         done: 'Done — status "completed", completed within the selected period.',
     };
+
+    /**
+     * Hover text for the Stages board (operator 2026-11-19), written like logicTip: who is counted, by which
+     * status / field, over which window, one row per what. Appointments on this board are only those starting
+     * in the current calendar month (filterAppointmentsByType('all') on selectedMonth — no month picker here).
+     * Keep in step with filterProductData / filterStageData / filterAppointmentsForStage / getNotScheduledCards.
+     */
+    private readonly stageColTips: Record<string, Record<string, string>> = {
+        eiStarterPack: {
+            'past month': 'Past Month — EI Starter Pack products not started yet (no status, or "initiated"; eligible) whose tentative start set in journey planning falls in last calendar month. They stay in Total Eligible too. One per product.',
+            'this month': 'This Month — EI Starter Pack products not started yet (no status, or "initiated"; eligible) whose tentative start set in journey planning falls in this calendar month. They stay in Total Eligible too. One per product.',
+            'next month': 'Next Month — EI Starter Pack products not started yet (no status, or "initiated"; eligible) whose tentative start set in journey planning falls in next calendar month. They stay in Total Eligible too. One per product.',
+        },
+        eiCustomSolutions: {
+            'this month': 'This Month — EI Solution products not started yet (no status, or "initiated"; eligible) whose tentative start set in journey planning falls in this calendar month. They stay in Total Eligible too. One per product.',
+            'next month': 'Next Month — EI Solution products not started yet (no status, or "initiated"; eligible) whose tentative start set in journey planning falls in next calendar month. They stay in Total Eligible too. One per product.',
+        },
+        ctdAppointment: {
+            'total eligible': 'Total Eligible — CTD D&I (Appointment) products with no status or status "initiated" (participant mode not installation event / event / integration; minimum paid or nothing owed), plus products with status "ongoing" that have no attended CTD Diagnostics, Implementation or Review appointment this calendar month. One per product.',
+            'diagnostics': 'Diagnostics — CTD D&I (Appointment) products with status "ongoing" whose most advanced attended appointment this calendar month is CTD Diagnostics. One per product. The cards below follow the All / Scheduled / Waiting tab.',
+            'implementation': 'Implementation — CTD D&I (Appointment) products with status "ongoing" whose most advanced attended appointment this calendar month is CTD Implementation or CTD Implementation Appointment. One per product. The cards below follow the All / Scheduled / Waiting tab.',
+            'review': 'Review — CTD D&I (Appointment) products with status "ongoing" that have an attended CTD Review or CTD Review/Validation appointment this calendar month. One per product. The cards below follow the All / Scheduled / Waiting tab.',
+            'completion': 'Completion — CTD D&I (Appointment) products with status "completed", completed within the selected period. One per product.',
+        },
+    };
+
+    /** Who sits in the column a stage's Waiting list is drawn from (CTD only; other products show the column name). */
+    private readonly stagePoolRule: Record<string, Record<string, string>> = {
+        ctdAppointment: {
+            totalEligible: 'Total Eligible (not started, or ongoing with no attended CTD stage appointment this month)',
+            diagnostics: 'Diagnostics (most advanced attended appointment is CTD Diagnostics)',
+            implementation: 'Implementation (most advanced attended appointment is CTD Implementation)',
+        },
+    };
+
+    private readonly stagePoolLabel: Record<string, string> = {
+        totalEligible: 'Total Eligible', onBoarding: 'Onboarding', preprocess: 'Pre-Process',
+        diagnostics: 'Diagnostics', implementation: 'Implementation', review: 'Review',
+    };
+
+    stageColTip(col: string): string {
+        return this.stageColTips[this.selectedProductType]?.[col.toLowerCase().trim()] || '';
+    }
+
+    stageStatTip(col: string, kind: 'completed' | 'cancelled' | 'all' | 'scheduled' | 'waiting'): string {
+        const key = col.toLowerCase().trim();
+        const product = this.selectedProductType;
+        const type = this.stageAppointmentTypeMap[key] || col;
+        const isOnboarding = key === 'onboarding';
+        const isCtd = product === 'ctdAppointment';
+        const typeText = isCtd && key === 'implementation' ? 'CTD Implementation / CTD Implementation Appointment'
+            : isCtd && key === 'review' ? 'CTD Review / CTD Review/Validation' : type;
+        switch (kind) {
+            case 'completed':
+                return `Completed — ${typeText} appointments starting this calendar month marked attended (or form submitted). One per appointment.`
+                    + (this.terminalStageKey[product] === key ? ' On this last stage, products with status "completed" are added too, once per participant.' : '');
+            case 'cancelled':
+                return `Cancelled — ${typeText} appointments starting this calendar month marked cancelled. This board loads only non-cancelled appointments, so it stays 0.`;
+            case 'all':
+                return isOnboarding
+                    ? 'All — Scheduled + Waiting: every not-started product, onboarding call booked or not.'
+                    : `All — Scheduled + Waiting: everyone due for ${typeText} this calendar month, booked or not.`;
+            case 'scheduled':
+                return isOnboarding
+                    ? 'Scheduled — products with no status yet whose product onboarding call is booked or done. One per product.'
+                    : `Scheduled — ${typeText} appointments starting this calendar month, not attended and not cancelled; past-due ones stay here until marked attended. One per appointment.`;
+            case 'waiting': {
+                if (isOnboarding) return 'Waiting — products with no status yet and no product onboarding call booked. One per product.';
+                const pool = this.stagePopulationSource[product]?.[key];
+                const from = (pool && this.stagePoolRule[product]?.[pool]) || (pool ? (this.stagePoolLabel[pool] || pool) : 'the previous column');
+                return `Waiting — products in ${from} with no ${typeText} appointment booked this calendar month. One per product.`;
+            }
+        }
+    }
 
     // ===== Search inside every mat-select (ngx-mat-select-search, operator 2026-11-18) =====
     /** Text typed into each select's search box, keyed by select. */
