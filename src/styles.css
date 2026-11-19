@@ -851,3 +851,24 @@ body.eod-scroll-lock .toolbar {
   overflow: hidden;
   box-shadow: 0 24px 60px -20px rgba(15, 23, 42, 0.28), 0 8px 24px -8px rgba(15, 23, 42, 0.14);
 }
+
+/* Delivery dashboard logic tooltips: multi-line rules (bullets on their own lines), wider than the default 200px. */
+.dd-logic-tip .mdc-tooltip__surface {
+  white-space: pre-line;
+  text-align: left;
+  max-width: 380px;
+  line-height: 1.45;
+}
+
+/* Delivery dashboard dropdowns: show the full option name (operator 2026-11-19). The panel grows to the longest
+   option (panelWidth=""); a name longer than the cap wraps onto a second line instead of ending in "…". */
+.mat-mdc-select-panel.dd-full-options {
+  min-width: 260px;
+  max-width: min(520px, 92vw) !important;
+}
+.dd-full-options .mat-mdc-option .mdc-list-item__primary-text {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.3;
+}
