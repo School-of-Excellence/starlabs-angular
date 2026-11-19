@@ -9640,6 +9640,10 @@ table.specialist-table tr:hover td {
   background: var(--p-teal);
 }
 
+:host .stages-ctd-cycle {
+  margin-left: 10px;
+}
+
 :host .stages-pchip.active .stages-pchip-dot {
   box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.04);
 }
@@ -18868,3 +18872,29 @@ i.seat-chip {
 /* Stages header: Export (30px) sat lower than the 40px participant search beside it */
 :host .flow-section .header-right { display: flex; align-items: center; gap: 10px; }
 :host .flow-section .header-right .dd-btn { box-sizing: border-box; height: var(--dd-ctl-h); display: inline-flex; align-items: center; gap: 6px; }
+
+/* Add-on chip (operator 2026-11-19): the Participants group now has 5 chips — Total, Not Elig., Purch., Bonus, Add-on.
+   Same selectors as the 4-column rules above; later in the file, so these win. */
+:host .dd-app .dd-prow__chips,
+:host .dd-app .dd-prow>.dd-prow__chips,
+:host .dd-app .dd-prow > .dd-prow__chips {
+  grid-template-columns: repeat(5, 1fr) !important;
+}
+:host .dd-app .dd-prow__chips .dd-prow__chip:nth-child(5) .dd-prow__chip-num {
+  color: #0ea5e9 !important;
+}
+:host .dd-app .dd-prow__chips .dd-prow__chip:nth-child(5) .dd-prow__chip-num.zero {
+  color: #cbd5e1 !important;
+}
+/* 5 participant chips need a little more of the row: chips column 2.2fr → 2.7fr (header + rows stay in step). */
+:host .dd-app .dd-prow-colhead,
+:host .dd-app .dd-prow {
+  grid-template-columns:
+    minmax(160px, 1.8fr)
+    minmax(56px, 0.55fr)
+    minmax(64px, 0.6fr)
+    minmax(0, 2.7fr)
+    minmax(0, 2.6fr)
+    minmax(0, 1.3fr)
+    minmax(0, 1.1fr) !important;
+}
