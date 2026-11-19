@@ -120,3 +120,27 @@
 
 /* Full names in this section's pickers, however long they are. */
 .acc-sub .pop-row .n, .field .pop-row .n { white-space: normal; overflow-wrap: anywhere; }
+
+/* ── Mail template · email template ── */
+.mt-map { display: flex; flex-direction: column; gap: 12px; margin-top: 6px; padding-top: 16px; border-top: 1px solid var(--border); }
+.mt-head { display: flex; flex-direction: column; gap: 4px; }
+.mt-pick-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.mt-pick { flex: 0 1 420px; }
+.mt-pop { width: 420px; }
+.mt-warn { display: flex; align-items: center; gap: 6px; }
+.mt-rows { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 10px; }
+.mt-row { display: grid; grid-template-columns: minmax(140px, 220px) minmax(180px, 260px) minmax(0, 1fr); gap: 12px; align-items: start; padding: 10px 12px; }
+.mt-row + .mt-row { border-top: 1px solid var(--border); }
+.mt-var { min-height: 40px; display: flex; align-items: center; min-width: 0; }
+.mt-token { font-family: 'DM Mono', ui-monospace, monospace; font-size: 12.5px; color: var(--t1); background: #f1f3f7; border-radius: 6px; padding: 3px 8px; overflow-wrap: anywhere; }
+.mt-value { min-width: 0; min-height: 40px; display: flex; align-items: center; }
+.mt-value > .help { line-height: 1.4; }
+/* Two classes plus one: .input.textarea (wc2-shared) sets 84px and would win over a single class. */
+.input.textarea.mt-static { width: 100%; min-height: 56px; }
+.mt-save { margin-top: 2px; }
+
+@media (max-width: 900px) {
+  .mt-row { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .mt-var, .mt-value { min-height: 0; }
+  .mt-pop { width: 100%; }   /* fit the anchor, as wc2-shared does for every popover here */
+}

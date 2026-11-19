@@ -773,8 +773,15 @@
 
 /* Additional fixes for better visibility */
 .enhanced-calls-table .mat-column-recording {
-  min-width: 120px;
-  width: 180px;
+  /* wide enough for the compact player's seek bar to be draggable (was 180px) */
+  width: 360px;
+}
+
+/* min-width on a <td> is ignored by table layout; on the player inside it, it is not —
+   this is what actually stops the column (and the seek bar) from collapsing. */
+.enhanced-audio-container app-atc-audio {
+  flex: 1 1 auto;
+  min-width: 340px;
 }
 
 .enhanced-audio-container {

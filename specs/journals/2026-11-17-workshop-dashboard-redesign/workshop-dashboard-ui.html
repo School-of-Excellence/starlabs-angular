@@ -1,0 +1,860 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workshop Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Playfair+Display:wght@600&display=swap" rel="stylesheet">
+<style>
+/* ==========================================================================
+   Workshop Dashboard · Heritage Ledger — plain HTML + CSS design mockup
+   - Every class is prefixed "wdx-"; nothing reuses a Bootstrap 5 or Angular
+     Material class name.
+   - Tokens live on .wdx-root (never :root) so the port cannot leak them.
+   - Responsive rules are container queries on the "wdx" container, so the
+     screen reacts to the width of the content area, not the window.
+   ========================================================================== */
+html,body{height:auto}
+body{margin:0;background:#f4f6f9;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+
+.wdx-root{
+  --primary:#1a3c5e; --primary-light:#2a5a8e; --primary-deep:#14304b; --primary-tint:#eef3f9; --primary-line:#b8c7d9;
+  --accent:#c8a96e; --accent-ink:#7d5f26; --accent-tint:#fbf7ee; --accent-line:#e6d6b2; --accent-on-navy:#dcc391;
+  --bg:#f4f6f9; --surface:#fff; --head:#fafbfc; --hover:#f8fafc; --picked:#f1f5fa;
+  --border:#dde3ec; --border-light:#edf0f5; --border-strong:#c4cdd9;
+  --t1:#1a2535; --t2:#56647b; --t3:#617086;
+  --success:#2e7d52; --success-bg:#e8f5ed; --success-line:#bfe0cb;
+  --danger:#c0392b; --danger-bg:#fdecea; --danger-line:#f1c4be;
+  --warn:#a8630f; --warn-bg:#fff4e0; --warn-line:#f0d7ab;
+  /* meaning colours carried over from today's dashboard */
+  --c-cat:#5b3fa8; --c-cat-bg:#f1edfa; --c-cat-line:#d9cff2;
+  --c-coh:#00796b; --c-coh-bg:#e2f2ef; --c-coh-line:#b5ddd6;
+  --c-fac:#b25d0a; --c-fac-bg:#fdf0e1; --c-fac-line:#f1d3ad;
+  --c-act:#1f5fa8; --c-done:#2e7d52; --c-idle:#6b7385; --c-avg:#3949ab; --c-rate:#a8630f; --c-nav:#1a3c5e;
+  --s-done:#0E7A3D; --s-done-bg:#DFF3E7; --s-prog:#1258A8; --s-prog-bg:#E1EDFB;
+  --s-rev:#8A5A00; --s-rev-bg:#FAEFD2; --s-rew:#B3452E; --s-rew-bg:#FAE3DD;
+  --s-ready:#5B33B8; --s-ready-bg:#ECE5FB; --s-idle:#5A6172; --s-idle-bg:#E9EBF1;
+  --b-done:#2E9E5B; --b-rev:#E0A93E; --b-rew:#D96A5B; --b-mob:#7B5CC9; --b-prog:#4E8FDB;
+  --money:#0c8a5f; --new:#5e35b1; --new-bg:#ede7ff;
+  --tagc:#2e7d32; --tag-bg:#e8f5e9; --tag-line:#c3e2c6;
+  --ring:0 0 0 3px rgba(42,90,142,.2);
+  --shadow-sheet:0 1px 2px rgba(26,37,53,.04),0 10px 30px -20px rgba(26,37,53,.22);
+  --shadow-pop:0 24px 48px -20px rgba(26,37,53,.34),0 2px 6px rgba(26,37,53,.06);
+  --shadow-panel:-24px 0 60px -30px rgba(14,32,52,.45);
+  font:400 14px/1.45 'DM Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  color:var(--t1);letter-spacing:normal;text-align:left;
+  font-variant-numeric:lining-nums tabular-nums;
+}
+/* ---------- hardening against the global Bootstrap 5 + Material sheets ---------- */
+:where(.wdx-root),:where(.wdx-root) *,:where(.wdx-root) *::before,:where(.wdx-root) *::after{box-sizing:border-box}
+:where(.wdx-root) :where(button,input,select,textarea){font:inherit;color:inherit;letter-spacing:inherit;margin:0}
+:where(.wdx-root) :where(button){cursor:pointer;-webkit-appearance:none;appearance:none;background:none;border:0;padding:0;text-transform:none;text-align:inherit}
+:where(.wdx-root) :where(button:disabled){cursor:not-allowed}
+:where(.wdx-root) a{color:inherit;text-decoration:none}
+.wdx-root table{border-collapse:separate;border-spacing:0;caption-side:top}
+.wdx-root :is(th,td){text-align:left}
+.wdx-root.wdx-root :is(h1,h2,h3,h4,h5,h6,p,figure,figcaption,pre,ul,ol,dl,dd){margin:0;padding:0;letter-spacing:normal}
+.wdx-root ul{list-style:none}
+.wdx-root label{white-space:normal;margin:0}
+.wdx-root :focus-visible{outline:2px solid var(--primary-light);outline-offset:2px}
+
+/* ---------- icons + helpers ---------- */
+.wdx-ic{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;vertical-align:middle}
+.wdx-ic--sm{width:15px;height:15px}
+.wdx-ic--xs{width:13px;height:13px}
+.wdx-ic--lg{width:24px;height:24px}
+.wdx-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.wdx-num{font-variant-numeric:lining-nums tabular-nums}
+.wdx-eyebrow{font:600 11px/1.2 'DM Sans',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--t3)}
+.wdx-root .wdx-h2{font:600 22px/1.2 'Playfair Display',Georgia,serif;color:var(--primary)}
+.wdx-root.wdx-root .wdx-sub{margin-top:4px;color:var(--t2);font-size:13.5px;line-height:1.45}
+.wdx-tip{position:relative}
+.wdx-tip[data-tip]:hover::after,.wdx-tip[data-tip]:focus-visible::after,.wdx-tip.wdx-is-tip::after{content:attr(data-tip);position:absolute;z-index:20;left:50%;bottom:calc(100% + 9px);transform:translateX(-50%);width:max-content;max-width:280px;padding:7px 11px;border-radius:7px;background:var(--t1);color:#fff;font:500 12.5px/1.4 'DM Sans',sans-serif;letter-spacing:normal;text-transform:none;white-space:normal;text-align:left;box-shadow:0 8px 20px -8px rgba(0,0,0,.4);pointer-events:none}
+.wdx-tip--end.wdx-is-tip::after,.wdx-tip--end[data-tip]:hover::after{left:auto;right:0;transform:none}
+.wdx-tip--start.wdx-is-tip::after{left:0;transform:none}
+.wdx-tip--below.wdx-is-tip::after{bottom:auto;top:calc(100% + 9px)}
+
+/* ---------- shell ---------- */
+.wdx-shell{container-type:inline-size;container-name:wdx;background:var(--bg)}
+.wdx-page{padding:28px 32px 56px}
+
+/* ---------- buttons ---------- */
+.wdx-tool{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 15px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:var(--t1);font-size:13.5px;font-weight:500;white-space:nowrap;transition:border-color .15s,background-color .15s}
+.wdx-tool .wdx-ic{color:var(--t2)}
+.wdx-tool:hover{border-color:var(--primary-line);background:#fbfcfe}
+.wdx-tool--danger{color:var(--danger);border-color:var(--danger-line);background:#fff}
+.wdx-tool--danger .wdx-ic{color:var(--danger)}
+.wdx-tool--danger:hover{background:var(--danger-bg);border-color:var(--danger)}
+.wdx-tool--sm{height:34px;padding:0 12px;font-size:13px;border-radius:8px}
+.wdx-tool:disabled{color:#8b96a7;background:#f6f7f9;border-color:var(--border-light)}
+.wdx-tool:disabled .wdx-ic{color:#a4adbb}
+.wdx-primary{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 18px;border:1px solid var(--primary);border-radius:9px;background:var(--primary);color:#fff;font-size:13.5px;font-weight:600;white-space:nowrap}
+.wdx-primary:hover{background:var(--primary-deep)}
+.wdx-primary .wdx-ic{color:var(--accent-on-navy)}
+.wdx-primary:disabled{background:#e9edf3;border-color:var(--border);color:#6f7d90}
+.wdx-primary:disabled .wdx-ic{color:#6f7d90}
+.wdx-primary--sm{height:34px;padding:0 14px;font-size:13px;border-radius:8px}
+.wdx-iconbtn{display:inline-grid;place-items:center;flex:none;width:36px;height:36px;border:1px solid transparent;border-radius:8px;color:var(--t2);transition:border-color .15s,color .15s,background-color .15s}
+.wdx-iconbtn:hover{border-color:var(--border);background:var(--surface);color:var(--primary)}
+.wdx-iconbtn:disabled{opacity:.38}
+.wdx-iconbtn--boxed{border-color:var(--border);background:var(--surface)}
+.wdx-iconbtn.wdx-is-set{border-color:var(--primary-line);background:var(--primary-tint);color:var(--primary)}
+.wdx-iconbtn--danger{color:var(--danger)}
+.wdx-iconbtn--danger:hover{background:var(--danger-bg);border-color:var(--danger-line);color:var(--danger)}
+.wdx-link{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 6px;border-radius:7px;color:var(--primary-light);font-size:13px;font-weight:600;text-decoration:underline;text-decoration-color:rgba(42,90,142,.35);text-underline-offset:3px;white-space:nowrap}
+.wdx-link:hover{background:var(--primary-tint)}
+.wdx-spin{display:inline-block;flex:none;width:16px;height:16px;border:2px solid #d3dde9;border-top-color:var(--primary);border-radius:50%;animation:wdx-rot .8s linear infinite;vertical-align:-3px}
+.wdx-spin--light{border-color:rgba(255,255,255,.3);border-top-color:#fff}
+.wdx-spin--lg{width:44px;height:44px;border-width:2px;border-color:var(--border);border-top-color:var(--accent)}
+@keyframes wdx-rot{to{transform:rotate(360deg)}}
+.wdx-skel{display:inline-block;vertical-align:middle;height:10px;border-radius:4px;background:#e1e7ef;animation:wdx-pulse 1.4s ease-in-out infinite}
+@keyframes wdx-pulse{50%{opacity:.5}}
+@media (prefers-reduced-motion:reduce){.wdx-skel,.wdx-spin{animation:none}}
+
+/* ---------- pills + chips ---------- */
+.wdx-pill{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border:1px solid var(--border);border-radius:999px;background:var(--surface);color:var(--t2);font-size:12.5px;font-weight:500;white-space:nowrap;line-height:1}
+.wdx-pill .wdx-ic{width:13px;height:13px}
+.wdx-pill--gold{border-color:var(--accent-line);background:var(--accent-tint);color:var(--accent-ink);font-weight:600;letter-spacing:.04em}
+.wdx-pill--grey{background:#f1f3f6;border-color:var(--border);color:var(--t2)}
+.wdx-new{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:5px;background:var(--new-bg);color:var(--new);font:700 10.5px/1 'DM Sans',sans-serif;letter-spacing:.08em;text-transform:uppercase;flex:none}
+.wdx-tag{display:inline-flex;align-items:center;height:24px;padding:0 9px;border:1px solid var(--tag-line);border-radius:999px;background:var(--tag-bg);color:var(--tagc);font-size:12px;font-weight:600;white-space:nowrap;line-height:1}
+.wdx-type{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:6px;font-size:12px;font-weight:600;white-space:nowrap;line-height:1}
+.wdx-type--fac{background:var(--c-fac-bg);color:var(--c-fac)}
+.wdx-type--coh{background:var(--c-coh-bg);color:var(--c-coh)}
+.wdx-type--cat{background:var(--c-cat-bg);color:var(--c-cat)}
+.wdx-kind{display:inline-flex;align-items:center;height:20px;padding:0 7px;border:1px solid var(--border);border-radius:5px;background:var(--head);color:var(--t2);font:500 11.5px/1 'DM Sans',sans-serif;white-space:nowrap}
+.wdx-catpill{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 9px;border:1px solid var(--c-cat-line);border-radius:999px;background:var(--c-cat-bg);color:var(--c-cat);font-size:12px;font-weight:600;white-space:nowrap}
+/* status chips: one colour set for the whole screen */
+.wdx-st{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 10px;border-radius:999px;background:var(--bg-s);color:var(--fg-s);font-size:12.5px;font-weight:500;white-space:nowrap;line-height:1;border:1px solid transparent;transition:box-shadow .15s,border-color .15s}
+.wdx-st b{font-weight:700}
+button.wdx-st:hover{border-color:currentColor;box-shadow:0 1px 0 rgba(0,0,0,.04)}
+.wdx-st--done{--fg-s:var(--s-done);--bg-s:var(--s-done-bg)}
+.wdx-st--prog{--fg-s:var(--s-prog);--bg-s:var(--s-prog-bg)}
+.wdx-st--rev{--fg-s:var(--s-rev);--bg-s:var(--s-rev-bg)}
+.wdx-st--rew{--fg-s:var(--s-rew);--bg-s:var(--s-rew-bg)}
+.wdx-st--ready,.wdx-st--mob{--fg-s:var(--s-ready);--bg-s:var(--s-ready-bg)}
+.wdx-st--idle{--fg-s:var(--s-idle);--bg-s:var(--s-idle-bg)}
+.wdx-st--enrolled{--fg-s:#2e7d32;--bg-s:#e8f5e8}
+.wdx-st--sq{border-radius:6px;height:24px;padding:0 8px;font-size:12px;font-weight:600}
+
+/* ---------- header ---------- */
+.wdx-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px 32px;flex-wrap:wrap;margin-bottom:22px}
+.wdx-id{min-width:0;flex:1 1 520px}
+.wdx-meta{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;margin-bottom:12px;color:var(--t2);font-size:13px}
+.wdx-dates{display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+.wdx-dates .wdx-ic{color:var(--accent-ink)}
+.wdx-root .wdx-title{font:600 34px/1.12 'Playfair Display',Georgia,serif;color:var(--primary)}
+.wdx-root.wdx-root .wdx-title{letter-spacing:-.005em}
+.wdx-rule{display:block;width:40px;height:0;border-top:1.5px solid var(--accent);margin:13px 0 11px}
+.wdx-root.wdx-root .wdx-lede{color:var(--t2);font-size:14.5px;max-width:96ch;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wdx-actions{display:flex;align-items:center;flex-wrap:wrap;justify-content:flex-end;gap:8px}
+.wdx-actions .wdx-vr{width:1px;height:24px;background:var(--border);margin:0 4px}
+.wdx-access{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 11px;border:1px solid var(--border);border-radius:999px;background:#f1f3f6;color:var(--t2);font-size:12.5px;font-weight:600;white-space:nowrap}
+
+/* ---------- section index (anchor links) ---------- */
+.wdx-nav{position:sticky;top:0;z-index:15;display:flex;align-items:stretch;gap:2px;margin:0 -32px 24px;padding:0 32px;background:rgba(244,246,249,.94);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;-webkit-backdrop-filter:saturate(1.2) blur(6px);backdrop-filter:saturate(1.2) blur(6px)}
+.wdx-nav::-webkit-scrollbar{display:none}
+.wdx-nav a{position:relative;display:inline-flex;align-items:center;gap:8px;height:46px;padding:0 14px;color:var(--t2);font-size:13.5px;font-weight:500;white-space:nowrap}
+.wdx-nav a:hover{color:var(--t1)}
+.wdx-nav a.wdx-is-on{color:var(--primary);font-weight:600}
+.wdx-nav a.wdx-is-on::after{content:"";position:absolute;left:14px;right:14px;bottom:-1px;height:2px;background:var(--accent)}
+.wdx-nav-n{color:var(--t3);font-weight:500;font-size:12.5px}
+
+/* ---------- sheets + section heads ---------- */
+.wdx-sheet{background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-sheet)}
+.wdx-block{margin-top:28px;scroll-margin-top:60px}
+.wdx-block:first-child{margin-top:0}
+.wdx-sh{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px 20px;padding:20px 22px 16px}
+.wdx-sh-tools{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.wdx-chapter{display:flex;align-items:baseline;gap:14px;margin:40px 0 14px;padding-bottom:10px;border-bottom:1px solid var(--border);scroll-margin-top:60px}
+.wdx-chapter-n{font:600 12px/1 'DM Sans',sans-serif;letter-spacing:.12em;color:var(--accent-ink)}
+.wdx-root .wdx-chapter-t{font:600 24px/1.2 'Playfair Display',Georgia,serif;color:var(--primary)}
+.wdx-root.wdx-root .wdx-chapter-note{margin-left:auto;color:var(--t2);font-size:13px;text-align:right}
+
+/* ---------- at a glance: headline figures ---------- */
+.wdx-hero{display:grid;grid-template-columns:repeat(var(--cols,4),minmax(0,1fr));border-bottom:1px solid var(--border)}
+.wdx-fig{position:relative;display:flex;flex-direction:column;gap:6px;min-width:0;padding:20px 22px 20px;border-right:1px solid var(--border-light);text-align:left}
+.wdx-fig:last-child{border-right:0}
+.wdx-fig-k{display:flex;align-items:center;gap:8px;color:var(--t2);font-size:13px;font-weight:500}
+.wdx-fig-k .wdx-ic{width:16px;height:16px;color:var(--tone,var(--primary))}
+.wdx-fig-n{display:flex;align-items:baseline;gap:10px;font:600 36px/1.05 'DM Sans',sans-serif;letter-spacing:-.015em;color:var(--t1)}
+.wdx-fig-n small{font-size:.5em;font-weight:600;letter-spacing:0;color:var(--t2)}
+.wdx-fig-s{color:var(--t2);font-size:13px}
+.wdx-fig-s b{color:var(--t1);font-weight:600}
+.wdx-fig--money .wdx-fig-n{color:var(--money)}
+.wdx-fig--lead{background:linear-gradient(180deg,#fbfcfe,#fff)}
+.wdx-fig--lead::before{content:"";position:absolute;left:22px;top:0;width:32px;border-top:2px solid var(--accent)}
+.wdx-go{position:absolute;top:18px;right:16px;display:inline-flex;align-items:center;gap:4px;color:var(--t3);font-size:12px;font-weight:600;opacity:.75;transition:color .15s,opacity .15s}
+button.wdx-fig{cursor:pointer;transition:background-color .15s}
+button.wdx-fig:hover{background:var(--hover)}
+button.wdx-fig:hover .wdx-go,button.wdx-cell:hover .wdx-go{color:var(--primary);opacity:1}
+.wdx-bar{position:relative;height:6px;margin-top:6px;border-radius:999px;background:var(--border-light);overflow:hidden}
+.wdx-bar i{position:absolute;left:0;top:0;bottom:0;border-radius:inherit;background:var(--tone,var(--primary))}
+.wdx-info{display:inline-grid;place-items:center;color:var(--t3)}
+
+/* ---------- at a glance: grouped ledger cells ---------- */
+.wdx-groups{display:flex;flex-wrap:wrap;margin-left:-1px}
+.wdx-grp{flex:var(--n,1) 1 calc(var(--n,1) * 168px);min-width:0;border-left:1px solid var(--border);overflow:hidden}
+.wdx-grp-h{display:flex;align-items:center;gap:8px;height:38px;padding:0 18px;border-bottom:1px solid var(--border-light);background:var(--head)}
+.wdx-grp-h .wdx-eyebrow{font-size:10.5px}
+.wdx-grp-cells{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin:0 -1px -1px 0}
+.wdx-cell{position:relative;display:flex;flex-direction:column;gap:4px;min-width:0;min-height:96px;padding:14px 18px 14px;border-right:1px solid var(--border-light);border-bottom:1px solid var(--border-light);background:var(--surface);text-align:left}
+button.wdx-cell{cursor:pointer;transition:background-color .15s}
+button.wdx-cell:hover{background:var(--hover)}
+.wdx-cell-k{display:flex;align-items:flex-start;gap:7px;padding-right:18px;color:var(--t2);font-size:12.5px;font-weight:500;line-height:1.3}
+.wdx-cell-k .wdx-ic{width:15px;height:15px;margin-top:1px;color:var(--tone,var(--primary))}
+.wdx-cell-n{margin-top:auto;font:600 26px/1.1 'DM Sans',sans-serif;letter-spacing:-.01em;color:var(--t1)}
+.wdx-cell-s{color:var(--t2);font-size:12.5px}
+.wdx-cell .wdx-go{top:14px;right:12px}
+.wdx-cell .wdx-bar{margin-top:4px;height:5px}
+.wdx-cell--tone{box-shadow:inset 0 2px 0 var(--tone)}
+
+/* ---------- evergreen journey ---------- */
+.wdx-track{position:relative;display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:10px;padding:8px 22px 24px}
+.wdx-node{position:relative;flex:1 0 92px;display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 6px 12px;border:1px solid var(--border-light);border-radius:12px;background:var(--surface);text-align:center;transition:transform .15s,border-color .15s,box-shadow .15s}
+.wdx-node:not(:disabled):hover{transform:translateY(-3px);border-color:var(--primary-line);box-shadow:0 10px 20px -16px rgba(26,37,53,.5)}
+.wdx-node::before{content:"";position:absolute;top:33px;left:-11px;width:10px;border-top:1px dashed var(--border-strong);display:none}
+.wdx-node:first-child::before{display:none}
+.wdx-node-b{display:grid;place-items:center;width:38px;height:38px;border-radius:50%;border:1px solid var(--primary-line);background:var(--primary-tint);color:var(--primary);font:600 14px/1 'DM Sans',sans-serif}
+.wdx-node-n{font:600 22px/1 'DM Sans',sans-serif;color:var(--t1)}
+.wdx-node-c{color:var(--t2);font-size:12px;font-weight:500}
+.wdx-node.wdx-is-empty{background:#f7f8fa;border-style:dashed;cursor:default}
+.wdx-node.wdx-is-empty .wdx-node-b{background:#eef0f3;border-color:var(--border);color:#9aa3b2}
+.wdx-node.wdx-is-empty .wdx-node-n{color:#a3acb9}
+.wdx-node--done .wdx-node-b{background:var(--success-bg);border-color:var(--success-line);color:var(--success)}
+.wdx-node--ext .wdx-node-b{background:var(--warn-bg);border-color:var(--warn-line);color:var(--warn)}
+.wdx-node--done,.wdx-node--ext{flex-basis:104px}
+.wdx-node.wdx-is-focus{outline:2px solid var(--primary-light);outline-offset:2px}
+.wdx-track-sep{display:none}
+
+/* ---------- challenge progress overview ---------- */
+.wdx-select{position:relative;display:inline-flex;flex-direction:column;gap:4px}
+.wdx-select-l{font-size:11.5px;font-weight:600;color:var(--t3);letter-spacing:.04em}
+.wdx-select select,.wdx-selectbtn{height:38px;min-width:200px;padding:0 34px 0 12px;border:1px solid var(--border);border-radius:9px;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2356647b' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.5 9.5L12 15l5.5-5.5'/%3E%3C/svg%3E") right 10px center/15px no-repeat;color:var(--t1);font-size:13.5px;font-weight:500;-webkit-appearance:none;appearance:none;text-align:left;display:inline-flex;align-items:center;white-space:nowrap}
+.wdx-selectbtn.wdx-is-set{border-color:var(--primary-line);background-color:var(--primary-tint);color:var(--primary);font-weight:600}
+.wdx-selectbtn.wdx-is-open{border-color:var(--primary-light);box-shadow:var(--ring)}
+.wdx-chs{border-top:1px solid var(--border)}
+.wdx-ch{border-bottom:1px solid var(--border-light)}
+.wdx-ch:last-child{border-bottom:0}
+.wdx-ch-head{display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px;width:100%;min-height:64px;padding:12px 18px 12px 22px;text-align:left;transition:background-color .15s}
+.wdx-ch-head:hover{background:var(--hover)}
+.wdx-ch-num{display:grid;place-items:center;flex:none;width:32px;height:32px;border:1px solid var(--accent-line);border-radius:50%;background:var(--accent-tint);color:var(--accent-ink);font:600 13px/1 'DM Sans',sans-serif}
+.wdx-ch-num--zoom{border-radius:9px;border-color:var(--primary-line);background:var(--primary-tint);color:var(--primary)}
+.wdx-ch-title{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;flex:1 1 260px;min-width:0}
+.wdx-ch-name{font-weight:600;font-size:14.5px;color:var(--t1)}
+.wdx-ch-chips{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+.wdx-ch-caret{display:grid;place-items:center;flex:none;width:32px;height:32px;border-radius:8px;color:var(--t2);transition:transform .2s}
+.wdx-ch.wdx-is-open{background:var(--head);box-shadow:inset 3px 0 0 var(--accent)}
+.wdx-ch.wdx-is-open .wdx-ch-head:hover{background:transparent}
+.wdx-ch.wdx-is-open .wdx-ch-caret{transform:rotate(180deg);color:var(--primary)}
+.wdx-ch-zoomnote{color:var(--t3);font-size:12.5px}
+.wdx-ch-body{padding:0 22px 20px 68px}
+.wdx-mainst{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:4px 0 16px}
+.wdx-mainst .wdx-eyebrow{margin-right:6px}
+.wdx-stbtn{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 13px;border:1px solid var(--bg-s);border-radius:9px;background:var(--bg-s);color:var(--fg-s);font-size:13px;font-weight:500;white-space:nowrap}
+.wdx-stbtn b{font-weight:700;font-size:14px}
+.wdx-stbtn:hover{border-color:currentColor}
+.wdx-stbtn--zoom{--fg-s:var(--s-prog);--bg-s:var(--s-prog-bg)}
+.wdx-steps{border:1px solid var(--border);border-radius:10px;background:var(--surface);overflow:hidden}
+.wdx-step{display:grid;grid-template-columns:44px minmax(140px,1.2fr) 108px minmax(100px,1fr);grid-template-areas:"idx name frac bar" "idx chips chips chips";gap:6px 16px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border-light)}
+.wdx-step:last-child{border-bottom:0}
+.wdx-step-i{grid-area:idx;align-self:start;padding-top:2px;font:600 13px/1.4 'DM Sans',sans-serif;color:var(--accent-ink)}
+.wdx-step-name{grid-area:name;display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;min-width:0;font-weight:600;color:var(--t1)}
+.wdx-step-frac{grid-area:frac;color:var(--t2);font-size:12.5px;white-space:nowrap;text-align:right}
+.wdx-step-frac b{color:var(--t1);font-weight:700;font-size:13.5px}
+.wdx-step .wdx-stack{grid-area:bar}
+.wdx-step-chips{grid-area:chips;display:flex;flex-wrap:wrap;gap:6px}
+.wdx-stack{position:relative;display:flex;height:10px;border-radius:999px;background:#eef0f4;overflow:visible}
+.wdx-stack > span{position:relative;height:100%;flex:none}
+.wdx-stack > span:first-child{border-radius:999px 0 0 999px}
+.wdx-seg-done{background:var(--b-done)}.wdx-seg-rev{background:var(--b-rev)}.wdx-seg-rew{background:var(--b-rew)}.wdx-seg-mob{background:var(--b-mob)}.wdx-seg-prog{background:var(--b-prog)}
+.wdx-stack > span + span{box-shadow:-1px 0 0 #fff}
+
+/* ---------- participant progress table ---------- */
+.wdx-bar2{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:12px 16px;border-top:1px solid var(--border-light)}
+.wdx-search{position:relative;display:block;flex:1 1 280px;max-width:380px;min-width:220px}
+.wdx-search > .wdx-ic{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--t3);pointer-events:none}
+.wdx-search input{display:block;width:100%;height:40px;padding:0 38px 0 38px;border:1px solid var(--border);border-radius:9px;background:var(--surface);font-size:14px;-webkit-appearance:none;appearance:none}
+.wdx-search input::placeholder{color:var(--t3);opacity:1}
+.wdx-search input.wdx-is-focus{outline:none;border-color:var(--primary-light);box-shadow:var(--ring)}
+.wdx-search-x{position:absolute;right:2px;top:2px;display:grid;place-items:center;width:36px;height:36px;border-radius:7px;color:var(--t2)}
+.wdx-search--sm input{height:36px}
+.wdx-search--sm .wdx-search-x{width:32px;height:32px}
+.wdx-fpill{display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 12px 0 14px;border:1px solid var(--border);border-radius:999px;background:var(--surface);color:var(--t2);font-size:13.5px;font-weight:500;white-space:nowrap}
+.wdx-fpill .wdx-ic{color:var(--t3)}
+.wdx-fpill.wdx-is-set{background:var(--primary-tint);border-color:var(--primary-line);color:var(--primary);font-weight:600}
+.wdx-fpill.wdx-is-set .wdx-ic{color:var(--primary)}
+.wdx-fpill.wdx-is-open{border-color:var(--primary-light);box-shadow:var(--ring)}
+.wdx-fpill-v{color:var(--t1);font-weight:600}
+.wdx-bar2-end{margin-left:auto;display:flex;align-items:center;gap:8px}
+.wdx-filtered{color:var(--c-cat);font-weight:600}
+.wdx-tablewrap{position:relative;border-top:1px solid var(--border)}
+.wdx-table{width:100%;border-collapse:separate;border-spacing:0}
+.wdx-table th{height:44px;padding:0 14px;background:var(--head);border-bottom:1px solid var(--border);font:600 11.5px/1.2 'DM Sans',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--t2);white-space:nowrap;vertical-align:middle}
+.wdx-th-sort{display:inline-flex;align-items:center;gap:6px;height:34px;margin-left:-8px;padding:0 8px;border-radius:7px;font:inherit;letter-spacing:inherit;text-transform:inherit;color:inherit}
+.wdx-th-sort .wdx-ic{width:13px;height:13px;opacity:.45}
+.wdx-th-sort:hover{background:var(--border-light);color:var(--t1)}
+.wdx-th-sort.wdx-is-sorted{color:var(--t1)}
+.wdx-th-sort.wdx-is-sorted .wdx-ic{opacity:1;color:var(--primary)}
+.wdx-table td{padding:11px 14px;border-bottom:1px solid var(--border-light);vertical-align:middle;font-size:13.5px;background:var(--surface)}
+.wdx-table tbody tr.wdx-is-click{cursor:pointer}
+.wdx-table tbody tr.wdx-is-click:hover td{background:#f6f9fd}
+.wdx-table tbody tr.wdx-is-picked td{background:var(--picked)}
+.wdx-table tbody tr.wdx-is-picked td:first-child{box-shadow:inset 4px 0 0 var(--primary)}
+.wdx-table tbody tr:last-child td{border-bottom:0}
+.wdx-person{display:flex;align-items:center;gap:11px;min-width:0}
+.wdx-mono{flex:none;display:grid;place-items:center;width:34px;height:34px;border-radius:50%;border:1px solid var(--border);background:#f5f7fa;color:var(--primary);font:600 11.5px/1 'DM Sans',sans-serif;letter-spacing:.06em}
+.wdx-mono--lg{width:52px;height:52px;font-size:15px;border-color:var(--accent-line);background:var(--accent-tint);color:var(--accent-ink);box-shadow:0 0 0 4px #fff,0 0 0 5px var(--border-light)}
+.wdx-name{font-weight:600;color:var(--t1);line-height:1.3}
+.wdx-email{color:var(--t2);display:inline-block;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}
+.wdx-cur{display:flex;align-items:baseline;gap:8px;min-width:0}
+.wdx-cur-i{flex:none;font-weight:600;color:var(--accent-ink);font-size:12.5px}
+.wdx-cur-n{color:var(--t1)}
+.wdx-prog{display:flex;align-items:center;gap:10px;min-width:150px}
+.wdx-prog .wdx-bar{flex:1;margin:0;height:6px}
+.wdx-prog .wdx-bar i{background:var(--accent)}
+.wdx-prog.wdx-is-full .wdx-bar i{background:var(--primary)}
+.wdx-prog-v{width:38px;text-align:right;font-weight:600;font-size:13px}
+.wdx-act{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:112px;height:32px;padding:0 12px;border:1px solid var(--accent-line);border-radius:8px;background:var(--accent-tint);color:var(--accent-ink);font-size:12.5px;font-weight:600;white-space:nowrap}
+.wdx-act:hover{border-color:var(--accent)}
+.wdx-act--done{border-color:var(--primary-line);background:var(--primary-tint);color:var(--primary)}
+.wdx-act:disabled{opacity:.72;cursor:not-allowed}
+.wdx-act--done:disabled{opacity:1}
+.wdx-act--zoom:disabled{background:#f3f4f7;border-color:var(--border);color:var(--t3);opacity:1}
+.wdx-foot{display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px;padding:10px 16px;border-top:1px solid var(--border);color:var(--t2);font-size:13.5px}
+.wdx-selectbox select{height:34px;padding:0 30px 0 11px;border:1px solid var(--border);border-radius:8px;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2356647b' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.5 9.5L12 15l5.5-5.5'/%3E%3C/svg%3E") right 8px center/14px no-repeat;color:var(--t1);font-size:13px;font-weight:600;-webkit-appearance:none;appearance:none}
+.wdx-foot-range{margin-left:auto;color:var(--t1)}
+.wdx-pager{display:flex;gap:2px}
+
+/* ---------- participant data ---------- */
+.wdx-pd-hero{display:flex;align-items:center;flex-wrap:wrap;gap:16px 22px;padding:20px 22px;border-top:1px solid var(--border);background:linear-gradient(180deg,#fbfaf6,#fff)}
+.wdx-pd-who{display:flex;align-items:center;gap:16px;flex:1 1 420px;min-width:0}
+.wdx-pd-name{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;font-size:19px;font-weight:600;color:var(--t1)}
+.wdx-pd-meta{display:flex;align-items:center;flex-wrap:wrap;gap:6px 16px;margin-top:6px;color:var(--t2);font-size:13px}
+.wdx-pd-meta > span{display:inline-flex;align-items:center;gap:6px}
+.wdx-pd-meta .wdx-ic{width:15px;height:15px;color:var(--t3)}
+.wdx-pd-tags{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:10px}
+.wdx-pd-tags > .wdx-ic{color:var(--tagc)}
+.wdx-pd-prog{display:flex;align-items:center;gap:16px;padding-left:22px;border-left:1px solid var(--border)}
+.wdx-pd-pct{font:600 34px/1 'DM Sans',sans-serif;letter-spacing:-.015em;color:var(--primary)}
+.wdx-pd-pct-l{display:block;margin-top:6px;color:var(--t3);font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase}
+.wdx-pd-prog .wdx-bar{width:120px;margin:0}
+.wdx-pd-prog .wdx-bar i{background:var(--accent)}
+.wdx-pd-grid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);gap:0;border-top:1px solid var(--border)}
+.wdx-pd-col{min-width:0;padding:20px 22px 24px}
+.wdx-pd-col + .wdx-pd-col{border-left:1px solid var(--border);background:#fcfcfd}
+.wdx-root .wdx-pd-h{display:flex;align-items:center;gap:9px;font:600 15px/1.3 'DM Sans',sans-serif;color:var(--t1)}
+.wdx-root.wdx-root .wdx-pd-h{margin-bottom:14px}
+.wdx-pd-h .wdx-ic{color:var(--accent-ink)}
+.wdx-pd-h .wdx-eyebrow{margin-left:auto}
+.wdx-pcs{display:flex;flex-direction:column;gap:12px}
+.wdx-pc{border:1px solid var(--border);border-radius:11px;background:var(--surface);overflow:hidden}
+.wdx-pc.wdx-is-current{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent),0 8px 22px -18px rgba(125,95,38,.55)}
+.wdx-pc-head{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;padding:12px 14px;border-bottom:1px solid var(--border-light)}
+.wdx-pc-title{flex:1 1 200px;min-width:0}
+.wdx-pc-name{font-weight:600;color:var(--t1)}
+.wdx-pc-kind{display:block;color:var(--t3);font-size:12px;margin-top:1px}
+.wdx-pc-meta{display:flex;flex-wrap:wrap;gap:6px 16px;padding:8px 14px;border-bottom:1px solid var(--border-light);background:var(--head);color:var(--t2);font-size:12.5px}
+.wdx-pc-meta span{display:inline-flex;align-items:center;gap:6px}
+.wdx-pc-meta .wdx-ic{width:14px;height:14px;color:var(--t3)}
+.wdx-pc-zoom{display:flex;align-items:center;gap:8px;padding:12px 14px;color:var(--t2);font-size:13px}
+.wdx-pc-zoom .wdx-ic{color:var(--primary)}
+.wdx-ps{display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:4px 10px;padding:10px 14px;border-bottom:1px solid var(--border-light)}
+.wdx-ps:last-child{border-bottom:0}
+.wdx-ps.wdx-is-current{background:var(--accent-tint);box-shadow:inset 0 0 0 1px var(--accent-line)}
+.wdx-ps-i{font-weight:600;font-size:12.5px;color:var(--accent-ink);padding-top:2px}
+.wdx-ps-name{font-weight:500;color:var(--t1);min-width:0}
+.wdx-ps-meta{grid-column:2 / -1;display:flex;align-items:center;flex-wrap:wrap;gap:6px 12px;color:var(--t2);font-size:12px}
+.wdx-ps-meta > span{display:inline-flex;align-items:center;gap:5px}
+.wdx-ps-meta .wdx-ic{width:13px;height:13px;color:var(--t3)}
+.wdx-plat{display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 7px;border:1px solid var(--primary-line);border-radius:5px;background:var(--primary-tint);color:var(--primary);font-size:11.5px;font-weight:600}
+.wdx-plat .wdx-ic{width:12px;height:12px;color:var(--primary)}
+.wdx-sacts{grid-column:2 / -1;display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.wdx-sbtn{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border:1px solid var(--primary-line);border-radius:7px;background:#fff;color:var(--primary);font-size:12.5px;font-weight:600;white-space:nowrap}
+.wdx-sbtn:hover{background:var(--primary-tint)}
+.wdx-sbtn .wdx-ic{width:14px;height:14px}
+.wdx-sbtn--muted{border-color:var(--border);color:var(--t2);font-weight:500;background:var(--head);max-width:100%;white-space:normal;height:auto;min-height:30px;padding:5px 10px;text-align:left}
+.wdx-badge{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:var(--primary);color:#fff;font:700 10.5px/1 'DM Sans',sans-serif}
+.wdx-answer{grid-column:2 / -1;margin-top:8px;padding:10px 12px;border:1px solid var(--border-light);border-left:2px solid var(--accent);border-radius:4px 8px 8px 4px;background:var(--head)}
+.wdx-answer-h{display:flex;align-items:center;gap:6px;color:var(--t3);font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.wdx-answer-h .wdx-ic{width:14px;height:14px}
+.wdx-root.wdx-root .wdx-answer p{margin-top:5px;color:var(--t1);font-size:13px;line-height:1.55}
+.wdx-ads{display:flex;flex-direction:column;gap:12px}
+.wdx-ad{border:1px solid var(--border);border-radius:11px;background:var(--surface);overflow:hidden}
+.wdx-ad-head{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;padding:11px 14px;border-bottom:1px solid var(--border-light)}
+.wdx-ad-i{display:inline-grid;place-items:center;height:22px;padding:0 7px;border-radius:6px;background:var(--accent-tint);border:1px solid var(--accent-line);color:var(--accent-ink);font-size:12px;font-weight:700}
+.wdx-ad-t{flex:1 1 140px;min-width:0}
+.wdx-ad-t b{display:block;font-weight:600}
+.wdx-ad-t span{display:block;color:var(--t3);font-size:12px}
+.wdx-ad-row{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border-light)}
+.wdx-ad-row:last-child{border-bottom:0}
+.wdx-ad-row > div{flex:1;min-width:0}
+.wdx-ad-row b{display:block;font-weight:600;font-size:13px}
+.wdx-ad-row span{display:block;color:var(--t2);font-size:12.5px}
+.wdx-root.wdx-root .wdx-ad-row p{margin-top:4px;color:var(--t1);font-size:13px;line-height:1.55}
+.wdx-prev{padding:10px 14px;border-top:1px solid var(--border-light);background:var(--head)}
+.wdx-prev-h{display:flex;align-items:center;gap:6px;margin-bottom:8px;color:var(--t2);font-size:12.5px;font-weight:600}
+.wdx-prev-h .wdx-ic{width:14px;height:14px}
+.wdx-prev-e{display:flex;gap:10px;padding:8px 0;border-top:1px dashed var(--border)}
+.wdx-prev-e > div{flex:1;min-width:0}
+.wdx-prev-e b{font-weight:600;font-size:13px}
+.wdx-prev-e span{display:block;color:var(--t2);font-size:12px}
+.wdx-root.wdx-root .wdx-prev-e p{margin-top:4px;color:var(--t1);font-size:12.5px}
+.wdx-raw{margin:0 22px 22px;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.wdx-raw summary{display:flex;align-items:center;gap:10px;min-height:48px;padding:8px 14px;cursor:pointer;list-style:none}
+.wdx-raw summary::-webkit-details-marker{display:none}
+.wdx-raw summary b{font-weight:600}
+.wdx-raw summary span{color:var(--t2);font-size:12.5px}
+.wdx-raw summary .wdx-ch-caret{margin-left:auto}
+.wdx-raw[open] summary .wdx-ch-caret{transform:rotate(180deg)}
+.wdx-root.wdx-root .wdx-raw pre{margin:0 14px 14px;padding:12px 14px;max-height:260px;overflow:auto;border-radius:8px;background:#0f2235;color:#d9e3ef;font:500 12px/1.55 ui-monospace,Menlo,monospace;white-space:pre}
+
+/* ---------- message blocks ---------- */
+.wdx-msg{display:flex;flex-direction:column;align-items:center;max-width:540px;margin:0 auto;padding:52px 24px 56px;text-align:center}
+.wdx-msg--sm{padding:30px 20px 32px}
+.wdx-msg-ic{display:grid;place-items:center;width:56px;height:56px;margin-bottom:18px;border:1px solid var(--border);border-radius:50%;background:#f7f9fb;color:var(--primary);box-shadow:0 0 0 6px #fff,0 0 0 7px var(--accent-line)}
+.wdx-msg-ic .wdx-ic{width:24px;height:24px}
+.wdx-msg--sm .wdx-msg-ic{width:44px;height:44px;margin-bottom:14px}
+.wdx-msg--sm .wdx-msg-ic .wdx-ic{width:20px;height:20px}
+.wdx-msg-ic--danger{background:var(--danger-bg);border-color:var(--danger-line);color:var(--danger)}
+.wdx-root .wdx-msg-title{font:600 21px/1.25 'Playfair Display',Georgia,serif;color:var(--t1)}
+.wdx-msg--sm .wdx-msg-title{font:600 15px/1.3 'DM Sans',sans-serif}
+.wdx-root.wdx-root .wdx-msg-text{margin-top:8px;color:var(--t2);font-size:14px}
+.wdx-msg--sm .wdx-msg-text{font-size:13px}
+.wdx-msg-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:22px}
+.wdx-inline-err{display:flex;align-items:center;gap:10px;margin:16px 22px;padding:12px 14px;border:1px solid var(--danger-line);border-radius:10px;background:var(--danger-bg);color:var(--danger);font-size:13.5px;font-weight:500}
+.wdx-inline-load{display:flex;align-items:center;gap:12px;padding:28px 22px;color:var(--t2);font-size:13.5px}
+.wdx-inline-load .wdx-spin{width:24px;height:24px}
+
+/* ---------- submissions archives ---------- */
+.wdx-ags{border-top:1px solid var(--border)}
+.wdx-ag{border-bottom:1px solid var(--border-light)}
+.wdx-ag:last-child{border-bottom:0}
+.wdx-ag-head{display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px;width:100%;min-height:62px;padding:10px 18px 10px 22px;text-align:left}
+.wdx-ag-head:hover{background:var(--hover)}
+.wdx-ag-ic{display:grid;place-items:center;flex:none;width:36px;height:36px;border-radius:9px;background:var(--accent-tint);border:1px solid var(--accent-line);color:var(--accent-ink)}
+.wdx-ag-ic--form{background:#eef3f9;border-color:var(--primary-line);color:var(--primary)}
+.wdx-ag-ic--video{background:#f1edfa;border-color:var(--c-cat-line);color:var(--c-cat)}
+.wdx-ag-t{flex:1 1 240px;min-width:0}
+.wdx-ag-t b{display:block;font-weight:600;font-size:14.5px}
+.wdx-ag-t span{display:block;color:var(--t2);font-size:12.5px}
+.wdx-ag-n{color:var(--t2);font-size:13px;white-space:nowrap}
+.wdx-ag-n b{color:var(--t1);font-weight:700}
+.wdx-ag.wdx-is-open{background:var(--head);box-shadow:inset 3px 0 0 var(--accent)}
+.wdx-ag.wdx-is-open .wdx-ch-caret{transform:rotate(180deg);color:var(--primary)}
+.wdx-ag-body{padding:0 22px 20px 72px}
+.wdx-root.wdx-root .wdx-ag-desc{max-width:90ch;margin-bottom:14px;color:var(--t2);font-size:13.5px}
+.wdx-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.wdx-card{display:flex;flex-direction:column;gap:8px;min-width:0;padding:12px 14px;border:1px solid var(--border);border-radius:11px;background:var(--surface);text-align:left}
+.wdx-card.wdx-is-click{cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.wdx-card.wdx-is-click:hover{border-color:var(--primary-line);box-shadow:0 8px 18px -16px rgba(26,37,53,.6)}
+.wdx-card-top{display:flex;align-items:center;gap:10px}
+.wdx-card-top .wdx-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wdx-ini{flex:none;display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--primary);color:#fff;font:600 12.5px/1 'DM Sans',sans-serif}
+.wdx-card-meta{display:flex;align-items:center;gap:6px;color:var(--t2);font-size:12.5px}
+.wdx-card-meta .wdx-ic{width:14px;height:14px;color:var(--t3)}
+.wdx-prevrow{display:flex;align-items:center;justify-content:space-between;gap:8px;height:34px;padding:0 10px;border:1px solid var(--border-light);border-radius:8px;background:var(--head);color:var(--t1);font-size:12.5px;font-weight:500}
+.wdx-prevrow .wdx-ic{width:15px;height:15px;color:var(--primary-light)}
+.wdx-root.wdx-root .wdx-clamp{color:var(--t1);font-size:13px;line-height:1.55;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.wdx-root.wdx-root .wdx-clamp.wdx-is-full{display:block;-webkit-line-clamp:unset}
+.wdx-more{display:inline-flex;align-items:center;gap:4px;align-self:flex-start;min-height:28px;padding:0 6px;margin-left:-6px;border-radius:6px;color:var(--primary-light);font-size:12.5px;font-weight:600}
+.wdx-more:hover{background:var(--primary-tint)}
+.wdx-more .wdx-ic{width:14px;height:14px}
+.wdx-counters{display:flex;flex-wrap:wrap;gap:12px;padding-top:8px;border-top:1px dashed var(--border);color:var(--t2);font-size:12px}
+.wdx-counters span{display:inline-flex;align-items:center;gap:5px}
+.wdx-counters .wdx-ic{width:13px;height:13px;color:var(--t3)}
+.wdx-card--text.wdx-is-expanded{grid-column:span 2}
+.wdx-player{display:flex;flex-direction:column;gap:0;padding:0;overflow:hidden;border-color:var(--primary)}
+.wdx-player-top{display:flex;align-items:center;gap:10px;padding:8px 8px 8px 12px;background:var(--primary);color:#fff;font-weight:600;font-size:13px}
+.wdx-player-top span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wdx-player-top button{display:grid;place-items:center;width:30px;height:30px;border-radius:7px;color:#dbe4ef}
+.wdx-player-top button:hover{background:rgba(255,255,255,.12);color:#fff}
+.wdx-video{position:relative;aspect-ratio:16/10;background:radial-gradient(120% 90% at 30% 20%,#2a4766,#0f2235);display:grid;place-items:center;color:rgba(255,255,255,.85)}
+.wdx-video-ctl{position:absolute;left:10px;right:10px;bottom:10px;display:flex;align-items:center;gap:8px;color:#fff;font-size:11.5px}
+.wdx-video-ctl i{flex:1;height:3px;border-radius:2px;background:linear-gradient(90deg,var(--accent) 38%,rgba(255,255,255,.3) 38%)}
+.wdx-card-load{display:flex;align-items:center;gap:7px;color:var(--t2);font-size:12.5px}
+.wdx-card-load .wdx-ic{color:var(--accent-ink)}
+
+/* ---------- platform usage ---------- */
+.wdx-plat-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);border-top:1px solid var(--border)}
+.wdx-plat-card{min-width:0;padding:18px 22px 22px}
+.wdx-plat-card + .wdx-plat-card{border-left:1px solid var(--border)}
+.wdx-plat-h{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 10px;margin-bottom:16px}
+.wdx-plat-h b{font-weight:600;font-size:14.5px}
+.wdx-plat-h .wdx-hint{color:var(--t3);font-size:12.5px}
+.wdx-plat-h .wdx-plat-c{margin-left:auto;color:var(--t2);font-size:13px}
+.wdx-plat-h .wdx-plat-c b{font-size:13px;color:var(--t1)}
+.wdx-donutwrap{display:flex;align-items:center;gap:26px;flex-wrap:wrap}
+.wdx-donut{position:relative;flex:none;width:168px;height:168px}
+.wdx-donut svg{width:168px;height:168px;transform:rotate(-90deg)}
+.wdx-donut-c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
+.wdx-donut-c b{font:600 26px/1 'DM Sans',sans-serif}
+.wdx-donut-c span{margin-top:4px;color:var(--t3);font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.wdx-legend{flex:1 1 220px;display:flex;flex-direction:column;min-width:0}
+.wdx-lrow{display:grid;grid-template-columns:12px minmax(0,1fr) auto 56px;align-items:center;gap:10px;min-height:42px;padding:0 10px;margin:0 -10px;border-radius:8px;text-align:left}
+.wdx-lrow:hover{background:var(--hover)}
+.wdx-lrow + .wdx-lrow{border-top:1px solid var(--border-light)}
+.wdx-dot{width:10px;height:10px;border-radius:3px;background:var(--d)}
+.wdx-lrow b{font-weight:700;text-align:right}
+.wdx-lrow em{font-style:normal;color:var(--t3);font-size:12.5px;text-align:right}
+.wdx-hbars{display:flex;flex-direction:column;gap:14px}
+.wdx-hbar-row{display:grid;grid-template-columns:96px minmax(0,1fr);align-items:center;gap:12px}
+.wdx-hbar-row > span{color:var(--t1);font-size:13px;font-weight:500}
+.wdx-hbar{display:flex;height:24px;border-radius:5px;overflow:hidden;background:#f1f3f6}
+.wdx-hbar i{display:flex;align-items:center;justify-content:flex-end;padding:0 7px;color:#fff;font:600 11.5px/1 'DM Sans',sans-serif;font-style:normal;white-space:nowrap;min-width:0}
+.wdx-hbar .wdx-is-done{background:var(--b-done)}
+.wdx-hbar .wdx-is-prog{background:var(--b-rev);color:#3b2a05}
+.wdx-hbar-key{display:flex;gap:16px;margin:14px 0 4px;color:var(--t2);font-size:12.5px}
+.wdx-hbar-key span{display:inline-flex;align-items:center;gap:6px}
+.wdx-slegend{margin-top:12px;border-top:1px solid var(--border-light)}
+.wdx-slrow{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:18px;align-items:center;min-height:38px;border-bottom:1px solid var(--border-light);font-size:13px;color:var(--t2)}
+.wdx-slrow span:first-child{color:var(--t1);font-weight:500}
+.wdx-slrow b{color:var(--t1)}
+
+/* ---------- participant side panel ---------- */
+.wdx-panel{display:flex;flex-direction:column;width:460px;max-width:100%;background:var(--surface);border-left:1px solid var(--border);box-shadow:var(--shadow-panel)}
+.wdx-panel--static{position:relative;border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow-pop);overflow:visible}
+.wdx-pn-head{display:flex;align-items:flex-start;gap:12px;padding:18px 14px 14px 20px;border-bottom:1px solid var(--border-light)}
+.wdx-pn-t{flex:1;min-width:0}
+.wdx-root .wdx-pn-title{font:600 22px/1.2 'Playfair Display',Georgia,serif;color:var(--primary)}
+.wdx-root.wdx-root .wdx-pn-sub{margin-top:3px;color:var(--t2);font-size:13px}
+.wdx-pn-tools{display:flex;align-items:center;gap:2px;flex:none}
+.wdx-pn-add{display:flex;align-items:center;gap:10px;padding:10px 20px;border-bottom:1px solid var(--border-light);background:var(--head)}
+.wdx-pn-add .wdx-hint{color:var(--t2);font-size:12.5px}
+.wdx-bubble{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--accent);color:#2b210b;font:700 11px/1 'DM Sans',sans-serif}
+.wdx-pn-count{display:flex;align-items:center;gap:12px;padding:14px 20px 10px}
+.wdx-pn-count-n{font:600 30px/1 'DM Sans',sans-serif;letter-spacing:-.01em;color:var(--t1)}
+.wdx-pn-count-l{color:var(--t2);font-size:13px}
+.wdx-pn-count .wdx-tool{margin-left:auto}
+.wdx-pn-body{display:flex;flex-direction:column;gap:10px;padding:0 20px 14px}
+.wdx-pn-body .wdx-search{flex:none}
+.wdx-pd-rail{position:sticky;top:64px}
+.wdx-pn-filterrow{display:flex;align-items:center;gap:6px}
+.wdx-pn-filterrow > span{flex:1;color:var(--t2);font-size:13px}
+.wdx-pn-filterrow > span b{color:var(--t1);font-weight:600}
+.wdx-seg{display:inline-grid;grid-auto-flow:column;gap:3px;padding:3px;border:1px solid var(--border);border-radius:10px;background:var(--bg)}
+.wdx-seg button{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:30px;padding:0 11px;border:1px solid transparent;border-radius:7px;color:var(--t2);font-size:12.5px;font-weight:500;white-space:nowrap}
+.wdx-seg button.wdx-is-on{background:#fff;border-color:var(--border);color:var(--primary);font-weight:600;box-shadow:0 1px 2px rgba(26,37,53,.07)}
+.wdx-range{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 36px;gap:8px;align-items:end}
+.wdx-field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.wdx-field > span{font-size:11.5px;font-weight:600;color:var(--t3);letter-spacing:.04em}
+.wdx-field input{height:36px;width:100%;min-width:0;padding:0 10px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:13px;color:var(--t1)}
+.wdx-field input::placeholder{color:var(--t3);opacity:1}
+.wdx-field input.wdx-is-set{border-color:var(--primary-line);background:var(--primary-tint);font-weight:600;color:var(--primary)}
+.wdx-total{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--success-line);border-radius:9px;background:#f3faf6;color:var(--t2);font-size:13px}
+.wdx-total b{color:var(--money);font:700 18px/1 'DM Sans',sans-serif}
+.wdx-fchips{display:flex;flex-wrap:wrap;gap:6px}
+.wdx-fchip{display:inline-flex;align-items:center;gap:4px;height:28px;padding:0 2px 0 10px;border:1px solid var(--border);border-radius:999px;background:var(--surface);font-size:12.5px;font-weight:500;color:var(--t1)}
+.wdx-fchip button{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;color:var(--t3)}
+.wdx-fchip button:hover{background:var(--danger-bg);color:var(--danger)}
+.wdx-fchip--tier{border-color:var(--accent-line);background:var(--accent-tint);color:var(--accent-ink)}
+.wdx-fchip--cat{border-color:var(--primary-line);background:var(--primary-tint);color:var(--primary)}
+.wdx-pn-list{display:flex;flex-direction:column;border-top:1px solid var(--border);overflow:auto}
+.wdx-pp{position:relative;display:flex;align-items:flex-start;gap:12px;padding:12px 20px;border-bottom:1px solid var(--border-light);text-align:left;width:100%}
+a.wdx-pp:hover,div.wdx-pp[role]:hover{background:var(--hover)}
+.wdx-pp-b{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.wdx-pp-n{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px}
+.wdx-pp-line{color:var(--t2);font-size:12.5px}
+.wdx-pp-tags{display:flex;flex-wrap:wrap;gap:5px}
+.wdx-pp-end{flex:none;display:flex;align-items:center;gap:8px;align-self:center;color:var(--t3)}
+.wdx-amt{color:var(--money);font-weight:700;font-size:14px}
+.wdx-amt-n{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:var(--success-bg);color:var(--success);font:700 11.5px/1 'DM Sans',sans-serif}
+.wdx-nologin{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 9px;border:1px solid var(--warn-line);border-radius:999px;background:var(--warn-bg);color:var(--warn);font-size:12px;font-weight:600;white-space:nowrap}
+.wdx-extbox{display:flex;flex-direction:column;gap:10px;margin:0 20px 12px 64px;padding:12px;border:1px solid var(--accent-line);border-radius:10px;background:var(--accent-tint)}
+.wdx-extbox-a{display:flex;justify-content:flex-end;gap:8px}
+.wdx-pp.wdx-is-picked{background:var(--accent-tint)}
+.wdx-pp-hint{color:var(--accent-ink);font-size:12.5px}
+.wdx-pn-empty{padding:28px 20px;color:var(--t3);font-size:13px;text-align:center}
+.wdx-hcard{width:300px;background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-pop);overflow:hidden}
+.wdx-hcard-h{padding:12px 14px;border-bottom:1px solid var(--border-light)}
+.wdx-hcard-h b{display:block;font-weight:600}
+.wdx-hcard-h span{color:var(--t3);font-size:12px}
+.wdx-hcard-r{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:baseline;padding:9px 14px;border-bottom:1px solid var(--border-light);font-size:12.5px}
+.wdx-hcard-r span:first-child{color:var(--t2);white-space:nowrap}
+.wdx-hcard-r b{font-weight:600;color:var(--t1)}
+.wdx-hcard-f{display:flex;justify-content:space-between;padding:10px 14px;background:var(--head);font-size:13px;color:var(--t2)}
+.wdx-hcard-f b{color:var(--money);font-weight:700}
+
+/* popovers / menus */
+.wdx-pop{width:320px;max-width:100%;background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-pop);overflow:hidden}
+.wdx-pop-sec{padding:10px 8px 6px}
+.wdx-pop-sec + .wdx-pop-sec{border-top:1px solid var(--border-light)}
+.wdx-pop-sec > .wdx-eyebrow{display:flex;align-items:center;justify-content:space-between;padding:2px 10px 6px}
+.wdx-pop-sec > .wdx-eyebrow .wdx-link{letter-spacing:normal;text-transform:none;min-height:24px}
+.wdx-pop--scroll .wdx-pop-body{max-height:320px;overflow:auto}
+.wdx-opt{display:flex;align-items:center;gap:11px;width:100%;min-height:38px;padding:0 10px;border-radius:7px;text-align:left;font-size:13.5px;color:var(--t1)}
+.wdx-opt:hover{background:var(--bg)}
+.wdx-opt.wdx-is-on{font-weight:600;color:var(--primary)}
+.wdx-opt.wdx-is-off{color:#9aa3b2;cursor:not-allowed}
+.wdx-opt.wdx-is-off .wdx-box,.wdx-opt.wdx-is-off .wdx-radio{border-color:#c9d0da;background:#f3f5f8}
+.wdx-opt-n{margin-left:auto;color:var(--t3);font-size:12.5px;font-weight:400}
+.wdx-box{flex:none;display:grid;place-items:center;width:18px;height:18px;border:1.5px solid #7c8a9e;border-radius:4px;background:#fff;color:#fff}
+.wdx-box .wdx-ic{width:12px;height:12px;stroke-width:3.2}
+.wdx-box.wdx-is-on{background:var(--primary);border-color:var(--primary)}
+.wdx-radio{flex:none;width:18px;height:18px;border:1.5px solid #7c8a9e;border-radius:50%;background:#fff}
+.wdx-radio.wdx-is-on{border-color:var(--primary);background:var(--primary);box-shadow:inset 0 0 0 3.5px #fff}
+.wdx-pop-empty{padding:4px 10px 8px;color:var(--t3);font-size:12.5px}
+.wdx-pop-foot{padding:8px;border-top:1px solid var(--border-light);background:var(--head)}
+.wdx-pop-foot .wdx-tool{width:100%}
+.wdx-multi{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:38px;margin:0 2px;padding:4px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--t1)}
+.wdx-multi.wdx-is-off{background:#f3f5f8;color:#9aa3b2}
+.wdx-multi .wdx-fchips{gap:4px}
+
+/* scene: dashboard with the panel open over it */
+.wdx-scene{position:relative;height:960px;overflow:hidden;border-top:1px solid var(--border)}
+.wdx-scene-bg{position:absolute;inset:0 0 auto 0;transform:translateX(-56px);pointer-events:none}
+.wdx-scrim{position:absolute;inset:0;z-index:20;background:rgba(15,30,48,.38)}
+.wdx-scene .wdx-panel{position:absolute;z-index:30;top:0;right:0;bottom:0}
+.wdx-scene-bg .wdx-nav{position:static}
+.wdx-scene .wdx-pn-list{flex:1}
+.wdx-handle{display:none}
+.wdx-hover-demo{position:absolute;right:476px;top:300px}
+
+/* ==========================================================================
+   Laptop (content narrower than 1320px)
+   ========================================================================== */
+@container wdx (max-width:1320px){
+  .wdx-page{padding:24px 24px 48px}
+  .wdx-nav{margin:0 -24px 22px;padding:0 24px}
+  .wdx-fig{padding:18px 18px}
+  .wdx-fig-n{font-size:32px}
+  .wdx-table th{padding:0 11px}
+  .wdx-table td{padding:11px 11px}
+  .wdx-email{max-width:210px}
+  .wdx-ch-body{padding-left:22px}
+  .wdx-ag-body{padding-left:22px}
+}
+@container wdx (max-width:1120px){
+  .wdx-pd-grid{grid-template-columns:minmax(0,1fr)}
+  .wdx-pd-col + .wdx-pd-col{border-left:0;border-top:1px solid var(--border)}
+  .wdx-step{grid-template-columns:44px minmax(0,1fr) 118px;grid-template-areas:"idx name frac" "idx bar bar" "idx chips chips"}
+}
+/* ==========================================================================
+   Tablet (below 900px): header stacks, figures 2 x 2, table rows become cards
+   ========================================================================== */
+@container wdx (max-width:899px){
+  .wdx-page{padding:20px 20px 40px}
+  .wdx-nav{margin:0 -20px 20px;padding:0 12px}
+  .wdx-head{flex-direction:column;flex-wrap:nowrap;align-items:stretch}
+  .wdx-id{flex-basis:auto}
+  .wdx-actions{justify-content:flex-start}
+  .wdx-root .wdx-title{font-size:30px}
+  .wdx-hero{--cols:2 !important}
+  .wdx-fig:nth-child(2n){border-right:0}
+  .wdx-fig:nth-child(n+3){border-top:1px solid var(--border-light)}
+  .wdx-plat-grid{grid-template-columns:minmax(0,1fr)}
+  .wdx-plat-card + .wdx-plat-card{border-left:0;border-top:1px solid var(--border)}
+  .wdx-table thead{display:none}
+  .wdx-table,.wdx-table tbody{display:block}
+  .wdx-table tbody tr{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name act" "email type" "cur cur" "prog done";gap:6px 14px;padding:14px 16px;border-bottom:1px solid var(--border-light);background:var(--surface)}
+  .wdx-table tbody tr.wdx-is-picked{background:var(--picked);box-shadow:inset 4px 0 0 var(--primary)}
+  .wdx-table tbody tr.wdx-is-picked td:first-child{box-shadow:none}
+  .wdx-table td{display:block;padding:0;border:0;background:transparent !important;min-width:0}
+  .wdx-table td.wdx-c-name{grid-area:name}
+  .wdx-table td.wdx-c-email{grid-area:email}
+  .wdx-table td.wdx-c-type{grid-area:type;justify-self:end}
+  .wdx-table td.wdx-c-cur{grid-area:cur}
+  .wdx-table td.wdx-c-prog{grid-area:prog}
+  .wdx-table td.wdx-c-done{grid-area:done;align-self:center;color:var(--t2);font-size:12.5px}
+  .wdx-table td.wdx-c-done::before{content:"Completed ";color:var(--t3)}
+  .wdx-table td.wdx-c-act{grid-area:act;align-self:center}
+  .wdx-person .wdx-mono{display:none}
+  .wdx-email{max-width:100%}
+  .wdx-act{min-width:0}
+  .wdx-ch-body{padding:0 16px 16px}
+  .wdx-ag-body{padding:0 16px 16px}
+  .wdx-ch-chips,.wdx-ch-zoomnote{order:3;justify-content:flex-start;flex:1 1 100%;padding-left:46px}
+  .wdx-ch-caret{order:2}
+  .wdx-ch-head{padding:12px 14px}
+  .wdx-chapter-note{display:none}
+  .wdx-pd-prog{padding-left:0;border-left:0}
+  .wdx-scene-bg{transform:none}
+  .wdx-hover-demo{display:none}
+}
+/* ==========================================================================
+   Phone (below 600px): single column, panel becomes a full-height sheet
+   ========================================================================== */
+@container wdx (max-width:600px){
+  .wdx-page{padding:16px 16px 36px}
+  .wdx-nav{margin:0 -16px 16px;padding:0 4px}
+  .wdx-nav a{padding:0 10px;height:44px}
+  .wdx-root .wdx-title{font-size:26px}
+  .wdx-root.wdx-root .wdx-lede{white-space:normal;font-size:14px}
+  .wdx-actions{display:grid;grid-template-columns:1fr 1fr;width:100%}
+  .wdx-actions .wdx-vr{display:none}
+  .wdx-actions .wdx-access{grid-column:1 / -1;justify-self:start}
+  .wdx-actions .wdx-primary{grid-column:1 / -1}
+  .wdx-tool,.wdx-primary{padding:0 10px}
+  .wdx-sh{padding:16px 16px 12px}
+  .wdx-sh-tools{width:100%}
+  .wdx-sh-tools > *{flex:1 1 auto}
+  .wdx-sh-tools > .wdx-pill{flex:none}
+  .wdx-select select,.wdx-selectbtn{min-width:0;width:100%}
+  .wdx-fig{padding:14px 14px}
+  .wdx-fig-n{font-size:26px}
+  .wdx-fig-k{font-size:12.5px}
+  .wdx-go span{display:none}
+  .wdx-grp{flex-basis:100%}
+  .wdx-grp-cells{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .wdx-grp-cells > :last-child:nth-child(odd){grid-column:1 / -1}
+  .wdx-cell{padding:12px 14px;min-height:88px}
+  .wdx-cell-n{font-size:22px}
+  .wdx-track{display:flex;padding:8px 16px 18px;overflow-x:auto}
+  .wdx-node{flex:0 0 104px}
+  .wdx-node::before{display:block}
+  .wdx-node:first-child::before{display:none}
+  .wdx-ch-chips,.wdx-ch-zoomnote{padding-left:0}
+  .wdx-ch-name{font-size:14px}
+  .wdx-ch-title{flex:1 1 0}
+  .wdx-step{grid-template-columns:36px minmax(0,1fr);grid-template-areas:"idx name" "idx frac" "idx bar" "idx chips";padding:12px}
+  .wdx-step-frac{text-align:left}
+  .wdx-bar2{padding:12px}
+  .wdx-search{min-width:0;flex:1 1 100%;max-width:none}
+  .wdx-bar2-end{margin-left:0}
+  .wdx-foot > span:first-child{display:none}
+  .wdx-pd-hero{padding:16px}
+  .wdx-pd-who{flex-basis:100%;align-items:flex-start}
+  .wdx-mono--lg{width:44px;height:44px}
+  .wdx-pd-col{padding:16px}
+  .wdx-ps{grid-template-columns:34px minmax(0,1fr)}
+  .wdx-ps > .wdx-st{grid-column:2;justify-self:start}
+  .wdx-raw{margin:0 16px 16px}
+  .wdx-cards{grid-template-columns:minmax(0,1fr)}
+  .wdx-card--text.wdx-is-expanded{grid-column:auto}
+  .wdx-ag-head{padding:10px 14px}
+  .wdx-ag-n{flex:1 1 auto}
+  .wdx-plat-card{padding:16px}
+  .wdx-donutwrap{justify-content:center}
+  .wdx-hbar-row{grid-template-columns:78px minmax(0,1fr)}
+  .wdx-chapter{flex-wrap:wrap}
+  .wdx-root .wdx-chapter-t{font-size:21px}
+  .wdx-scene{height:820px}
+  .wdx-scene .wdx-panel{top:44px;left:0;width:auto;border-left:0;border-radius:18px 18px 0 0;box-shadow:0 -20px 50px -20px rgba(14,32,52,.5)}
+  .wdx-handle{display:block;width:40px;height:4px;margin:8px auto 0;border-radius:2px;background:var(--border-strong)}
+  .wdx-pn-head{padding:12px 8px 12px 16px}
+  .wdx-pn-count,.wdx-pn-body{padding-left:16px;padding-right:16px}
+  .wdx-pp{padding:12px 16px}
+  .wdx-extbox{margin-left:16px;margin-right:16px}
+  .wdx-hcard{width:100%}
+}
+/* Headline figures: the "Open list" words give way to the chevron alone when a figure is narrow,
+   so they never sit on top of the figure's label (checker fix, 2026-11-17). */
+.wdx-fig{container:wdxfig / inline-size}
+.wdx-fig:has(.wdx-go) .wdx-fig-k{padding-right:18px}
+@container wdxfig (max-width:240px){.wdx-go span{display:none}}
+
+
+.wdx-band{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;padding:22px 32px 18px;background:#e9edf2;border-top:1px solid #d5dce6;border-bottom:1px solid #d5dce6}
+.wdx-band b{font:600 12.5px/1 'DM Sans',sans-serif;letter-spacing:.1em;color:var(--accent-ink);text-transform:uppercase}
+.wdx-band span{color:var(--t2);font-size:13.5px}
+@container wdx (max-width:600px){.wdx-band{padding:16px}}
+</style>
+</head>
+<body>
+<div class="wdx-root wdx-shell"><div class="wdx-band"><b>Frame 1</b><span>Live screen, richest normal state: a regular live workshop (not evergreen, not category-based) with a chat group, one challenge opened and Meera Pillai selected in the table.</span></div></div><main class="wdx-root wdx-shell" aria-label="Workshop dashboard">
+<div class="wdx-page">
+<header class="wdx-head">
+  <div class="wdx-id"><div class="wdx-meta"><span class="wdx-pill wdx-pill--gold">Workshop</span><span class="wdx-dates"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 9.8h17M8 3v4M16 3v4"/></svg>05 Nov 2026 – 28 Nov 2026</span></div><h1 class="wdx-title">Inner Clarity Intensive</h1><span class="wdx-rule" aria-hidden="true"></span><p class="wdx-lede" title="A four-week guided programme to build a daily reflection habit, map your values and leave with a personal ninety-day clarity plan you can actually keep.">A four-week guided programme to build a daily reflection habit, map your values and leave with a personal ninety-day clarity plan you can actually keep.</p></div>
+  <div class="wdx-actions"><button class="wdx-tool wdx-tip" type="button" data-tip="Email, WhatsApp or notify anyone — enrolled in this workshop or not"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 5.5h11a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1H8.5l-3.5 3v-3H3.5a1 1 0 0 1-1-1V6.5a1 1 0 0 1 1-1z"/><path d="M15.5 9h4.5a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1h-1.5v3l-3.5-3H11a1 1 0 0 1-1-1V14"/></svg>Communication</button><button class="wdx-tool" type="button"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.6M12 16.6v.2"/></svg>Q &amp; A</button><button class="wdx-tool wdx-tip" type="button" data-tip="Check why a profile can or cannot enroll in this workshop"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.8-4.8M6.5 10.5h1.8l1.2-2.4 2 4.8 1.2-2.4h1.8"/></svg>Diagnose</button><span class="wdx-vr" aria-hidden="true"></span><button class="wdx-tool wdx-tool--danger" type="button"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 12.5h9l1-12.5M10 10.5v6M14 10.5v6"/></svg>Clear</button><button class="wdx-primary" type="button"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="9.5" cy="8.5" r="3.5"/><path d="M3 19.5c.6-3.3 3-5 6.5-5 1.4 0 2.6.3 3.6.8M18 13.5v6M15 16.5h6"/></svg>Enroll</button></div>
+</header>
+<nav class="wdx-nav" aria-label="Dashboard sections"><a href="#wdx-glance" class="wdx-is-on">At a glance</a><a href="#wdx-challenges">Challenge progress<span class="wdx-nav-n">6</span></a><a href="#wdx-participants">Participants<span class="wdx-nav-n">248</span></a><a href="#wdx-pdata">Participant data</a><a href="#wdx-submissions">Submissions</a><a href="#wdx-platform">Platform usage</a></nav>
+<section class="wdx-sheet wdx-block" id="wdx-glance" aria-label="At a glance">
+  <div class="wdx-hero" style="--cols:4"><button type="button" class="wdx-fig wdx-fig--lead" style="--tone:var(--primary)"><span class="wdx-fig-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="9" cy="8.5" r="3.5"/><path d="M3 19.5c.6-3.3 3-5 6-5s5.4 1.7 6 5"/><path d="M15.5 5.3a3.5 3.5 0 0 1 0 6.4M17.5 14.8c1.8.6 3 2.1 3.5 4.7"/></svg>Total Enrolled</span><span class="wdx-fig-n">248</span><span class="wdx-go"><span>Open list</span><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span></button><div class="wdx-fig" style="--tone:var(--c-avg)"><span class="wdx-fig-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="3.5" width="17" height="17" rx="2"/><path d="M8 16v-4M12 16V8M16 16v-6"/></svg>Average Progress</span><span class="wdx-fig-n">46.8%</span><div class="wdx-bar" aria-hidden="true"><i style="width:46.8%"></i></div></div><div class="wdx-fig" style="--tone:var(--c-rate)"><span class="wdx-fig-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M8 12.3l2.8 2.8L16.2 9.6"/></svg>Completion Rate</span><span class="wdx-fig-n">18.5%</span><div class="wdx-bar" aria-hidden="true"><i style="width:18.5%"></i></div></div><button type="button" class="wdx-fig wdx-fig--money" style="--tone:var(--money)"><span class="wdx-fig-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 4.5h10M7 9h10M7 4.5h3.5a4.25 4.25 0 0 1 0 8.5H7l7.5 7"/></svg>Sale Achieved<span class="wdx-info wdx-tip" tabindex="0" data-tip="Enrolled people who bought between registration start and one month after the workshop ended"><svg class="wdx-ic wdx-ic--xs" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8v.2"/></svg></span></span><span class="wdx-fig-n">₹4,86,500</span><span class="wdx-fig-s"><b>31</b> users</span><span class="wdx-go"><span>Open list</span><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span></button></div>
+  <div class="wdx-groups"><section class="wdx-grp" style="--n:3"><div class="wdx-grp-h"><span class="wdx-eyebrow">Participation</span></div><div class="wdx-grp-cells"><button type="button" class="wdx-cell" style="--tone:var(--c-nav)"><span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 5.5v13l10.5-6.5z"/></svg><span>Total Started</span></span><span class="wdx-cell-n">214</span><span class="wdx-go"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span></button><button type="button" class="wdx-cell" style="--tone:var(--c-idle)"><span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M10 9v6M14 9v6"/></svg><span>Not Started</span></span><span class="wdx-cell-n">34</span><span class="wdx-go"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span></button><button type="button" class="wdx-cell" style="--tone:var(--c-act)"><span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 16.5l6-6 4 4 7-7.5M15 7h5.5v5.5"/></svg><span>Active Participants</span></span><span class="wdx-cell-n">196</span><span class="wdx-go"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span></button></div></section><section class="wdx-grp" style="--n:4"><div class="wdx-grp-h"><span class="wdx-eyebrow">People</span></div><div class="wdx-grp-cells"><button type="button" class="wdx-cell" style="--tone:var(--c-nav)"><span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20c.7-3.8 3.6-5.8 7.5-5.8s6.8 2 7.5 5.8"/></svg><span>Existing Participants</span></span><span class="wdx-cell-n">171</span><span class="wdx-go"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span></button><button type="button" class="wdx-cell" style="--tone:var(--new)"><span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 14c.8 1.3 2 2 3.5 2s2.7-.7 3.5-2M9 9.8v.4M15 9.8v.4"/></svg><span>New Users</span></span><span class="wdx-cell-n">77</span><span class="wdx-go"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span></button><button type="button" class="wdx-cell" style="--tone:var(--c-idle)"><span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 16c.8-1.3 2-2 3.5-2s2.7.7 3.5 2M9 9.8v.4M15 9.8v.4"/></svg><span>New Users Not Enrolled</span></span><span class="wdx-cell-n">39</span><span class="wdx-go"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span></button><button type="button" class="wdx-cell wdx-tip" data-tip="Enrolled people whose login is not yet in the workshop's chat group" style="--tone:var(--warn)"><span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.5 11.5c0 4-3.8 7-8.5 7a9.6 9.6 0 0 1-3.2-.5L4 19.5l1.4-3.4a6.5 6.5 0 0 1-1.9-4.6c0-4 3.8-7 8.5-7s8.5 3 8.5 7z"/><path d="M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01"/></svg><span>Users Not in Chat Group</span></span><span class="wdx-cell-n">12</span><span class="wdx-go"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span></button></div></section></div>
+</section>
+<section class="wdx-sheet wdx-block" id="wdx-challenges">
+  <div class="wdx-sh"><div><h2 class="wdx-h2">Challenge Progress Overview</h2><p class="wdx-sub">6 challenges · click any status to open its participants</p></div><div class="wdx-sh-tools"></div></div>
+  <div class="wdx-chs"><div class="wdx-ch"><button class="wdx-ch-head" type="button" aria-expanded="false"><span class="wdx-ch-num">1</span><span class="wdx-ch-title"><span class="wdx-ch-name">Orientation &amp; Intentions</span></span><span class="wdx-ch-chips"><span class="wdx-st wdx-st--done "><b>188</b> Completed</span><span class="wdx-st wdx-st--prog "><b>22</b> In Progress</span><span class="wdx-st wdx-st--idle "><b>38</b> Not Started</span></span><span class="wdx-ch-caret"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 9.5L12 15l5.5-5.5"/></svg></span></button></div><div class="wdx-ch wdx-is-open"><button class="wdx-ch-head" type="button" aria-expanded="true"><span class="wdx-ch-num">2</span><span class="wdx-ch-title"><span class="wdx-ch-name">Morning Pages</span></span><span class="wdx-ch-caret"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 9.5L12 15l5.5-5.5"/></svg></span></button><div class="wdx-ch-body"><div class="wdx-mainst"><span class="wdx-eyebrow">Main challenge status</span><button class="wdx-stbtn wdx-st--done" type="button"><b>142</b> Completed</button><button class="wdx-stbtn wdx-st--prog" type="button"><b>31</b> In Progress</button><button class="wdx-stbtn wdx-st--ready" type="button"><b>21</b> Ready to Start</button><button class="wdx-stbtn wdx-st--idle" type="button"><b>54</b> Not Started</button></div><div class="wdx-steps"><div class="wdx-step">
+  <span class="wdx-step-i">2.1</span>
+  <span class="wdx-step-name">Why morning pages work<span class="wdx-kind">quiz</span></span>
+  <span class="wdx-step-frac"><b>171</b>/248 completed</span>
+  <div class="wdx-stack" role="img" aria-label="Step status bar"><span class="wdx-seg-done" style="width:68.95%" title="Completed: 171"></span><span class="wdx-seg-prog" style="width:3.63%" title="In Progress: 9"></span></div>
+  <div class="wdx-step-chips"><button type="button" class="wdx-st wdx-st--done "><b>171</b> Completed</button><button type="button" class="wdx-st wdx-st--ready "><b>12</b> Ready to Start</button><button type="button" class="wdx-st wdx-st--idle "><b>56</b> Not Started</button></div>
+</div><div class="wdx-step">
+  <span class="wdx-step-i">2.2</span>
+  <span class="wdx-step-name">Seven-day practice log<span class="wdx-kind">assignment</span></span>
+  <span class="wdx-step-frac"><b>150</b>/248 completed</span>
+  <div class="wdx-stack" role="img" aria-label="Step status bar"><span class="wdx-seg-done" style="width:60.48%" title="Completed: 150"></span><span class="wdx-seg-rev" style="width:5.65%" title="In Review: 14"></span><span class="wdx-seg-rew" style="width:2.42%" title="Rework: 6"></span><span class="wdx-seg-mob" style="width:1.21%" title="Ready for Mobile: 3"></span><span class="wdx-seg-prog" style="width:3.23%" title="In Progress: 8"></span></div>
+  <div class="wdx-step-chips"><button type="button" class="wdx-st wdx-st--done "><b>150</b> Completed</button><button type="button" class="wdx-st wdx-st--rev "><b>14</b> In Review</button><button type="button" class="wdx-st wdx-st--rew "><b>6</b> Rework Required</button><button type="button" class="wdx-st wdx-st--mob "><b>3</b> Ready for Mobile</button><button type="button" class="wdx-st wdx-st--ready "><b>11</b> Ready to Start</button><button type="button" class="wdx-st wdx-st--idle "><b>56</b> Not Started</button></div>
+</div><div class="wdx-step">
+  <span class="wdx-step-i">2.3</span>
+  <span class="wdx-step-name">Reflection check-in<span class="wdx-kind">form</span></span>
+  <span class="wdx-step-frac"><b>142</b>/248 completed</span>
+  <div class="wdx-stack" role="img" aria-label="Step status bar"><span class="wdx-seg-done" style="width:57.26%" title="Completed: 142"></span><span class="wdx-seg-prog" style="width:1.61%" title="In Progress: 4"></span></div>
+  <div class="wdx-step-chips"><button type="button" class="wdx-st wdx-st--done "><b>142</b> Completed</button><button type="button" class="wdx-st wdx-st--ready "><b>8</b> Ready to Start</button><button type="button" class="wdx-st wdx-st--idle "><b>94</b> Not Started</button></div>
+</div><div class="wdx-step">
+  <span class="wdx-step-i">2.4</span>
+  <span class="wdx-step-name">Share your first page<span class="wdx-kind">videoask</span></span>
+  <span class="wdx-step-frac"><b>138</b>/248 completed</span>
+  <div class="wdx-stack" role="img" aria-label="Step status bar"><span class="wdx-seg-done" style="width:55.65%" title="Completed: 138"></span><span class="wdx-seg-prog" style="width:0.81%" title="In Progress: 2"></span></div>
+  <div class="wdx-step-chips"><button type="button" class="wdx-st wdx-st--done "><b>138</b> Completed</button><button type="button" class="wdx-st wdx-st--ready "><b>4</b> Ready to Start</button><button type="button" class="wdx-st wdx-st--idle "><b>104</b> Not Started</button></div>
+</div></div></div></div><div class="wdx-ch"><button class="wdx-ch-head" type="button" aria-expanded="false"><span class="wdx-ch-num wdx-ch-num--zoom"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="6.5" width="12.5" height="11" rx="2"/><path d="M15.5 10.5l5.5-3v9l-5.5-3"/></svg></span><span class="wdx-ch-title"><span class="wdx-ch-name">Live Session: Clearing the Fog</span></span><span class="wdx-ch-zoomnote">Zoom call · no per-person status</span><span class="wdx-ch-caret"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 9.5L12 15l5.5-5.5"/></svg></span></button></div><div class="wdx-ch"><button class="wdx-ch-head" type="button" aria-expanded="false"><span class="wdx-ch-num">4</span><span class="wdx-ch-title"><span class="wdx-ch-name">Values Map</span></span><span class="wdx-ch-chips"><span class="wdx-st wdx-st--done "><b>96</b> Completed</span><span class="wdx-st wdx-st--prog "><b>40</b> In Progress</span><span class="wdx-st wdx-st--ready "><b>18</b> Ready to Start</span><span class="wdx-st wdx-st--idle "><b>94</b> Not Started</span></span><span class="wdx-ch-caret"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 9.5L12 15l5.5-5.5"/></svg></span></button></div><div class="wdx-ch"><button class="wdx-ch-head" type="button" aria-expanded="false"><span class="wdx-ch-num">5</span><span class="wdx-ch-title"><span class="wdx-ch-name">The Clarity Letter</span></span><span class="wdx-ch-chips"><span class="wdx-st wdx-st--done "><b>61</b> Completed</span><span class="wdx-st wdx-st--prog "><b>25</b> In Progress</span><span class="wdx-st wdx-st--ready "><b>12</b> Ready to Start</span><span class="wdx-st wdx-st--idle "><b>150</b> Not Started</span></span><span class="wdx-ch-caret"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 9.5L12 15l5.5-5.5"/></svg></span></button></div><div class="wdx-ch"><button class="wdx-ch-head" type="button" aria-expanded="false"><span class="wdx-ch-num">6</span><span class="wdx-ch-title"><span class="wdx-ch-name">Personal Clarity Plan</span></span><span class="wdx-ch-chips"><span class="wdx-st wdx-st--done "><b>46</b> Completed</span><span class="wdx-st wdx-st--prog "><b>19</b> In Progress</span><span class="wdx-st wdx-st--ready "><b>8</b> Ready to Start</span><span class="wdx-st wdx-st--idle "><b>175</b> Not Started</span></span><span class="wdx-ch-caret"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 9.5L12 15l5.5-5.5"/></svg></span></button></div></div>
+</section>
+<section class="wdx-sheet wdx-block" id="wdx-participants">
+  <div class="wdx-sh"><div><h2 class="wdx-h2">Participant Progress Details</h2><p class="wdx-sub">248 participants</p></div><div class="wdx-sh-tools"><button class="wdx-primary wdx-primary--sm" type="button"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14"/></svg>Export</button></div></div>
+  <div class="wdx-bar2"><label class="wdx-search"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><span class="wdx-sr">Search</span><input type="search" placeholder="Search by name or email"></label></div>
+  <div class="wdx-tablewrap"><table class="wdx-table"><thead><tr><th><button class="wdx-th-sort wdx-is-sorted" type="button">Participant<svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 14.5L12 9l5.5 5.5"/></svg></button></th><th>Email</th><th>Current Challenge</th><th><button class="wdx-th-sort" type="button">Progress<svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 4.5v15M4.5 8L8 4.5 11.5 8M16 19.5v-15M12.5 16l3.5 3.5 3.5-3.5"/></svg></button></th><th><button class="wdx-th-sort" type="button">Completed<svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 4.5v15M4.5 8L8 4.5 11.5 8M16 19.5v-15M12.5 16l3.5 3.5 3.5-3.5"/></svg></button></th><th>Action</th></tr></thead><tbody><tr class="wdx-is-click"><td class="wdx-c-name"><div class="wdx-person"><span class="wdx-mono " aria-hidden="true">AM</span><span class="wdx-name">Aarav Mehta</span><span class="wdx-new">New</span></div></td><td class="wdx-c-email"><span class="wdx-email" title="aarav.mehta@examplemail.in">aarav.mehta@examplemail.in</span></td><td class="wdx-c-cur"><div class="wdx-cur"><span class="wdx-cur-i">4.2</span><span class="wdx-cur-n">Name your top five values</span></div></td><td class="wdx-c-prog"><div class="wdx-prog"><div class="wdx-bar"><i style="width:58%"></i></div><span class="wdx-prog-v">58%</span></div></td><td class="wdx-c-done">11</td><td class="wdx-c-act"><button class="wdx-act wdx-tip" type="button" data-tip="Move to next challenge">Move Next<svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M13.5 6.5L19 12l-5.5 5.5"/></svg></button></td></tr><tr class="wdx-is-click"><td class="wdx-c-name"><div class="wdx-person"><span class="wdx-mono " aria-hidden="true">IR</span><span class="wdx-name">Ishita Rao</span></div></td><td class="wdx-c-email"><span class="wdx-email" title="ishita.rao@examplemail.in">ishita.rao@examplemail.in</span></td><td class="wdx-c-cur"><div class="wdx-cur"><span class="wdx-cur-i">2.2</span><span class="wdx-cur-n">Seven-day practice log</span></div></td><td class="wdx-c-prog"><div class="wdx-prog"><div class="wdx-bar"><i style="width:34%"></i></div><span class="wdx-prog-v">34%</span></div></td><td class="wdx-c-done">6</td><td class="wdx-c-act"><button class="wdx-act wdx-tip" type="button" data-tip="Move to next challenge">Move Next<svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M13.5 6.5L19 12l-5.5 5.5"/></svg></button></td></tr><tr class="wdx-is-click"><td class="wdx-c-name"><div class="wdx-person"><span class="wdx-mono " aria-hidden="true">KS</span><span class="wdx-name">Kabir Sethi</span></div></td><td class="wdx-c-email"><span class="wdx-email" title="kabir.sethi@examplemail.in">kabir.sethi@examplemail.in</span></td><td class="wdx-c-cur"><div class="wdx-cur"><span class="wdx-cur-i">6.4</span><span class="wdx-cur-n">Commit to one change</span></div></td><td class="wdx-c-prog"><div class="wdx-prog wdx-is-full"><div class="wdx-bar"><i style="width:100%"></i></div><span class="wdx-prog-v">100%</span></div></td><td class="wdx-c-done">19</td><td class="wdx-c-act"><button class="wdx-act wdx-act--done wdx-tip" type="button" disabled data-tip="Workshop completed"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Completed</button></td></tr><tr class="wdx-is-click wdx-is-picked"><td class="wdx-c-name"><div class="wdx-person"><span class="wdx-mono " aria-hidden="true">MP</span><span class="wdx-name">Meera Pillai</span></div></td><td class="wdx-c-email"><span class="wdx-email" title="meera.pillai@examplemail.in">meera.pillai@examplemail.in</span></td><td class="wdx-c-cur"><div class="wdx-cur"><span class="wdx-cur-i">4.2</span><span class="wdx-cur-n">Name your top five values</span></div></td><td class="wdx-c-prog"><div class="wdx-prog"><div class="wdx-bar"><i style="width:58%"></i></div><span class="wdx-prog-v">58%</span></div></td><td class="wdx-c-done">11</td><td class="wdx-c-act"><button class="wdx-act wdx-tip" type="button" data-tip="Move to next challenge">Move Next<svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M13.5 6.5L19 12l-5.5 5.5"/></svg></button></td></tr><tr class="wdx-is-click"><td class="wdx-c-name"><div class="wdx-person"><span class="wdx-mono " aria-hidden="true">RD</span><span class="wdx-name">Rohan Das</span><span class="wdx-new">New</span></div></td><td class="wdx-c-email"><span class="wdx-email" title="rohan.das@examplemail.in">rohan.das@examplemail.in</span></td><td class="wdx-c-cur"><div class="wdx-cur"><span class="wdx-cur-i">3</span><span class="wdx-cur-n">Live Session: Clearing the Fog</span></div></td><td class="wdx-c-prog"><div class="wdx-prog"><div class="wdx-bar"><i style="width:42%"></i></div><span class="wdx-prog-v">42%</span></div></td><td class="wdx-c-done">8</td><td class="wdx-c-act"><button class="wdx-act wdx-act--zoom wdx-tip" type="button" disabled data-tip="Zoom call challenges cannot be moved manually"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="6.5" width="12.5" height="11" rx="2"/><path d="M15.5 10.5l5.5-3v9l-5.5-3"/></svg>Zoom Call</button></td></tr><tr class="wdx-is-click"><td class="wdx-c-name"><div class="wdx-person"><span class="wdx-mono " aria-hidden="true">TI</span><span class="wdx-name">Tara Iyer</span></div></td><td class="wdx-c-email"><span class="wdx-email" title="tara.iyer@examplemail.in">tara.iyer@examplemail.in</span></td><td class="wdx-c-cur"><div class="wdx-cur"><span class="wdx-cur-i">1.1</span><span class="wdx-cur-n">Welcome and intentions</span></div></td><td class="wdx-c-prog"><div class="wdx-prog"><div class="wdx-bar"><i style="width:0%"></i></div><span class="wdx-prog-v">0%</span></div></td><td class="wdx-c-done">0</td><td class="wdx-c-act"><button class="wdx-act wdx-tip" type="button" data-tip="Move to next challenge">Move Next<svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M13.5 6.5L19 12l-5.5 5.5"/></svg></button></td></tr><tr class="wdx-is-click"><td class="wdx-c-name"><div class="wdx-person"><span class="wdx-mono " aria-hidden="true">VN</span><span class="wdx-name">Vikram Nair</span></div></td><td class="wdx-c-email"><span class="wdx-email">—</span></td><td class="wdx-c-cur"><div class="wdx-cur"><span class="wdx-cur-i">5.1</span><span class="wdx-cur-n">Draft your letter</span></div></td><td class="wdx-c-prog"><div class="wdx-prog"><div class="wdx-bar"><i style="width:68%"></i></div><span class="wdx-prog-v">68%</span></div></td><td class="wdx-c-done">13</td><td class="wdx-c-act"><button class="wdx-act" type="button" disabled aria-label="Moving"><span class="wdx-spin" style="width:20px;height:20px"></span></button></td></tr><tr class="wdx-is-click"><td class="wdx-c-name"><div class="wdx-person"><span class="wdx-mono " aria-hidden="true">AB</span><span class="wdx-name">Ananya Bose</span><span class="wdx-new">New</span></div></td><td class="wdx-c-email"><span class="wdx-email" title="ananya.bose@examplemail.in">ananya.bose@examplemail.in</span></td><td class="wdx-c-cur"><div class="wdx-cur"><span class="wdx-cur-i">2.4</span><span class="wdx-cur-n">Share your first page</span></div></td><td class="wdx-c-prog"><div class="wdx-prog"><div class="wdx-bar"><i style="width:47%"></i></div><span class="wdx-prog-v">47%</span></div></td><td class="wdx-c-done">9</td><td class="wdx-c-act"><button class="wdx-act wdx-tip" type="button" data-tip="Move to next challenge">Move Next<svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M13.5 6.5L19 12l-5.5 5.5"/></svg></button></td></tr><tr class="wdx-is-click"><td class="wdx-c-name"><div class="wdx-person"><span class="wdx-mono " aria-hidden="true">DK</span><span class="wdx-name">Dev Khanna</span></div></td><td class="wdx-c-email"><span class="wdx-email" title="dev.khanna@examplemail.in">dev.khanna@examplemail.in</span></td><td class="wdx-c-cur"><div class="wdx-cur"><span class="wdx-cur-i">6.1</span><span class="wdx-cur-n">Map the next ninety days</span></div></td><td class="wdx-c-prog"><div class="wdx-prog"><div class="wdx-bar"><i style="width:84%"></i></div><span class="wdx-prog-v">84%</span></div></td><td class="wdx-c-done">16</td><td class="wdx-c-act"><button class="wdx-act wdx-tip" type="button" data-tip="Move to next challenge">Move Next<svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M13.5 6.5L19 12l-5.5 5.5"/></svg></button></td></tr><tr class="wdx-is-click"><td class="wdx-c-name"><div class="wdx-person"><span class="wdx-mono " aria-hidden="true">NV</span><span class="wdx-name">Nisha Varma</span></div></td><td class="wdx-c-email"><span class="wdx-email" title="nisha.varma.longername@examplemail.in">nisha.varma.longername@examplemail.in</span></td><td class="wdx-c-cur"><div class="wdx-cur"><span class="wdx-cur-i">4.1</span><span class="wdx-cur-n">Values card sort</span></div></td><td class="wdx-c-prog"><div class="wdx-prog"><div class="wdx-bar"><i style="width:53%"></i></div><span class="wdx-prog-v">53%</span></div></td><td class="wdx-c-done">10</td><td class="wdx-c-act"><button class="wdx-act wdx-tip" type="button" data-tip="Move to next challenge">Move Next<svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M13.5 6.5L19 12l-5.5 5.5"/></svg></button></td></tr></tbody></table></div>
+  <div class="wdx-foot"><span>Items per page:</span><span class="wdx-selectbox"><select aria-label="Items per page"><option>10</option><option>25</option><option>50</option><option>100</option></select></span><span class="wdx-foot-range">1 – 10 of 248</span><div class="wdx-pager"><button class="wdx-iconbtn" type="button" disabled aria-label="First page"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M16.5 6.5L11 12l5.5 5.5M7.5 6.5v11"/></svg></button><button class="wdx-iconbtn" type="button" disabled aria-label="Previous page"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14.5 6.5L9 12l5.5 5.5"/></svg></button><button class="wdx-iconbtn wdx-iconbtn--boxed" type="button" aria-label="Next page"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></button><button class="wdx-iconbtn wdx-iconbtn--boxed" type="button" aria-label="Last page"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7.5 6.5L13 12l-5.5 5.5M16.5 6.5v11"/></svg></button></div></div>
+</section>
+<section class="wdx-sheet wdx-block" id="wdx-pdata"><div class="wdx-sh"><div><h2 class="wdx-h2">Participant Data</h2><p class="wdx-sub">Challenge progress &amp; submissions for the selected participant</p></div></div><div class="wdx-pd-hero">
+  <div class="wdx-pd-who"><span class="wdx-mono wdx-mono--lg" aria-hidden="true">MP</span><div style="min-width:0">
+    <div class="wdx-pd-name">Meera Pillai<span class="wdx-st wdx-st--enrolled wdx-st--sq">Enrolled</span></div>
+    <div class="wdx-pd-meta"><span><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 9.8h17M8 3v4M16 3v4"/><path d="M13.5 13.5h3v3h-3z"/></svg>Enrolled 06 Nov 2026</span><span class="wdx-tip" tabindex="0" data-tip="Platform this participant enrolled from"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2.5" y="5" width="13" height="10" rx="1.2"/><path d="M5.5 18.5h7M9 15v3.5"/><rect x="16.5" y="9" width="5" height="10" rx="1"/></svg>via EiFlix App</span></div>
+    <div class="wdx-pd-tags"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.8 12.6V5a1.2 1.2 0 0 1 1.2-1.2h7.6a1.2 1.2 0 0 1 .85.35l7.3 7.3a1.2 1.2 0 0 1 0 1.7l-7.6 7.6a1.2 1.2 0 0 1-1.7 0l-7.3-7.3a1.2 1.2 0 0 1-.35-.85z"/><circle cx="8.3" cy="8.3" r="1.3"/></svg><span class="wdx-tag">Morning batch</span><span class="wdx-tag">Scholarship</span><span class="wdx-tag">Referral – Q3</span></div>
+  </div></div>
+  <div class="wdx-pd-prog"><div><span class="wdx-pd-pct">58%</span><span class="wdx-pd-pct-l">Progress</span></div><div class="wdx-bar"><i style="width:58%"></i></div></div>
+  <button class="wdx-iconbtn wdx-iconbtn--boxed wdx-tip wdx-tip--end" type="button" data-tip="Clear selection" aria-label="Clear selection"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg></button>
+</div><div class="wdx-pd-grid">
+  <div class="wdx-pd-col"><h3 class="wdx-pd-h"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="5" y="4.5" width="14" height="16" rx="1.5"/><path d="M9 4.5V3.5h6v1M8.5 10h7M8.5 13.5h7M8.5 17h4"/></svg>Challenge Progress Details<span class="wdx-eyebrow">current: 4.2</span></h3><div class="wdx-pcs"><article class="wdx-pc"><div class="wdx-pc-head"><span class="wdx-ch-num">1</span><div class="wdx-pc-title"><span class="wdx-pc-name">Orientation: Setting your intentions</span><span class="wdx-pc-kind">Challenge</span></div><span class="wdx-st wdx-st--done wdx-st--sq ">Completed</span></div><div class="wdx-pc-meta"><span><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 5.5v13l10.5-6.5z"/></svg>Started 06 Nov 2026</span><span><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M8 12.3l2.8 2.8L16.2 9.6"/></svg>Completed 08 Nov 2026</span></div><div class="wdx-ps"><span class="wdx-ps-i">1.1</span><span class="wdx-ps-name">Welcome and intentions</span><span class="wdx-st wdx-st--done wdx-st--sq ">Completed</span><div class="wdx-ps-meta"><span class="wdx-kind">Form</span><span class="wdx-plat wdx-tip" tabindex="0" data-tip="Platform the participant completed this step on"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2.5" y="5" width="13" height="10" rx="1.2"/><path d="M5.5 18.5h7M9 15v3.5"/><rect x="16.5" y="9" width="5" height="10" rx="1"/></svg>EiFlix App</span><span><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>06 Nov 2026</span><span><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>06 Nov 2026, 9:12 am</span></div><div class="wdx-sacts"><button class="wdx-sbtn wdx-tip" data-tip="Click to view current form" type="button"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3.5V8h4.5M9 12.5h6M9 16h6"/></svg>Form</button></div></div><div class="wdx-ps"><span class="wdx-ps-i">1.2</span><span class="wdx-ps-name">Your starting point</span><span class="wdx-st wdx-st--done wdx-st--sq ">Completed</span><div class="wdx-ps-meta"><span class="wdx-kind">Quiz</span><span class="wdx-plat wdx-tip" tabindex="0" data-tip="Platform the participant completed this step on"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2.5" y="5" width="13" height="10" rx="1.2"/><path d="M5.5 18.5h7M9 15v3.5"/><rect x="16.5" y="9" width="5" height="10" rx="1"/></svg>EiFlix App</span><span><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>06 Nov 2026</span><span><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>07 Nov 2026, 7:40 pm</span></div><div class="wdx-sacts"><button class="wdx-sbtn wdx-tip" data-tip="Click to view quiz results (2 results)" type="button"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5"/></svg>Quiz Results<span class="wdx-badge">2</span></button></div></div><div class="wdx-ps"><span class="wdx-ps-i">1.3</span><span class="wdx-ps-name">Meet your circle</span><span class="wdx-st wdx-st--done wdx-st--sq ">Completed</span><div class="wdx-ps-meta"><span class="wdx-kind">Videoask</span><span class="wdx-plat wdx-tip" tabindex="0" data-tip="Platform the participant completed this step on"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2.5" y="5" width="13" height="10" rx="1.2"/><path d="M5.5 18.5h7M9 15v3.5"/><rect x="16.5" y="9" width="5" height="10" rx="1"/></svg>EiFlix Web</span><span><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>07 Nov 2026</span><span><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>07 Nov 2026, 8:05 pm</span></div><div class="wdx-sacts"><button class="wdx-sbtn wdx-tip" data-tip="Click to view the VideoAsk video" type="button"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="6.5" width="12.5" height="11" rx="2"/><path d="M15.5 10.5l5.5-3v9l-5.5-3"/></svg>Video Ask</button></div></div><div class="wdx-ps"><span class="wdx-ps-i">1.4</span><span class="wdx-ps-name">First reflection</span><span class="wdx-st wdx-st--done wdx-st--sq ">Completed</span><div class="wdx-ps-meta"><span class="wdx-kind">Form</span><span class="wdx-plat wdx-tip" tabindex="0" data-tip="Platform the participant completed this step on"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2.5" y="5" width="13" height="10" rx="1.2"/><path d="M5.5 18.5h7M9 15v3.5"/><rect x="16.5" y="9" width="5" height="10" rx="1"/></svg>EiFlix App</span><span><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>08 Nov 2026</span><span><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>08 Nov 2026, 6:30 am</span></div></div></article><article class="wdx-pc"><div class="wdx-pc-head"><span class="wdx-ch-num">2</span><div class="wdx-pc-title"><span class="wdx-pc-name">Morning Pages: Build the habit</span><span class="wdx-pc-kind">Challenge</span></div><span class="wdx-st wdx-st--done wdx-st--sq ">Completed</span></div><div class="wdx-pc-meta"><span><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 5.5v13l10.5-6.5z"/></svg>Started 08 Nov 2026</span><span><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M8 12.3l2.8 2.8L16.2 9.6"/></svg>Completed 13 Nov 2026</span><span><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5l7 2.8v5.2c0 4.3-3 7.8-7 9-4-1.2-7-4.7-7-9V6.3z"/><circle cx="12" cy="10.5" r="2"/><path d="M8.8 15.5c.6-1.4 1.8-2.2 3.2-2.2s2.6.8 3.2 2.2"/></svg>Manual Completion</span></div><div class="wdx-ps"><span class="wdx-ps-i">2.1</span><span class="wdx-ps-name">Why morning pages work</span><span class="wdx-st wdx-st--done wdx-st--sq ">Completed</span><div class="wdx-ps-meta"><span class="wdx-kind">Quiz</span><span class="wdx-plat wdx-tip" tabindex="0" data-tip="Platform the participant completed this step on"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2.5" y="5" width="13" height="10" rx="1.2"/><path d="M5.5 18.5h7M9 15v3.5"/><rect x="16.5" y="9" width="5" height="10" rx="1"/></svg>EiFlix App</span><span><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>08 Nov 2026</span><span><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>08 Nov 2026, 7:02 am</span></div><div class="wdx-sacts"><button class="wdx-sbtn wdx-tip" data-tip="Click to view quiz results (1 result)" type="button"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5"/></svg>Quiz Results</button></div></div><div class="wdx-ps"><span class="wdx-ps-i">2.2</span><span class="wdx-ps-name">Seven-day practice log</span><span class="wdx-st wdx-st--done wdx-st--sq ">Completed</span><div class="wdx-ps-meta"><span class="wdx-kind">Assignment</span><span class="wdx-plat wdx-tip" tabindex="0" data-tip="Platform the participant completed this step on"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2.5" y="5" width="13" height="10" rx="1.2"/><path d="M5.5 18.5h7M9 15v3.5"/><rect x="16.5" y="9" width="5" height="10" rx="1"/></svg>EiFlix Web</span><span><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>09 Nov 2026</span><span><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>12 Nov 2026, 9:48 pm</span></div><div class="wdx-sacts"><button class="wdx-sbtn wdx-tip" data-tip="Click to review assignment submissions" type="button"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="3.5" width="16" height="17" rx="2"/><path d="M9.8 9a2.2 2.2 0 1 1 3 2c-.5.3-.8.7-.8 1.3v.4M12 15.8v.2"/></svg>Assignment (Question)<span class="wdx-badge">3</span></button><button class="wdx-sbtn wdx-sbtn--muted wdx-tip" type="button" data-tip="Click to view previous question assignment from 11 Nov 2026"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 12a8.5 8.5 0 1 0 2.5-6M3.5 4.5V9H8"/><path d="M12 8v4.5l3 2"/></svg>Previous 2 (11 Nov 2026) · 2 files · “Add one more day” +1 more</button><button class="wdx-sbtn wdx-sbtn--muted wdx-tip" type="button" data-tip="Click to view previous question assignment from 10 Nov 2026"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 12a8.5 8.5 0 1 0 2.5-6M3.5 4.5V9H8"/><path d="M12 8v4.5l3 2"/></svg>Previous 1 (10 Nov 2026) · 1 file</button></div></div><div class="wdx-ps"><span class="wdx-ps-i">2.3</span><span class="wdx-ps-name">Reflection check-in</span><span class="wdx-st wdx-st--done wdx-st--sq ">Completed</span><div class="wdx-ps-meta"><span class="wdx-kind">Form</span><span class="wdx-plat wdx-tip" tabindex="0" data-tip="Platform the participant completed this step on"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2.5" y="5" width="13" height="10" rx="1.2"/><path d="M5.5 18.5h7M9 15v3.5"/><rect x="16.5" y="9" width="5" height="10" rx="1"/></svg>EiFlix App</span><span><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>12 Nov 2026</span><span><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>13 Nov 2026, 6:55 am</span></div><div class="wdx-sacts"><button class="wdx-sbtn wdx-tip" data-tip="Click to view current form" type="button"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3.5V8h4.5M9 12.5h6M9 16h6"/></svg>Form</button></div></div><div class="wdx-ps"><span class="wdx-ps-i">2.4</span><span class="wdx-ps-name">Share your first page</span><span class="wdx-st wdx-st--done wdx-st--sq ">Completed</span><div class="wdx-ps-meta"><span class="wdx-kind">Videoask</span><span class="wdx-plat wdx-tip" tabindex="0" data-tip="Platform the participant completed this step on"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2.5" y="5" width="13" height="10" rx="1.2"/><path d="M5.5 18.5h7M9 15v3.5"/><rect x="16.5" y="9" width="5" height="10" rx="1"/></svg>EiFlix App</span><span><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>13 Nov 2026</span><span><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>13 Nov 2026, 7:20 am</span></div><div class="wdx-sacts"><button class="wdx-sbtn wdx-tip" data-tip="Click to view the VideoAsk video" type="button"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="6.5" width="12.5" height="11" rx="2"/><path d="M15.5 10.5l5.5-3v9l-5.5-3"/></svg>Video Ask</button></div></div></article><article class="wdx-pc"><div class="wdx-pc-head"><span class="wdx-ch-num">3</span><div class="wdx-pc-title"><span class="wdx-pc-name">Live Session: Clearing the Fog</span><span class="wdx-pc-kind">Zoomcall</span></div><span class="wdx-st wdx-st--done wdx-st--sq ">Completed</span></div><div class="wdx-pc-zoom"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="6.5" width="12.5" height="11" rx="2"/><path d="M15.5 10.5l5.5-3v9l-5.5-3"/></svg>Zoom Call Session</div></article><article class="wdx-pc wdx-is-current"><div class="wdx-pc-head"><span class="wdx-ch-num">4</span><div class="wdx-pc-title"><span class="wdx-pc-name">Values Map: What matters most</span><span class="wdx-pc-kind">Challenge</span></div><span class="wdx-st wdx-st--prog wdx-st--sq ">In Progress</span></div><div class="wdx-pc-meta"><span><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 5.5v13l10.5-6.5z"/></svg>Started 14 Nov 2026</span></div><div class="wdx-ps"><span class="wdx-ps-i">4.1</span><span class="wdx-ps-name">Values card sort</span><span class="wdx-st wdx-st--done wdx-st--sq ">Completed</span><div class="wdx-ps-meta"><span class="wdx-kind">Assignment</span><span class="wdx-plat wdx-tip" tabindex="0" data-tip="Platform the participant completed this step on"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2.5" y="5" width="13" height="10" rx="1.2"/><path d="M5.5 18.5h7M9 15v3.5"/><rect x="16.5" y="9" width="5" height="10" rx="1"/></svg>EiFlix App</span><span><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>14 Nov 2026</span><span><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>15 Nov 2026, 8:05 pm</span></div><div class="wdx-sacts"><button class="wdx-sbtn wdx-tip" data-tip="Click to view current assignment form" type="button"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="5" y="4.5" width="14" height="16" rx="1.5"/><path d="M9 4.5V3.5h6v1M8.5 10h7M8.5 13.5h7M8.5 17h4"/></svg>Assignment (Form)</button><button class="wdx-sbtn wdx-sbtn--muted wdx-tip" type="button" data-tip="Click to view previous form submission from 14 Nov 2026"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 12a8.5 8.5 0 1 0 2.5-6M3.5 4.5V9H8"/><path d="M12 8v4.5l3 2"/></svg>Previous 1 (14 Nov 2026) · Form Data · “Please rank all ten”</button></div></div><div class="wdx-ps wdx-is-current"><span class="wdx-ps-i">4.2</span><span class="wdx-ps-name">Name your top five values</span><span class="wdx-st wdx-st--prog wdx-st--sq ">In Progress</span><div class="wdx-ps-meta"><span class="wdx-kind">Assignment</span><span><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>16 Nov 2026</span></div></div><div class="wdx-ps"><span class="wdx-ps-i">4.3</span><span class="wdx-ps-name">Values in action</span><span class="wdx-st wdx-st--idle wdx-st--sq ">Not Started</span><div class="wdx-ps-meta"><span class="wdx-kind">Form</span></div></div><div class="wdx-ps"><span class="wdx-ps-i">4.4</span><span class="wdx-ps-name">Values check-in call notes</span><span class="wdx-st wdx-st--idle wdx-st--sq ">Not Started</span><div class="wdx-ps-meta"><span class="wdx-kind">Quiz</span></div></div></article><article class="wdx-pc"><div class="wdx-pc-head"><span class="wdx-ch-num">5</span><div class="wdx-pc-title"><span class="wdx-pc-name">The Clarity Letter</span><span class="wdx-pc-kind">Challenge</span></div><span class="wdx-st wdx-st--idle wdx-st--sq ">Not Started</span></div><div class="wdx-ps"><span class="wdx-ps-i">5.1</span><span class="wdx-ps-name">Draft your letter</span><span class="wdx-st wdx-st--idle wdx-st--sq ">Not Started</span><div class="wdx-ps-meta"><span class="wdx-kind">Assignment</span></div></div><div class="wdx-ps"><span class="wdx-ps-i">5.2</span><span class="wdx-ps-name">Read it aloud</span><span class="wdx-st wdx-st--idle wdx-st--sq ">Not Started</span><div class="wdx-ps-meta"><span class="wdx-kind">Videoask</span></div></div><div class="wdx-ps"><span class="wdx-ps-i">5.3</span><span class="wdx-ps-name">Letter reflection</span><span class="wdx-st wdx-st--idle wdx-st--sq ">Not Started</span><div class="wdx-ps-meta"><span class="wdx-kind">Form</span></div></div></article><article class="wdx-pc"><div class="wdx-pc-head"><span class="wdx-ch-num">6</span><div class="wdx-pc-title"><span class="wdx-pc-name">Personal Clarity Plan</span><span class="wdx-pc-kind">Challenge</span></div><span class="wdx-st wdx-st--idle wdx-st--sq ">Not Started</span></div><div class="wdx-ps"><span class="wdx-ps-i">6.1</span><span class="wdx-ps-name">Map the next ninety days</span><span class="wdx-st wdx-st--idle wdx-st--sq ">Not Started</span><div class="wdx-ps-meta"><span class="wdx-kind">Form</span></div></div><div class="wdx-ps"><span class="wdx-ps-i">6.2</span><span class="wdx-ps-name">Plan review</span><span class="wdx-st wdx-st--idle wdx-st--sq ">Not Started</span><div class="wdx-ps-meta"><span class="wdx-kind">Quiz</span></div></div><div class="wdx-ps"><span class="wdx-ps-i">6.3</span><span class="wdx-ps-name">Accountability partner</span><span class="wdx-st wdx-st--idle wdx-st--sq ">Not Started</span><div class="wdx-ps-meta"><span class="wdx-kind">Form</span></div></div><div class="wdx-ps"><span class="wdx-ps-i">6.4</span><span class="wdx-ps-name">Commit to one change</span><span class="wdx-st wdx-st--idle wdx-st--sq ">Not Started</span><div class="wdx-ps-meta"><span class="wdx-kind">Assignment</span></div></div></article></div></div>
+  <div class="wdx-pd-col"><div class="wdx-pd-rail"><h3 class="wdx-pd-h"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="4.5" width="17" height="15" rx="1.5"/><path d="M7 9h5M7 12.5h3M13.5 14l2 2 3.5-4"/></svg>Assignment Data</h3><div class="wdx-ads"><article class="wdx-ad"><div class="wdx-ad-head"><span class="wdx-ad-i">2.2</span><div class="wdx-ad-t"><b>Seven-day practice log</b><span>Morning Pages: Build the habit</span></div><span class="wdx-st wdx-st--done wdx-st--sq ">Completed</span></div>
+<div class="wdx-ad-row"><div><b>Assignment Question</b><span>3 files submitted</span></div><button class="wdx-tool wdx-tool--sm" type="button"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>Review</button></div>
+<div class="wdx-prev"><div class="wdx-prev-h"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 12a8.5 8.5 0 1 0 2.5-6M3.5 4.5V9H8"/><path d="M12 8v4.5l3 2"/></svg>Previous Submissions (2)</div>
+<div class="wdx-prev-e"><div><b>Previous Submission 2</b><span>11 Nov 2026 · Question Assignment · 2 files</span><p><b>Notes:</b></p><p>Add one more day so the log covers a full week.</p><p>Photos are clear — thank you.</p></div><button class="wdx-tool wdx-tool--sm" type="button"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>View</button></div>
+<div class="wdx-prev-e"><div><b>Previous Submission 1</b><span>10 Nov 2026 · Question Assignment · 1 file</span></div><button class="wdx-tool wdx-tool--sm" type="button"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>View</button></div></div></article><article class="wdx-ad"><div class="wdx-ad-head"><span class="wdx-ad-i">4.1</span><div class="wdx-ad-t"><b>Values card sort</b><span>Values Map: What matters most</span></div><span class="wdx-st wdx-st--done wdx-st--sq ">Completed</span></div>
+<div class="wdx-ad-row"><div><b>Assignment Form</b><span>Form-based Assignment</span></div><button class="wdx-tool wdx-tool--sm" type="button"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>View</button></div>
+<div class="wdx-prev"><div class="wdx-prev-h"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 12a8.5 8.5 0 1 0 2.5-6M3.5 4.5V9H8"/><path d="M12 8v4.5l3 2"/></svg>Previous Submissions (1)</div>
+<div class="wdx-prev-e"><div><b>Previous Submission 1</b><span>14 Nov 2026 · Form Assignment · Form Data Available</span><p><b>Notes:</b></p><p>Please rank all ten cards, not only the top three.</p></div><button class="wdx-tool wdx-tool--sm" type="button"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>View</button></div></div></article><article class="wdx-ad"><div class="wdx-ad-head"><span class="wdx-ad-i">1.4</span><div class="wdx-ad-t"><b>First reflection</b><span>Orientation: Setting your intentions</span></div><span class="wdx-st wdx-st--done wdx-st--sq ">Completed</span></div>
+<div class="wdx-ad-row"><div><b>Assignment Question (Text)</b><p>I want to stop starting my day on my phone. Writing first thing feels awkward but I already notice I am calmer before work.</p></div></div></article></div></div></div>
+</div><details class="wdx-raw"><summary><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8.5 7.5L4 12l4.5 4.5M15.5 7.5L20 12l-4.5 4.5M13.5 5l-3 14"/></svg><div><b>Raw Data</b><br><span>View complete participant workshop data [developer only]</span></div><span class="wdx-ch-caret"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 9.5L12 15l5.5-5.5"/></svg></span></summary><pre>{
+  … the participant's full
+    workshop record, pretty-
+    printed as it is stored …
+}</pre></details></section>
+<div class="wdx-chapter" id="wdx-submissions-ch"><span class="wdx-chapter-n">SUBMISSIONS</span><h2 class="wdx-chapter-t">Everything participants have handed in</h2><p class="wdx-chapter-note">Assignments, forms and VideoAsk replies across the whole workshop</p></div>
+<section class="wdx-sheet wdx-block" id="wdx-submissions"><div class="wdx-sh"><div><h2 class="wdx-h2">All Assignments</h2><p class="wdx-sub">4 assignments in Inner Clarity Intensive workshop</p></div></div><div class="wdx-ags"><div class="wdx-ag"><button class="wdx-ag-head" type="button" aria-expanded="false"><span class="wdx-ag-ic"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="5" y="4.5" width="14" height="16" rx="1.5"/><path d="M9 4.5V3.5h6v1M8.5 10h7M8.5 13.5h7M8.5 17h4"/></svg></span><span class="wdx-ag-t"><b>Seven-day practice log</b><span>Morning Pages: Build the habit</span></span><span class="wdx-kind">question</span><span class="wdx-ag-n"><b>170</b> participants</span><span class="wdx-ch-caret"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 9.5L12 15l5.5-5.5"/></svg></span></button></div><div class="wdx-ag"><button class="wdx-ag-head" type="button" aria-expanded="false"><span class="wdx-ag-ic"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="5" y="4.5" width="14" height="16" rx="1.5"/><path d="M9 4.5V3.5h6v1M8.5 10h7M8.5 13.5h7M8.5 17h4"/></svg></span><span class="wdx-ag-t"><b>Values card sort</b><span>Values Map: What matters most</span></span><span class="wdx-kind">form</span><span class="wdx-ag-n"><b>41</b> participants</span><span class="wdx-ch-caret"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 9.5L12 15l5.5-5.5"/></svg></span></button></div><div class="wdx-ag"><button class="wdx-ag-head" type="button" aria-expanded="false"><span class="wdx-ag-ic"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="5" y="4.5" width="14" height="16" rx="1.5"/><path d="M9 4.5V3.5h6v1M8.5 10h7M8.5 13.5h7M8.5 17h4"/></svg></span><span class="wdx-ag-t"><b>First reflection</b><span>Orientation: Setting your intentions</span></span><span class="wdx-kind">question</span><span class="wdx-ag-n"><b>188</b> participants</span><span class="wdx-ch-caret"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 9.5L12 15l5.5-5.5"/></svg></span></button></div><div class="wdx-ag wdx-is-open"><button class="wdx-ag-head" type="button" aria-expanded="true"><span class="wdx-ag-ic"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="5" y="4.5" width="14" height="16" rx="1.5"/><path d="M9 4.5V3.5h6v1M8.5 10h7M8.5 13.5h7M8.5 17h4"/></svg></span><span class="wdx-ag-t"><b>Commit to one change</b><span>Personal Clarity Plan: Ninety days</span></span><span class="wdx-kind">question</span><span class="wdx-ag-n"><b>5</b> participants</span><span class="wdx-ch-caret"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 9.5L12 15l5.5-5.5"/></svg></span></button><div class="wdx-ag-body"><p class="wdx-ag-desc">Write the one change you will commit to for the next ninety days and who will hold you to it.</p><div class="wdx-cards"><div role="button" tabindex="0" class="wdx-card wdx-is-click wdx-card--text wdx-is-expanded"><div class="wdx-card-top"><span class="wdx-ini" aria-hidden="true">K</span><span class="wdx-name">Kabir Sethi</span><span class="wdx-st wdx-st--done wdx-st--sq ">Completed</span></div><div class="wdx-card-meta"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>17 Nov 2026</div><p class="wdx-clamp wdx-is-full">I will protect the first forty minutes of every morning for writing and planning. No phone until the pages are done. On Sundays I will review the week, choose one change for the next week and tell my partner what it is, so someone else is holding me to it as well.</p><button class="wdx-more" type="button">Show less<svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 14.5L12 9l5.5 5.5"/></svg></button><div class="wdx-counters"><span><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 12a8.5 8.5 0 1 0 2.5-6M3.5 4.5V9H8"/><path d="M12 8v4.5l3 2"/></svg>1 previous submission</span><span><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3.5V8h4.5M9 12.5h6M9 16h6"/></svg>2 notes</span></div></div><div role="button" tabindex="0" class="wdx-card wdx-is-click wdx-card--text"><div class="wdx-card-top"><span class="wdx-ini" aria-hidden="true">D</span><span class="wdx-name">Dev Khanna</span><span class="wdx-st wdx-st--rev wdx-st--sq ">In Review</span></div><p class="wdx-clamp">Move my workout to the evening so mornings stay quiet for writing. I tried it twice last week and the difference was obvious.</p><button class="wdx-more" type="button">View complete answer<svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 9.5L12 15l5.5-5.5"/></svg></button></div><div role="button" tabindex="0" class="wdx-card wdx-is-click wdx-card--text"><div class="wdx-card-top"><span class="wdx-ini" aria-hidden="true">Z</span><span class="wdx-name">Zoya Kapoor</span><span class="wdx-st wdx-st--rew wdx-st--sq ">Rework Required</span></div><p class="wdx-clamp">Sleep earlier.</p><button class="wdx-more" type="button">View complete answer<svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 9.5L12 15l5.5-5.5"/></svg></button><div class="wdx-counters"><span><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 12a8.5 8.5 0 1 0 2.5-6M3.5 4.5V9H8"/><path d="M12 8v4.5l3 2"/></svg>1 previous submission</span><span><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3.5V8h4.5M9 12.5h6M9 16h6"/></svg>1 note</span></div></div><div role="button" tabindex="0" class="wdx-card wdx-is-click wdx-card--text"><div class="wdx-card-top"><span class="wdx-ini" aria-hidden="true">A</span><span class="wdx-name">Arjun Menon</span><span class="wdx-st wdx-st--done wdx-st--sq ">Completed</span></div><div class="wdx-card-meta"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>16 Nov 2026</div><p class="wdx-clamp">Say no to one standing meeting each week and use the hour to finish the hardest task first. My manager has agreed to try it for a month.</p><button class="wdx-more" type="button">View complete answer<svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 9.5L12 15l5.5-5.5"/></svg></button></div><div role="button" tabindex="0" class="wdx-card wdx-is-click wdx-card--text"><div class="wdx-card-top"><span class="wdx-ini" aria-hidden="true">L</span><span class="wdx-name">Leela Joseph</span><span class="wdx-st wdx-st--done wdx-st--sq ">Completed</span></div><div class="wdx-card-meta"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>16 Nov 2026</div><p class="wdx-clamp">One page of writing before any screen, every day, including weekends and travel days.</p><button class="wdx-more" type="button">View complete answer<svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 9.5L12 15l5.5-5.5"/></svg></button></div></div></div></div></div></section>
+<section class="wdx-sheet wdx-block"><div class="wdx-sh"><div><h2 class="wdx-h2">All Forms</h2><p class="wdx-sub">2 Forms in Inner Clarity Intensive workshop</p></div><div class="wdx-sh-tools"><button class="wdx-tool" type="button"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14"/></svg>Export Excel</button></div></div><div class="wdx-ags"><div class="wdx-ag"><button class="wdx-ag-head" type="button" aria-expanded="false"><span class="wdx-ag-ic wdx-ag-ic--form"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3.5V8h4.5M9 12.5h6M9 16h6"/></svg></span><span class="wdx-ag-t"><b>Reflection check-in</b><span>Morning Pages</span></span><span class="wdx-kind">form</span><span class="wdx-ag-n"><b>142</b> participants</span><span class="wdx-ch-caret"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 9.5L12 15l5.5-5.5"/></svg></span></button></div><div class="wdx-ag"><button class="wdx-ag-head" type="button" aria-expanded="false"><span class="wdx-ag-ic wdx-ag-ic--form"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3.5V8h4.5M9 12.5h6M9 16h6"/></svg></span><span class="wdx-ag-t"><b>Week one pulse survey</b><span>Orientation</span></span><span class="wdx-kind">form</span><span class="wdx-ag-n"><b>188</b> participants</span><span class="wdx-ch-caret"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 9.5L12 15l5.5-5.5"/></svg></span></button></div></div></section>
+<section class="wdx-sheet wdx-block"><div class="wdx-sh"><div><h2 class="wdx-h2">All VideoAsk</h2><p class="wdx-sub">2 VideoAsks in Inner Clarity Intensive workshop</p></div></div><div class="wdx-ags"><div class="wdx-ag"><button class="wdx-ag-head" type="button" aria-expanded="false"><span class="wdx-ag-ic wdx-ag-ic--video"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="6.5" width="12.5" height="11" rx="2"/><path d="M15.5 10.5l5.5-3v9l-5.5-3"/></svg></span><span class="wdx-ag-t"><b>Share your first page</b><span>Morning Pages</span></span><span class="wdx-kind">videoask</span><span class="wdx-ag-n"><b>138</b> participants</span><span class="wdx-ch-caret"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 9.5L12 15l5.5-5.5"/></svg></span></button></div><div class="wdx-ag"><button class="wdx-ag-head" type="button" aria-expanded="false"><span class="wdx-ag-ic wdx-ag-ic--video"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="6.5" width="12.5" height="11" rx="2"/><path d="M15.5 10.5l5.5-3v9l-5.5-3"/></svg></span><span class="wdx-ag-t"><b>Meet your circle</b><span>Orientation</span></span><span class="wdx-kind">videoask</span><span class="wdx-ag-n"><b>201</b> participants</span><span class="wdx-ch-caret"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 9.5L12 15l5.5-5.5"/></svg></span></button></div></div></section>
+<section class="wdx-sheet wdx-block" id="wdx-platform"><div class="wdx-sh"><div><h2 class="wdx-h2">Platform Usage</h2><p class="wdx-sub">How participants reach this workshop, and where each step gets done</p></div></div><div class="wdx-plat-grid"><div class="wdx-plat-card"><div class="wdx-plat-h"><b>Enrolled via</b><span class="wdx-hint">· click a platform to open its participants</span><span class="wdx-plat-c"><b>248</b> participants</span></div>
+<div class="wdx-donutwrap"><div class="wdx-donut"><svg viewBox="0 0 168 168" role="img" aria-label="Participants by enrolment platform"><circle cx="84" cy="84" r="60" fill="none" stroke="#eef0f4" stroke-width="22"/><circle cx="84" cy="84" r="60" fill="none" stroke="#2557C7" stroke-width="22" stroke-dasharray="212.51 376.99" stroke-dashoffset="0.00"><title>141 participants</title></circle><circle cx="84" cy="84" r="60" fill="none" stroke="#2E9E5B" stroke-width="22" stroke-dasharray="146.91 376.99" stroke-dashoffset="-214.51"><title>98 participants</title></circle><circle cx="84" cy="84" r="60" fill="none" stroke="#E0A93E" stroke-width="22" stroke-dasharray="11.57 376.99" stroke-dashoffset="-363.42"><title>9 participants</title></circle></svg><div class="wdx-donut-c"><b>248</b><span>Participants</span></div></div><div class="wdx-legend"><button class="wdx-lrow wdx-tip wdx-tip--start" type="button" data-tip="Open everyone enrolled via EiFlix App"><span class="wdx-dot" style="--d:#2557C7"></span><span>EiFlix App</span><b>141</b><em>56.9%</em></button><button class="wdx-lrow wdx-tip wdx-tip--start" type="button" data-tip="Open everyone enrolled via EiFlix Web"><span class="wdx-dot" style="--d:#2E9E5B"></span><span>EiFlix Web</span><b>98</b><em>39.5%</em></button><button class="wdx-lrow wdx-tip wdx-tip--start" type="button" data-tip="Open everyone enrolled via Admin enrol"><span class="wdx-dot" style="--d:#E0A93E"></span><span>Admin enrol</span><b>9</b><em>3.6%</em></button></div></div></div><div class="wdx-plat-card"><div class="wdx-plat-h"><b>Steps by platform</b><span class="wdx-plat-c"><b>2,964</b> steps touched</span></div>
+<div class="wdx-hbars"><div class="wdx-hbar-row"><span>EiFlix App</span><div class="wdx-hbar"><i class="wdx-is-done wdx-tip" data-tip="1,702 steps" style="width:93.5%">1,702</i><i class="wdx-is-prog wdx-tip" data-tip="118 steps" style="width:6.5%">118</i></div></div><div class="wdx-hbar-row"><span>EiFlix Web</span><div class="wdx-hbar"><i class="wdx-is-done wdx-tip" data-tip="1,031 steps" style="width:56.6%">1,031</i><i class="wdx-is-prog wdx-tip" data-tip="96 steps" style="width:5.3%">96</i></div></div><div class="wdx-hbar-row"><span>Admin enrol</span><div class="wdx-hbar"><i class="wdx-is-done wdx-tip" data-tip="12 steps" style="width:0.7%"></i><i class="wdx-is-prog wdx-tip" data-tip="5 steps" style="width:2.2%"></i></div></div></div><div class="wdx-hbar-key"><span><span class="wdx-dot" style="--d:var(--b-done)"></span>Completed</span><span><span class="wdx-dot" style="--d:var(--b-rev)"></span>In progress</span></div><div class="wdx-slegend"><div class="wdx-slrow"><span>EiFlix App</span><span><b>1,702</b> completed</span><span>118 in progress</span></div><div class="wdx-slrow"><span>EiFlix Web</span><span><b>1,031</b> completed</span><span>96 in progress</span></div><div class="wdx-slrow"><span>Admin enrol</span><span><b>12</b> completed</span><span>5 in progress</span></div></div></div></div></section>
+</div>
+</main><section class="wdx-root wdx-shell" aria-label="Frame 2">
+<div class="wdx-band"><b>Frame 2</b><span>Total Enrolled was clicked: the participant panel slides in from the right, the dashboard eases left under a dim backdrop. Clicking the backdrop or ✕ closes it. On a phone the same panel rises as a full-height sheet.</span></div>
+<div class="wdx-scene">
+  <div class="wdx-scene-bg" aria-hidden="true"><div class="wdx-page"><header class="wdx-head">
+  <div class="wdx-id"><div class="wdx-meta"><span class="wdx-pill wdx-pill--gold">Workshop</span><span class="wdx-dates"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 9.8h17M8 3v4M16 3v4"/></svg>05 Nov 2026 – 28 Nov 2026</span></div><h2 class="wdx-title">Inner Clarity Intensive</h2><span class="wdx-rule" aria-hidden="true"></span><p class="wdx-lede" title="A four-week guided programme to build a daily reflection habit, map your values and leave with a personal ninety-day clarity plan you can actually keep.">A four-week guided programme to build a daily reflection habit, map your values and leave with a personal ninety-day clarity plan you can actually keep.</p></div>
+  <div class="wdx-actions"><button class="wdx-tool wdx-tip" type="button" data-tip="Email, WhatsApp or notify anyone — enrolled in this workshop or not"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 5.5h11a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1H8.5l-3.5 3v-3H3.5a1 1 0 0 1-1-1V6.5a1 1 0 0 1 1-1z"/><path d="M15.5 9h4.5a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1h-1.5v3l-3.5-3H11a1 1 0 0 1-1-1V14"/></svg>Communication</button><button class="wdx-tool" type="button"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.6M12 16.6v.2"/></svg>Q &amp; A</button><button class="wdx-tool wdx-tip" type="button" data-tip="Check why a profile can or cannot enroll in this workshop"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.8-4.8M6.5 10.5h1.8l1.2-2.4 2 4.8 1.2-2.4h1.8"/></svg>Diagnose</button><span class="wdx-vr" aria-hidden="true"></span><button class="wdx-tool wdx-tool--danger" type="button"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 12.5h9l1-12.5M10 10.5v6M14 10.5v6"/></svg>Clear</button><button class="wdx-primary" type="button"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="9.5" cy="8.5" r="3.5"/><path d="M3 19.5c.6-3.3 3-5 6.5-5 1.4 0 2.6.3 3.6.8M18 13.5v6M15 16.5h6"/></svg>Enroll</button></div>
+</header><nav class="wdx-nav" aria-label="Dashboard sections"><a href="#wdx-glance" class="wdx-is-on">At a glance</a><a href="#wdx-challenges">Challenge progress<span class="wdx-nav-n">6</span></a><a href="#wdx-participants">Participants<span class="wdx-nav-n">248</span></a><a href="#wdx-pdata">Participant data</a><a href="#wdx-submissions">Submissions</a><a href="#wdx-platform">Platform usage</a></nav><section class="wdx-sheet wdx-block" aria-label="At a glance">
+  <div class="wdx-hero" style="--cols:4"><button type="button" class="wdx-fig wdx-fig--lead" style="--tone:var(--primary)"><span class="wdx-fig-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="9" cy="8.5" r="3.5"/><path d="M3 19.5c.6-3.3 3-5 6-5s5.4 1.7 6 5"/><path d="M15.5 5.3a3.5 3.5 0 0 1 0 6.4M17.5 14.8c1.8.6 3 2.1 3.5 4.7"/></svg>Total Enrolled</span><span class="wdx-fig-n">248</span><span class="wdx-go"><span>Open list</span><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span></button><div class="wdx-fig" style="--tone:var(--c-avg)"><span class="wdx-fig-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="3.5" width="17" height="17" rx="2"/><path d="M8 16v-4M12 16V8M16 16v-6"/></svg>Average Progress</span><span class="wdx-fig-n">46.8%</span><div class="wdx-bar" aria-hidden="true"><i style="width:46.8%"></i></div></div><div class="wdx-fig" style="--tone:var(--c-rate)"><span class="wdx-fig-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M8 12.3l2.8 2.8L16.2 9.6"/></svg>Completion Rate</span><span class="wdx-fig-n">18.5%</span><div class="wdx-bar" aria-hidden="true"><i style="width:18.5%"></i></div></div><button type="button" class="wdx-fig wdx-fig--money" style="--tone:var(--money)"><span class="wdx-fig-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 4.5h10M7 9h10M7 4.5h3.5a4.25 4.25 0 0 1 0 8.5H7l7.5 7"/></svg>Sale Achieved<span class="wdx-info wdx-tip" tabindex="0" data-tip="Enrolled people who bought between registration start and one month after the workshop ended"><svg class="wdx-ic wdx-ic--xs" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8v.2"/></svg></span></span><span class="wdx-fig-n">₹4,86,500</span><span class="wdx-fig-s"><b>31</b> users</span><span class="wdx-go"><span>Open list</span><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span></button></div>
+  <div class="wdx-groups"><section class="wdx-grp" style="--n:3"><div class="wdx-grp-h"><span class="wdx-eyebrow">Participation</span></div><div class="wdx-grp-cells"><button type="button" class="wdx-cell" style="--tone:var(--c-nav)"><span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 5.5v13l10.5-6.5z"/></svg><span>Total Started</span></span><span class="wdx-cell-n">214</span><span class="wdx-go"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span></button><button type="button" class="wdx-cell" style="--tone:var(--c-idle)"><span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M10 9v6M14 9v6"/></svg><span>Not Started</span></span><span class="wdx-cell-n">34</span><span class="wdx-go"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span></button><button type="button" class="wdx-cell" style="--tone:var(--c-act)"><span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 16.5l6-6 4 4 7-7.5M15 7h5.5v5.5"/></svg><span>Active Participants</span></span><span class="wdx-cell-n">196</span><span class="wdx-go"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span></button></div></section><section class="wdx-grp" style="--n:4"><div class="wdx-grp-h"><span class="wdx-eyebrow">People</span></div><div class="wdx-grp-cells"><button type="button" class="wdx-cell" style="--tone:var(--c-nav)"><span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20c.7-3.8 3.6-5.8 7.5-5.8s6.8 2 7.5 5.8"/></svg><span>Existing Participants</span></span><span class="wdx-cell-n">171</span><span class="wdx-go"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span></button><button type="button" class="wdx-cell" style="--tone:var(--new)"><span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 14c.8 1.3 2 2 3.5 2s2.7-.7 3.5-2M9 9.8v.4M15 9.8v.4"/></svg><span>New Users</span></span><span class="wdx-cell-n">77</span><span class="wdx-go"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span></button><button type="button" class="wdx-cell" style="--tone:var(--c-idle)"><span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 16c.8-1.3 2-2 3.5-2s2.7.7 3.5 2M9 9.8v.4M15 9.8v.4"/></svg><span>New Users Not Enrolled</span></span><span class="wdx-cell-n">39</span><span class="wdx-go"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span></button><button type="button" class="wdx-cell wdx-tip" data-tip="Enrolled people whose login is not yet in the workshop's chat group" style="--tone:var(--warn)"><span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.5 11.5c0 4-3.8 7-8.5 7a9.6 9.6 0 0 1-3.2-.5L4 19.5l1.4-3.4a6.5 6.5 0 0 1-1.9-4.6c0-4 3.8-7 8.5-7s8.5 3 8.5 7z"/><path d="M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01"/></svg><span>Users Not in Chat Group</span></span><span class="wdx-cell-n">12</span><span class="wdx-go"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span></button></div></section></div>
+</section><section class="wdx-sheet wdx-block">
+  <div class="wdx-sh"><div><h2 class="wdx-h2">Challenge Progress Overview</h2><p class="wdx-sub">6 challenges · click any status to open its participants</p></div><div class="wdx-sh-tools"></div></div>
+  <div class="wdx-chs"><div class="wdx-ch"><button class="wdx-ch-head" type="button" aria-expanded="false"><span class="wdx-ch-num">1</span><span class="wdx-ch-title"><span class="wdx-ch-name">Orientation &amp; Intentions</span></span><span class="wdx-ch-chips"><span class="wdx-st wdx-st--done "><b>188</b> Completed</span><span class="wdx-st wdx-st--prog "><b>22</b> In Progress</span><span class="wdx-st wdx-st--idle "><b>38</b> Not Started</span></span><span class="wdx-ch-caret"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 9.5L12 15l5.5-5.5"/></svg></span></button></div><div class="wdx-ch"><button class="wdx-ch-head" type="button" aria-expanded="false"><span class="wdx-ch-num">2</span><span class="wdx-ch-title"><span class="wdx-ch-name">Morning Pages</span></span><span class="wdx-ch-chips"><span class="wdx-st wdx-st--done "><b>142</b> Completed</span><span class="wdx-st wdx-st--prog "><b>31</b> In Progress</span><span class="wdx-st wdx-st--ready "><b>21</b> Ready to Start</span><span class="wdx-st wdx-st--idle "><b>54</b> Not Started</span></span><span class="wdx-ch-caret"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 9.5L12 15l5.5-5.5"/></svg></span></button></div><div class="wdx-ch"><button class="wdx-ch-head" type="button" aria-expanded="false"><span class="wdx-ch-num wdx-ch-num--zoom"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="6.5" width="12.5" height="11" rx="2"/><path d="M15.5 10.5l5.5-3v9l-5.5-3"/></svg></span><span class="wdx-ch-title"><span class="wdx-ch-name">Live Session: Clearing the Fog</span></span><span class="wdx-ch-zoomnote">Zoom call · no per-person status</span><span class="wdx-ch-caret"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 9.5L12 15l5.5-5.5"/></svg></span></button></div><div class="wdx-ch"><button class="wdx-ch-head" type="button" aria-expanded="false"><span class="wdx-ch-num">4</span><span class="wdx-ch-title"><span class="wdx-ch-name">Values Map</span></span><span class="wdx-ch-chips"><span class="wdx-st wdx-st--done "><b>96</b> Completed</span><span class="wdx-st wdx-st--prog "><b>40</b> In Progress</span><span class="wdx-st wdx-st--ready "><b>18</b> Ready to Start</span><span class="wdx-st wdx-st--idle "><b>94</b> Not Started</span></span><span class="wdx-ch-caret"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 9.5L12 15l5.5-5.5"/></svg></span></button></div><div class="wdx-ch"><button class="wdx-ch-head" type="button" aria-expanded="false"><span class="wdx-ch-num">5</span><span class="wdx-ch-title"><span class="wdx-ch-name">The Clarity Letter</span></span><span class="wdx-ch-chips"><span class="wdx-st wdx-st--done "><b>61</b> Completed</span><span class="wdx-st wdx-st--prog "><b>25</b> In Progress</span><span class="wdx-st wdx-st--ready "><b>12</b> Ready to Start</span><span class="wdx-st wdx-st--idle "><b>150</b> Not Started</span></span><span class="wdx-ch-caret"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 9.5L12 15l5.5-5.5"/></svg></span></button></div><div class="wdx-ch"><button class="wdx-ch-head" type="button" aria-expanded="false"><span class="wdx-ch-num">6</span><span class="wdx-ch-title"><span class="wdx-ch-name">Personal Clarity Plan</span></span><span class="wdx-ch-chips"><span class="wdx-st wdx-st--done "><b>46</b> Completed</span><span class="wdx-st wdx-st--prog "><b>19</b> In Progress</span><span class="wdx-st wdx-st--ready "><b>8</b> Ready to Start</span><span class="wdx-st wdx-st--idle "><b>175</b> Not Started</span></span><span class="wdx-ch-caret"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 9.5L12 15l5.5-5.5"/></svg></span></button></div></div>
+</section></div></div>
+  <div class="wdx-scrim"></div>
+  <aside class="wdx-panel" aria-label="Total Enrolled"><span class="wdx-handle" aria-hidden="true"></span>
+  <div class="wdx-pn-head"><div class="wdx-pn-t"><h2 class="wdx-pn-title">Total Enrolled</h2><p class="wdx-pn-sub">All Participants - Total Enrolled</p></div><div class="wdx-pn-tools"><button class="wdx-iconbtn wdx-tip" type="button" data-tip="Email the people listed" aria-label="Email"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="5.5" width="17" height="13" rx="1.5"/><path d="M4 7l8 6 8-6"/></svg></button><button class="wdx-iconbtn wdx-tip" type="button" data-tip="WhatsApp the people listed" aria-label="WhatsApp"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5.3 18.7l1-3.4A7.5 7.5 0 1 1 8.8 18z"/><path d="M9.4 9.4c.3 2.2 2.1 4 4.3 4.4l.9-1.1 1.6.7-.3 1.3c-3.1.2-6.4-2.9-6.3-6.1l1.3-.3.7 1.6z"/></svg></button><button class="wdx-iconbtn wdx-tip" type="button" data-tip="Send an app notification" aria-label="Notification"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 16.5v-5a5.5 5.5 0 0 1 11 0v5l1.5 1.5h-14z"/><path d="M10 20.5a2 2 0 0 0 4 0"/><path d="M3.5 9a8 8 0 0 1 2.5-5M20.5 9A8 8 0 0 0 18 4"/></svg></button><button class="wdx-iconbtn wdx-iconbtn--boxed" type="button" aria-label="Close"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg></button></div></div>
+  
+  <div class="wdx-pn-count"><span class="wdx-pn-count-n">248</span><span class="wdx-pn-count-l">participants</span><button class="wdx-tool wdx-tool--sm wdx-tip wdx-tip--end" type="button" data-tip="Export this list as CSV"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14"/></svg>Export</button></div>
+  <div class="wdx-pn-body">
+    <label class="wdx-search wdx-search--sm" style="max-width:none;min-width:0"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><span class="wdx-sr">Search names</span><input type="search" placeholder="Search names"></label>
+    <div class="wdx-pn-filterrow"><span>Filter All <b>(248)</b></span><button class="wdx-iconbtn wdx-iconbtn--boxed wdx-tip wdx-tip--end" type="button" data-tip="Filter" aria-label="Filter"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></button><button class="wdx-iconbtn wdx-iconbtn--boxed wdx-tip wdx-tip--end" type="button" data-tip="Sort" aria-label="Sort"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 4.5v15M3.5 8L7 4.5 10.5 8M17 19.5v-15M13.5 16l3.5 3.5 3.5-3.5"/></svg></button></div><div class="wdx-range"><label class="wdx-field"><span>Enrolled from</span><input type="text" placeholder="dd/mm/yyyy" value=""></label><label class="wdx-field"><span>To</span><input type="text" placeholder="dd/mm/yyyy" value=""></label><span></span></div>
+  </div>
+  <div class="wdx-pn-list"><a href="#" target="_blank" rel="noopener" class="wdx-pp"><span class="wdx-mono " aria-hidden="true">AM</span><span class="wdx-pp-b"><span class="wdx-pp-n"><span class="wdx-name">Aarav Mehta</span><span class="wdx-new">New</span></span><span class="wdx-pp-line">Enrolled via code: Ritika Shah</span><span class="wdx-pp-tags"><span class="wdx-tag">Morning batch</span></span></span><span class="wdx-pp-end"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M13.5 4.5h6v6M19.5 4.5L11 13M17.5 13.5v5a1.5 1.5 0 0 1-1.5 1.5H6A1.5 1.5 0 0 1 4.5 18.5V8A1.5 1.5 0 0 1 6 6.5h5"/></svg></span></a><a href="#" target="_blank" rel="noopener" class="wdx-pp"><span class="wdx-mono " aria-hidden="true">IR</span><span class="wdx-pp-b"><span class="wdx-pp-n"><span class="wdx-name">Ishita Rao</span></span><span class="wdx-pp-tags"><span class="wdx-tag">Scholarship</span><span class="wdx-tag">Morning batch</span></span></span><span class="wdx-pp-end"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M13.5 4.5h6v6M19.5 4.5L11 13M17.5 13.5v5a1.5 1.5 0 0 1-1.5 1.5H6A1.5 1.5 0 0 1 4.5 18.5V8A1.5 1.5 0 0 1 6 6.5h5"/></svg></span></a><a href="#" target="_blank" rel="noopener" class="wdx-pp"><span class="wdx-mono " aria-hidden="true">KS</span><span class="wdx-pp-b"><span class="wdx-pp-n"><span class="wdx-name">Kabir Sethi</span></span><span class="wdx-pp-tags"><span class="wdx-tag">Alumni</span></span></span><span class="wdx-pp-end"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M13.5 4.5h6v6M19.5 4.5L11 13M17.5 13.5v5a1.5 1.5 0 0 1-1.5 1.5H6A1.5 1.5 0 0 1 4.5 18.5V8A1.5 1.5 0 0 1 6 6.5h5"/></svg></span></a><a href="#" target="_blank" rel="noopener" class="wdx-pp"><span class="wdx-mono " aria-hidden="true">MP</span><span class="wdx-pp-b"><span class="wdx-pp-n"><span class="wdx-name">Meera Pillai</span></span><span class="wdx-pp-tags"><span class="wdx-tag">Morning batch</span><span class="wdx-tag">Scholarship</span><span class="wdx-tag">Referral – Q3</span></span></span><span class="wdx-pp-end"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M13.5 4.5h6v6M19.5 4.5L11 13M17.5 13.5v5a1.5 1.5 0 0 1-1.5 1.5H6A1.5 1.5 0 0 1 4.5 18.5V8A1.5 1.5 0 0 1 6 6.5h5"/></svg></span></a><a href="#" target="_blank" rel="noopener" class="wdx-pp"><span class="wdx-mono " aria-hidden="true">RD</span><span class="wdx-pp-b"><span class="wdx-pp-n"><span class="wdx-name">Rohan Das</span><span class="wdx-new">New</span></span><span class="wdx-pp-line">Enrolled via code: Kabir Sethi, Ishita Rao</span></span><span class="wdx-pp-end"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M13.5 4.5h6v6M19.5 4.5L11 13M17.5 13.5v5a1.5 1.5 0 0 1-1.5 1.5H6A1.5 1.5 0 0 1 4.5 18.5V8A1.5 1.5 0 0 1 6 6.5h5"/></svg></span></a><a href="#" target="_blank" rel="noopener" class="wdx-pp"><span class="wdx-mono " aria-hidden="true">TI</span><span class="wdx-pp-b"><span class="wdx-pp-n"><span class="wdx-name">Tara Iyer</span></span><span class="wdx-pp-tags"><span class="wdx-tag">Evening batch</span></span></span><span class="wdx-pp-end"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M13.5 4.5h6v6M19.5 4.5L11 13M17.5 13.5v5a1.5 1.5 0 0 1-1.5 1.5H6A1.5 1.5 0 0 1 4.5 18.5V8A1.5 1.5 0 0 1 6 6.5h5"/></svg></span></a><a href="#" target="_blank" rel="noopener" class="wdx-pp"><span class="wdx-mono " aria-hidden="true">VN</span><span class="wdx-pp-b"><span class="wdx-pp-n"><span class="wdx-name">Vikram Nair</span></span></span><span class="wdx-pp-end"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M13.5 4.5h6v6M19.5 4.5L11 13M17.5 13.5v5a1.5 1.5 0 0 1-1.5 1.5H6A1.5 1.5 0 0 1 4.5 18.5V8A1.5 1.5 0 0 1 6 6.5h5"/></svg></span></a><a href="#" target="_blank" rel="noopener" class="wdx-pp"><span class="wdx-mono " aria-hidden="true">AB</span><span class="wdx-pp-b"><span class="wdx-pp-n"><span class="wdx-name">Ananya Bose</span><span class="wdx-new">New</span></span><span class="wdx-pp-tags"><span class="wdx-tag">Evening batch</span></span></span><span class="wdx-pp-end"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M13.5 4.5h6v6M19.5 4.5L11 13M17.5 13.5v5a1.5 1.5 0 0 1-1.5 1.5H6A1.5 1.5 0 0 1 4.5 18.5V8A1.5 1.5 0 0 1 6 6.5h5"/></svg></span></a><a href="#" target="_blank" rel="noopener" class="wdx-pp"><span class="wdx-mono " aria-hidden="true">DK</span><span class="wdx-pp-b"><span class="wdx-pp-n"><span class="wdx-name">Dev Khanna</span></span><span class="wdx-pp-tags"><span class="wdx-tag">Alumni</span><span class="wdx-tag">Scholarship</span></span></span><span class="wdx-pp-end"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M13.5 4.5h6v6M19.5 4.5L11 13M17.5 13.5v5a1.5 1.5 0 0 1-1.5 1.5H6A1.5 1.5 0 0 1 4.5 18.5V8A1.5 1.5 0 0 1 6 6.5h5"/></svg></span></a><a href="#" target="_blank" rel="noopener" class="wdx-pp"><span class="wdx-mono " aria-hidden="true">NV</span><span class="wdx-pp-b"><span class="wdx-pp-n"><span class="wdx-name">Nisha Varma</span></span></span><span class="wdx-pp-end"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M13.5 4.5h6v6M19.5 4.5L11 13M17.5 13.5v5a1.5 1.5 0 0 1-1.5 1.5H6A1.5 1.5 0 0 1 4.5 18.5V8A1.5 1.5 0 0 1 6 6.5h5"/></svg></span></a></div>
+</aside>
+</div>
+</section>
+</body>
+</html>

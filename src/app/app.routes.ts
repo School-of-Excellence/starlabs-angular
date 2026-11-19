@@ -285,7 +285,10 @@ export const routes: Routes = [
   // Communication Center
   {path: 'zoom-recording-dashboard', loadComponent: () => import('./Communication Center/zoom-recording-dashboard/zoom-recording-dashboard.component').then(m => m.ZoomRecordingDashboardComponent), canActivate:[authGuard]},
   {path: 'email-templates', loadComponent: () => import('./Communication Center/create-email-template/create-email-template.component').then(m => m.CreateEmailTemplateComponent), canActivate:[authGuard]},
-  {path: 'communication', loadComponent: () => import('./Communication Center/communication/communication.component').then(m => m.CommunicationComponent), canActivate:[authGuard]},
+  // Retired 2026-11-18 (call-recording signed-URL migration): this screen played `recordingurl`
+  // straight into <audio [src]>, which silently fails once rows hold object paths. Calls are
+  // played from /notificationrecord → Calls tab via the shared signed-URL player instead.
+  // {path: 'communication', loadComponent: () => import('./Communication Center/communication/communication.component').then(m => m.CommunicationComponent), canActivate:[authGuard]},
   {path: 'communication-grid-planner', loadComponent: () => import('./Communication Center/communication-grid-planner/communication-grid-planner.component').then(m => m.CommunicationGridPlannerComponent), canActivate:[authGuard]},
 
   // New Workshop
@@ -377,6 +380,11 @@ export const routes: Routes = [
   // ATC generation pipeline ops
   {path: 'queue-atc-generation', loadComponent: () => import('./ATC-Ops/atc-generation-ops/atc-generation-ops.component').then(m => m.AtcGenerationOpsComponent), canActivate: [authGuard]},
   {path: 'queue-atc-usage', loadComponent: () => import('./ATC-Ops/atc-usage-dashboard/atc-usage-dashboard.component').then(m => m.AtcUsageDashboardComponent), canActivate: [authGuard]},
+
+  // Storage signed-URL harness (2026-11-04). Self-contained test screen: owns the
+  // `signed_url_test` collection and the `signed-url-test/` Storage prefix, touches
+  // nothing else. Safe to delete along with both once the model is validated.
+  {path: 'signedurltest', loadComponent: () => import('./Test/signed-url-test/signed-url-test.component').then(m => m.SignedURLTestComponent), canActivate: [authGuard]},
 
   // Wildcard must stay LAST — it catches every unmatched path
   {path: '**',loadComponent: () =>import('./exceptionalrouting/exceptionalrouting.component').then(m => m.ExceptionalroutingComponent)},

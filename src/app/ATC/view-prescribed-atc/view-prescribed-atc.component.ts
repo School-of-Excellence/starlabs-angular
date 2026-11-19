@@ -4,6 +4,8 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatPaginator, MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { AuthguardService } from '../../authguard.service';
 import { AtcReview, AtcReviewLogService } from '../shared/atc-review-log.service';
+import { AtcAudioComponent } from '../atc-audio/atc-audio.component';
+import { MediaUrlService } from '../../shared/media-url.service';
 import { isEISolutionProduct, isWiSHProduct } from '../shared/atc-product';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
@@ -42,7 +44,8 @@ import { FormOverlayViewComponent } from '../../Participants Profile Management/
     MatListModule,
     MatRadioModule,
     MatDatepickerModule,
-    FormOverlayViewComponent
+    FormOverlayViewComponent,
+    AtcAudioComponent
   ],
   templateUrl: './view-prescribed-atc.component.html',
   styleUrl: './view-prescribed-atc.component.css'
@@ -111,6 +114,23 @@ export class ViewPrescribedATCComponent {
   // ATC Notes
   mapATCnotes = {};
   mapNotesSubscription = {}
+
+  // Stored image ref → loadable URL. A migrated row holds an object path, which an <img>
+  // cannot load; a legacy row holds a download URL, which resolve() passes straight back.
+  // Audio is NOT in here — app-atc-audio resolves its own clip when play is pressed, so a
+  // note nobody listens to costs no signature.
+  noteImageUrls: Record<string, string> = {};
+
+  /** Resolve every image on a note in ONE batched call, as its document arrives. */
+  private async resolveNoteImages(notes: any): Promise<void> {
+    const refs: string[] = (notes?.['imagenotes'] ?? []).filter((r: unknown) => typeof r === 'string' && r);
+    if (refs.length === 0) return;
+    this.mediaUrl.prefetch(refs);
+    await Promise.all(refs.map(async (r) => {
+      const url = await this.mediaUrl.resolve(r);
+      if (url) this.noteImageUrls[r] = url;
+    }));
+  }
 
   // Metadata
   // recommendlist = [];
@@ -981,6 +1001,7 @@ export class ViewPrescribedATCComponent {
         takeUntil(this.atcAlphaSubscription),
       ).subscribe(doc => {
         this.mapATCnotes[doc.id] = doc.data()
+        void this.resolveNoteImages(doc.data())
       })
       this.mapNotesSubscription[noteid] = noteSubscription
     }
@@ -990,6 +1011,7 @@ export class ViewPrescribedATCComponent {
         debounceTime(300),
       ).subscribe(doc => {
         this.mapATCnotes[doc.id] = doc.data()
+        void this.resolveNoteImages(doc.data())
       })
       this.mapNotesSubscription[mentoringid] = mentorSubscription
     }
@@ -1681,6 +1703,7 @@ export class ViewPrescribedATCComponent {
   // ---- 2026-10-24: EI Solution Review log (plan specs/plans/2026-10-24-review-log.md) ----
   reviewLog = inject(AtcReviewLogService)
   private reviewSnack = inject(MatSnackBar)
+  private mediaUrl = inject(MediaUrlService)
   reviewDraft: { [atcId: string]: string } = {}
   reviewError: { [atcId: string]: string | null } = {}
   reviewConfirm: { [atcId: string]: string | null } = {}
