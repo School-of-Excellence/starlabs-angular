@@ -695,3 +695,14 @@
 .panel-content::-webkit-scrollbar-thumb:hover {
   background: #cbd5e1;
 }
+/* Export buttons (2026-11-20) */
+.export-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 999px; border: 1px solid rgba(0,0,0,.12);
+  background: #fff; color: #1c1c1e; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.export-btn:hover:not(:disabled) { background: #f2f2f7; }
+.export-btn:disabled { opacity: .5; cursor: default; }
+.export-btn-sm { padding: 4px 10px; font-size: 12px; margin-left: auto; margin-right: 8px; }
+
+.panel-search { display: flex; align-items: center; gap: 6px; margin: 0 0 10px; padding: 6px 10px; border: 1px solid rgba(0,0,0,.12);
+  border-radius: 9px; color: #8e8e93; }
+.panel-search input { flex: 1 1 auto; min-width: 0; border: 0; outline: 0; background: transparent; font: inherit; font-size: 13px; color: inherit; }
+.panel-search:focus-within { border-color: #2563eb; }

@@ -117,6 +117,51 @@
         <span class="fb-hint" *ngIf="!summaryFilterReady">Loading base…</span>
       </div>
 
+      <!-- Happiness quotient for a date range (2026-11-20). Source: the health logs in healthtracker_activity,
+           scoped by the filter above. HQ = Happy health logs ÷ all health logs in the range. The all-types
+           "logs created" TOTAL was removed at the operator's request; the per-type counts stay. -->
+      <section class="ios2-card hq-card" data-testid="jchd-hq-card" *ngIf="hq() as q">
+        <div class="hq-bar">
+          <div class="ios2-head hq-head"><span class="ios2-app ap-green"><mat-icon>sentiment_satisfied</mat-icon></span><span class="ios2-title">Happiness quotient</span></div>
+          <div class="ov-seg" role="group" aria-label="Date range">
+            <button type="button" [class.on]="hqPreset() === 'week'" (click)="hqSetPreset('week')" data-testid="jchd-hq-week">This week</button>
+            <button type="button" [class.on]="hqPreset() === 'lastweek'" (click)="hqSetPreset('lastweek')" data-testid="jchd-hq-lastweek">Last week</button>
+            <button type="button" [class.on]="hqPreset() === 'month'" (click)="hqSetPreset('month')" data-testid="jchd-hq-month">This month</button>
+            <button type="button" [class.on]="hqPreset() === 'custom'" (click)="hqSetPreset('custom')" data-testid="jchd-hq-custom">Custom</button>
+          </div>
+          <span class="ov-pill" *ngIf="hqPreset() === 'custom'">
+            <input type="date" class="ov-in" [ngModel]="hqIso(hqRange().start)" (ngModelChange)="hqSetDate('start', $event)" aria-label="Start date" data-testid="jchd-hq-start">
+            <span class="ov-dash">–</span>
+            <input type="date" class="ov-in" [ngModel]="hqIso(hqRange().end)" (ngModelChange)="hqSetDate('end', $event)" aria-label="End date" data-testid="jchd-hq-end">
+          </span>
+          <span class="ov-range" data-testid="jchd-hq-range">{{ hqRange().start | date:'d MMM y' }} – {{ hqRange().end | date:'d MMM y' }}</span>
+        </div>
+        <p class="ios2-empty" *ngIf="hqError()" data-testid="jchd-hq-error">Logs could not be loaded.</p>
+        <div class="hq-body" *ngIf="!hqError()" [class.is-loading]="hqLoading()">
+          <div class="hq-metric">
+            <span class="hq-pct" data-testid="jchd-hq-pct">{{ q.pct === null ? '–' : q.pct + '%' }}</span>
+            <button type="button" class="hq-frac" data-testid="jchd-hq-frac" [disabled]="!q.happy" (click)="hqDrill('health', 'HAPPY', 'Happy health logs')"
+              matTooltip="Happy health logs ÷ all health logs saved in the date range (every log counts, so one participant set twice counts twice)">{{ q.happy }}/{{ q.healthTotal }}</button>
+          </div>
+          <div class="hq-logs">
+            <div class="hq-row hq-types" *ngIf="q.types.length" data-testid="jchd-hq-types">
+              <button type="button" class="hq-type" *ngFor="let t of q.types" data-testid="jchd-hq-type" [matTooltip]="hqTypeHint(t.key)"
+                (click)="hqDrill(t.key, null, 'Logs · ' + t.label)">{{ t.label }} <b>{{ t.n }}</b></button>
+            </div>
+            <div class="hq-row health-card">
+              <span class="hq-k" matTooltip="Each time a coach set a participant's health in the date range. One participant set twice counts twice.">Health logs <b>{{ q.healthTotal }}</b></span>
+              <span class="health-legend hq-states">
+                <button type="button" class="hl-item" data-testid="jchd-hq-happy" [disabled]="!q.states[0].n" (click)="hqDrill('health', 'HAPPY', 'Health logs · Happy')"><i class="hl-dot state-happy"></i>Happy <b>{{ q.states[0].n }}</b></button>
+                <button type="button" class="hl-item" data-testid="jchd-hq-neutral" [disabled]="!q.states[1].n" (click)="hqDrill('health', 'NEUTRAL', 'Health logs · Neutral')"><i class="hl-dot state-neutral"></i>Neutral <b>{{ q.states[1].n }}</b></button>
+                <button type="button" class="hl-item" data-testid="jchd-hq-unhappy" [disabled]="!q.states[2].n" (click)="hqDrill('health', 'UNHAPPY', 'Health logs · Unhappy')"><i class="hl-dot state-unhappy"></i>Unhappy <b>{{ q.states[2].n }}</b></button>
+                <button type="button" class="hl-item" data-testid="jchd-hq-atrisk" [disabled]="!q.states[3].n" (click)="hqDrill('health', 'AT_RISK', 'Health logs · At-risk')"><i class="hl-dot state-at-risk"></i>At-risk <b>{{ q.states[3].n }}</b></button>
+                <button type="button" class="hl-item" data-testid="jchd-hq-critical" [disabled]="!q.states[4].n" (click)="hqDrill('health', 'CRITICAL', 'Health logs · Critical')"><i class="hl-dot state-critical"></i>Critical <b>{{ q.states[4].n }}</b></button>
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- Row 1: Needs attention (who needs you) + Your base (lifecycle split) -->
       <div class="ios2-top">
         <div class="ios2-hero-col">
@@ -402,6 +447,9 @@
       <div class="ios2-bot">
         <section class="ios2-card health-card" *ngIf="healthDistribution() as hd">
           <div class="ios2-head"><span class="ios2-app ap-indigo"><mat-icon>favorite</mat-icon></span><span class="ios2-title">Coach-set health</span></div>
+          <!-- Timeline note (2026-11-20): this card is a snapshot, not the Happiness-quotient date range. -->
+          <p class="ov-sub" data-testid="jchd-hc-desc">Where participants stand today: each one's <b>latest</b> health set by a coach in the
+            <b>last {{ HEALTH_TTL_DAYS }} days</b>. Not affected by the Happiness quotient dates.</p>
           <div class="health-bar" *ngIf="hd.total > 0" aria-hidden="true">
             <span class="hb-segment state-happy" [style.width.%]="healthPct(hd.happy, hd.total)" matTooltip="Happy: {{ hd.happy }}"></span>
             <span class="hb-segment state-neutral" [style.width.%]="healthPct(hd.neutral, hd.total)" matTooltip="Neutral: {{ hd.neutral }}"></span>
@@ -410,13 +458,14 @@
             <span class="hb-segment state-critical" [style.width.%]="healthPct(hd.critical, hd.total)" matTooltip="Critical: {{ hd.critical }}"></span>
             <span class="hb-segment state-not-assessed" [style.width.%]="healthPct(hd.notAssessed, hd.total)" matTooltip="Not assessed: {{ hd.notAssessed }}"></span>
           </div>
+          <!-- Each count opens the participant list behind it (2026-11-20). -->
           <div class="health-legend">
-            <span class="hl-item"><i class="hl-dot state-happy"></i>Happy <b>{{ hd.happy }}</b></span>
-            <span class="hl-item"><i class="hl-dot state-neutral"></i>Neutral <b>{{ hd.neutral }}</b></span>
-            <span class="hl-item"><i class="hl-dot state-unhappy"></i>Unhappy <b>{{ hd.unhappy }}</b></span>
-            <span class="hl-item"><i class="hl-dot state-at-risk"></i>At-risk <b>{{ hd.atRisk }}</b></span>
-            <span class="hl-item"><i class="hl-dot state-critical"></i>Critical <b>{{ hd.critical }}</b></span>
-            <span class="hl-item"><i class="hl-dot state-not-assessed"></i>Not assessed <b>{{ hd.notAssessed }}</b></span>
+            <button type="button" class="hl-item" data-testid="jchd-hc-happy" [disabled]="!hd.happy" (click)="healthCardDrill('HAPPY', 'Coach-set health · Happy')"><i class="hl-dot state-happy"></i>Happy <b>{{ hd.happy }}</b></button>
+            <button type="button" class="hl-item" data-testid="jchd-hc-neutral" [disabled]="!hd.neutral" (click)="healthCardDrill('NEUTRAL', 'Coach-set health · Neutral')"><i class="hl-dot state-neutral"></i>Neutral <b>{{ hd.neutral }}</b></button>
+            <button type="button" class="hl-item" data-testid="jchd-hc-unhappy" [disabled]="!hd.unhappy" (click)="healthCardDrill('UNHAPPY', 'Coach-set health · Unhappy')"><i class="hl-dot state-unhappy"></i>Unhappy <b>{{ hd.unhappy }}</b></button>
+            <button type="button" class="hl-item" data-testid="jchd-hc-atrisk" [disabled]="!hd.atRisk" (click)="healthCardDrill('AT_RISK', 'Coach-set health · At-risk')"><i class="hl-dot state-at-risk"></i>At-risk <b>{{ hd.atRisk }}</b></button>
+            <button type="button" class="hl-item" data-testid="jchd-hc-critical" [disabled]="!hd.critical" (click)="healthCardDrill('CRITICAL', 'Coach-set health · Critical')"><i class="hl-dot state-critical"></i>Critical <b>{{ hd.critical }}</b></button>
+            <button type="button" class="hl-item" data-testid="jchd-hc-unassessed" matTooltip="No coach has set this participant's health in the last {{ HEALTH_TTL_DAYS }} days — either it was never set, or the last one is older than {{ HEALTH_TTL_DAYS }} days and has expired." [disabled]="!hd.notAssessed" (click)="healthCardDrill(null, 'Coach-set health · Not assessed')"><i class="hl-dot state-not-assessed"></i>Not assessed <b>{{ hd.notAssessed }}</b></button>
           </div>
         </section>
 
@@ -585,12 +634,14 @@
       </label>
 
       <div class="jchd-filter-pills">
-        <label class="jchd-pill jchd-pill-select">
-          <span class="jchd-pill-label">Journey</span>
-          <select data-testid="jchd-sel-048" [(ngModel)]="journeyFilter" (ngModelChange)="onTopJourneyChange()" aria-label="Journey">
-            <option value="">All</option>
-            <option *ngFor="let j of journeyOptions" [value]="j">{{ j }}</option>
-          </select>
+        <!-- Multi-select (2026-11-20): bound to journeyGroupFilter, the same array the panel chips toggle.
+             The mat-select is an invisible overlay like the native selects; its panel opens below the pill. -->
+        <label class="jchd-pill jchd-pill-select" [class.is-on]="journeyGroupFilter.length > 0">
+          <span class="jchd-pill-label">Journey · {{ topJourneyLabel }}</span>
+          <mat-select data-testid="jchd-sel-048" class="jchd-pill-mselect" [(ngModel)]="journeyGroupFilter" (ngModelChange)="onTopJourneyChange()"
+            multiple [panelWidth]="null" [panelClass]="isDark ? 'jchd-fp-panel jchd-fp-dark' : 'jchd-fp-panel'" aria-label="Journey">
+            <mat-option *ngFor="let j of journeyOptions" [value]="j">{{ j }}</mat-option>
+          </mat-select>
           <svg class="jchd-pill-chev" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
             stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
         </label>
@@ -640,7 +691,7 @@
           <span class="fp-field-label">Priority band</span>
           <mat-form-field appearance="outline" class="fp-mat">
             <mat-select data-testid="jchd-msel-055" [(ngModel)]="bandFilters" (ngModelChange)="applyFilters()" multiple
-              panelClass="jchd-fp-panel" placeholder="Any">
+              [panelClass]="isDark ? 'jchd-fp-panel jchd-fp-dark' : 'jchd-fp-panel'" placeholder="Any">
               <mat-option value="High">High</mat-option>
               <mat-option value="Medium">Medium</mat-option>
               <mat-option value="Low">Low</mat-option>
@@ -652,7 +703,7 @@
           <span class="fp-field-label">Coach health</span>
           <mat-form-field appearance="outline" class="fp-mat">
             <mat-select data-testid="jchd-msel-056" [(ngModel)]="healthFilters" (ngModelChange)="applyFilters()" multiple
-              panelClass="jchd-fp-panel" placeholder="Any">
+              [panelClass]="isDark ? 'jchd-fp-panel jchd-fp-dark' : 'jchd-fp-panel'" placeholder="Any">
               <mat-option *ngFor="let h of healthFilterOptions" [value]="h">{{ healthFilterLabel(h) }}</mat-option>
             </mat-select>
           </mat-form-field>
@@ -662,7 +713,7 @@
           <span class="fp-field-label">Financial status</span>
           <mat-form-field appearance="outline" class="fp-mat">
             <mat-select data-testid="jchd-msel-057" [(ngModel)]="financeFilters" (ngModelChange)="applyFilters()" multiple
-              panelClass="jchd-fp-panel" placeholder="Any">
+              [panelClass]="isDark ? 'jchd-fp-panel jchd-fp-dark' : 'jchd-fp-panel'" placeholder="Any">
               <mat-option *ngFor="let f of financeOptions" [value]="f">{{ f }}</mat-option>
             </mat-select>
           </mat-form-field>
@@ -704,8 +755,8 @@
       <div class="fp-note" *ngIf="pagedMode">
         <mat-icon>info</mat-icon>
         <span>Search, journey, status, finance &amp; renewal-window filters cover the
-          <strong>full base</strong> via a lightweight index. Priority band, coach-health &amp;
-          going-quiet refine within loaded pages — page through to apply them across everyone.</span>
+          <strong>full base</strong> via a lightweight index, and so does coach health. Priority band
+          refines within loaded pages — page through to apply it across everyone.</span>
       </div>
     </section>
 
@@ -1129,18 +1180,26 @@
   <!-- ===== A&H drill overlay — shared by Journey Planning and Overall Summary (native; themed by the .jchd-wrap design tokens, dark included) ===== -->
   <div data-testid="jchd-ahd-backdrop" class="ahd-backdrop" *ngIf="ahDrill() as drill" (click)="closeAhDrill()">
     <div class="ahd-panel" data-testid="jchd-ahd-overlay" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+     <ng-container *ngIf="(drill.entries | nameSearch:drillQuery:drillText) as shown">
       <div class="ahd-head">
-        <h2 class="ahd-title">{{ drill.title }}<span data-testid="jchd-ahd-count" class="ahd-count">{{ drill.entries.length }}</span></h2>
+        <h2 class="ahd-title">{{ drill.title }}<span data-testid="jchd-ahd-count" class="ahd-count">{{ drillQuery ? shown.length + ' of ' + drill.entries.length : drill.entries.length }}</span></h2>
+        <button data-testid="jchd-ahd-export" type="button" class="ahd-export" [disabled]="!shown.length" (click)="exportAhDrill({ title: drill.title, entries: shown })"><mat-icon>download</mat-icon>Export</button>
         <button data-testid="jchd-ahd-close" type="button" class="ahd-close" aria-label="Close" (click)="closeAhDrill()">&times;</button>
       </div>
+      <label class="ahd-search" *ngIf="drill.entries.length > 1">
+        <mat-icon>search</mat-icon>
+        <input type="search" data-testid="jchd-ahd-search" [(ngModel)]="drillQuery" placeholder="Search name" aria-label="Search name" autocomplete="off">
+      </label>
       <div class="ahd-body">
         <p *ngIf="!drill.entries.length" class="ahd-empty">No records in this window.</p>
-        <button *ngFor="let e of drill.entries" type="button" class="ahd-row" data-testid="jchd-ahd-row" [disabled]="!e.profileid" (click)="pickAhDrill(e)">
-          <span class="ahd-name">{{ e.name }}</span>
+        <p *ngIf="drill.entries.length && !shown.length" class="ahd-empty" data-testid="jchd-ahd-nomatch">No one matches “{{ drillQuery }}”.</p>
+        <button *ngFor="let e of shown" type="button" class="ahd-row" data-testid="jchd-ahd-row" [disabled]="!e.profileid" (click)="pickAhDrill(e)">
+          <span class="ahd-main"><span class="ahd-name">{{ e.name }}</span><span class="ahd-detail" *ngIf="e.detail">{{ e.detail }}</span></span>
           <span class="ahd-date" *ngIf="e.created">{{ e.created | date:'d MMM y' }}</span>
           <span class="ahd-chev" *ngIf="e.profileid" aria-hidden="true">&rsaquo;</span>
         </button>
       </div>
+     </ng-container>
     </div>
   </div>
 
@@ -1306,7 +1365,8 @@
           <span class="ios2-title">Participant health</span>
           <span class="ov-scope ov-scope-coach">Viewing as</span>
         </div>
-        <p class="ov-sub">Active participants on Ecosystem products · <b data-testid="jchd-ov-health-total">{{ hd.total }}</b></p>
+        <p class="ov-sub">Active participants on Ecosystem products · <b data-testid="jchd-ov-health-total">{{ hd.total }}</b> ·
+          latest coach-set health from the last {{ HEALTH_TTL_DAYS }} days (not the date range above)</p>
         <div class="health-bar" *ngIf="hd.total > 0" aria-hidden="true">
           <span class="hb-segment state-happy" [style.width.%]="healthPct(hd.happy, hd.total)"></span>
           <span class="hb-segment state-neutral" [style.width.%]="healthPct(hd.neutral, hd.total)"></span>
@@ -1321,7 +1381,7 @@
           <button type="button" (click)="ovHealthDrill('UNHAPPY', 'Participant health · Unhappy')" data-testid="jchd-ov-health-unhappy"><span><i class="hl-dot state-unhappy"></i>Unhappy</span><b>{{ hd.unhappy }}</b></button>
           <button type="button" (click)="ovHealthDrill('AT_RISK', 'Participant health · At-risk')" data-testid="jchd-ov-health-atrisk"><span><i class="hl-dot state-at-risk"></i>At-risk</span><b>{{ hd.atRisk }}</b></button>
           <button type="button" (click)="ovHealthDrill('CRITICAL', 'Participant health · Critical')" data-testid="jchd-ov-health-critical"><span><i class="hl-dot state-critical"></i>Critical</span><b>{{ hd.critical }}</b></button>
-          <button type="button" (click)="ovHealthDrill(null, 'Participant health · Not assessed')" data-testid="jchd-ov-health-unassessed"><span><i class="hl-dot state-not-assessed"></i>Not assessed</span><b>{{ hd.notAssessed }}</b></button>
+          <button type="button" (click)="ovHealthDrill(null, 'Participant health · Not assessed')" data-testid="jchd-ov-health-unassessed" matTooltip="No coach has set this participant's health in the last {{ HEALTH_TTL_DAYS }} days — either it was never set, or the last one is older than {{ HEALTH_TTL_DAYS }} days and has expired."><span><i class="hl-dot state-not-assessed"></i>Not assessed</span><b>{{ hd.notAssessed }}</b></button>
         </div>
       </section>
 
