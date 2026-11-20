@@ -10,6 +10,8 @@
 
 | CTD full sequence + 1st / Next Cycle toggle, Overview tooltips (multi-line), Add-on count, full-name dropdowns | committed with this entry (see `git log -- "src/app/Journey Onboarding/delivery-dashboard-clone"`) | `/delivery-dashboard` → Stages (CTD), Products Overview, every dropdown | the three component files + `src/styles.css` (`.dd-logic-tip`, `.dd-full-options`) | `git revert <that commit>` — the two `src/styles.css` rules are scoped to `dd-` classes, nothing else uses them |
 
+| Delivered all cycles + discontinued, Total without initiated, Stuck from last booked appt at 7 days, Weekly cancelled, "Why not here?" dialog | uncommitted | `/delivery-dashboard` → funnel Delivered / Done, Products Overview chips, Needs attention, Stuck table, Weekly Report, header button | the three component files | `git checkout -- "src/app/Journey Onboarding/delivery-dashboard-clone/"` while uncommitted; afterwards `git revert <hash>`. Plan: `specs/plans/2026-11-19-delivery-dashboard-delivered-total-stuck-whynot.md` |
+
 Self-contained: no other screen depends on it. The `ctdStageType()` alias fold sits in shared stage helpers, but it only rewrites two CTD type names, so other products are unaffected and reverting it alone is safe.
 
 ## What changed
@@ -84,7 +86,24 @@ Known limit: appointments only load for the current month, so an Implementation 
 - Month-column tooltips were added in the same `logicTip` voice.
 - The participant investigation (21 names, the reason for each) went to the operator as a PNG; it isn't in the repo. Root causes, briefly: newer open cycle replaces the completed one; period filter; discontinued customers are never loaded; "EI Solutions for Health" is not on the EI card; Integration Mode is excluded; parallel-product rule; an undated new cycle loses the "latest record" pick to an old completed one; Total counts "initiated".
 
+## Delivered / Total / Stuck / Weekly / "Why not here?" (EI team asks, same day)
+
+- **Delivered = every completed cycle, discontinued included.** The products listener now also keeps `completedRecordsRaw` (status completed, any customer status) and feeds it to `funnelData.completed` only. Total / Eligible / Stages / Stuck / Weekly still read `allMatchedProductsRaw` (Active / Non active, no cancelled / shifted). Why separate: discontinued customers must count as delivered but must never re-enter "to start" lists.
+- **Undated completions.** 206 latest records have no completion date and the old rule counts them in every period — that is why Last 30 days already read ~220. The records this change adds (older cycles, discontinued) count undated only under All time, otherwise they swelled Last 30 days to 296. Last 30 days now 231; All time 2,593. The 206 undated latest records are a team decision (pending).
+- **Total excludes initiated.** Overview pool (Overall / Eligible / Not Eligible / Purchased / Bonus / Add-on / This & Next Month) = latest record with no status. The Stages board keeps its own `groupedStagePool` (no status OR initiated) because Onboarding's Waiting list is built from initiated products. Checked: every card still has Overall = Eligible + Not Eligible and Eligible = Purchased + Bonus + Add-on; 0 initiated in Overall.
+- **Stuck** counts from the latest non-cancelled appointment that has started, attended or not (was latest attended); column renamed LAST BOOKED APPT, status Attended / Not attended. `STUCK_DAYS` 15 → 7, label "stuck >7d". Live: 42 stuck, all ≥ 8 days, none booked ahead.
+- **Weekly Report** no longer filters `cancelled == false`; cancelled appointments show as Cancelled (filter option added). Specialist names still come from non-cancelled appointments only. EI Custom Solutions: 433 cancelled rows.
+- **"Why not here?"** header button. Membership ✓/✗ is read from the live lists (grouped*, funnelData, cohorts, stuck cache), so it can't disagree with the screen; the reason re-checks the rule. When the rule passes but the list hasn't got them, it says the dashboard is still loading (found when the dialog was opened mid-load and gave wrong reasons). Search collapses spaces — metadata names carry double spaces ("Karan  Sawhney").
+- Verified at All time: all 13 names the EI team expected in Delivered now appear (Tejal Sanghvi under the EI Solutions for Health card); Ashok Pillai and Jude Anthony Assey are out of Overall.
+- Dialog height: `.dd-why` has `min-height: min(640px, 86vh)` and the name list up to `min(460px, 60vh)` — the list of 10 matches was clipped inside the short empty dialog while typing (operator).
+- Products shown as `mat-expansion-panel`s (`MatExpansionModule` added to the component imports), header badge "In N of 15 sections" or ✓ In / ✗ Not in for a chosen section; one panel opens by default when only one shows. Product filter (`whyProduct`) lists the participant's products. Header needed `flex: 1 1 auto` on the title — Material's default `flex-basis: 0` split it 50/50 with the badge and wrapped the name (operator).
+- Product status chip on each panel header + Status filter (`whyStatus`, options = the statuses this participant's products have). Status = the latest record the dashboard uses; when nothing of that product is loaded (cancelled / shifted / discontinued), the most recent record of any status. Product, Status and Section filters combine (operator).
+- Product / Status / Section are multi-select (empty = all; trigger shows "<first> +N"); header badge = ✓/✗ for one section, "In k of n selected" for several. Compact layout: 36px fields, filters in one sticky row (`flex-wrap: nowrap`), dialog `min-height: min(760px, 88vh)`, body scrolls under the filters. Checked at 1440 and 1024 wide (operator).
+- New hooks to register before push: `ddc-why-status`, `ddc-btn-whynot`, `ddc-why-overlay`, `ddc-why-dialog`, `ddc-why-close`, `ddc-why-name`, `ddc-why-match`, `ddc-why-section`, `ddc-why-product`, `ddc-why-panel`.
+
 ## Pending
 
 - UI check while signed in (the code compiles on the dev server; the page is auth-gated).
 - e2e: register `ddc-btn-ctd-appt`, `ddc-ctd-cycle-first`, `ddc-ctd-cycle-next`, `ddc-chip-addon` and `ddc-btn-addon` in the delivery-dashboard suite before pushing.
+- e2e: also register the "Why not here?" hooks listed above.
+- Team decision: 206 latest completed records have no completion date and count in every period.

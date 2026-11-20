@@ -856,13 +856,13 @@
         </span>
       </ng-container>
       <span class="summary-grids" *ngIf="panelViewType === 'appointment'" style="grid-template-columns: repeat(2, 1fr);">
-        <div class="summary-card confirmed-card" (click)="openApptPanel(selectedAppt, selectedStageForPanel, 'confirmed')">
+        <div class="summary-card confirmed-card" data-testid="qpr-appt-summary-confirmed" (click)="openApptPanel(selectedAppt, selectedStageForPanel, 'confirmed')">
           <div class="summary-content-compact">
             <span class="summary-label">Confirmed</span>
             <span class="summary-count">{{ selectedAppt?.bookedby ? 1 : 0 }}</span>
           </div>
         </div>
-        <div class="summary-card non-confirmed-card" (click)="openApptPanel(selectedAppt, selectedStageForPanel, 'non-confirmed')">
+        <div class="summary-card non-confirmed-card" data-testid="qpr-appt-summary-nonconfirmed" (click)="openApptPanel(selectedAppt, selectedStageForPanel, 'non-confirmed')">
           <div class="summary-content-compact">
             <span class="summary-label">Non-Confirmed</span>
             <span class="summary-count">{{ getApptNonConfirmed(selectedAppt) }}</span>
@@ -1115,7 +1115,7 @@
                 <mat-icon>event_available</mat-icon>
               </button>
 
-              <button mat-icon-button
+              <button data-testid="qpr-panel-revert-appointment" mat-icon-button
                 *ngIf="panelViewType === 'appointment' && activePanelSection === 'confirmed' && selectedAppt?.appointmentref"
                  matTooltip="Revert Appointment" class="revert-btn"
                 (click)="revertAppointmentSlot(selectedAppt); $event.stopPropagation()">
@@ -1279,7 +1279,7 @@
               </td>
             </tr>
             <ng-container *ngFor="let appt of dayGroup.slots; trackBy: trackByAppt">
-              <tr class="slot-row" [class.appt-booked]="appt.bookedby" [class.appt-open]="!appt.bookedby" [style.cursor]="appt.bookedby || roles['developer'] || roles['tester'] ? 'pointer' : 'default'" (click)="toggleApptRow(appt)">                <td>{{ appt.startdate.toDate() | date:'d MMMM' }}</td>
+              <tr class="slot-row" data-testid="qpr-planner-appt-row" [class.appt-booked]="appt.bookedby" [class.appt-open]="!appt.bookedby" [style.cursor]="appt.bookedby || roles['developer'] || roles['tester'] ? 'pointer' : 'default'" (click)="toggleApptRow(appt)">                <td>{{ appt.startdate.toDate() | date:'d MMMM' }}</td>
                 <td>{{ appt.startdate.toDate() | date:'EEEE' }}</td>
                 <td>{{ appt.startdate.toDate() | date:'h:mm a' }} - {{ appt.enddate.toDate() | date:'h:mm a' }}</td>
                 <td>{{ getProfileName(appt.hostref?.id) }}</td>
@@ -1791,7 +1791,7 @@
       <textarea matInput rows="3" [(ngModel)]="newNoteText"></textarea>
     </mat-form-field>
     <div style="display:flex; justify-content:flex-end; gap:8px;">
-      <button mat-button mat-dialog-close>Close</button>
+      <button mat-button mat-dialog-close data-testid="qpr-planner-note-close">Close</button>
       <button mat-raised-button color="primary" data-testid="qpr-planner-note-save"
         [disabled]="!newNoteText.trim() || notesSaving" (click)="saveApptNote()">Save</button>
     </div>

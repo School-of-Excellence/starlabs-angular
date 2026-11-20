@@ -20,6 +20,9 @@
           <h1 class="dd-title">Delivery Dashboard</h1>
           <span class="dd-live-chip"><span class="dd-live-chip__dot"></span>Live &middot; {{ lastUpdatedRelative
             }}</span>
+          <button data-testid="ddc-btn-whynot" class="dd-btn dd-why-btn" type="button" (click)="openWhyDialog()"
+            matTooltip="Type a participant's name to see which sections they are in, and the exact rule that keeps them out of the others."
+            matTooltipClass="dd-logic-tip" [matTooltipShowDelay]="250">Why not here?</button>
         </div>
       </div>
       <div class="dd-filter-bar">
@@ -141,7 +144,7 @@
           <button class="dd-fnl-flag dd-fnl-flag--hot" type="button" data-testid="ddc-btn-011" [matTooltip]="logicTip.stuck" matTooltipPosition="above" [matTooltipShowDelay]="250"
             [class.is-zero]="kpiStuck === 0" (click)="navToAttention('stuck')">
             <span class="dd-fnl-flag__n">{{ kpiStuck | number }}</span>
-            <span class="dd-fnl-flag__t">stuck &gt;15d</span>
+            <span class="dd-fnl-flag__t">stuck &gt;7d</span>
           </button>
           <button class="dd-fnl-flag" type="button" data-testid="ddc-btn-014" [matTooltip]="logicTip.idle" matTooltipPosition="above" [matTooltipShowDelay]="250"
             [class.is-zero]="kpiInitiatedNotConsuming === 0" (click)="navToAttention('idle')">
@@ -1965,6 +1968,7 @@
                     <mat-option *ngIf="optMatch('wstatus', 'All')" value="all">All</mat-option>
                     <mat-option *ngIf="optMatch('wstatus', 'Booked')" value="booked">Booked</mat-option>
                     <mat-option *ngIf="optMatch('wstatus', 'Completed')" value="completed">Completed</mat-option>
+                    <mat-option *ngIf="optMatch('wstatus', 'Cancelled')" value="cancelled">Cancelled</mat-option>
                   </mat-select>
                 </mat-form-field>
 
@@ -1995,4 +1999,76 @@
       </mat-tab>
     </mat-tab-group>
   </div><!-- /.dd-app -->
+  <!-- "Why not here?" (operator 2026-11-19): name → per product, In / Not in each section + the blocking rule. -->
+  <div data-testid="ddc-why-overlay" class="modal-overlay" *ngIf="whyOpen" (click)="closeWhyDialog()">
+    <div data-testid="ddc-why-dialog" class="modal-content dd-why" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Why not here?</h3>
+        <button data-testid="ddc-why-close" class="modal-close" (click)="closeWhyDialog()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="dd-why__controls">
+          <div class="dd-why__search">
+            <input data-testid="ddc-why-name" class="dd-why__input" type="text" placeholder="Participant name (2+ letters)"
+              [(ngModel)]="whyQuery" (input)="onWhyQuery()" autocomplete="off">
+            <div class="dd-why__matches" *ngIf="whyMatchList.length">
+              <button data-testid="ddc-why-match" type="button" class="dd-why__match" *ngFor="let m of whyMatchList" (click)="pickWhy(m)">
+                {{ m.name }} <span class="dd-why__muted">· {{ m.status }}</span>
+              </button>
+            </div>
+          </div>
+          <mat-form-field subscriptSizing="dynamic" appearance="outline" class="dd-why__section" floatLabel="always">
+            <mat-label>Product</mat-label>
+            <mat-select data-testid="ddc-why-product" multiple panelClass="dd-full-options" panelWidth="" [(ngModel)]="whyProduct" [disabled]="!whyResults.length" placeholder="All products">
+              <mat-select-trigger>{{ whyTriggerText(whyProduct, whyProductLabel, 'All products') }}</mat-select-trigger>
+              <mat-option *ngFor="let r of whyResults" [value]="r.pid">{{ r.product }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field subscriptSizing="dynamic" appearance="outline" class="dd-why__status" floatLabel="always">
+            <mat-label>Status</mat-label>
+            <mat-select data-testid="ddc-why-status" multiple panelClass="dd-full-options" panelWidth="" [(ngModel)]="whyStatus" [disabled]="!whyResults.length" placeholder="All statuses">
+              <mat-select-trigger>{{ whyTriggerText(whyStatus, whyStatusLabel, 'All statuses') }}</mat-select-trigger>
+              <mat-option *ngFor="let st of whyStatusOptions" [value]="st">{{ st | titlecase }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field subscriptSizing="dynamic" appearance="outline" class="dd-why__section" floatLabel="always">
+            <mat-label>Section</mat-label>
+            <mat-select data-testid="ddc-why-section" multiple panelClass="dd-full-options" panelWidth="" [(ngModel)]="whySection" placeholder="All sections">
+              <mat-select-trigger>{{ whyTriggerText(whySection, whySectionLabel, 'All sections') }}</mat-select-trigger>
+              <mat-option *ngFor="let sec of whySections" [value]="sec.key">{{ sec.label }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+        <div class="dd-why__hint" *ngIf="!whyProfileId">Pick a participant from the list. Dates follow the period chosen at the top.</div>
+        <div class="dd-why__hint" *ngIf="whyProfileId && !whyResults.length && everyProductRecordRaw.length">No Delivery Dashboard product records for this participant.</div>
+        <div class="dd-why__hint" *ngIf="whyProfileId && !everyProductRecordRaw.length">The dashboard is still loading product records — pick the name again in a few seconds.</div>
+
+        <mat-accordion class="dd-why__accordion" multi *ngIf="whyResults.length">
+          <mat-expansion-panel data-testid="ddc-why-panel" class="dd-why__panel" *ngFor="let r of whyFilteredResults"
+            [expanded]="whyFilteredResults.length === 1">
+            <mat-expansion-panel-header class="dd-why__phead">
+              <mat-panel-title class="dd-why__ptitle">{{ r.product }} <span class="dd-why__muted">&nbsp;· {{ r.card }}</span></mat-panel-title>
+              <mat-panel-description class="dd-why__pdesc">
+                <span class="dd-why__status-chip" [attr.data-status]="r.status">{{ r.status | titlecase }}</span>
+                <span class="dd-why__badge" [class.is-in]="whyHeaderBadge(r).isIn">{{ whyHeaderBadge(r).text }}</span>
+              </mat-panel-description>
+            </mat-expansion-panel-header>
+            <div class="dd-why__summary">{{ r.summary }}</div>
+            <div class="dd-why__now"><b>Currently in:</b> {{ r.inNow.length ? r.inNow.join(', ') : 'no section' }}</div>
+            <table class="avg-table dd-why__table">
+              <tbody>
+                <tr *ngFor="let row of whyRowsFor(r)" [class.is-in]="row.isIn">
+                  <td class="dd-why__mark">{{ row.isIn ? '✓' : '✗' }}</td>
+                  <td class="dd-why__sec">{{ row.label }}</td>
+                  <td>{{ row.reason }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </mat-expansion-panel>
+        </mat-accordion>
+        <div class="dd-why__hint" *ngIf="whyResults.length && !whyFilteredResults.length">No product matches the Product / Status filter.</div>
+      </div>
+    </div>
+  </div>
+
 </div>
