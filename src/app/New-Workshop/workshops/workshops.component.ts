@@ -202,6 +202,11 @@ export class WorkshopsComponent implements OnInit {
     }
   }
 
+  /** The Live feed of completed steps (shown on Active rows only), in a new tab like the Dashboard. */
+  openLive(workshop: any): void {
+    window.open('/workshoplive/' + workshop.id, '_blank');
+  }
+
   private popupBannerOpening = false;
   /** EiFlix popup banner — edits the single `classify/eiflixpopupbanner` document. */
   async openPopupBannerDialog() {

@@ -1,4 +1,5 @@
 import { WorkshopDashboardComponent } from './workshop-dashboard.component';
+import { newUserDocsById } from './workshop-dashboard.engine';
 
 /**
  * Exist Users Enrolled — counting, the `movedtoexist` rule, and the panel filters.
@@ -375,6 +376,7 @@ describe('WorkshopDashboard — Users Not in Chat Group', () => {
     c.supportChatMembers = new Set(['uid-e1', 'uid-n1']);
     c.notInChatParticipants = [];
     c.profileUserRefs = new Map(); c.profileUserRefsPending = new Set();
+    c.lateNewUserAsked = new Set(); c.lateNewUserPending = new Set();
     c.resolveProfileUserRefs = async () => {};      // the Firestore fallback is exercised separately
     c.newUserDataState = 'ready';                    // new users' uids come from new_user_data
     Object.assign(c, over);
@@ -452,6 +454,290 @@ describe('WorkshopDashboard — Users Not in Chat Group', () => {
       expect(ids(c.filteredParticipants)).toEqual(['e4', 'n2']);
       expect(c.selectedStatusInfo.count).toBe(2);
       expect(c.chatAddableCount).toBe(0);
+    });
+  });
+
+  // Someone who signs up and enrolls while the dashboard is open is in neither profile map (2026-11-19):
+  // looked up in new_user_data on their own instead of showing as "Unknown · No login yet" until a refresh.
+  describe('late enrollees', () => {
+    const META = (c: any) => ({ e1: c.mapProfile.e1, e2: c.mapProfile.e2, e3: c.mapProfile.e3, e4: c.mapProfile.e4 });
+    function late(over: Partial<any> = {}): any {
+      const c = make();
+      c.participantMetaDocdata = META(c);
+      c.mapProfile = { ...c.participantMetaDocdata, ...c.newUserOverlay() };
+      c.enrolledParticipants = [...c.enrolledParticipants, { profileid: 'late1' }, { profileid: 'late2' }, { profileid: 'orphan' }];
+      c.appliedEnrolledIds = c.enrolledParticipants.map((p: any) => p.profileid);   // the metadata above is for this list
+      c.enrolledGen = 1; c.enrolledGenApplied = 1; c.enrolledGenDone = 1; c.destroyed = false;
+      c.ngZone = { run: (fn: () => any) => fn() };
+      c.cdr = { markForCheck: () => {}, detectChanges: () => {} };
+      c.recomputeDerivedState = () => {};
+      c.loadSaleAchieved = async () => {};
+      c.reads = [] as string[][];
+      c.readNewUsersByIds = async (asked: string[]) => { c.reads.push(asked); return {}; };
+      Object.assign(c, over);
+      return c;
+    }
+    const found = {
+      late1: { id: 'late1', name: 'Late One', uid: 'uid-late1' },   // already in the group
+      late2: { id: 'late2', name: 'Late Two', uid: 'uid-late2', email: 'late.two@x.com' },   // not in the group
+    };
+    /** A promise the test resolves or rejects itself. */
+    function deferred<T>() {
+      let resolve!: (v: T) => void; let reject!: (e: any) => void;
+      const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+      return { promise, resolve, reject };
+    }
+
+    it('leaves them out of Not in Chat Group while being looked up, then lists them by name', async () => {
+      const c = late({ supportChatMembers: new Set(['uid-e1', 'uid-n1', 'uid-late1']) });
+      const asked: string[][] = [];
+      c.resolveProfileUserRefs = async (pids: string[]) => { asked.push(pids); };
+      let land!: (v: any) => void;
+      c.readNewUsersByIds = (pids: string[]) => { c.reads.push(pids); return new Promise(r => { land = r; }); };
+      const before = c.mapProfileNew;
+      const done = c.fillMissingNewUsers();
+      expect(c.reads).toEqual([['late1', 'late2', 'orphan']]);       // only the ids in neither map
+      c.recomputeNotInChat();
+      expect(ids(c.notInChatParticipants)).toEqual(['e2', 'e3', 'e4', 'n2']);
+      expect(asked).toEqual([['e4']]);                                // none of them sent to profile_data
+      land(found);
+      await done;
+      expect(c.mapProfileNew).not.toBe(before);                       // a new object; the old one is unchanged
+      expect(before.late1).toBeUndefined();
+      expect(c.mapProfile.late2.name).toBe('Late Two');
+      expect(ids(c.notInChatParticipants)).toEqual(['e2', 'e3', 'e4', 'late2', 'n2', 'orphan']);
+      const l2 = c.notInChatParticipants.find((p: any) => p.profileid === 'late2');
+      expect(l2.name).toBe('Late Two');
+      expect(l2.uid).toBe('uid-late2');
+      expect(c.totalNewUsersEnrolled).toBe(4);                        // n1, n2, late1, late2
+      expect(c.totalExistUsersEnrolled).toBe(5);                      // e1–e4 and the orphan
+      expect(c.reads.length).toBe(1);                                 // the catch-up asked for nobody new
+    });
+
+    it('reads an id once: one not found is an orphan enrolment and stays as it was', async () => {
+      const c = late();
+      c.readNewUsersByIds = async (pids: string[]) => { c.reads.push(pids); return { late1: found.late1 }; };
+      await c.fillMissingNewUsers();
+      await c.fillMissingNewUsers();
+      expect(c.reads).toEqual([['late1', 'late2', 'orphan']]);
+      expect(c.lateNewUserPending.size).toBe(0);
+      expect(ids(c.notInChatParticipants)).toContain('orphan');
+      expect(c.notInChatParticipants.find((p: any) => p.profileid === 'orphan').name).toBe('Unknown');
+      c.enrolledParticipants = [...c.enrolledParticipants, { profileid: 'late3' }];   // the next enrolment...
+      c.appliedEnrolledIds = [...c.appliedEnrolledIds, 'late3'];                      // ...once its metadata read is in
+      await c.fillMissingNewUsers();
+      expect(c.reads[1]).toEqual(['late3']);
+    });
+
+    it('does nothing until new_user_data is ready; never asks for ids whose metadata read is still out', async () => {
+      for (const state of ['loading', 'failed']) {
+        const c = late({ newUserDataState: state });
+        await c.fillMissingNewUsers();
+        expect(c.reads).withContext(state).toEqual([]);
+      }
+      // A newer enrolled list (with the late ids) is still being read: the applied one is the seed's six.
+      const c = late({ enrolledGen: 2, appliedEnrolledIds: ['e1', 'e2', 'e3', 'e4', 'n1', 'n2'] });
+      await c.fillMissingNewUsers();
+      expect(c.reads).toEqual([]);
+      const gone = late({ destroyed: true });
+      await gone.fillMissingNewUsers();
+      expect(gone.reads).toEqual([]);
+    });
+
+    it('a failed lookup lists them as before and is asked again by the next call', async () => {
+      const c = late();
+      let fail = true;
+      c.readNewUsersByIds = async (pids: string[]) => { c.reads.push(pids); if (fail) throw new Error('offline'); return found; };
+      spyOn(console, 'error');
+      await c.fillMissingNewUsers();
+      expect(console.error).toHaveBeenCalled();
+      expect(c.lateNewUserPending.size).toBe(0);
+      expect(ids(c.notInChatParticipants)).toContain('late2');
+      fail = false;
+      await c.fillMissingNewUsers();
+      expect(c.reads.length).toBe(2);
+      expect(c.mapProfileNew.late2.name).toBe('Late Two');
+    });
+
+    // 2026-11-19 review: offline, a cache answer is empty, and taking it would make them orphans for good.
+    it('an answer from the cache is retried, then not taken: the ids are not marked as asked', async () => {
+      const K: any = WorkshopDashboardComponent;
+      const saved = K.LATE_NEW_USER_RETRY_DELAYS_MS;
+      K.LATE_NEW_USER_RETRY_DELAYS_MS = [0, 0];                       // the real waits are 1s and 3s
+      try {
+        const c = late();
+        let offline = true;
+        c.readNewUsersByIds = async (pids: string[]) => {
+          c.reads.push(pids);
+          return newUserDocsById(offline
+            ? [{ metadata: { fromCache: true }, docs: [] }]
+            : [{ metadata: { fromCache: false }, docs: [{ id: 'late2', data: () => ({ name: 'Late Two', uid: 'uid-late2' }) }] }]);
+        };
+        spyOn(console, 'error');
+        await c.fillMissingNewUsers();
+        expect(c.reads.length).toBe(3);                               // the first try and both retries
+        expect(console.error).toHaveBeenCalledTimes(1);
+        for (const id of ['late1', 'late2', 'orphan']) expect(c.lateNewUserAsked.has(id)).withContext(id).toBe(false);
+        expect(c.lateNewUserPending.size).toBe(0);
+        expect(c.mapProfileNew.late2).toBeUndefined();
+        offline = false;
+        await c.fillMissingNewUsers();                                  // asked again
+        expect(c.reads.length).toBe(4);
+        expect(c.mapProfileNew.late2.name).toBe('Late Two');
+      } finally {
+        K.LATE_NEW_USER_RETRY_DELAYS_MS = saved;
+      }
+    });
+
+    // 2026-11-19 review: the enrolled handler ran Sale Achieved before these people were known.
+    it('runs Sale Achieved again once a late new user is found, with their email known', async () => {
+      const c = late();
+      const emails: (string | undefined)[] = [];
+      c.loadSaleAchieved = async () => { emails.push(c.mapProfile.late2?.email); };
+      c.readNewUsersByIds = async () => found;
+      await c.fillMissingNewUsers();
+      expect(emails).toEqual(['late.two@x.com']);
+      const none = late();                                            // only orphans: no new emails, no new run
+      let runs = 0; none.loadSaleAchieved = async () => { runs++; };
+      await none.fillMissingNewUsers();
+      expect(runs).toBe(0);
+    });
+
+    // 2026-11-19 review: the group can change between the enrolment and the metadata read for it.
+    it('while the newest enrolled list is still being read, lists nobody it cannot identify yet', () => {
+      const c = late({
+        enrolledGen: 2, enrolledGenDone: 1,
+        appliedEnrolledIds: ['e1', 'e2', 'e3', 'e4', 'n1', 'n2', 'orphan'],
+        lateNewUserAsked: new Set(['orphan']),                       // looked up before: an orphan enrolment
+      });
+      const asked: string[][] = [];
+      c.resolveProfileUserRefs = async (pids: string[]) => { asked.push(pids); };
+      c.recomputeNotInChat();
+      expect(ids(c.notInChatParticipants)).toEqual(['e2', 'e3', 'e4', 'n2', 'orphan']);   // late1 / late2 wait
+      expect(asked).toEqual([['e4', 'orphan']]);                     // and are not sent to profile_data
+      c.enrolledGenDone = 2;                                          // that read has finished
+      c.recomputeNotInChat();
+      expect(ids(c.notInChatParticipants)).toContain('late2');
+    });
+
+    // 2026-11-19 review: two enrolled snapshots close together can finish their metadata reads out of order.
+    describe('enrolled snapshots that land out of order', () => {
+      const SEED = ['e1', 'e2', 'e3', 'e4', 'n1', 'n2'];
+      const ALL = [...SEED, 'late1', 'late2', 'orphan'];
+      function orders(): any {
+        const c = late({ enrolledGen: 0, enrolledGenApplied: 0, enrolledGenDone: 0, participantMetaDocdata: null, appliedEnrolledIds: [] });
+        c.loading = true;
+        c.calls = { notInChat: 0, fill: 0, detect: 0 };
+        const realNotInChat = c.recomputeNotInChat.bind(c);
+        c.recomputeNotInChat = () => { c.calls.notInChat++; realNotInChat(); };
+        const realFill = c.fillMissingNewUsers.bind(c);
+        c.fillMissingNewUsers = () => { c.calls.fill++; return realFill(); };
+        c.cdr = { markForCheck: () => {}, detectChanges: () => { c.calls.detect++; } };
+        c.metaReads = new Map<number, ReturnType<typeof deferred<any>>>();
+        c.getParticipantMetaMapForIds = (pids: string[]) => {
+          const d = deferred<any>(); c.metaReads.set(c.metaReads.size + 1, d); return d.promise;
+        };
+        return c;
+      }
+      /** What the snapshot handler does before its await: a new generation and the live list. */
+      function snapshot(c: any, list: string[]): Promise<void> {
+        const gen = ++c.enrolledGen;
+        c.enrolledParticipants = list.map(profileid => ({ profileid }));
+        return c.loadEnrolledMeta(gen, list);
+      }
+      const D1 = (c: any) => META(c);
+      const D2 = (c: any) => ({ ...META(c), e4: { name: 'Exist Four (renamed)' } });
+
+      it('(a) the newer read lands first: the older one is dropped and changes nothing', async () => {
+        const c = orders();
+        const d1 = D1(c), d2 = D2(c);
+        const h1 = snapshot(c, SEED);
+        const h2 = snapshot(c, ALL);
+        c.metaReads.get(2).resolve({ docdata: d2 }); await h2;
+        await new Promise(r => setTimeout(r, 0));                     // gen 2's own late-enrollee lookup lands
+        expect(c.participantMetaDocdata).toBe(d2);
+        expect(c.appliedEnrolledIds).toEqual(ALL);
+        const seen = { ...c.calls };
+        c.metaReads.get(1).resolve({ docdata: d1 }); await h1;
+        expect(c.participantMetaDocdata).toBe(d2);                    // gen 2's, not gen 1's
+        expect(c.mapProfile.e4.name).toBe('Exist Four (renamed)');
+        expect(c.appliedEnrolledIds).toEqual(ALL);
+        expect(c.calls).toEqual(seen);                                // no recompute, no lookup, no repaint
+        expect(c.enrolledGenApplied).toBe(2);
+        expect(c.loading).toBe(false);
+      });
+
+      it('(b) in order: both apply, and loading is cleared once', async () => {
+        const c = orders();
+        const d1 = D1(c), d2 = D2(c);
+        const h1 = snapshot(c, SEED);
+        c.metaReads.get(1).resolve({ docdata: d1 }); await h1;
+        expect(c.participantMetaDocdata).toBe(d1);
+        expect(c.loading).toBe(false);
+        const h2 = snapshot(c, ALL);
+        c.metaReads.get(2).resolve({ docdata: d2 }); await h2;
+        expect(c.participantMetaDocdata).toBe(d2);
+        expect(c.mapProfile.e4.name).toBe('Exist Four (renamed)');
+        expect(c.calls.notInChat).toBe(2);
+        expect(c.calls.detect).toBe(1);
+        expect(c.enrolledGenApplied).toBe(2);
+      });
+
+      it('(c) the older read lands while the newer is out: no lookup for the newer ids until theirs lands', async () => {
+        const c = orders();
+        const asked: string[][] = [];
+        c.resolveProfileUserRefs = async (pids: string[]) => { asked.push(pids); };
+        const h1 = snapshot(c, SEED);
+        const h2 = snapshot(c, ALL);
+        c.metaReads.get(1).resolve({ docdata: D1(c) }); await h1;
+        await Promise.resolve();
+        expect(c.reads).toEqual([]);                                  // the late ids are not in the applied list
+        expect(ids(c.notInChatParticipants)).toEqual(['e2', 'e3', 'e4', 'n2']);   // and not listed as Unknown
+        expect(asked).toEqual([['e4']]);
+        c.metaReads.get(2).resolve({ docdata: D2(c) }); await h2;
+        expect(c.reads).toEqual([['late1', 'late2', 'orphan']]);
+      });
+
+      it('a failed metadata read is logged and stops holding Not in Chat Group back', async () => {
+        const c = orders();
+        spyOn(console, 'error');
+        const h1 = snapshot(c, SEED);
+        c.metaReads.get(1).resolve({ docdata: D1(c) }); await h1;
+        const h2 = snapshot(c, ALL);
+        c.recomputeNotInChat();
+        expect(ids(c.notInChatParticipants)).not.toContain('late2');  // waiting for gen 2's read
+        c.metaReads.get(2).reject(Object.assign(new Error('denied'), { code: 'permission-denied' }));
+        await h2;                                                     // no unhandled rejection
+        expect(console.error).toHaveBeenCalled();
+        expect(c.enrolledGenDone).toBe(2);
+        expect(c.enrolledGenApplied).toBe(1);
+        expect(ids(c.notInChatParticipants)).toContain('late2');      // listed as before, not hidden for good
+      });
+    });
+
+    // The two call sites must start the lookup BEFORE recomputeNotInChat, or the late ids flash as
+    // "No login yet" and are sent to profile_data (2026-11-19 review).
+    it('enrolled while new_user_data was loading: the settle starts the lookup before listing anyone', async () => {
+      const c = late({ newUserDataState: 'loading', supportChatMembers: new Set(['uid-e1', 'uid-n1', 'uid-late1']) });
+      c.refreshOpenPanelPeople = () => {};
+      const asked: string[][] = [];
+      c.resolveProfileUserRefs = async (pids: string[]) => { asked.push(pids); };
+      const land = deferred<any>();
+      c.readNewUsersByIds = (pids: string[]) => { c.reads.push(pids); return land.promise; };
+      await c.fillMissingNewUsers();                                  // the enrolled handler's call: still loading
+      expect(c.reads).toEqual([]);
+      c.newUserDataState = 'ready';
+      c.onNewUserDataSettled();
+      expect(c.reads).toEqual([['late1', 'late2', 'orphan']]);       // issued once, by the settle
+      expect(ids(c.notInChatParticipants)).toEqual(['e2', 'e3', 'e4', 'n2']);
+      expect(asked).toEqual([['e4']]);                                // none of the late ids sent to profile_data
+      land.resolve(found);
+      await land.promise; await Promise.resolve(); await Promise.resolve();
+      await new Promise(r => setTimeout(r, 0));
+      expect(c.reads.length).toBe(1);
+      const l2 = c.notInChatParticipants.find((p: any) => p.profileid === 'late2');
+      expect(l2.name).toBe('Late Two');
+      expect(ids(c.notInChatParticipants)).not.toContain('late1');    // in the group
     });
   });
 });

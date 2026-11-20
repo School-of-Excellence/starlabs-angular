@@ -116,7 +116,7 @@
         </div>
 
         <div class="wdx-hero" [style.--cols]="isLiveWorkshop ? 4 : 3">
-          <button data-testid="wd-on-metric-click-6" type="button" class="wdx-fig wdx-fig--lead metric-card" style="--tone:var(--primary)"
+          <button data-testid="wd-on-metric-click-6" type="button" class="wdx-fig wdx-fig--lead metric-card" style="--tone:var(--gl-enrolled)"
                   (click)="onMetricClick('totalEnrolled')">
             <span class="wdx-fig-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="9" cy="8.5" r="3.5"/><path d="M3 19.5c.6-3.3 3-5 6-5s5.4 1.7 6 5"/><path d="M15.5 5.3a3.5 3.5 0 0 1 0 6.4M17.5 14.8c1.8.6 3 2.1 3.5 4.7"/></svg>Total Enrolled</span>
             <span class="wdx-fig-n metric-value">{{ totalEnrolled }}</span>
@@ -124,12 +124,12 @@
           </button>
 
           <ng-container *ngIf="workshopData?.categorybased !== true">
-            <div class="wdx-fig metric-card" style="--tone:var(--c-avg)">
+            <div class="wdx-fig metric-card" style="--tone:var(--gl-avg)">
               <span class="wdx-fig-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="3.5" width="17" height="17" rx="2"/><path d="M8 16v-4M12 16V8M16 16v-6"/></svg>Average Progress</span>
               <span class="wdx-fig-n metric-value">{{ averageProgress.toFixed(1) }}%</span>
               <span class="wdx-bar" aria-hidden="true"><i [style.width.%]="averageProgress"></i></span>
             </div>
-            <div class="wdx-fig metric-card" style="--tone:var(--c-rate)">
+            <div class="wdx-fig metric-card" style="--tone:var(--gl-rate)">
               <span class="wdx-fig-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M8 12.3l2.8 2.8L16.2 9.6"/></svg>Completion Rate</span>
               <span class="wdx-fig-n metric-value">{{ completionRate.toFixed(1) }}%</span>
               <span class="wdx-bar" aria-hidden="true"><i [style.width.%]="completionRate"></i></span>
@@ -137,12 +137,12 @@
           </ng-container>
 
           <ng-container *ngIf="workshopData?.categorybased === true">
-            <div class="wdx-fig metric-card" style="--tone:var(--c-avg)">
+            <div class="wdx-fig metric-card" style="--tone:var(--gl-avg)">
               <span class="wdx-fig-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="3.5" width="17" height="17" rx="2"/><path d="M8 16v-4M12 16V8M16 16v-6"/></svg>Overall Avg Progress</span>
               <span class="wdx-fig-n metric-value">{{ categoryBasedMetrics.overallAvgProgress.toFixed(1) }}%</span>
               <span class="wdx-bar" aria-hidden="true"><i [style.width.%]="categoryBasedMetrics.overallAvgProgress"></i></span>
             </div>
-            <div class="wdx-fig metric-card" style="--tone:var(--c-rate)">
+            <div class="wdx-fig metric-card" style="--tone:var(--gl-rate)">
               <span class="wdx-fig-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7.5 4.5h9v4a4.5 4.5 0 0 1-9 0z"/><path d="M7.5 6H4.5v1.5a3 3 0 0 0 3.2 3M16.5 6h3v1.5a3 3 0 0 1-3.2 3M12 13v3.5M8.5 20h7M9.5 20l.5-3.5h4l.5 3.5"/></svg>Overall Completion Rate</span>
               <span class="wdx-fig-n metric-value">{{ categoryBasedMetrics.overallCompletionRate.toFixed(1) }}%</span>
               <span class="wdx-bar" aria-hidden="true"><i [style.width.%]="categoryBasedMetrics.overallCompletionRate"></i></span>
@@ -152,7 +152,7 @@
           <!-- Sale Achieved — live workshops only: enrolled people who bought in Watson between the
                registration start and one month after the workshop end (Watson read-only).
                The amount is the headline; the number of buyers sits under it. -->
-          <button type="button" class="wdx-fig wdx-fig--money metric-card" style="--tone:var(--money)" data-testid="wdash-sale-card" *ngIf="isLiveWorkshop"
+          <button type="button" class="wdx-fig wdx-fig--money metric-card" style="--tone:var(--gl-sale)" data-testid="wdash-sale-card" *ngIf="isLiveWorkshop"
                   (click)="openSaleAchieved()"
                   matTooltip="Enrolled people who bought between registration start and one month after the workshop ended" matTooltipClass="wdx-mtip">
             <span class="wdx-fig-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 4.5h10M7 9h10M7 4.5h3.5a4.25 4.25 0 0 1 0 8.5H7l7.5 7"/></svg>Sale Achieved<span class="wdx-info" aria-hidden="true"><svg class="wdx-ic wdx-ic--xs" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8v.2"/></svg></span></span>
@@ -165,27 +165,27 @@
         <div class="wdx-groups">
           <!-- Regular (not category-based) workshop. -->
           <ng-container *ngIf="workshopData?.categorybased !== true">
-            <section class="wdx-grp" style="--n:4">
+            <section class="wdx-grp wdx-grp--blue" style="--n:4">
               <div class="wdx-grp-h"><span class="wdx-eyebrow">Participation</span></div>
               <div class="wdx-grp-cells">
-                <button data-testid="wd-on-metric-click-16" type="button" class="wdx-cell metric-card" style="--tone:var(--c-nav)" (click)="onMetricClick('totalStarted')">
+                <button data-testid="wd-on-metric-click-16" type="button" class="wdx-cell metric-card" style="--tone:var(--gl-started)" (click)="onMetricClick('totalStarted')">
                   <span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 5.5v13l10.5-6.5z"/></svg><span>Total Started</span></span>
                   <span class="wdx-cell-n metric-value">{{ totalStarted }}</span>
                   <span class="wdx-go"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span>
                 </button>
-                <button data-testid="wd-on-metric-click-17" type="button" class="wdx-cell metric-card" style="--tone:var(--c-idle)" (click)="onMetricClick('notStarted')">
+                <button data-testid="wd-on-metric-click-17" type="button" class="wdx-cell metric-card" style="--tone:var(--gl-notstarted)" (click)="onMetricClick('notStarted')">
                   <span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M10 9v6M14 9v6"/></svg><span>Not Started</span></span>
                   <span class="wdx-cell-n metric-value">{{ notStarted }}</span>
                   <span class="wdx-go"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span>
                 </button>
-                <button data-testid="wd-on-metric-click-18" type="button" class="wdx-cell metric-card" style="--tone:var(--c-act)" (click)="onMetricClick('activeParticipants')">
+                <button data-testid="wd-on-metric-click-18" type="button" class="wdx-cell metric-card" style="--tone:var(--gl-active)" (click)="onMetricClick('activeParticipants')">
                   <span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 16.5l6-6 4 4 7-7.5M15 7h5.5v5.5"/></svg><span>Active Participants</span></span>
                   <span class="wdx-cell-n metric-value">{{ activeParticipants }}</span>
                   <span class="wdx-go"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span>
                 </button>
                 <!-- Completed (2026-11-17): the list behind Completion Rate, as a number. A category-based
                      workshop already has its own Completed cell below, so this one is for this layout only. -->
-                <button type="button" class="wdx-cell" style="--tone:var(--c-done)" data-testid="wdash-completed-card" (click)="onMetricClick('completedParticipants')">
+                <button type="button" class="wdx-cell" style="--tone:var(--gl-completed)" data-testid="wdash-completed-card" (click)="onMetricClick('completedParticipants')">
                   <span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M8 12.3l2.8 2.8L16.2 9.6"/></svg><span>Completed</span></span>
                   <span class="wdx-cell-n" data-testid="wdash-completed-count">{{ glanceCompleted }}</span>
                   <span class="wdx-cell-s">of {{ totalEnrolled }} enrolled</span>
@@ -193,13 +193,13 @@
                 </button>
               </div>
             </section>
-            <section class="wdx-grp" [style.--n]="showNotInChatCard ? 4 : 3">
+            <section class="wdx-grp wdx-grp--violet" [style.--n]="showNotInChatCard ? 4 : 3">
               <div class="wdx-grp-h"><span class="wdx-eyebrow">People</span></div>
               <div class="wdx-grp-cells">
                 <!-- Existing / New / Not Enrolled split people by new_user_data, a large collection read once that the
                      dashboard does not wait for (2026-11-18): until it lands these three show a quiet bar in place of
                      the number and stay disabled; if the read fails they say "—" and stay disabled. -->
-                <button type="button" class="wdx-cell metric-card" style="--tone:var(--c-nav)" data-testid="wdash-exist-users-card"
+                <button type="button" class="wdx-cell metric-card" style="--tone:var(--gl-existing)" data-testid="wdash-exist-users-card"
                         [disabled]="newUserDataState !== 'ready'" [attr.aria-busy]="newUserDataState === 'loading' ? 'true' : null"
                         (click)="onMetricClick('existUsersEnrolled')">
                   <span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20c.7-3.8 3.6-5.8 7.5-5.8s6.8 2 7.5 5.8"/></svg><span data-testid="wdash-exist-users-label">Existing Participants</span></span>
@@ -210,7 +210,7 @@
                   }
                   <span class="wdx-go"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span>
                 </button>
-                <button data-testid="wd-on-metric-click-19" type="button" class="wdx-cell metric-card" style="--tone:var(--new)"
+                <button data-testid="wd-on-metric-click-19" type="button" class="wdx-cell metric-card" style="--tone:var(--gl-new)"
                         [disabled]="newUserDataState !== 'ready'" [attr.aria-busy]="newUserDataState === 'loading' ? 'true' : null"
                         (click)="onMetricClick('totalNewUsers')">
                   <span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 14c.8 1.3 2 2 3.5 2s2.7-.7 3.5-2M9 9.8v.4M15 9.8v.4"/></svg><span data-testid="wdash-new-users-label">New Users</span></span>
@@ -221,7 +221,7 @@
                   }
                   <span class="wdx-go"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span>
                 </button>
-                <button data-testid="wd-on-metric-click-20" type="button" class="wdx-cell metric-card" style="--tone:var(--c-idle)"
+                <button data-testid="wd-on-metric-click-20" type="button" class="wdx-cell metric-card" style="--tone:var(--gl-notenrolled)"
                         [disabled]="newUserDataState !== 'ready'" [attr.aria-busy]="newUserDataState === 'loading' ? 'true' : null"
                         (click)="onMetricClick('totalNewUsersNotEnrolled')">
                   <span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 16c.8-1.3 2-2 3.5-2s2.7.7 3.5 2M9 9.8v.4M15 9.8v.4"/></svg><span>New Users Not Enrolled</span></span>
@@ -233,7 +233,7 @@
                   <span class="wdx-go"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span>
                 </button>
                 <!-- Only for a workshop with a chat group, and only while someone enrolled is missing from it. -->
-                <button type="button" class="wdx-cell metric-card" style="--tone:var(--warn)" data-testid="wdash-chat-card" *ngIf="showNotInChatCard"
+                <button type="button" class="wdx-cell metric-card" style="--tone:var(--gl-chat)" data-testid="wdash-chat-card" *ngIf="showNotInChatCard"
                         (click)="onMetricClick('notInChatGroup')" matTooltip="Enrolled people whose login is not yet in the workshop's chat group" matTooltipClass="wdx-mtip">
                   <span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.5 11.5c0 4-3.8 7-8.5 7a9.6 9.6 0 0 1-3.2-.5L4 19.5l1.4-3.4a6.5 6.5 0 0 1-1.9-4.6c0-4 3.8-7 8.5-7s8.5 3 8.5 7z"/><path d="M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01"/></svg><span>Users Not in Chat Group</span></span>
                   <span class="wdx-cell-n metric-value" data-testid="wdash-chat-count">{{ totalNotInChatGroup }}</span>
@@ -246,23 +246,23 @@
           <!-- Category-based (CP) workshop. Colours keep today's meaning: purple = category,
                teal = Above Diagnostics, orange = Facilitator. -->
           <ng-container *ngIf="workshopData?.categorybased === true">
-            <section class="wdx-grp" [style.--n]="categoryWiseEnrolled.length + 2">
+            <section class="wdx-grp wdx-grp--violet" [style.--n]="categoryWiseEnrolled.length + 2">
               <div class="wdx-grp-h"><span class="wdx-eyebrow">Enrolled by group</span></div>
               <div class="wdx-grp-cells">
-                <button data-testid="wd-on-category-click-7" type="button" class="wdx-cell metric-card" style="--tone:var(--c-cat)"
+                <button data-testid="wd-on-category-click-7" type="button" class="wdx-cell metric-card" style="--tone:var(--gl-cat)"
                         *ngFor="let cat of categoryWiseEnrolled"
                         (click)="onCategoryClick(cat)">
                   <span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="4" width="6.5" height="6.5" rx="1"/><circle cx="17.25" cy="7.25" r="3.25"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1"/><path d="M14 13.5h6.5V20H14z"/></svg><span>{{ cat.categoryName }}</span></span>
                   <span class="wdx-cell-n metric-value">{{ cat.count }}</span>
                   <span class="wdx-go"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span>
                 </button>
-                <button data-testid="wd-on-cohort-click-8" type="button" class="wdx-cell metric-card" style="--tone:var(--c-coh)"
+                <button data-testid="wd-on-cohort-click-8" type="button" class="wdx-cell metric-card" style="--tone:var(--gl-coh)"
                         (click)="onCohortClick()">
                   <span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 3.5h5M10.5 3.5v5.5L5 18.5a1.4 1.4 0 0 0 1.2 2h11.6a1.4 1.4 0 0 0 1.2-2L13.5 9V3.5M7.6 14h8.8"/></svg><span>Above Diagnostics</span></span>
                   <span class="wdx-cell-n metric-value">{{ cohortParticipantCount }}</span>
                   <span class="wdx-go"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span>
                 </button>
-                <button data-testid="wd-on-facilitator-click-9" type="button" class="wdx-cell metric-card" style="--tone:var(--c-fac)"
+                <button data-testid="wd-on-facilitator-click-9" type="button" class="wdx-cell metric-card" style="--tone:var(--gl-fac)"
                         (click)="onFacilitatorClick()">
                   <span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2.5 9.5L12 5l9.5 4.5L12 14z"/><path d="M6.5 11.5v4.5c1.5 1.5 3.5 2.2 5.5 2.2s4-.7 5.5-2.2v-4.5M21.5 9.5v5"/></svg><span>Facilitator Only</span></span>
                   <span class="wdx-cell-n metric-value">{{ facilitatorCount }}</span>
@@ -270,22 +270,22 @@
                 </button>
               </div>
             </section>
-            <section class="wdx-grp" style="--n:3">
+            <section class="wdx-grp wdx-grp--blue" style="--n:3">
               <div class="wdx-grp-h"><span class="wdx-eyebrow">Participation</span></div>
               <div class="wdx-grp-cells">
-                <button data-testid="wd-on-category-based-metric-click-10" type="button" class="wdx-cell metric-card" style="--tone:var(--c-act)"
+                <button data-testid="wd-on-category-based-metric-click-10" type="button" class="wdx-cell metric-card" style="--tone:var(--gl-active)"
                         (click)="onCategoryBasedMetricClick('active')">
                   <span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 16.5l6-6 4 4 7-7.5M15 7h5.5v5.5"/></svg><span>Active Participants</span></span>
                   <span class="wdx-cell-n metric-value">{{ categoryBasedMetrics.totalActive }}</span>
                   <span class="wdx-go"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span>
                 </button>
-                <button data-testid="wd-on-category-based-metric-click-11" type="button" class="wdx-cell metric-card" style="--tone:var(--c-done)"
+                <button data-testid="wd-on-category-based-metric-click-11" type="button" class="wdx-cell metric-card" style="--tone:var(--gl-completed)"
                         (click)="onCategoryBasedMetricClick('completed')">
                   <span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M8 12.3l2.8 2.8L16.2 9.6"/></svg><span>Completed</span></span>
                   <span class="wdx-cell-n metric-value">{{ categoryBasedMetrics.totalCompleted }}</span>
                   <span class="wdx-go"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span>
                 </button>
-                <button data-testid="wd-on-category-based-metric-click-12" type="button" class="wdx-cell metric-card" style="--tone:var(--c-idle)"
+                <button data-testid="wd-on-category-based-metric-click-12" type="button" class="wdx-cell metric-card" style="--tone:var(--gl-notstarted)"
                         (click)="onCategoryBasedMetricClick('notStarted')">
                   <span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M10 9v6M14 9v6"/></svg><span>Not Started</span></span>
                   <span class="wdx-cell-n metric-value">{{ categoryBasedMetrics.totalNotStarted }}</span>
@@ -293,10 +293,10 @@
                 </button>
               </div>
             </section>
-            <section class="wdx-grp" [style.--n]="categoryBasedMetrics.categoryProgress.length + 2">
+            <section class="wdx-grp wdx-grp--teal" [style.--n]="categoryBasedMetrics.categoryProgress.length + 2">
               <div class="wdx-grp-h"><span class="wdx-eyebrow">Progress by group</span><span class="wdx-eyebrow wdx-grp-note">click to open completed</span></div>
               <div class="wdx-grp-cells">
-                <button data-testid="wd-on-category-based-metric-click-13" type="button" class="wdx-cell metric-card" style="--tone:var(--c-cat)"
+                <button data-testid="wd-on-category-based-metric-click-13" type="button" class="wdx-cell metric-card" style="--tone:var(--gl-cat)"
                         *ngFor="let catProg of categoryBasedMetrics.categoryProgress"
                         (click)="onCategoryBasedMetricClick('categoryCompleted', catProg.categoryId)">
                   <span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 18.5l5-6 4 3 7.5-9"/><circle cx="8.5" cy="12.5" r="1.3"/><circle cx="12.5" cy="15.5" r="1.3"/></svg><span>{{ catProg.categoryName }} Progress</span></span>
@@ -305,7 +305,7 @@
                   <span class="wdx-bar" aria-hidden="true"><i [style.width.%]="catProg.avgProgress"></i></span>
                   <span class="wdx-go"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span>
                 </button>
-                <button data-testid="wd-on-category-based-metric-click-14" type="button" class="wdx-cell metric-card" style="--tone:var(--c-coh)"
+                <button data-testid="wd-on-category-based-metric-click-14" type="button" class="wdx-cell metric-card" style="--tone:var(--gl-coh)"
                         (click)="onCategoryBasedMetricClick('cohortCompleted')">
                   <span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 3.5h5M10.5 3.5v5.5L5 18.5a1.4 1.4 0 0 0 1.2 2h11.6a1.4 1.4 0 0 0 1.2-2L13.5 9V3.5M7.6 14h8.8"/></svg><span>Above Diagnostics Progress</span></span>
                   <span class="wdx-cell-n metric-value">{{ categoryBasedMetrics.cohortAvgProgress.toFixed(1) }}%</span>
@@ -313,7 +313,7 @@
                   <span class="wdx-bar" aria-hidden="true"><i [style.width.%]="categoryBasedMetrics.cohortAvgProgress"></i></span>
                   <span class="wdx-go"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span>
                 </button>
-                <button data-testid="wd-on-category-based-metric-click-15" type="button" class="wdx-cell metric-card" style="--tone:var(--c-fac)"
+                <button data-testid="wd-on-category-based-metric-click-15" type="button" class="wdx-cell metric-card" style="--tone:var(--gl-fac)"
                         (click)="onCategoryBasedMetricClick('facilitatorCompleted')">
                   <span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2.5 9.5L12 5l9.5 4.5L12 14z"/><path d="M6.5 11.5v4.5c1.5 1.5 3.5 2.2 5.5 2.2s4-.7 5.5-2.2v-4.5M21.5 9.5v5"/></svg><span>Facilitator Progress</span></span>
                   <span class="wdx-cell-n metric-value">{{ categoryBasedMetrics.facilitatorAvgProgress.toFixed(1) }}%</span>
@@ -327,21 +327,21 @@
 
           <!-- Evergreen-only referral cards, after either layout (category-based too, as before). -->
           <ng-container *ngIf="workshopData?.evergreenWorkshop === true">
-            <section class="wdx-grp" [style.--n]="workshopData?.payment === true ? 3 : 2">
+            <section class="wdx-grp wdx-grp--rose" [style.--n]="workshopData?.payment === true ? 3 : 2">
               <div class="wdx-grp-h"><span class="wdx-eyebrow">Referral<ng-container *ngIf="workshopData?.payment === true">&nbsp;&amp; purchase</ng-container></span></div>
               <div class="wdx-grp-cells">
-                <button data-testid="wd-on-metric-click-21" type="button" class="wdx-cell metric-card" style="--tone:var(--c-nav)" (click)="onMetricClick('shareClicked')">
+                <button data-testid="wd-on-metric-click-21" type="button" class="wdx-cell metric-card" style="--tone:var(--gl-share)" (click)="onMetricClick('shareClicked')">
                   <span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="17.5" cy="5.5" r="2.5"/><circle cx="6.5" cy="12" r="2.5"/><circle cx="17.5" cy="18.5" r="2.5"/><path d="M8.7 10.8l6.6-4M8.7 13.2l6.6 4"/></svg><span>Share Clicked</span></span>
                   <span class="wdx-cell-n metric-value">{{ shareClicked }}</span>
                   <span class="wdx-go"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span>
                 </button>
-                <button data-testid="wd-on-metric-click-22" type="button" class="wdx-cell metric-card" style="--tone:var(--accent-ink)" (click)="onMetricClick('shareClaimed')">
+                <button data-testid="wd-on-metric-click-22" type="button" class="wdx-cell metric-card" style="--tone:var(--gl-claim)" (click)="onMetricClick('shareClaimed')">
                   <span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="8" width="17" height="4" rx="1"/><path d="M5 12v8h14v-8M12 8v12M12 8c-1-2.8-4.5-4-5.3-2s2.3 2 5.3 2zM12 8c1-2.8 4.5-4 5.3-2s-2.3 2-5.3 2z"/></svg><span>Share Claimed</span></span>
                   <span class="wdx-cell-n metric-value">{{ shareClaimed }}</span>
                   <span class="wdx-go"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span>
                 </button>
                 <!-- Purchasers: evergreen + paid workshops only -->
-                <button data-testid="wd-on-metric-click-23" type="button" class="wdx-cell metric-card" style="--tone:var(--money)" *ngIf="workshopData?.payment === true"
+                <button data-testid="wd-on-metric-click-23" type="button" class="wdx-cell metric-card" style="--tone:var(--gl-purchase)" *ngIf="workshopData?.payment === true"
                         (click)="onMetricClick('purchase')">
                   <span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 4.5h2.2l2.2 10.5h10.1l2-7.5H6.4"/><circle cx="9" cy="19" r="1.4"/><circle cx="16.5" cy="19" r="1.4"/></svg><span>Purchase</span></span>
                   <span class="wdx-cell-n metric-value">{{ purchase }}</span>
@@ -357,7 +357,7 @@
              by recomputeGlance() (rules: workshop-dashboard.glance.ts). Each list opens in the side panel. ═════ -->
         <div class="wdx-gl-row">
           <!-- Joined recently: enrolled in the last 7×24h vs the 7×24h before; 14 calendar-day bars, last 7 darker. -->
-          <button type="button" class="wdx-gl-mo wdx-gl-mo--join" data-testid="wdash-joined-card" (click)="onMetricClick('joinedRecently')">
+          <button type="button" class="wdx-gl-mo wdx-gl-mo--join" style="--tone:var(--gl-joined)" data-testid="wdash-joined-card" (click)="onMetricClick('joinedRecently')">
             <span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="10" cy="8.5" r="3.5"/><path d="M4 19.5c.6-3.3 3-5 6-5 1.4 0 2.6.4 3.6 1M18 13.5v6M15 16.5h6"/></svg><span>Joined recently</span></span>
             <ng-container *ngIf="glanceJoined.count > 0; else wdxJoinedNone">
               <span class="wdx-gl-mo-n" data-testid="wdash-joined-count">+{{ glanceJoined.count }}</span>
@@ -378,17 +378,17 @@
           </button>
 
           <!-- Needs attention: the two lists never overlap (0% is stuck; inactive needs some progress). -->
-          <section class="wdx-grp" style="--n:2">
+          <section class="wdx-grp wdx-grp--amber" style="--n:2">
             <div class="wdx-grp-h"><span class="wdx-eyebrow">Needs attention</span></div>
             <div class="wdx-grp-cells">
-              <button type="button" class="wdx-cell" style="--tone:var(--warn)" data-testid="wdash-stuck-card"
+              <button type="button" class="wdx-cell" style="--tone:var(--gl-stuck)" data-testid="wdash-stuck-card"
                       [class.wdx-gl-zero]="!glanceStuck" (click)="onMetricClick('startedStuck')">
                 <span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 12h7"/></svg><span>Started but stuck</span></span>
                 <span class="wdx-cell-n" data-testid="wdash-stuck-count">{{ glanceStuck }}</span>
                 <span class="wdx-cell-s">started, still at 0%</span>
                 <span class="wdx-go"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span>
               </button>
-              <button type="button" class="wdx-cell" style="--tone:var(--danger)" data-testid="wdash-inactive-card"
+              <button type="button" class="wdx-cell" style="--tone:var(--gl-inactive)" data-testid="wdash-inactive-card"
                       [class.wdx-gl-zero]="!glanceInactive" (click)="onMetricClick('inactiveRecently')">
                 <span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg><span>Inactive for 3+ days</span></span>
                 <span class="wdx-cell-n" data-testid="wdash-inactive-count">{{ glanceInactive }}</span>
@@ -399,7 +399,7 @@
           </section>
 
           <!-- Top tags: the 5 most-carried tags on enrolled people; a row opens Total Enrolled with that tag ticked. -->
-          <section class="wdx-gl-mo wdx-gl-mo--tags" aria-label="Top tags" data-testid="wdash-top-tags">
+          <section class="wdx-gl-mo wdx-gl-mo--tags" style="--tone:var(--gl-tags)" aria-label="Top tags" data-testid="wdash-top-tags">
             <span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 12.5V4.5a1 1 0 0 1 1-1h8l8 8a1 1 0 0 1 0 1.4l-7.6 7.6a1 1 0 0 1-1.4 0z"/><circle cx="8" cy="8" r="1.4"/></svg><span>Top tags</span><span class="wdx-gl-hint" *ngIf="glanceTopTags.length">click a tag to open its people</span></span>
             <ol class="wdx-gl-tags" *ngIf="glanceTopTags.length; else wdxTagsNone">
               <li *ngFor="let t of glanceTopTags; trackBy: trackGlanceTag">
@@ -423,7 +423,7 @@
            journey is hidden, so the page gap does not double. ═════ -->
       <div class="wdx-anchor" #wdxJourney><section class="wdx-sheet wdx-block" aria-label="Participant Journey"
                *ngIf="workshopData?.evergreenWorkshop === true && evergreenWorkshopDays > 0">
-        <div class="wdx-sh">
+        <div class="wdx-sh wdx-sh--violet">
           <div>
             <h2 class="wdx-h2">Participant Journey</h2>
             <p class="wdx-sub">
@@ -484,7 +484,7 @@
            Data, bindings and click handlers are IDENTICAL to the previous
            accordion; only the markup/styling changed. ═════ -->
       <section class="wdx-sheet wdx-block cpo" id="wdx-challenges" #wdxChallenges>
-        <div class="wdx-sh">
+        <div class="wdx-sh wdx-sh--teal">
           <div>
             <h2 class="wdx-h2">Challenge Progress Overview</h2>
             <p class="wdx-sub">{{ challengeStatistics.length }} challenge{{ challengeStatistics.length !== 1 ? 's' : '' }} &middot; click any status to open its participants</p>
@@ -619,7 +619,7 @@
            which cannot scroll). It takes over the block margin; the card inside is its :first-child. -->
       <div class="wdx-block wdx-anchor-blk" #wdxParticipants>
       <mat-card class="participants-card wdx-sheet wdx-block" id="wdx-participants">
-        <div class="wdx-sh">
+        <div class="wdx-sh wdx-sh--blue">
           <div>
             <h2 class="wdx-h2">Participant Progress Details</h2>
             <p class="wdx-sub">
@@ -880,7 +880,7 @@
            accordion/list; only markup/styling changed. id="participantDataCard" is what
            scrollToParticipantData() and the section index scroll to. ═════ -->
       <section class="wdx-sheet wdx-block" id="participantDataCard" #participantDataSection *ngIf="can('participantprogress')">
-        <div class="wdx-sh">
+        <div class="wdx-sh wdx-sh--sky">
           <div>
             <!-- Focus lands here after the side-panel menu's "View participant data" (viewPersonData). -->
             <h2 class="wdx-h2 wdx-pd-focus" tabindex="-1">Participant Data</h2>
@@ -1152,7 +1152,7 @@
       </div>
 
       <section class="wdx-sheet wdx-block" *ngIf="can('allassignments')">
-        <div class="wdx-sh">
+        <div class="wdx-sh wdx-sh--amber">
           <div>
             <h2 class="wdx-h2 arc-title">All Assignments</h2>
             <p class="wdx-sub">{{ assignmentsList.length }} assignment(s) in {{ workshopTitle }} workshop</p>
@@ -1243,7 +1243,7 @@
       </section>
 
       <section class="wdx-sheet wdx-block" *ngIf="can('allforms')">
-        <div class="wdx-sh">
+        <div class="wdx-sh wdx-sh--rose">
           <div>
             <h2 class="wdx-h2 arc-title">All Forms</h2>
             <p class="wdx-sub">{{ challengeForms.length }} Form(s) in {{ workshopTitle }} workshop</p>
@@ -1310,7 +1310,7 @@
       </section>
 
       <section class="wdx-sheet wdx-block" *ngIf="can('allvideoask')">
-        <div class="wdx-sh">
+        <div class="wdx-sh wdx-sh--indigo">
           <div>
             <h2 class="wdx-h2 arc-title">All VideoAsk</h2>
             <p class="wdx-sub">{{ videoAskList.length }} VideoAsk(s) in {{ workshopTitle }} workshop</p>
@@ -1385,7 +1385,7 @@
            Reads `platform_name` on the progress document (enrolment) and on every sub-challenge
            (steps); blank means the web app. Live: recomputed with the progress snapshot. ═════ -->
       <section class="wdx-sheet wdx-block" id="wdx-platform" data-testid="wdash-platform-section" #wdxPlatform>
-        <div class="wdx-sh">
+        <div class="wdx-sh wdx-sh--green">
           <div>
             <h2 class="wdx-h2">Platform Usage</h2>
             <p class="wdx-sub">How participants reach this workshop, and where each step gets done</p>
@@ -1459,7 +1459,7 @@
   <aside class="participant-panel wdx-root wdx-panel wdx-panel--fixed" aria-label="Participant list"
          [class.panel-visible]="showParticipantPanel" [class.wdx-is-open]="showParticipantPanel">
     <span class="wdx-handle" aria-hidden="true"></span>
-    <div class="panel-header wdx-pn-head">
+    <div class="panel-header wdx-pn-head" [style.--pn-tone]="panelTone">
       <div class="wdx-pn-t">
         <!-- Title: the proper label for every entry point (was `status | titlecase`, e.g. "Totalenrolled").
              The three named cards keep their literal titles. -->
@@ -1970,8 +1970,10 @@
     </div>
 
     <div class="wdx-pn-list">
-      <!-- One mat-card.participant-card per person (the hub counts them); flattened into a list row. -->
-      <mat-card class="participant-card wdx-ppcard" *ngFor="let participant of filteredParticipants"
+      <!-- One mat-card.participant-card per person (the hub counts them); flattened into a list row. Tracked by person
+           (2026-11-19): live updates rebuild the entries (Not in Chat Group on every enrolled snapshot), and a row that
+           is rebuilt destroys the name's menu trigger without closing its menu, stranding the Manage tag submenu. -->
+      <mat-card class="participant-card wdx-ppcard" *ngFor="let participant of filteredParticipants; trackBy: trackPanelPerson"
                 [class.wdx-is-picked]="saleTipRow === participant"
                 (mouseenter)="showSaleTip(participant, $any($event.currentTarget))" (mouseleave)="hideSaleTip()">
         <!-- A plain row: the side panel no longer opens /userprofile in a new tab (operator 2026-11-17). The hook
@@ -1988,7 +1990,8 @@
               <button *ngIf="can('participantprogress'); else wdxPlainName" type="button"
                       class="wdx-name participant-name wdx-pp-namebtn" data-testid="wd-side-person-name"
                       [matMenuTriggerFor]="personMenu" [matMenuTriggerData]="{ p: participant }"
-                      (menuOpened)="onPersonMenuOpened()" (menuClosed)="personMenuOpen = false"
+                      #wdxNameTrigger="matMenuTrigger"
+                      (menuOpened)="onPersonMenuOpened(wdxNameTrigger, participant)" (menuClosed)="onPersonMenuClosed()"
                       [attr.aria-label]="'Options for ' + participant.name">{{ participant.name }}</button>
               <ng-template #wdxPlainName><span class="wdx-name participant-name">{{ participant.name }}</span></ng-template>
               <span class="wdx-new new-badge" *ngIf="isNewUserProfile(participant.profileid)">New</span>
@@ -2113,6 +2116,49 @@
             <span class="wdx-pmenu-l">View participant data</span>
             <span class="wdx-pmenu-s" *ngIf="personHasData(p); else wdxNoData">In {{ workshopTitle }}</span>
             <ng-template #wdxNoData><span class="wdx-pmenu-s">{{ personNoDataNote(p) }}</span></ng-template>
+          </button>
+          <!-- Manage tag (operator 2026-11-19): the shared clear list only. Opens the segment tags (#personTagMenu);
+               choosing one adds it to, or removes it from, this person's enrolment here. Someone not enrolled in this
+               workshop has nothing to tag: the item is disabled and says why (no submenu trigger at all then). -->
+          <ng-container *ngIf="canManageTags">
+            <button *ngIf="personIsEnrolled(p); else wdxNoTagEnrol" mat-menu-item type="button"
+                    class="wdx-pmenu-item" data-testid="wd-side-person-tags"
+                    [matMenuTriggerFor]="personTagMenu" [matMenuTriggerData]="{ p: p }"
+                    (menuOpened)="onPersonTagMenuOpened()">
+              <svg matMenuItemIcon class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 12.5V4.5a1 1 0 0 1 1-1h8l8 8a1 1 0 0 1 0 1.4l-7.6 7.6a1 1 0 0 1-1.4 0z"/><circle cx="8" cy="8" r="1.4"/></svg>
+              <span class="wdx-pmenu-l">Manage tag</span>
+              <span class="wdx-pmenu-s">Add or remove tags</span>
+            </button>
+            <ng-template #wdxNoTagEnrol>
+              <button mat-menu-item type="button" class="wdx-pmenu-item" data-testid="wd-side-person-tags" disabled>
+                <svg matMenuItemIcon class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 12.5V4.5a1 1 0 0 1 1-1h8l8 8a1 1 0 0 1 0 1.4l-7.6 7.6a1 1 0 0 1-1.4 0z"/><circle cx="8" cy="8" r="1.4"/></svg>
+                <span class="wdx-pmenu-l">Manage tag</span>
+                <span class="wdx-pmenu-s">Not enrolled in this workshop</span>
+              </button>
+            </ng-template>
+          </ng-container>
+        </div>
+      </ng-template>
+    </mat-menu>
+
+    <!-- Manage tag submenu: one item per segment tag, ✓ when this person carries it. A click saves at once and the
+         submenu stays open (togglePersonTag stops the click before the panel's close), so several can be set. -->
+    <mat-menu #personTagMenu="matMenu" class="wdx-root wdx-menu wdx-pop wdx-pmenu wdx-ptags" xPosition="after">
+      <ng-template matMenuContent let-p="p">
+        <div class="wdx-ptags-h"><span class="wdx-eyebrow">Tags</span></div>
+        <p class="wdx-ptags-note" data-testid="wd-side-person-tags-note" role="status"
+           *ngIf="segmentTagsNote" [class.wdx-is-failed]="segmentTagsState === 'failed'">{{ segmentTagsNote }}</p>
+        <div class="wdx-ptags-list" *ngIf="!segmentTagsNote">
+          <button mat-menu-item type="button" role="menuitemcheckbox" class="wdx-ptag" data-testid="wd-side-person-tag"
+                  *ngFor="let t of segmentTags; trackBy: trackSegmentTag"
+                  [attr.aria-checked]="personHasTag(p, t.id)" [class.wdx-is-on]="personHasTag(p, t.id)"
+                  [disabled]="isPersonTagBusy(p, t.id)" [attr.aria-busy]="isPersonTagBusy(p, t.id) || null"
+                  (click)="togglePersonTag($event, p, t)">
+            <span class="wdx-ptag-mark" aria-hidden="true">
+              <span class="wdx-spin" *ngIf="isPersonTagBusy(p, t.id); else wdxTagTick"></span>
+              <ng-template #wdxTagTick><svg *ngIf="personHasTag(p, t.id)" class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></ng-template>
+            </span>
+            <span class="wdx-ptag-n">{{ t.name }}</span>
           </button>
         </div>
       </ng-template>

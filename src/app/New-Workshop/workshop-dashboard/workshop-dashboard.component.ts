@@ -15,8 +15,8 @@ import { RouterModule } from '@angular/router';
 import {
   Firestore, collection, doc, query, where,
   updateDoc, setDoc, Timestamp, Unsubscribe,
-  getDoc, getDocs, onSnapshot, getFirestore, documentId,
-  arrayUnion,
+  getDoc, getDocs, getDocsFromServer, onSnapshot, getFirestore, documentId,
+  arrayUnion, arrayRemove, writeBatch,
 } from '@angular/fire/firestore';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { watsonFirestore, saleWindow, purchaseLabels, formatRupees, buildSaleBuyers, sortSaleBuyers, saleExportRows, saleBuyersInRange, saleBuyersTotal } from '../watson-purchases';
@@ -25,7 +25,7 @@ import { AuthguardService } from '../../authguard.service';
 import { MatDialog } from '@angular/material/dialog';
 import { debounceTime, firstValueFrom, Subject, takeUntil } from 'rxjs';
 import * as XLSX from 'xlsx';
-import { MatMenuModule } from '@angular/material/menu';
+import { MatMenuModule, MatMenuTrigger } from '@angular/material/menu';
 import { MatRadioModule } from '@angular/material/radio';
 import { FormsModule } from '@angular/forms';
 import { environment } from '../../../environments/environment.development';
@@ -49,7 +49,8 @@ import {
   moveButtonText, moveButtonTooltip, neverStartedIds, normalizeSubChallengeStatus, oldResultTooltip,
   personMenuNoDataNote,
   overallProgressLabel, participantTypeClass, participantTypeLabel,
-  filterParticipantsByName, panelEntryFill, retryRead,
+  filterParticipantsByName, panelEntryFill, retryRead, missingProfileIds, newUserDocsById,
+  SegmentTag, segmentTagList, personTagIds, tagTogglePlan, applyTagToggle,
 } from './workshop-dashboard.engine';
 // At a glance additions (2026-11-17): timeline, Completed, Joined recently, Needs attention, Top tags.
 import {
@@ -237,6 +238,11 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
 
   can(key: WorkshopAccessKey): boolean { return this.access.can(key); }
   get canClear(): boolean { return this.can('clear'); }
+  /**
+   * Manage tag in the side-panel person menu (operator 2026-11-19): only the shared clear list. Not can('clear'):
+   * this workshop's own Clear tick does not give it.
+   */
+  get canManageTags(): boolean { return this.access.inClearList(); }
   get canEnroll(): boolean { return this.can('enroll'); }
   /** The forms sheet needs both: the right to export, and the right to see the forms. */
   get canExportForms(): boolean { return this.can('export') && this.can('allforms'); }
@@ -283,6 +289,22 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   private newUserDataReady: Promise<void> = Promise.resolve();
   /** The latest participant metadata the enrolled snapshot read, so the overlay can be rebuilt when new_user_data lands. */
   private participantMetaDocdata: Record<string, any> | null = null;
+  /**
+   * Enrolled snapshots seen (enrolledGen); the newest one whose metadata read has been applied (enrolledGenApplied);
+   * the newest one whose read has finished, applied, dropped or failed (enrolledGenDone) (2026-11-19). The handler
+   * awaits that read, so two snapshots close together can finish out of order. appliedEnrolledIds is the enrolled
+   * list the applied read was for: with participantMetaDocdata, a consistent pair for the late-enrollee lookup.
+   */
+  private enrolledGen = 0;
+  private enrolledGenApplied = 0;
+  private enrolledGenDone = 0;
+  private appliedEnrolledIds: string[] = [];
+  /**
+   * Late enrollees looked up in new_user_data on their own (fillMissingNewUsers, 2026-11-19). Asked = out now or
+   * done, never read again (an id not found is an orphan enrolment); pending = out now.
+   */
+  private lateNewUserAsked = new Set<string>();
+  private lateNewUserPending = new Set<string>();
   loading = true;
   error: string | null = null;
   isMovingParticipant: string | null = null;
@@ -475,18 +497,87 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
    * metadata, fill in what an open side panel could not know, and re-derive every figure — so the People cards
    * show their numbers and enable, and New badges and new users' names appear everywhere (progress table,
    * Participant Data, panels, the lists behind the exports). Before the enrolled snapshot has read the metadata
-   * there is nothing to rebuild: that snapshot builds the overlay itself.
+   * there is nothing to rebuild: that snapshot builds the overlay itself. Also run when fillMissingNewUsers has
+   * found late enrollees (2026-11-19).
    */
   private onNewUserDataSettled(): void {
     this.ngZone.run(() => {
       if (this.participantMetaDocdata) {
         this.mapProfile = { ...this.participantMetaDocdata, ...this.newUserOverlay() };
+        // Enrolled after the one-time read (2026-11-19). Before recomputeNotInChat, so the ids it starts looking
+        // up are left out of Not in Chat Group meanwhile. Never awaited; only acts once the read is 'ready'.
+        void this.fillMissingNewUsers();
         this.refreshOpenPanelPeople();
         this.recomputeNotInChat();
         this.recomputeDerivedState();
       }
       this.cdr.markForCheck();
     });
+  }
+
+  /**
+   * The late-enrollee lookup (fillMissingNewUsers): a dropped connection is retried twice (after 1s, then 3s) and
+   * the lookup gives up after 20s, so those people are not left out of Not in Chat Group for long (2026-11-19 review).
+   */
+  private static readonly LATE_NEW_USER_RETRY_DELAYS_MS = [1000, 3000];
+  private static readonly LATE_NEW_USER_TIMEOUT_MS = 20_000;
+
+  /**
+   * new_user_data is read once, so someone who signs up and enrolls while the dashboard is open is in neither
+   * profile map: "Unknown", counted as Existing, and "No login yet" in Not in Chat Group until a refresh
+   * (2026-11-19). Reads just those ids, then catches up as when the whole read landed. Only once that read is
+   * 'ready' (first paint never waits on this). The ids come from the enrolled list the latest applied metadata
+   * read was for, never a newer list whose read is still out (its new ids are missing from that metadata anyway;
+   * that handler calls this when it lands). Never awaited, never throws: on error (offline included) the ids are
+   * listed as before and asked again by the next call.
+   */
+  private async fillMissingNewUsers(): Promise<void> {
+    if (this.destroyed || this.newUserDataState !== 'ready' || !this.participantMetaDocdata) return;
+    const ids = missingProfileIds(this.appliedEnrolledIds,
+      this.participantMetaDocdata, this.mapProfileNew, this.lateNewUserAsked);
+    if (!ids.length) return;
+    ids.forEach(id => { this.lateNewUserAsked.add(id); this.lateNewUserPending.add(id); });
+    let found: Record<string, any>;
+    try {
+      found = await retryRead(() => this.readNewUsersByIds(ids), {
+        delaysMs: WorkshopDashboardComponent.LATE_NEW_USER_RETRY_DELAYS_MS,
+        timeoutMs: WorkshopDashboardComponent.LATE_NEW_USER_TIMEOUT_MS,
+      });
+    } catch (err) {
+      console.error('Could not look up late enrollees in new_user_data:', err);
+      ids.forEach(id => { this.lateNewUserAsked.delete(id); this.lateNewUserPending.delete(id); });
+      if (!this.destroyed) this.ngZone.run(() => { this.recomputeNotInChat(); this.cdr.markForCheck(); });
+      return;
+    }
+    ids.forEach(id => this.lateNewUserPending.delete(id));
+    if (this.destroyed) return;
+    if (Object.keys(found).length) {
+      // A new object: the dialogs handed the old map keep a consistent one.
+      this.mapProfileNew = { ...this.mapProfileNew, ...found };
+      this.onNewUserDataSettled();
+      // Sale Achieved takes new users' emails from the overlay, and the enrolled handler ran it before these
+      // people were known. A no-op unless the set of emails changed (2026-11-19 review).
+      void this.loadSaleAchieved();
+    } else {
+      // Orphan enrolments only: listed again, as before.
+      this.ngZone.run(() => { this.recomputeNotInChat(); this.cdr.markForCheck(); });
+    }
+  }
+
+  /**
+   * new_user_data docs for these ids, each with its `id` (as readNewUserData). Full SDK, never Lite: hub
+   * WNU-03/04 hold every Lite read of new_user_data to prove first paint does not wait for it (2026-11-19).
+   * From the server only: offline, getDocs would answer from the empty cache and these people would be taken
+   * for orphan enrolments for good; getDocsFromServer fails instead, so they are asked again (2026-11-19 review).
+   */
+  private async readNewUsersByIds(ids: string[]): Promise<Record<string, any>> {
+    const BATCH = 30;
+    const reads: Promise<any>[] = [];
+    for (let i = 0; i < ids.length; i += BATCH) {
+      reads.push(getDocsFromServer(query(collection(this.firestoreDefault, 'new_user_data'),
+        where(documentId(), 'in', ids.slice(i, i + BATCH)))));
+    }
+    return newUserDocsById(await Promise.all(reads));
   }
 
   /**
@@ -1257,6 +1348,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     );
 
     const unsubscribe = onSnapshot(enrolledQuery, async (querySnap) => {
+      const gen = ++this.enrolledGen;
       this.enrolledParticipants = querySnap.docs.map(d => {
         const data = d.data();
         return {
@@ -1274,30 +1366,67 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       this.enrolledDelivered = true;
 
       const enrolledProfileIds = this.enrolledParticipants.map(p => p.profileid);
-      // NOT new_user_data (2026-11-18): the dashboard paints without it. Until it lands the overlay below is
-      // empty and the three People cards wait; onNewUserDataSettled then rebuilds this map from the docdata kept here.
-      const participantData = await this.getParticipantMetaMapForIds(enrolledProfileIds);
-      if (this.destroyed) return; // component torn down while awaiting
-      this.participantMetaDocdata = participantData.docdata;
-      // Overlay only the still-new users: a moved-to-existing person keeps their
-      // `participant metadata` (which carries activejourney / customerstatus).
-      this.mapProfile = { ...participantData.docdata, ...this.newUserOverlay() };
-      this.recomputeNotInChat();
-      void this.loadSaleAchieved();
-      // Participant progress lives in its own snapshot (setupParticipantWorkshopSnapshot);
-      // here we just re-derive from the current (live) participantWorkshopMap.
-      this.recomputeDerivedState();
-
-      if (this.loading) {
-        this.loading = false;
-        this.cdr.detectChanges();
-      }
+      // NOT new_user_data (2026-11-18): the dashboard paints without it. Until it lands the overlay is empty and
+      // the three People cards wait; onNewUserDataSettled then rebuilds the map from the docdata kept here.
+      await this.loadEnrolledMeta(gen, enrolledProfileIds);
     }, (error) => {
       this.error = `Error loading participants: ${error.message}`;
       this.loading = false;
     });
 
     this.unsubscribes.push(unsubscribe);
+  }
+
+  /**
+   * The enrolled snapshot's participant metadata read, then applyEnrolledMeta. A failed read is logged (it used to
+   * reject unhandled) and counts as finished, so Not in Chat Group stops waiting on it: the people it was to
+   * identify are listed as before, and the next enrolled snapshot reads again (2026-11-19 review).
+   */
+  private async loadEnrolledMeta(gen: number, enrolledIds: string[]): Promise<void> {
+    let docdata: Record<string, any>;
+    try {
+      docdata = (await this.getParticipantMetaMapForIds(enrolledIds)).docdata;
+    } catch (err) {
+      console.error('Error reading participant metadata for the enrolled list:', err);
+      if (this.destroyed) return;
+      this.enrolledGenDone = Math.max(this.enrolledGenDone, gen);
+      this.recomputeNotInChat();
+      this.cdr.markForCheck();
+      return;
+    }
+    if (this.destroyed) return; // component torn down while awaiting
+    this.applyEnrolledMeta(gen, enrolledIds, docdata);
+  }
+
+  /**
+   * What an enrolled snapshot does once its participant metadata has landed. Returns false, doing nothing, when a
+   * newer snapshot's read landed first (2026-11-19): this older id list would put late enrollees back to "Unknown",
+   * and the newer one has done all of this. An older read that lands first still applies, so first paint never
+   * waits for a later snapshot.
+   */
+  private applyEnrolledMeta(gen: number, enrolledIds: string[], docdata: Record<string, any>): boolean {
+    this.enrolledGenDone = Math.max(this.enrolledGenDone, gen);
+    if (gen < this.enrolledGenApplied) return false;
+    this.enrolledGenApplied = gen;
+    this.appliedEnrolledIds = enrolledIds;
+    this.participantMetaDocdata = docdata;
+    // Overlay only the still-new users: a moved-to-existing person keeps their
+    // `participant metadata` (which carries activejourney / customerstatus).
+    this.mapProfile = { ...docdata, ...this.newUserOverlay() };
+    // Enrolled after the one-time new_user_data read (2026-11-19). Before recomputeNotInChat, so the ids it
+    // starts looking up are left out of Not in Chat Group meanwhile. Never awaited: this goes on.
+    void this.fillMissingNewUsers();
+    this.recomputeNotInChat();
+    void this.loadSaleAchieved();
+    // Participant progress lives in its own snapshot (setupParticipantWorkshopSnapshot);
+    // here we just re-derive from the current (live) participantWorkshopMap.
+    this.recomputeDerivedState();
+
+    if (this.loading) {
+      this.loading = false;
+      this.cdr.detectChanges();
+    }
+    return true;
   }
 
   // Live listener for participant progress (the 'participant workshop' collection).
@@ -1428,11 +1557,175 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
 
   /** True while the person menu is open: the Sale Achieved purchases card (z-index above the overlay) stays away. */
   personMenuOpen = false;
+  /**
+   * The name that opened the person menu, and whose it is (2026-11-19 review). Material does not close a menu when
+   * its trigger is destroyed: the person menu just vanishes (menuClosed never fires, so personMenuOpen stays true)
+   * and an open Manage tag submenu is left floating. So when that person leaves the panel's list,
+   * closePersonMenuIfGone closes the chain first.
+   */
+  private personMenuTrigger: MatMenuTrigger | null = null;
+  private personMenuPid: string | null = null;
 
-  onPersonMenuOpened(): void {
+  onPersonMenuOpened(trigger?: MatMenuTrigger, p?: any): void {
     this.personMenuOpen = true;
+    this.personMenuTrigger = trigger ?? null;
+    this.personMenuPid = p?.profileid ?? null;
     this.keepSaleTip();
     this.saleTipRow = null;
+    // Manage tag: start reading the tag list now, so it is there by the time its submenu opens.
+    this.loadSegmentTags();
+  }
+
+  onPersonMenuClosed(): void {
+    this.personMenuOpen = false;
+    this.personMenuTrigger = null;
+    this.personMenuPid = null;
+  }
+
+  /**
+   * Runs whenever the panel's list is rebuilt (applyFilterSide): the person menu is closed — its submenu with it,
+   * as that listens for the person menu's close — while its row is still on the page, if the person is no longer
+   * listed. For example: their tag was just removed under a ticked Tag filter, or they were added to the chat group.
+   * Someone still listed keeps the menu open (trackPanelPerson keeps their row).
+   */
+  private closePersonMenuIfGone(): void {
+    const trigger = this.personMenuTrigger;
+    if (!trigger?.menuOpen) return;
+    const pid = this.personMenuPid;
+    if (pid && (this.filteredParticipants || []).some((x: any) => x?.profileid === pid)) return;
+    trigger.closeMenu();
+  }
+
+  /** The panel rows are tracked by person, so a rebuilt entry for the same person keeps its row (and menu). */
+  trackPanelPerson(i: number, p: any): any { return p?.profileid ?? i; }
+
+  // ───────── Manage tag (operator 2026-11-19; specs/plans/2026-11-19-dashboard-person-manage-tag.md) ─────────
+  // Only for the shared clear list (canManageTags). Lists the segment tags (the same list New Users offers) and
+  // adds or removes one on the person's enrolled doc for this workshop — its tags field and nothing else.
+
+  /** The segment tags, A→Z. Read once per visit, on the first person-menu open; never on the first-paint path. */
+  segmentTags: SegmentTag[] = [];
+  /** idle = not asked yet; a failed read is asked again the next time a person menu or the submenu opens. */
+  segmentTagsState: 'idle' | 'loading' | 'ready' | 'failed' = 'idle';
+  /** profileid + tag id while that change is being written: the item is disabled and shows a spinner. */
+  private personTagBusy = new Set<string>();
+
+  private loadSegmentTags(): void {
+    if (!this.canManageTags || this.segmentTagsState === 'loading' || this.segmentTagsState === 'ready') return;
+    this.segmentTagsState = 'loading';
+    // From the server only (2026-11-19 review): offline, getDocs would answer from the cache, which holds just the
+    // tags loadTagNames read by id — a partial list kept as 'ready' for the rest of the visit. getDocsFromServer
+    // fails instead, so the state goes to 'failed' and the next menu or submenu open asks again.
+    getDocsFromServer(query(collection(this.firestoreDefault, 'newusertags'), where('type', '==', 'newusersegments')))
+      .then(snap => {
+        if (this.destroyed) return;
+        const rows = snap.docs.map(d => ({ id: d.id, name: d.data()?.['name'] }));
+        // The names also serve the chips, Top tags and the export (they read tagNameCache).
+        for (const r of rows) this.tagNameCache.set(r.id, (r.name ?? '').toString().trim());
+        this.segmentTags = segmentTagList(rows);
+        this.segmentTagsState = 'ready';
+      })
+      .catch(err => {
+        console.error('Could not read the tag list:', err);
+        if (!this.destroyed) this.segmentTagsState = 'failed';
+      })
+      .finally(() => { if (!this.destroyed) this.cdr.markForCheck(); });
+  }
+
+  /** The Manage tag submenu opened: retry a failed read without making the user close the person menu. */
+  onPersonTagMenuOpened(): void { this.loadSegmentTags(); }
+
+  /** The line in the submenu while there is no list to show. '' = the list is showing. */
+  get segmentTagsNote(): string {
+    if (this.segmentTagsState === 'failed') return "Couldn't load tags";
+    if (this.segmentTagsState === 'ready') return this.segmentTags.length ? '' : 'No tags yet';
+    return 'Loading tags…';
+  }
+
+  trackSegmentTag(_i: number, t: SegmentTag): string { return t.id; }
+
+  /** Manage tag writes to an enrolled doc, so it is open only for someone enrolled in this workshop. */
+  personIsEnrolled(p: any): boolean {
+    const id = p?.profileid;
+    return !!id && (this.enrolledParticipants || []).some(e => e?.profileid === id);
+  }
+
+  /** The person's tag ids, cached per enrolled snapshot (a new array each time) — the template asks per tag. */
+  private personTagCache: { src: any[]; pid: string; set: Set<string> } | null = null;
+  private personTagSet(pid: string): Set<string> {
+    const c = this.personTagCache;
+    if (c && c.src === this.enrolledParticipants && c.pid === pid) return c.set;
+    const set = personTagIds(this.enrolledParticipants, pid);
+    this.personTagCache = { src: this.enrolledParticipants, pid, set };
+    return set;
+  }
+
+  /** The ✓: the live enrolled snapshot, so it follows a change as soon as it is made (and if it fails, back). */
+  personHasTag(p: any, tagId: string): boolean { return !!p?.profileid && this.personTagSet(p.profileid).has(tagId); }
+
+  private personTagKey(pid: string, tagId: string): string { return `${pid}/${tagId}`; }   // '/' cannot occur in a doc id
+  isPersonTagBusy(p: any, tagId: string): boolean {
+    return !!p?.profileid && this.personTagBusy.has(this.personTagKey(p.profileid, tagId));
+  }
+
+  /**
+   * Choose a tag: added when the person does not carry it, removed when they do (tagTogglePlan), on their enrolled
+   * doc(s) for this workshop in one batch — only the tags field. The click does not reach the menu panel, so the
+   * submenu stays open and several tags can be set in a row. A second click while it saves is ignored.
+   */
+  async togglePersonTag(event: Event, p: any, tag: SegmentTag): Promise<void> {
+    event.stopPropagation();
+    const pid = p?.profileid;
+    if (!this.canManageTags || !pid || !tag?.id) return;
+    const key = this.personTagKey(pid, tag.id);
+    if (this.personTagBusy.has(key)) return;
+    const plan = tagTogglePlan(this.enrolledParticipants, pid, tag.id);
+    if (!plan) return;
+    // Disabling the focused item drops keyboard focus to the page; it is put back once the item is enabled again.
+    const item = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+    const hadFocus = !!item && document.activeElement === item;
+    this.personTagBusy.add(key);
+    try {
+      const batch = writeBatch(this.firestoreDefault);
+      const change = plan.add ? arrayUnion(tag.id) : arrayRemove(tag.id);
+      for (const id of plan.docIds) batch.update(doc(this.firestoreDefault, 'workshop participant enrolled', id), { tags: change });
+      await batch.commit();
+      if (!this.destroyed) this.patchPersonTagChips(pid, tag.id, plan.add);
+    } catch (err) {
+      console.error('Could not update the tag:', err);
+      if (!this.destroyed) this.snackbarService.show('Could not update the tag');
+    } finally {
+      this.personTagBusy.delete(key);
+      if (!this.destroyed) {
+        this.cdr.detectChanges();
+        // Not into a menu that has just closed (its person left the panel: closePersonMenuIfGone).
+        if (hadFocus && this.personMenuOpen && item?.isConnected &&
+          (!document.activeElement || document.activeElement === document.body)) {
+          item.focus();
+        }
+      }
+    }
+  }
+
+  /**
+   * After a tag change: the side panel and Participant Data are click-time snapshots, so the chips they show for
+   * this person are brought in line here (the live enrolled snapshot already moves the ✓ and Top tags). The chips
+   * read the person's first enrolled doc, as when the panel opened, with the change applied.
+   */
+  private patchPersonTagChips(pid: string, tagId: string, add: boolean): void {
+    const names = this.tagNamesOf({ tags: applyTagToggle(this.firstEnrolledDocs().get(pid)?.tags, tagId, add) }, this.tagNameCache);
+    if (this.selectedParticipantData?.profileid === pid) this.selectedParticipantTags = names;
+    if (!this.showParticipantPanel || !this.showTagFilter) return;
+    if (!(this.selectedParticipants || []).some((x: any) => x?.profileid === pid)) return;
+    const next = { ...this.enrolledTagNames };
+    if (names.length) next[pid] = names; else delete next[pid];
+    this.enrolledTagNames = next;
+    // The panel's Tag filter offers the tags its people carry; a ticked one stays so it can be unticked.
+    const inPanel = new Set((this.selectedParticipants || []).map((x: any) => x?.profileid));
+    const options = new Set<string>(this.selectedTagFilters);
+    for (const id of Object.keys(next)) if (inPanel.has(id)) next[id].forEach(t => options.add(t));
+    this.enrolledTagOptions = [...options].sort((a, b) => a.localeCompare(b));
+    if (this.selectedTagFilters.length) this.applyFilterSide();
   }
 
   /**
@@ -1649,6 +1942,8 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
    */
   async onTopTagClick(tag: string): Promise<void> {
     this.onMetricClick('totalEnrolled');
+    // Display only: the panel header takes the Top tags card's colour (panelTone); the status stays 'totalEnrolled'.
+    if (this.selectedStatusInfo?.status === 'totalEnrolled') this.selectedStatusInfo = { ...this.selectedStatusInfo, from: 'topTags' };
     const load = this.enrolledTagLoad;
     await load;
     // Another panel (or another tag) was opened while the names were read.
@@ -2284,7 +2579,37 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     this.saleTipRow = null;
     this.showParticipantPanel = false;
     this.selectedParticipants = [];
+    // The panel slides out for 0.3s after this: keep its header colour (panelTone) so it does not flash blue.
+    this.lastPanelTone = this.panelTone;
     this.selectedStatusInfo = null;
+  }
+
+  /** Side-panel header colour (2026-11-19, colour option A): the At a glance card that opened the panel, as one of
+   *  the --gl-* tokens on .wdx-root. Display only. */
+  private static readonly PANEL_TONES = new Map<string, string>([
+    ['totalEnrolled', 'var(--gl-enrolled)'], ['saleAchieved', 'var(--gl-sale)'],
+    ['totalStarted', 'var(--gl-started)'], ['notStarted', 'var(--gl-notstarted)'],
+    ['activeParticipants', 'var(--gl-active)'], ['active', 'var(--gl-active)'],
+    ['completedParticipants', 'var(--gl-completed)'], ['completed', 'var(--gl-completed)'],
+    ['existUsersEnrolled', 'var(--gl-existing)'], ['totalNewUsers', 'var(--gl-new)'],
+    ['totalNewUsersNotEnrolled', 'var(--gl-notenrolled)'], ['notInChatGroup', 'var(--gl-chat)'],
+    ['joinedRecently', 'var(--gl-joined)'], ['startedStuck', 'var(--gl-stuck)'], ['inactiveRecently', 'var(--gl-inactive)'],
+    ['categoryEnrolled', 'var(--gl-cat)'], ['categoryCompleted', 'var(--gl-cat)'],
+    ['cohortParticipants', 'var(--gl-coh)'], ['cohortCompleted', 'var(--gl-coh)'],
+    ['facilitatorOnly', 'var(--gl-fac)'], ['facilitatorCompleted', 'var(--gl-fac)'],
+    ['shareClicked', 'var(--gl-share)'], ['shareClaimed', 'var(--gl-claim)'], ['purchase', 'var(--gl-purchase)']
+  ]);
+  /** The closing panel's colour, kept while it slides out (closeParticipantPanel). */
+  private lastPanelTone = 'var(--gl-enrolled)';
+  /** Blue for every other entry point. A Challenge Progress chip can reuse a status above ('completed'), but it
+   *  always carries its challenge index, so it stays blue. A Top tags row opens Total Enrolled's list but takes the
+   *  Top tags card's teal (from: 'topTags', set by onTopTagClick). */
+  get panelTone(): string {
+    const info = this.selectedStatusInfo;
+    if (!info) return this.lastPanelTone;
+    if (info.challengeIndex != null) return 'var(--gl-enrolled)';
+    if (info.from === 'topTags') return 'var(--gl-tags)';
+    return WorkshopDashboardComponent.PANEL_TONES.get(info.status) || 'var(--gl-enrolled)';
   }
 
   private communicationOpening = false;
@@ -2867,6 +3192,8 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     if (this.selectedStatusInfo?.status === 'totalEnrolled' && this.sideSort) {
       this.filteredParticipants = this.sortEnrolledPanel(this.filteredParticipants, this.sideSort);
     }
+    // Before the next render removes the row of the person whose menu is open (2026-11-19 review).
+    this.closePersonMenuIfGone();
   }
 
   /**
@@ -3568,8 +3895,19 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     const members = this.supportChatMembers;
     if (!this.supportChatGroupId || !members || this.newUserDataState !== 'ready') { this.notInChatParticipants = []; }
     else {
+      // Enrolled in a snapshot whose participant metadata read is still out (2026-11-19 review): nobody can tell
+      // yet who they are. Left out until that read (then the late-enrollee lookup) has landed, rather than flashing
+      // as "Unknown · No login yet" when the group changes meanwhile. Ids already looked up stay listed.
+      const unread = this.enrolledGenDone < this.enrolledGen
+        ? new Set(missingProfileIds(this.enrolledParticipants.map(p => p.profileid),
+          this.participantMetaDocdata, this.mapProfileNew, this.lateNewUserAsked))
+        : null;
       this.notInChatParticipants = this.enrolledParticipants
         .map(p => p.profileid)
+        .filter(id => !unread || !unread.has(id === null || id === undefined ? '' : String(id).trim()))
+        // Late enrollees still being looked up in new_user_data (2026-11-19): left out for that moment, not
+        // listed as "Unknown · No login yet" and not sent to the profile_data lookup below.
+        .filter(id => !this.lateNewUserPending.has(id))
         .filter(id => { const uid = this.uidOf(id); return !uid || !members.has(uid); })
         .map(id => ({ ...this.buildParticipantEntry(id), uid: this.uidOf(id) }));
       // Existing users still without a uid: try profile_data.user_ref once, then recompute.
