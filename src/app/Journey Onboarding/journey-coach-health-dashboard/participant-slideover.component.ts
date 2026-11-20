@@ -670,13 +670,13 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
           <ng-container *ngIf="composerType==='note'">
             <label class="so-field">
               <span class="so-field-l">Note</span>
-              <textarea class="so-input" rows="3" [(ngModel)]="composerNote" placeholder="Add a note"></textarea>
+              <textarea class="so-input" rows="3" [(ngModel)]="composerNote" placeholder="Add a note" data-testid="jcso-comp-note"></textarea>
             </label>
           </ng-container>
         </div>
 
         <div class="so-comp-actions">
-          <button type="button" class="so-btn so-btn-ghost" (click)="cancelComposer()">Cancel</button>
+          <button type="button" class="so-btn so-btn-ghost" data-testid="jcso-comp-cancel" (click)="cancelComposer()">Cancel</button>
           <button type="button" class="so-btn so-btn-primary" data-testid="jcso-comp-save" [disabled]="!composerValid()" (click)="submitComposer()">{{ fuDoneFor ? 'Save & mark done' : 'Save' }}</button>
         </div>
       </div>

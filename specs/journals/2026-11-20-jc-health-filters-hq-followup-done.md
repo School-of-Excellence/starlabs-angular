@@ -88,3 +88,12 @@ word must appear, any order. Each dialog's **Export downloads only the matching 
   visible cell. Ask A&H search composes with its Source/Resolved filters (memoised); its Export now follows those filters too.
 - Crossover side panel (`jcomd-inp-panel-search`).
 Verified on production data: each list narrows correctly, clears on reopen.
+
+## e2e (same day, before push)
+Gate (base origin/development) blocked on 47 unreferenced hooks + 10 unhooked search wrappers (`<div (click)=stopPropagation>`).
+Wrappers hooked `jcd-dlg-search-wrap-<dialog>`; composer got `jcso-comp-note` / `jcso-comp-cancel` (the new Mark done
+flow needs them). Hub branch `test/jc-health-hq-export-nov20`: JCH-16 rewritten for the note-first Mark done (Cancel keeps it
+open, Save writes a note + schedule_done), JCH-18 Not-assessed drill + search + Export, JCH-19 Happiness quotient (seeded
+health logs with off-base / discontinued / last-week controls), ADDR for the rest. Local lane: coach-health 19/19,
+coach-dashboards 9/9 (fixmes skipped). Gate MATCHED.
+Revert the hooks with the screen: drop the `jcd-dlg-search-wrap-*` attributes and the two `jcso-comp-*` ones.
