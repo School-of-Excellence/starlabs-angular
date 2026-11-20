@@ -20,6 +20,9 @@
           <h1 class="dd-title">Delivery Dashboard</h1>
           <span class="dd-live-chip"><span class="dd-live-chip__dot"></span>Live &middot; {{ lastUpdatedRelative
             }}</span>
+          <button data-testid="ddc-btn-whynot" class="dd-btn dd-why-btn" type="button" (click)="openWhyDialog()"
+            matTooltip="Type a participant's name to see which sections they are in, and the exact rule that keeps them out of the others."
+            matTooltipClass="dd-logic-tip" [matTooltipShowDelay]="250">Why not here?</button>
         </div>
       </div>
       <div class="dd-filter-bar">
@@ -65,7 +68,7 @@
           </svg>
           <mat-form-field appearance="outline" class="product-select-field" subscriptSizing="dynamic">
             <mat-label>Products</mat-label>
-            <mat-select data-testid="ddc-msel-008" multiple [formControl]="productFilterControl" panelClass="product-panel"
+            <mat-select panelWidth="" data-testid="ddc-msel-008" multiple [formControl]="productFilterControl" panelClass="product-panel dd-full-options"
               placeholder="All products">
               <mat-select-trigger>{{ productSelectTrigger }}</mat-select-trigger>
               <mat-option class="dd-opt-search"><ngx-mat-select-search [(ngModel)]="optSearch['products']" [ngModelOptions]="{standalone: true}" placeholderLabel="Search…" noEntriesFoundLabel="No match"></ngx-mat-select-search></mat-option>
@@ -119,7 +122,7 @@
           </div>
 
           <div class="dd-fnl-step" [class.is-zero]="kpiCompletedTotal === 0">
-            <button class="dd-fnl-step__body" type="button" data-testid="ddc-funnel-delivered" [matTooltip]="logicTip.delivered" matTooltipPosition="above" [matTooltipShowDelay]="250"
+            <button class="dd-fnl-step__body" type="button" data-testid="ddc-funnel-delivered" [matTooltip]="logicTip.delivered" matTooltipPosition="above" [matTooltipShowDelay]="250" matTooltipClass="dd-logic-tip"
               (click)="outerTabIndex = 1">
               <span class="dd-fnl-step__lbl">Delivered</span>
               <span class="dd-fnl-step__val">{{ kpiCompletedTotal | number }}</span>
@@ -141,7 +144,7 @@
           <button class="dd-fnl-flag dd-fnl-flag--hot" type="button" data-testid="ddc-btn-011" [matTooltip]="logicTip.stuck" matTooltipPosition="above" [matTooltipShowDelay]="250"
             [class.is-zero]="kpiStuck === 0" (click)="navToAttention('stuck')">
             <span class="dd-fnl-flag__n">{{ kpiStuck | number }}</span>
-            <span class="dd-fnl-flag__t">stuck &gt;15d</span>
+            <span class="dd-fnl-flag__t">stuck &gt;7d</span>
           </button>
           <button class="dd-fnl-flag" type="button" data-testid="ddc-btn-014" [matTooltip]="logicTip.idle" matTooltipPosition="above" [matTooltipShowDelay]="250"
             [class.is-zero]="kpiInitiatedNotConsuming === 0" (click)="navToAttention('idle')">
@@ -263,22 +266,22 @@
             <div class="dd-prow-colhead__cell dd-prow-colhead__cell--group">
               <span class="dd-colhead__grp-lbl">Participants</span>
               <div class="dd-colhead__grp-tags">
-                <span>Total</span><span>Not Elig.</span><span>Purch.</span><span>Bonus</span>
+                <span>Total</span><span>Not Elig.</span><span>Purch.</span><span>Bonus</span><span>Add-on</span>
               </div>
             </div>
             <div class="dd-prow-colhead__cell dd-prow-colhead__cell--group">
               <span class="dd-colhead__grp-lbl">Journey Funnel
                 <span class="dd-mixleg" data-testid="ddc-stagemix-legend">
                   <span class="dd-mixleg__for">bar:</span>
-                  <span class="dd-mixleg__i" [matTooltip]="logicTip.yetToStart" matTooltipPosition="above" [matTooltipShowDelay]="250"><i class="dd-bg-s1"></i>Yet to Start</span>
-                  <span class="dd-mixleg__i" [matTooltip]="logicTip.init" matTooltipPosition="above" [matTooltipShowDelay]="250"><i class="dd-bg-s2"></i>Init</span>
-                  <span class="dd-mixleg__i" [matTooltip]="logicTip.started" matTooltipPosition="above" [matTooltipShowDelay]="250"><i class="dd-bg-s3"></i>Started</span>
-                  <span class="dd-mixleg__i" [matTooltip]="logicTip.ongoing" matTooltipPosition="above" [matTooltipShowDelay]="250"><i class="dd-bg-s4"></i>Ongoing</span>
-                  <span class="dd-mixleg__i" [matTooltip]="logicTip.done" matTooltipPosition="above" [matTooltipShowDelay]="250"><i class="dd-bg-s5"></i>Done</span>
+                  <span class="dd-mixleg__i" [matTooltip]="logicTip.yetToStart" matTooltipPosition="above" [matTooltipShowDelay]="250" matTooltipClass="dd-logic-tip"><i class="dd-bg-s1"></i>Yet to Start</span>
+                  <span class="dd-mixleg__i" [matTooltip]="logicTip.init" matTooltipPosition="above" [matTooltipShowDelay]="250" matTooltipClass="dd-logic-tip"><i class="dd-bg-s2"></i>Init</span>
+                  <span class="dd-mixleg__i" [matTooltip]="logicTip.started" matTooltipPosition="above" [matTooltipShowDelay]="250" matTooltipClass="dd-logic-tip"><i class="dd-bg-s3"></i>Started</span>
+                  <span class="dd-mixleg__i" [matTooltip]="logicTip.ongoing" matTooltipPosition="above" [matTooltipShowDelay]="250" matTooltipClass="dd-logic-tip"><i class="dd-bg-s4"></i>Ongoing</span>
+                  <span class="dd-mixleg__i" [matTooltip]="logicTip.done" matTooltipPosition="above" [matTooltipShowDelay]="250" matTooltipClass="dd-logic-tip"><i class="dd-bg-s5"></i>Done</span>
                 </span>
               </span>
               <div class="dd-colhead__grp-tags">
-                <span [matTooltip]="logicTip.yetToStart" matTooltipPosition="above" [matTooltipShowDelay]="250">Yet to Start</span><span [matTooltip]="logicTip.init" matTooltipPosition="above" [matTooltipShowDelay]="250">Init</span><span [matTooltip]="logicTip.started" matTooltipPosition="above" [matTooltipShowDelay]="250">Started</span><span [matTooltip]="logicTip.ongoing" matTooltipPosition="above" [matTooltipShowDelay]="250">Ongoing</span><span [matTooltip]="logicTip.done" matTooltipPosition="above" [matTooltipShowDelay]="250">Done</span>
+                <span [matTooltip]="logicTip.yetToStart" matTooltipPosition="above" [matTooltipShowDelay]="250" matTooltipClass="dd-logic-tip">Yet to Start</span><span [matTooltip]="logicTip.init" matTooltipPosition="above" [matTooltipShowDelay]="250" matTooltipClass="dd-logic-tip">Init</span><span [matTooltip]="logicTip.started" matTooltipPosition="above" [matTooltipShowDelay]="250" matTooltipClass="dd-logic-tip">Started</span><span [matTooltip]="logicTip.ongoing" matTooltipPosition="above" [matTooltipShowDelay]="250" matTooltipClass="dd-logic-tip">Ongoing</span><span [matTooltip]="logicTip.done" matTooltipPosition="above" [matTooltipShowDelay]="250" matTooltipClass="dd-logic-tip">Done</span>
               </div>
             </div>
             <div class="dd-prow-colhead__cell">Avg. Time</div>
@@ -307,7 +310,7 @@
             </div>
 
             <!-- 3. Eligible -->
-            <div data-testid="ddc-div-020" class="dd-prow__hero" (click)="openCardModal(cardId, 'filtered'); $event.stopPropagation()">
+            <div data-testid="ddc-div-020" class="dd-prow__hero" [matTooltip]="logicTip.eligible" matTooltipPosition="above" [matTooltipShowDelay]="250" matTooltipClass="dd-logic-tip" (click)="openCardModal(cardId, 'filtered'); $event.stopPropagation()">
               <span class="dd-prow__hero-num" [class.zero]="getCardGroupedFiltered(cardId).length === 0">{{
                 getCardGroupedFiltered(cardId).length | number }}</span>
               <span class="dd-prow__hero-lbl">Eligible</span>
@@ -315,52 +318,57 @@
 
             <!-- 4. Participants chips -->
             <div class="dd-prow__chips">
-              <div data-testid="ddc-div-021" class="dd-prow__chip" (click)="openCardModal(cardId, 'all'); $event.stopPropagation()">
+              <div data-testid="ddc-div-021" class="dd-prow__chip" [matTooltip]="logicTip.total" matTooltipPosition="above" [matTooltipShowDelay]="250" matTooltipClass="dd-logic-tip" (click)="openCardModal(cardId, 'all'); $event.stopPropagation()">
                 <span class="dd-prow__chip-num">{{ getCardGroupedAll(cardId).length | number }}</span>
                 <span class="dd-prow__chip-lbl">Overall</span>
               </div>
-              <div data-testid="ddc-div-022" class="dd-prow__chip" (click)="openCardModal(cardId, 'noteligible'); $event.stopPropagation()">
+              <div data-testid="ddc-div-022" class="dd-prow__chip" [matTooltip]="logicTip.notEligible" matTooltipPosition="above" [matTooltipShowDelay]="250" matTooltipClass="dd-logic-tip" (click)="openCardModal(cardId, 'noteligible'); $event.stopPropagation()">
                 <span class="dd-prow__chip-num" [class.zero]="getCardGroupedNotEligible(cardId).length === 0"
                   [class.alert]="getCardGroupedNotEligible(cardId).length > 0">{{
                   getCardGroupedNotEligible(cardId).length | number }}</span>
                 <span class="dd-prow__chip-lbl">Not Elig.</span>
               </div>
-              <div data-testid="ddc-div-023" class="dd-prow__chip" (click)="openCardModal(cardId, 'purchased'); $event.stopPropagation()">
+              <div data-testid="ddc-div-023" class="dd-prow__chip" [matTooltip]="logicTip.purchased" matTooltipPosition="above" [matTooltipShowDelay]="250" matTooltipClass="dd-logic-tip" (click)="openCardModal(cardId, 'purchased'); $event.stopPropagation()">
                 <span class="dd-prow__chip-num" [class.zero]="getCardGroupedPurchased(cardId).length === 0">{{
                   getCardGroupedPurchased(cardId).length | number }}</span>
                 <span class="dd-prow__chip-lbl">Purch.</span>
               </div>
-              <div data-testid="ddc-div-024" class="dd-prow__chip" (click)="openCardModal(cardId, 'bonus'); $event.stopPropagation()">
+              <div data-testid="ddc-div-024" class="dd-prow__chip" [matTooltip]="logicTip.bonus" matTooltipPosition="above" [matTooltipShowDelay]="250" matTooltipClass="dd-logic-tip" (click)="openCardModal(cardId, 'bonus'); $event.stopPropagation()">
                 <span class="dd-prow__chip-num" [class.zero]="getCardGroupedBonus(cardId).length === 0">{{
                   getCardGroupedBonus(cardId).length | number }}</span>
                 <span class="dd-prow__chip-lbl">Bonus</span>
+              </div>
+              <div data-testid="ddc-chip-addon" class="dd-prow__chip" [matTooltip]="logicTip.addons" matTooltipPosition="above" [matTooltipShowDelay]="250" matTooltipClass="dd-logic-tip" (click)="openCardModal(cardId, 'addons'); $event.stopPropagation()">
+                <span class="dd-prow__chip-num" [class.zero]="getCardGroupedAddons(cardId).length === 0">{{
+                  getCardGroupedAddons(cardId).length | number }}</span>
+                <span class="dd-prow__chip-lbl">Add-on</span>
               </div>
             </div>
 
             <!-- 5. Journey Funnel -->
             <!-- 5. Journey Funnel -->
             <div class="dd-prow__funnel">
-              <div data-testid="ddc-div-025" class="dd-fstep" [matTooltip]="logicTip.yetToStart" matTooltipPosition="above" [matTooltipShowDelay]="250" (click)="openCardFunnelModal(cardId, 'awaiting', $event)">
+              <div data-testid="ddc-div-025" class="dd-fstep" [matTooltip]="logicTip.yetToStart" matTooltipPosition="above" [matTooltipShowDelay]="250" matTooltipClass="dd-logic-tip" (click)="openCardFunnelModal(cardId, 'awaiting', $event)">
                 <span class="dd-fstep__pill" [class.empty]="getCardFunnel(cardId).awaiting.length === 0">{{
                   getCardFunnel(cardId).awaiting.length | number }}</span>
                 <span class="dd-fstep__lbl">Yet to Start</span>
               </div>
-              <div data-testid="ddc-div-026" class="dd-fstep" [matTooltip]="logicTip.init" matTooltipPosition="above" [matTooltipShowDelay]="250" (click)="openCardFunnelModal(cardId, 'initiated', $event)">
+              <div data-testid="ddc-div-026" class="dd-fstep" [matTooltip]="logicTip.init" matTooltipPosition="above" [matTooltipShowDelay]="250" matTooltipClass="dd-logic-tip" (click)="openCardFunnelModal(cardId, 'initiated', $event)">
                 <span class="dd-fstep__pill" [class.empty]="getCardFunnel(cardId).initiated.length === 0">{{
                   getCardFunnel(cardId).initiated.length }}</span>
                 <span class="dd-fstep__lbl">Init</span>
               </div>
-              <div data-testid="ddc-div-027" class="dd-fstep" [matTooltip]="logicTip.started" matTooltipPosition="above" [matTooltipShowDelay]="250" (click)="openCardFunnelModal(cardId, 'started', $event)">
+              <div data-testid="ddc-div-027" class="dd-fstep" [matTooltip]="logicTip.started" matTooltipPosition="above" [matTooltipShowDelay]="250" matTooltipClass="dd-logic-tip" (click)="openCardFunnelModal(cardId, 'started', $event)">
                 <span class="dd-fstep__pill" [class.empty]="getCardFunnel(cardId).started.length === 0">{{
                   getCardFunnel(cardId).started.length }}</span>
                 <span class="dd-fstep__lbl">Started</span>
               </div>
-              <div data-testid="ddc-div-028" class="dd-fstep" [matTooltip]="logicTip.ongoing" matTooltipPosition="above" [matTooltipShowDelay]="250" (click)="openCardFunnelModal(cardId, 'ongoing', $event)">
+              <div data-testid="ddc-div-028" class="dd-fstep" [matTooltip]="logicTip.ongoing" matTooltipPosition="above" [matTooltipShowDelay]="250" matTooltipClass="dd-logic-tip" (click)="openCardFunnelModal(cardId, 'ongoing', $event)">
                 <span class="dd-fstep__pill" [class.empty]="(getCardFunnel(cardId).ongoing?.length || 0) === 0">{{
                   getCardFunnel(cardId).ongoing?.length || 0 }}</span>
                 <span class="dd-fstep__lbl">Ongoing</span>
               </div>
-              <div data-testid="ddc-div-029" class="dd-fstep" [matTooltip]="logicTip.done" matTooltipPosition="above" [matTooltipShowDelay]="250" (click)="openCardFunnelModal(cardId, 'completed', $event)">
+              <div data-testid="ddc-div-029" class="dd-fstep" [matTooltip]="logicTip.done" matTooltipPosition="above" [matTooltipShowDelay]="250" matTooltipClass="dd-logic-tip" (click)="openCardFunnelModal(cardId, 'completed', $event)">
                 <span class="dd-fstep__pill done" [class.empty]="getCardFunnel(cardId).completed.length === 0">{{
                   getCardFunnel(cardId).completed.length }}</span>
                 <span class="dd-fstep__lbl">Done</span>
@@ -474,6 +482,13 @@
                   <span class="chip-num">{{ getCardGroupedBonus(productId).length | number }}</span>
                   <span class="chip-label">Bonus</span>
                 </button>
+                <button data-testid="ddc-btn-addon" class="chip chip-bonus clickable"
+                  [class.chip-empty]="getCardGroupedAddons(productId).length === 0"
+                  [matTooltip]="logicTip.addons" matTooltipPosition="above" [matTooltipShowDelay]="250" matTooltipClass="dd-logic-tip"
+                  (click)="openCardModal(productId, 'addons'); $event.stopPropagation()">
+                  <span class="chip-num">{{ getCardGroupedAddons(productId).length | number }}</span>
+                  <span class="chip-label">Add-on</span>
+                </button>
               </div>
 
               <ng-template #noParticipants>
@@ -553,6 +568,7 @@
                     modalType === 'filtered' ? 'Filtered Eligible' :
                     modalType === 'noteligible' ? 'Not Eligible' :
                     modalType === 'bonus' ? 'Bonus' :
+                    modalType === 'addons' ? 'Add-on' :
                     modalType === 'purchased' ? 'Purchased' :
                     modalType === 'thismonth' ? 'This Month' :
                     modalType === 'nextmonth' ? 'Next Month' : '' }}
@@ -570,7 +586,7 @@
                       (click)="selectedStatus = 'initiated'; filterCardProfiles()">Initiated</button>
                   </div>
 
-                  <select data-testid="ddc-sel-051" *ngIf="modalType === 'purchased' || modalType === 'bonus'" class="custom-select pe-2"
+                  <select data-testid="ddc-sel-051" *ngIf="modalType === 'purchased' || modalType === 'bonus' || modalType === 'addons'" class="custom-select pe-2"
                     [(ngModel)]="selectedStatus" (change)="filterCardProfiles()">
                     <option value="all">All</option>
                     <option value="">Not Initiated</option>
@@ -654,7 +670,7 @@
                     <!-- Delivery Option -->
                     <mat-form-field subscriptSizing="dynamic" appearance="outline">
                       <mat-label>Delivery Option</mat-label>
-                      <mat-select panelWidth="" data-testid="ddc-msel-057" [(ngModel)]="selectedDeliveryType" #deliveryTypeRef="ngModel" required>
+                      <mat-select panelClass="dd-full-options" panelWidth="" data-testid="ddc-msel-057" [(ngModel)]="selectedDeliveryType" #deliveryTypeRef="ngModel" required>
                         <mat-option class="dd-opt-search"><ngx-mat-select-search [(ngModel)]="optSearch['delivery']" [ngModelOptions]="{standalone: true}" placeholderLabel="Search…" noEntriesFoundLabel="No match"></ngx-mat-select-search></mat-option>
                         <mat-option *ngFor="let list of filterOpts(deliveryTypes, 'delivery')" [value]="list">
                           {{ list }}
@@ -971,6 +987,21 @@
                     (click)="selectProduct('Critical Support')">
                     <span class="stages-pchip-dot stages-pchip-dot-critical"></span>Critical Support
                   </button>
+                  <button data-testid="ddc-btn-ctd-appt" class="stages-pchip"
+                    *ngIf="!productFilterActive || (productFilterControl.value || []).includes('CTD Diagnostics & Implementation')"
+                    [class.active]="selectedProductLabel === 'CTD D&I (Appointment)'"
+                    matTooltip="Only the CTD Diagnostics & Implementation (Appointment) product — not the CTD queue, CTD Platinum or CTD Diagnostics (Appointment)." matTooltipPosition="above" [matTooltipShowDelay]="250"
+                    (click)="selectProduct('CTD D&I (Appointment)')">
+                    <span class="stages-pchip-dot stages-pchip-dot-ctd"></span>CTD D&amp;I (Appointment)
+                  </button>
+                </div>
+                <div class="dd-seg stages-ctd-cycle" *ngIf="selectedProductLabel === 'CTD D&I (Appointment)'">
+                  <button data-testid="ddc-ctd-cycle-first" type="button" class="dd-seg__btn" [class.is-active]="ctdCycle === 'first'"
+                    matTooltip="1st Cycle — enrolments whose delivery option is 1st Cycle (or not set). Third form: My Evolution Wishlist." matTooltipPosition="above" [matTooltipShowDelay]="250"
+                    (click)="setCtdCycle('first')">1st Cycle</button>
+                  <button data-testid="ddc-ctd-cycle-next" type="button" class="dd-seg__btn" [class.is-active]="ctdCycle === 'next'"
+                    matTooltip="Next Cycle — enrolments with any other delivery option. Third form: My Pocket ATC." matTooltipPosition="above" [matTooltipShowDelay]="250"
+                    (click)="setCtdCycle('next')">Next Cycle</button>
                 </div>
               </div>
               <div class="header-right">
@@ -998,7 +1029,7 @@
 
             <div class="stages-empty" *ngIf="!selectedProductLabel && !stagesLoading">
               <div class="stages-empty-title">Pick a product to inspect stages</div>
-              <div class="stages-empty-hint">Choose EI Starter Pack or Critical Support above to drill into
+              <div class="stages-empty-hint">Choose a product above to drill into
                 stage-by-stage data.</div>
             </div>
 
@@ -1029,7 +1060,7 @@
                     <div class="header-col">
                       <div data-testid="ddc-div-090" class="d-flex filter-asc" (click)="sortColumn(i)">
                         <div class="col-header-left">
-                          <span class="col-title">{{ col }}</span>
+                          <span class="col-title" [matTooltip]="stageColTip(col)" matTooltipPosition="above" [matTooltipShowDelay]="250">{{ col }}</span>
                         </div>
                         <div class="filter-asc ps-2">
                           <i class="fas text-black-50 filter-asc"
@@ -1037,7 +1068,7 @@
                           </i>
                         </div>
                       </div>
-                      <span class="col-badge">
+                      <span class="col-badge" [matTooltip]="stageColTip(col)" matTooltipPosition="above" [matTooltipShowDelay]="250">
                         {{ filteredCardsMap[i]?.length || 0 }}
                       </span>
                     </div>
@@ -1045,12 +1076,14 @@
                       <ng-container *ngIf="stageData[col.toLowerCase().trim()] as stage">
                         <div class="stage-stat-row">
                           <button data-testid="ddc-btn-091" type="button" class="stage-stat-card"
+                            [matTooltip]="stageStatTip(col, 'completed')" matTooltipPosition="above" [matTooltipShowDelay]="250"
                             (click)="openStageModal(col, 'Completed', getStageCompletedCards(col.toLowerCase().trim()))">
                             <span class="stage-stat-num stage-stat-num--completed">{{ getStageCompletedCards(col.toLowerCase().trim()).length || 0 }}</span>
                             <span class="stage-stat-arrow">›</span>
                             <span class="stage-stat-lbl">Completed</span>
                           </button>
                           <button data-testid="ddc-btn-092" type="button" class="stage-stat-card"
+                            [matTooltip]="stageStatTip(col, 'cancelled')" matTooltipPosition="above" [matTooltipShowDelay]="250"
                             (click)="openStageModal(col, 'Cancelled', stage.cancelled)">
                             <span class="stage-stat-num stage-stat-num--cancelled">{{ stage.cancelled.length || 0 }}</span>
                             <span class="stage-stat-arrow">›</span>
@@ -1061,10 +1094,13 @@
                         <ng-container *ngIf="getNotScheduledCards(col.toLowerCase().trim()) as notScheduledCards">
                           <div class="stage-tabs">
                             <button data-testid="ddc-btn-093" type="button" class="stage-tab" [class.is-active]="getStageTab(col) === 'all'"
-                            (click)="setStageTab(col, 'all')">All {{ (col.toLowerCase().trim() === 'onboarding' ? getScheduledOnboardingCards().length : stage.all.length) + notScheduledCards.length }}</button>
+                            [matTooltip]="stageStatTip(col, 'all')" matTooltipPosition="above" [matTooltipShowDelay]="250"
+                            (click)="setStageTab(col, 'all')">All {{ (col.toLowerCase().trim() === 'onboarding' ? getScheduledOnboardingCards().length : getStageScheduledCards(col.toLowerCase().trim()).length) + notScheduledCards.length }}</button>
                           <button data-testid="ddc-btn-094" type="button" class="stage-tab" [class.is-active]="getStageTab(col) === 'scheduled'"
-                            (click)="setStageTab(col, 'scheduled')">Scheduled {{ col.toLowerCase().trim() === 'onboarding' ? getScheduledOnboardingCards().length : stage.all.length }}</button>
+                            [matTooltip]="stageStatTip(col, 'scheduled')" matTooltipPosition="above" [matTooltipShowDelay]="250"
+                            (click)="setStageTab(col, 'scheduled')">Scheduled {{ col.toLowerCase().trim() === 'onboarding' ? getScheduledOnboardingCards().length : getStageScheduledCards(col.toLowerCase().trim()).length }}</button>
                             <button data-testid="ddc-btn-095" type="button" class="stage-tab" [class.is-active]="getStageTab(col) === 'waiting'"
+                              [matTooltip]="stageStatTip(col, 'waiting')" matTooltipPosition="above" [matTooltipShowDelay]="250"
                               (click)="setStageTab(col, 'waiting')">Waiting {{ notScheduledCards.length }}</button>
                           </div>
                         </ng-container>
@@ -1099,7 +1135,7 @@
                           </div>
                         </ng-container>
                         <ng-template #regularScheduledTpl>
-                          <div class="card" *ngFor="let app of stage.all; trackBy: trackByCard">
+                          <div class="card" *ngFor="let app of getStageScheduledCards(col.toLowerCase().trim()); trackBy: trackByCard">
                             <div class="card-top">
                               <div class="card-info">
                                 <div class="card-name">{{ mapMetaData[getStageModalProfileId(app)]?.name || getStageModalProfileId(app) }}</div>
@@ -1226,7 +1262,7 @@
                         </div>
                       </ng-container>
 
-                      <div class="no-data-card" *ngIf="stage.all.length === 0 && getNotScheduledCards(col.toLowerCase().trim()).length === 0">
+                      <div class="no-data-card" *ngIf="getStageScheduledCards(col.toLowerCase().trim()).length === 0 && getNotScheduledCards(col.toLowerCase().trim()).length === 0">
                         No Data Yet
                       </div>
                     </ng-container>
@@ -1632,7 +1668,7 @@
                   </div>
                   <mat-form-field subscriptSizing="dynamic" appearance="outline" class="pm-filter-field">
                     <mat-label>Customer Status</mat-label>
-                    <mat-select panelWidth="" data-testid="ddc-msel-125" [formControl]="customerStatusFilterControl"
+                    <mat-select panelClass="dd-full-options" panelWidth="" data-testid="ddc-msel-125" [formControl]="customerStatusFilterControl"
                       (selectionChange)="filterTableData()" multiple>
                       <mat-option class="dd-opt-search"><ngx-mat-select-search [(ngModel)]="optSearch['cust']" [ngModelOptions]="{standalone: true}" placeholderLabel="Search…" noEntriesFoundLabel="No match"></ngx-mat-select-search></mat-option>
                       <mat-option *ngIf="optMatch('cust', 'Active')" value="active">Active</mat-option>
@@ -1642,7 +1678,7 @@
 
                   <mat-form-field subscriptSizing="dynamic" appearance="outline" class="pm-filter-field">
                     <mat-label>Financial Status</mat-label>
-                    <mat-select panelWidth="" data-testid="ddc-msel-126" [formControl]="financialStatusFilterControl"
+                    <mat-select panelClass="dd-full-options" panelWidth="" data-testid="ddc-msel-126" [formControl]="financialStatusFilterControl"
                       (selectionChange)="filterTableData()" multiple>
                       <mat-option class="dd-opt-search"><ngx-mat-select-search [(ngModel)]="optSearch['fin']" [ngModelOptions]="{standalone: true}" placeholderLabel="Search…" noEntriesFoundLabel="No match"></ngx-mat-select-search></mat-option>
                       <mat-option *ngIf="optMatch('fin', 'Regular')" value="regular">Regular</mat-option>
@@ -1654,7 +1690,7 @@
 
                   <mat-form-field subscriptSizing="dynamic" appearance="outline" class="pm-filter-field">
                     <mat-label>Parallel Product</mat-label>
-                    <mat-select panelWidth="" data-testid="ddc-msel-127" [formControl]="parallelFilterControl"
+                    <mat-select panelClass="dd-full-options" panelWidth="" data-testid="ddc-msel-127" [formControl]="parallelFilterControl"
                       (selectionChange)="filterTableData()">
                       <mat-option class="dd-opt-search"><ngx-mat-select-search [(ngModel)]="optSearch['parallel']" [ngModelOptions]="{standalone: true}" placeholderLabel="Search…" noEntriesFoundLabel="No match"></ngx-mat-select-search></mat-option>
                       <mat-option *ngIf="optMatch('parallel', 'All')" value="all">All</mat-option>
@@ -1664,7 +1700,7 @@
                   </mat-form-field>
                   <mat-form-field subscriptSizing="dynamic" appearance="outline" class="pm-filter-field">
                     <mat-label>Journey</mat-label>
-                    <mat-select panelWidth="" data-testid="ddc-msel-106" placeholder="Select Journey" formControlName="journey"
+                    <mat-select panelClass="dd-full-options" panelWidth="" data-testid="ddc-msel-106" placeholder="Select Journey" formControlName="journey"
                       (selectionChange)="filterTableData()" multiple>
                       <mat-option class="dd-opt-search"><ngx-mat-select-search [(ngModel)]="optSearch['journey']" [ngModelOptions]="{standalone: true}" placeholderLabel="Search…" noEntriesFoundLabel="No match"></ngx-mat-select-search></mat-option>
                       <mat-option *ngFor="let journey of filterOpts(getUniqueJourneysForCurrentTab(), 'journey')" [value]="journey">{{
@@ -1674,7 +1710,7 @@
                 <mat-form-field subscriptSizing="dynamic" appearance="outline" class="pm-filter-field"
                   [class.pm-filter-field--hidden]="!(currentTabIndex === 2 || activeFilter === 'todayActivity' || activeFilter === 'last7DaysActivity' || activeFilter === 'last30DaysActivity' || activeFilter === 'thisMonthActivity')">
                   <mat-label>Product</mat-label>
-                  <mat-select panelWidth="" data-testid="ddc-msel-107" placeholder="Select Product" [formControl]="productTableFilterControl"
+                  <mat-select panelClass="dd-full-options" panelWidth="" data-testid="ddc-msel-107" placeholder="Select Product" [formControl]="productTableFilterControl"
                     (selectionChange)="filterTableData()" multiple>
                     <mat-option class="dd-opt-search"><ngx-mat-select-search [(ngModel)]="optSearch['product']" [ngModelOptions]="{standalone: true}" placeholderLabel="Search…" noEntriesFoundLabel="No match"></ngx-mat-select-search></mat-option>
                     <mat-option *ngFor="let product of filterOpts(getUniqueProductsForCurrentTab(), 'product')" [value]="product">{{ product }}</mat-option>
@@ -1898,7 +1934,7 @@
 
               <mat-form-field subscriptSizing="dynamic" appearance="outline" class="pm-filter-field pm-filter-field--wide">
                 <mat-label>Choose a product</mat-label>
-                <mat-select panelWidth="" data-testid="ddc-msel-131" [(ngModel)]="weeklyReportCardId" (selectionChange)="loadWeeklyReport()">
+                <mat-select panelClass="dd-full-options" panelWidth="" data-testid="ddc-msel-131" [(ngModel)]="weeklyReportCardId" (selectionChange)="loadWeeklyReport()">
                   <mat-option class="dd-opt-search"><ngx-mat-select-search [(ngModel)]="optSearch['weekly']" [ngModelOptions]="{standalone: true}" placeholderLabel="Search…" noEntriesFoundLabel="No match"></ngx-mat-select-search></mat-option>
                   <mat-option *ngFor="let cardId of filterOpts(visibleCardIds, 'weekly', cardOptLabel)" [value]="cardId">{{ getCardName(cardId) }}</mat-option>
                 </mat-select>
@@ -1927,11 +1963,12 @@
 
                 <mat-form-field subscriptSizing="dynamic" appearance="outline" class="pm-filter-field">
                   <mat-label>Status</mat-label>
-                  <mat-select panelWidth="" data-testid="ddc-msel-136" [(ngModel)]="weeklyStatusFilter" (selectionChange)="applyWeeklyFilters()">
+                  <mat-select panelClass="dd-full-options" panelWidth="" data-testid="ddc-msel-136" [(ngModel)]="weeklyStatusFilter" (selectionChange)="applyWeeklyFilters()">
                     <mat-option class="dd-opt-search"><ngx-mat-select-search [(ngModel)]="optSearch['wstatus']" [ngModelOptions]="{standalone: true}" placeholderLabel="Search…" noEntriesFoundLabel="No match"></ngx-mat-select-search></mat-option>
                     <mat-option *ngIf="optMatch('wstatus', 'All')" value="all">All</mat-option>
                     <mat-option *ngIf="optMatch('wstatus', 'Booked')" value="booked">Booked</mat-option>
                     <mat-option *ngIf="optMatch('wstatus', 'Completed')" value="completed">Completed</mat-option>
+                    <mat-option *ngIf="optMatch('wstatus', 'Cancelled')" value="cancelled">Cancelled</mat-option>
                   </mat-select>
                 </mat-form-field>
 
@@ -1962,4 +1999,76 @@
       </mat-tab>
     </mat-tab-group>
   </div><!-- /.dd-app -->
+  <!-- "Why not here?" (operator 2026-11-19): name → per product, In / Not in each section + the blocking rule. -->
+  <div data-testid="ddc-why-overlay" class="modal-overlay" *ngIf="whyOpen" (click)="closeWhyDialog()">
+    <div data-testid="ddc-why-dialog" class="modal-content dd-why" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Why not here?</h3>
+        <button data-testid="ddc-why-close" class="modal-close" (click)="closeWhyDialog()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="dd-why__controls">
+          <div class="dd-why__search">
+            <input data-testid="ddc-why-name" class="dd-why__input" type="text" placeholder="Participant name (2+ letters)"
+              [(ngModel)]="whyQuery" (input)="onWhyQuery()" autocomplete="off">
+            <div class="dd-why__matches" *ngIf="whyMatchList.length">
+              <button data-testid="ddc-why-match" type="button" class="dd-why__match" *ngFor="let m of whyMatchList" (click)="pickWhy(m)">
+                {{ m.name }} <span class="dd-why__muted">· {{ m.status }}</span>
+              </button>
+            </div>
+          </div>
+          <mat-form-field subscriptSizing="dynamic" appearance="outline" class="dd-why__section" floatLabel="always">
+            <mat-label>Product</mat-label>
+            <mat-select data-testid="ddc-why-product" multiple panelClass="dd-full-options" panelWidth="" [(ngModel)]="whyProduct" [disabled]="!whyResults.length" placeholder="All products">
+              <mat-select-trigger>{{ whyTriggerText(whyProduct, whyProductLabel, 'All products') }}</mat-select-trigger>
+              <mat-option *ngFor="let r of whyResults" [value]="r.pid">{{ r.product }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field subscriptSizing="dynamic" appearance="outline" class="dd-why__status" floatLabel="always">
+            <mat-label>Status</mat-label>
+            <mat-select data-testid="ddc-why-status" multiple panelClass="dd-full-options" panelWidth="" [(ngModel)]="whyStatus" [disabled]="!whyResults.length" placeholder="All statuses">
+              <mat-select-trigger>{{ whyTriggerText(whyStatus, whyStatusLabel, 'All statuses') }}</mat-select-trigger>
+              <mat-option *ngFor="let st of whyStatusOptions" [value]="st">{{ st | titlecase }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field subscriptSizing="dynamic" appearance="outline" class="dd-why__section" floatLabel="always">
+            <mat-label>Section</mat-label>
+            <mat-select data-testid="ddc-why-section" multiple panelClass="dd-full-options" panelWidth="" [(ngModel)]="whySection" placeholder="All sections">
+              <mat-select-trigger>{{ whyTriggerText(whySection, whySectionLabel, 'All sections') }}</mat-select-trigger>
+              <mat-option *ngFor="let sec of whySections" [value]="sec.key">{{ sec.label }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+        <div class="dd-why__hint" *ngIf="!whyProfileId">Pick a participant from the list. Dates follow the period chosen at the top.</div>
+        <div class="dd-why__hint" *ngIf="whyProfileId && !whyResults.length && everyProductRecordRaw.length">No Delivery Dashboard product records for this participant.</div>
+        <div class="dd-why__hint" *ngIf="whyProfileId && !everyProductRecordRaw.length">The dashboard is still loading product records — pick the name again in a few seconds.</div>
+
+        <mat-accordion class="dd-why__accordion" multi *ngIf="whyResults.length">
+          <mat-expansion-panel data-testid="ddc-why-panel" class="dd-why__panel" *ngFor="let r of whyFilteredResults"
+            [expanded]="whyFilteredResults.length === 1">
+            <mat-expansion-panel-header class="dd-why__phead">
+              <mat-panel-title class="dd-why__ptitle">{{ r.product }} <span class="dd-why__muted">&nbsp;· {{ r.card }}</span></mat-panel-title>
+              <mat-panel-description class="dd-why__pdesc">
+                <span class="dd-why__status-chip" [attr.data-status]="r.status">{{ r.status | titlecase }}</span>
+                <span class="dd-why__badge" [class.is-in]="whyHeaderBadge(r).isIn">{{ whyHeaderBadge(r).text }}</span>
+              </mat-panel-description>
+            </mat-expansion-panel-header>
+            <div class="dd-why__summary">{{ r.summary }}</div>
+            <div class="dd-why__now"><b>Currently in:</b> {{ r.inNow.length ? r.inNow.join(', ') : 'no section' }}</div>
+            <table class="avg-table dd-why__table">
+              <tbody>
+                <tr *ngFor="let row of whyRowsFor(r)" [class.is-in]="row.isIn">
+                  <td class="dd-why__mark">{{ row.isIn ? '✓' : '✗' }}</td>
+                  <td class="dd-why__sec">{{ row.label }}</td>
+                  <td>{{ row.reason }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </mat-expansion-panel>
+        </mat-accordion>
+        <div class="dd-why__hint" *ngIf="whyResults.length && !whyFilteredResults.length">No product matches the Product / Status filter.</div>
+      </div>
+    </div>
+  </div>
+
 </div>

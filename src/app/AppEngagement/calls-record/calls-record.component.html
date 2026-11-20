@@ -10,7 +10,7 @@
           <mat-icon matChipAvatar>phone</mat-icon>
           {{filteredData.length}} Total Calls
         </mat-chip>
-        <mat-chip class="realtime-chip" [highlighted]="isRealTimeActive">
+        <mat-chip data-testid="aeclr-live-chip" class="realtime-chip" [highlighted]="isRealTimeActive">
           <mat-icon matChipAvatar>wifi</mat-icon>
           {{isRealTimeActive ? 'Live' : 'Offline'}}
         </mat-chip>
@@ -124,7 +124,7 @@
 
           <!-- Action Buttons -->
           <div class="filter-actions">
-            <button data-testid="aeclr-btn-9" mat-raised-button color="primary" (click)="applyFilters()" [disabled]="isLoading">
+            <button data-testid="aeclr-btn-9" mat-raised-button color="primary" (click)="apply()" [disabled]="isLoading">
               <mat-icon>filter_alt</mat-icon>
               Apply Filters
             </button>
@@ -135,10 +135,6 @@
             <button data-testid="aeclr-btn-11" mat-stroked-button (click)="refreshData()">
               <mat-icon>refresh</mat-icon>
               Refresh
-            </button>
-            <button data-testid="aeclr-btn-12" mat-stroked-button (click)="toggleRealTime()" [color]="isRealTimeActive ? 'warn' : 'primary'">
-              <mat-icon>{{isRealTimeActive ? 'wifi_off' : 'wifi'}}</mat-icon>
-              {{isRealTimeActive ? 'Stop Live' : 'Start Live'}}
             </button>
           </div>
         </form>
@@ -224,109 +220,13 @@
               <th mat-header-cell *matHeaderCellDef>Recording</th>
               <td mat-cell *matCellDef="let element; let i = index">
                 <div class="enhanced-audio-container">
-                  <button data-testid="aeclr-btn-13" mat-mini-fab color="primary" class="play-button" *ngIf="element.recordingurl"
-                    (click)="toggleAudio(element, i)" [matTooltip]="audioStates[i]?.isPlaying ? 'Pause' : 'Play'">
-                    <mat-icon>{{ audioStates[i]?.isPlaying ? 'pause' : 'play_arrow' }}</mat-icon>
-                  </button>
-
-                  <!-- Enhanced Audio Player with Better Progress Controls -->
-                  <div class="enhanced-audio-player" [ngClass]="{'active': audioStates[i]?.isActive}"
-                    [id]="'audio-player-' + i">
-                    <div class="audio-controls" *ngIf="audioStates[i]?.isActive">
-                      <audio #audioElement [src]="element.recordingurl" (timeupdate)="updateProgress($event, i)"
-                        (ended)="audioEnded(i)" (pause)="audioPaused(i)" (play)="audioPlayed(i)"
-                        (loadedmetadata)="onAudioLoaded($event, i)">
-                      </audio>
-
-                      <div class="audio-header">
-                        <div class="audio-info">
-                          <span class="audio-title">Call Recording</span>
-                          <span class="audio-subtitle">{{getProfileName(element.calledby)}} →
-                            {{profileNumberMap[element.calledto]?.['name'] || element.calledto}}</span>
-                        </div>
-                        <button data-testid="aeclr-btn-14" mat-icon-button class="close-button" (click)="closeAudio(i)">
-                          <mat-icon>close</mat-icon>
-                        </button>
-                      </div>
-
-                      <!-- Main Play Controls -->
-                      <div class="main-controls">
-                        <button data-testid="aeclr-btn-15" mat-icon-button (click)="skipBackward(audioElement, i)" matTooltip="Skip 10s backward">
-                          <mat-icon>replay_10</mat-icon>
-                        </button>
-
-                        <button data-testid="aeclr-btn-16" mat-fab color="primary" (click)="togglePlayPause(audioElement, i)"
-                          class="main-play-button">
-                          <mat-icon>{{ audioStates[i]?.isPlaying ? 'pause' : 'play_arrow' }}</mat-icon>
-                        </button>
-
-                        <button data-testid="aeclr-btn-17" mat-icon-button (click)="skipForward(audioElement, i)" matTooltip="Skip 10s forward">
-                          <mat-icon>forward_10</mat-icon>
-                        </button>
-                      </div>
-
-                      <!-- Enhanced Progress Section -->
-                      <div class="progress-section">
-                        <div class="time-display">
-                          <span class="current-time">{{ formatTime(audioStates[i]?.currentTime) }}</span>
-                        </div>
-
-                        <div class="progress-container">
-                          <mat-progress-bar data-testid="aeclr-act-18" mode="determinate" [value]="audioStates[i]?.progress || 0"
-                            class="audio-progress-bar" (click)="seekToPosition($event, audioElement, i)">
-                          </mat-progress-bar>
-
-                          <!-- Custom Slider for Better Seeking -->
-                          <mat-slider class="seek-slider" [min]="0" [max]="audioStates[i]?.duration || 0" [step]="1"
-                            discrete>
-                            <input data-testid="aeclr-inp-19" matSliderThumb [value]="audioStates[i]?.currentTime || 0"
-                              (input)="onSeekChange($event, audioElement, i)">
-                          </mat-slider>
-                        </div>
-
-                        <div class="time-display">
-                          <span class="duration">{{ formatTime(audioStates[i]?.duration) }}</span>
-                        </div>
-                      </div>
-
-                      <!-- Secondary Controls -->
-                      <div class="secondary-controls">
-                        <!-- Volume Control -->
-                        <div class="volume-control">
-                          <button data-testid="aeclr-btn-20" mat-icon-button (click)="toggleMute(audioElement, i)" matTooltip="Toggle mute">
-                            <mat-icon>{{ audioStates[i]?.isMuted ? 'volume_off' : 'volume_up' }}</mat-icon>
-                          </button>
-                          <mat-slider class="volume-slider" [min]="0" [max]="1" [step]="0.1">
-                            <input data-testid="aeclr-inp-21" matSliderThumb [value]="audioStates[i]?.volume || 1"
-                              (input)="onVolumeChange($event, audioElement, i)">
-                          </mat-slider>
-
-                        </div>
-
-                        <!-- Playback Speed -->
-                        <div class="speed-control">
-                          <mat-form-field appearance="outline" class="speed-selector">
-                            <mat-label>Speed</mat-label>
-                            <mat-select data-testid="aeclr-sel-22" value="1.0"
-                              (selectionChange)="changePlaybackSpeed($event.value, audioElement, i)">
-                              <mat-option value="0.5">0.5x</mat-option>
-                              <mat-option value="0.75">0.75x</mat-option>
-                              <mat-option value="1.0">1.0x</mat-option>
-                              <mat-option value="1.25">1.25x</mat-option>
-                              <mat-option value="1.5">1.5x</mat-option>
-                              <mat-option value="2.0">2.0x</mat-option>
-                            </mat-select>
-                          </mat-form-field>
-                        </div>
-
-                        <!-- Download Button -->
-                        <button data-testid="aeclr-btn-23" mat-icon-button (click)="downloadAudio(element.recordingurl, element)"
-                          matTooltip="Download recording">
-                          <mat-icon>download</mat-icon>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                  <!-- Shared signed-URL player (same as ATC notes). `recordingurl` holds an object
+                       path after migration, or a legacy download URL before it — the player
+                       resolves either. Nothing is requested until Play is pressed. The old
+                       custom player and its hidden download button were removed: a bare path
+                       in [src] resolves against the app origin and silently plays nothing.
+                       `compact`: own controls (play, seek, time, speed), no download menu. -->
+                  <app-atc-audio compact data-testid="aeclr-audio" *ngIf="element.recordingurl" [path]="element.recordingurl"></app-atc-audio>
 
                   <div *ngIf="!element.recordingurl" class="no-recording">
                     <mat-icon class="no-recording-icon">mic_off</mat-icon>
@@ -365,12 +265,12 @@
             </ng-container>
 
             <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-            <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="table-row"
+            <tr mat-row data-testid="aeclr-row" *matRowDef="let row; columns: displayedColumns;" class="table-row"
               [class.highlighted]="row.callstatus === 'missed'" [class.new-record]="isNewRecord(row)"></tr>
           </table>
 
           <!-- Empty State -->
-          <div *ngIf="filteredData.length === 0" class="empty-state">
+          <div data-testid="aeclr-empty" *ngIf="filteredData.length === 0" class="empty-state">
             <mat-icon class="empty-icon">call_end</mat-icon>
             <h3>No call records found</h3>
             <p>Try adjusting your filters or date range to see more results.</p>

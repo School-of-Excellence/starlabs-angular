@@ -2,7 +2,7 @@ import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-
 import { CommonModule, DatePipe, Location } from '@angular/common';
 import { Component, OnDestroy } from '@angular/core';
 import { collection, doc, getFirestore, getDoc, getDocs, orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
-import { getDownloadURL, ref, Storage, uploadBytes } from '@angular/fire/storage';
+import { ref, Storage, uploadBytes } from '@angular/fire/storage';
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthguardService } from '../../../authguard.service';
@@ -749,13 +749,13 @@ export class EditTripleATCComponent implements OnDestroy {
     }
     for (let a = 0; a < this.selectedNoteImages.length; a++) {
       const imageFile = this.selectedNoteImages[a];
+      // Stores the PATH, not a download URL — a download URL carries a token with no TTL
+      // that bypasses Storage Rules. Reading a path needs a signed URL from getMediaUrls.
       await this.storage.upload("Uploaded ATC/" + imageFile.name + imageFile.lastModified + imageFile.size, imageFile).then(async uploaded=>{
-        await uploaded.ref.getDownloadURL().then(async imageURL =>{
-          imagenotes.push(imageURL)
-          if(imagenotes.length == this.selectedNoteImages.length){
-            await this.updateATCnotes(audiobrief, imagenotes)
-          }
-        })
+        imagenotes.push(uploaded.ref.fullPath)
+        if(imagenotes.length == this.selectedNoteImages.length){
+          await this.updateATCnotes(audiobrief, imagenotes)
+        }
       })
     }
   }
@@ -834,8 +834,7 @@ export class EditTripleATCComponent implements OnDestroy {
       const imageRef = ref(this.storage, "Online ATC Images/" + imageFile.name + imageFile.lastModified + imageFile.size);
       try {
         const uploadResult = await uploadBytes(imageRef, imageFile);
-        const imageURL = await getDownloadURL(uploadResult.ref);
-        atcImageURL.push(imageURL);
+        atcImageURL.push(uploadResult.ref.fullPath);   // path, not a tokenised download URL
       } catch (err) {
         console.log(err);
       }

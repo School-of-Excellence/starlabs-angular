@@ -145,8 +145,10 @@ export class JourneyEntryComponent implements OnInit {
 
   onvaluechange(event){
     const match = this.journeyarray.some((items) => {
-      let a = event?.replace(/ /g,"").toLowerCase()
-      let b = items.journey.replace(/ /g, "").toLowerCase()
+      // a journey doc without a `journey` name (legacy / partial data) must not break the duplicate check
+      let a = (event ?? '').replace(/ /g,"").toLowerCase()
+      let b = (items?.journey ?? '').replace(/ /g, "").toLowerCase()
+      if (!b) return false
       return a === b
     })
     this.crossmatch = match
