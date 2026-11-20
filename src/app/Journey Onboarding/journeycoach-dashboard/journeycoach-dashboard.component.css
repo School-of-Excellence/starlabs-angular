@@ -2498,3 +2498,11 @@ mat-dialog-actions,
 .jcd-root.jcd-dark .jcd-pg-num,
 .jcd-root.jcd-dark .jcd-pg-size { background: var(--soft) !important; color: var(--ink) !important; border-color: var(--line) !important; }
 .jcd-root.jcd-dark .jcd-pg-num.active { background: var(--accent) !important; color: #fff !important; border-color: var(--accent) !important; }
+
+/* Name search in every list dialog (2026-11-20) */
+:host .jcd-dlg-search { display: flex; align-items: center; gap: 6px; margin: 8px 16px 6px; padding: 6px 10px;
+  border: 1px solid var(--border, rgba(0,0,0,.12)); border-radius: 9px; background: var(--bg, transparent); color: var(--text3, #8e8e93); }
+:host .jcd-dlg-search input { flex: 1 1 auto; min-width: 0; border: 0; outline: 0; background: transparent; font: inherit;
+  font-size: 13px; color: var(--text, inherit); }
+:host .jcd-dlg-search:focus-within { border-color: var(--blue, #2563eb); }
+:host .jcd-cal-right .jcd-dlg-search { margin: 0 0 8px; }
