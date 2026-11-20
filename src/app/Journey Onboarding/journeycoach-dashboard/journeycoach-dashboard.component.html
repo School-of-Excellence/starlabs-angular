@@ -740,10 +740,11 @@
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Export
         </button><button data-testid="jcd-btn-169" class="close-btn" (click)="closeDialog()">✕</button></div></div>
+      <div class="jcd-dlg-search" (click)="$event.stopPropagation()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" data-testid="jcd-inp-dlg-search-interim" [(ngModel)]="dlgQuery" placeholder="Search name" aria-label="Search name" autocomplete="off"></div>
       <div class="dlg-body">
         <div class="sec-lbl" style="margin-bottom:8px;">Click name to view their interim</div>
         <div *ngIf="dialogProfileList.length===0" style="font-size:12px;color:var(--text3);padding:8px 0;">No profiles</div>
-        <div data-testid="jcd-div-170" *ngFor="let profile of dialogProfileList" class="participant-row" (click)="openProfileDetail(profile)"><div class="par-av" [ngClass]="dialogContext.statusClass">{{ getInitials(profile.profileName || profile.profileId) }}</div><div><div class="par-name">{{ profile.profileName || profile.profileId }}</div></div><div class="par-right"><span class="par-date">{{ profile.createdDate }}</span><span *ngIf="profile.changedCount" class="par-cnt" [ngClass]="getCountBadgeClass(profile.changedCount,dialogContext.statusType||'up')">{{ profile.changedCount==='all'?'ALL':profile.changedCount }}</span><span class="par-arrow">›</span></div></div>
+        <div data-testid="jcd-div-170" *ngFor="let profile of dialogProfileList | nameSearch:dlgQuery:dlgNameOfInterim" class="participant-row" (click)="openProfileDetail(profile)"><div class="par-av" [ngClass]="dialogContext.statusClass">{{ getInitials(profile.profileName || profile.profileId) }}</div><div><div class="par-name">{{ profile.profileName || profile.profileId }}</div></div><div class="par-right"><span class="par-date">{{ profile.createdDate }}</span><span *ngIf="profile.changedCount" class="par-cnt" [ngClass]="getCountBadgeClass(profile.changedCount,dialogContext.statusType||'up')">{{ profile.changedCount==='all'?'ALL':profile.changedCount }}</span><span class="par-arrow">›</span></div></div>
       </div>
     </ng-template>
   </div>
@@ -766,6 +767,7 @@
         </button><button data-testid="jcd-btn-173" class="close-btn" (click)="closeHealthDialog()">✕</button></div>
     </div>
 
+    <div class="jcd-dlg-search" (click)="$event.stopPropagation()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" data-testid="jcd-inp-dlg-search-health" [(ngModel)]="dlgQuery" placeholder="Search name" aria-label="Search name" autocomplete="off"></div>
     <!-- Sticky column headers -->
     <div class="hd-thead">
       <div class="hd-th hd-th-profile">Profile</div>
@@ -776,7 +778,7 @@
     <!-- Rows -->
     <div class="dlg-body" style="padding:0">
       <div *ngIf="healthDialogProfiles.length===0" class="jcd-cura-empty">No profiles found</div>
-      <div data-testid="jcd-div-174" class="hd-row" *ngFor="let p of healthDialogProfiles" (click)="navigatetoprofile(p.profileId)">
+      <div data-testid="jcd-div-174" class="hd-row" *ngFor="let p of healthDialogProfiles | nameSearch:dlgQuery:'profileName'" (click)="navigatetoprofile(p.profileId)">
 
         <!-- Profile cell -->
         <div class="hd-td hd-td-profile">
@@ -813,10 +815,11 @@
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Export
         </button><button data-testid="jcd-btn-177" class="close-btn" (click)="closeSubDialog()">✕</button></div></div>
+    <div class="jcd-dlg-search" (click)="$event.stopPropagation()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" data-testid="jcd-inp-dlg-search-sub" [(ngModel)]="dlgQuery" placeholder="Search name" aria-label="Search name" autocomplete="off"></div>
     <div class="sub-dlg-table-hd"><span class="sub-dlg-col name">Name</span><span class="sub-dlg-col journey">Journey</span><span class="sub-dlg-col status">Status</span><span class="sub-dlg-col enddate">Sub End</span></div>
     <div class="dlg-body">
       <div *ngIf="subDialogDocs.length===0" style="font-size:12px;color:var(--text3);padding:8px 0;">No participants</div>
-      <div data-testid="jcd-div-178" class="sub-dlg-row" *ngFor="let doc of subDialogDocs" (click)="navigatetoprofile(doc['profileid'])"><div class="sub-dlg-col name"><div class="par-av dn" style="flex-shrink:0;">{{ getInitials(mapprofile[doc['profileid']]||doc['profileid']) }}</div><div style="min-width:0;"><div class="par-name">{{ mapprofile[doc['profileid']]||doc['profileid'] }}</div><div class="par-id">{{ doc['profileid'] }}</div></div></div><div class="sub-dlg-col journey"><span class="sub-journey-pill">{{ getSubJourneyName(doc) }}</span></div><div class="sub-dlg-col status"><span class="sub-status-pill" [ngClass]="getSubStatusClass(doc['journeystatus'])">{{ doc['journeystatus'] }}</span></div><div class="sub-dlg-col enddate"><span class="sub-end-badge">{{ getSubEndDate(doc) }}</span></div></div>
+      <div data-testid="jcd-div-178" class="sub-dlg-row" *ngFor="let doc of subDialogDocs | nameSearch:dlgQuery:dlgNameOfDoc" (click)="navigatetoprofile(doc['profileid'])"><div class="sub-dlg-col name"><div class="par-av dn" style="flex-shrink:0;">{{ getInitials(mapprofile[doc['profileid']]||doc['profileid']) }}</div><div style="min-width:0;"><div class="par-name">{{ mapprofile[doc['profileid']]||doc['profileid'] }}</div><div class="par-id">{{ doc['profileid'] }}</div></div></div><div class="sub-dlg-col journey"><span class="sub-journey-pill">{{ getSubJourneyName(doc) }}</span></div><div class="sub-dlg-col status"><span class="sub-status-pill" [ngClass]="getSubStatusClass(doc['journeystatus'])">{{ doc['journeystatus'] }}</span></div><div class="sub-dlg-col enddate"><span class="sub-end-badge">{{ getSubEndDate(doc) }}</span></div></div>
     </div>
   </div>
 </div>
@@ -826,7 +829,8 @@
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Export
         </button><button data-testid="jcd-btn-181" class="close-btn" (click)="closeJourneyStatusDialog()">✕</button></div></div>
-    <div class="dlg-body"><div data-testid="jcd-div-182" class="participant-row" *ngFor="let p of journeyStatusDialogProfiles" (click)="navigatetoprofile(p['profileid'])"><div class="par-av nc">{{ getInitials(mapprofile[p['profileid']]||p['profileid']) }}</div><div style="flex:1;min-width:0;"><div class="par-name">{{ mapprofile[p['profileid']]||p['profileid'] }}</div><div class="par-id">{{ p['customerstatus']||'No status' }}</div></div><div class="par-right"><span class="js-badge" [ngClass]="getStatusClass(p['customerstatus'])">{{ p['customerstatus']||'null' }}</span><span class="par-arrow">›</span></div></div></div>
+    <div class="jcd-dlg-search" (click)="$event.stopPropagation()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" data-testid="jcd-inp-dlg-search-status" [(ngModel)]="dlgQuery" placeholder="Search name" aria-label="Search name" autocomplete="off"></div>
+    <div class="dlg-body"><div data-testid="jcd-div-182" class="participant-row" *ngFor="let p of journeyStatusDialogProfiles | nameSearch:dlgQuery:dlgNameOfDoc" (click)="navigatetoprofile(p['profileid'])"><div class="par-av nc">{{ getInitials(mapprofile[p['profileid']]||p['profileid']) }}</div><div style="flex:1;min-width:0;"><div class="par-name">{{ mapprofile[p['profileid']]||p['profileid'] }}</div><div class="par-id">{{ p['customerstatus']||'No status' }}</div></div><div class="par-right"><span class="js-badge" [ngClass]="getStatusClass(p['customerstatus'])">{{ p['customerstatus']||'null' }}</span><span class="par-arrow">›</span></div></div></div>
   </div>
 </div>
 
@@ -835,7 +839,8 @@
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Export
         </button><button data-testid="jcd-btn-185" class="close-btn" (click)="closeEpDialog()">✕</button></div></div>
-    <div class="dlg-body"><div class="sec-lbl" style="margin-bottom:10px;">Profiles in this band</div><div *ngIf="epDialogProfiles.length===0" style="font-size:12px;color:var(--text3);padding:8px 0;">No profiles</div><div *ngFor="let p of epDialogProfiles"><div data-testid="jcd-div-186" class="participant-row" [class.ep-row-expanded]="expandedEpProfile===p.profileId" (click)="toggleEpProfileExpand(p.profileId)" [style.border-radius]="expandedEpProfile===p.profileId?'10px 10px 0 0':'10px'"><div style="flex:1;min-width:0;"><div class="par-name">{{ p.profileName }}</div><div class="par-id">{{ p.profileId }}</div></div><div class="par-right"><span class="ep-pct-pill" [ngClass]="'ep-b'+epDialogBandIdx">{{ p.pct }}%</span><span class="par-arrow" style="opacity:1;transition:transform .2s;" [style.transform]="expandedEpProfile===p.profileId?'rotate(90deg)':'rotate(0deg)'">›</span></div></div><div *ngIf="expandedEpProfile===p.profileId" style="border:1px solid var(--border);border-top:none;border-radius:0 0 10px 10px;margin-bottom:6px;background:var(--bg);padding:8px 12px;"><div *ngFor="let kd of getProfileAllKeyData(p.profileId)" style="display:flex;align-items:center;gap:10px;padding:6px 4px;border-bottom:1px solid var(--border);" class="ep-key-expand-row"><span style="font-size:12px;font-weight:600;color:var(--text2);flex:1;">{{ kd.key }}</span><span style="font-size:12px;color:var(--text3);">{{ kd.count }}</span><span class="ep-pct-pill" [ngClass]="'ep-b'+kd.bandIdx" style="min-width:44px;text-align:center;">{{ kd.pct }}%</span></div><div *ngIf="getProfileAllKeyData(p.profileId).length===0" style="font-size:12px;color:var(--text3);padding:6px 0;">No key data found</div></div></div></div>
+    <div class="jcd-dlg-search" (click)="$event.stopPropagation()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" data-testid="jcd-inp-dlg-search-ep" [(ngModel)]="dlgQuery" placeholder="Search name" aria-label="Search name" autocomplete="off"></div>
+    <div class="dlg-body"><div class="sec-lbl" style="margin-bottom:10px;">Profiles in this band</div><div *ngIf="epDialogProfiles.length===0" style="font-size:12px;color:var(--text3);padding:8px 0;">No profiles</div><div *ngFor="let p of epDialogProfiles | nameSearch:dlgQuery:'profileName'"><div data-testid="jcd-div-186" class="participant-row" [class.ep-row-expanded]="expandedEpProfile===p.profileId" (click)="toggleEpProfileExpand(p.profileId)" [style.border-radius]="expandedEpProfile===p.profileId?'10px 10px 0 0':'10px'"><div style="flex:1;min-width:0;"><div class="par-name">{{ p.profileName }}</div><div class="par-id">{{ p.profileId }}</div></div><div class="par-right"><span class="ep-pct-pill" [ngClass]="'ep-b'+epDialogBandIdx">{{ p.pct }}%</span><span class="par-arrow" style="opacity:1;transition:transform .2s;" [style.transform]="expandedEpProfile===p.profileId?'rotate(90deg)':'rotate(0deg)'">›</span></div></div><div *ngIf="expandedEpProfile===p.profileId" style="border:1px solid var(--border);border-top:none;border-radius:0 0 10px 10px;margin-bottom:6px;background:var(--bg);padding:8px 12px;"><div *ngFor="let kd of getProfileAllKeyData(p.profileId)" style="display:flex;align-items:center;gap:10px;padding:6px 4px;border-bottom:1px solid var(--border);" class="ep-key-expand-row"><span style="font-size:12px;font-weight:600;color:var(--text2);flex:1;">{{ kd.key }}</span><span style="font-size:12px;color:var(--text3);">{{ kd.count }}</span><span class="ep-pct-pill" [ngClass]="'ep-b'+kd.bandIdx" style="min-width:44px;text-align:center;">{{ kd.pct }}%</span></div><div *ngIf="getProfileAllKeyData(p.profileId).length===0" style="font-size:12px;color:var(--text3);padding:6px 0;">No key data found</div></div></div></div>
   </div>
 </div>
 
@@ -878,6 +883,7 @@
       </div>
     </div>
 
+    <div class="jcd-dlg-search" (click)="$event.stopPropagation()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" data-testid="jcd-inp-dlg-search-askah" [(ngModel)]="dlgQuery" placeholder="Search name" aria-label="Search name" autocomplete="off"></div>
     <!-- Profile list -->
     <div class="dlg-body">
       <div *ngIf="getFilteredAskAHProfiles().length === 0" class="jcd-cura-empty">
@@ -911,7 +917,8 @@
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Export
         </button><button data-testid="jcd-btn-200" class="close-btn" (click)="closeTagProfilesDialog()">✕</button></div></div>
-    <div class="dlg-body"><div *ngIf="selectedTagProfiles.length===0" style="font-size:12px;color:var(--text3);padding:8px 0;">No profiles tagged</div><div class="participant-row" *ngFor="let p of selectedTagProfiles"><div class="par-av nc">{{ p.name.slice(0,2).toUpperCase() }}</div><div><div class="par-name">{{ p.name }}</div></div><div class="par-arrow">›</div></div></div>
+    <div class="jcd-dlg-search" (click)="$event.stopPropagation()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" data-testid="jcd-inp-dlg-search-tag" [(ngModel)]="dlgQuery" placeholder="Search name" aria-label="Search name" autocomplete="off"></div>
+    <div class="dlg-body"><div *ngIf="selectedTagProfiles.length===0" style="font-size:12px;color:var(--text3);padding:8px 0;">No profiles tagged</div><div class="participant-row" *ngFor="let p of selectedTagProfiles | nameSearch:dlgQuery:'name'"><div class="par-av nc">{{ p.name.slice(0,2).toUpperCase() }}</div><div><div class="par-name">{{ p.name }}</div></div><div class="par-arrow">›</div></div></div>
   </div>
 </div>
 
@@ -943,9 +950,13 @@ END ALL MONTHS DIALOG -->
           <div class="jcd-dlg-sub">Select a date to view scheduled calls</div>
         </div>
       </div>
+      <div style="display:flex;align-items:center;gap:6px"><button data-testid="jcd-btn-cal-export" class="jcd-dlg-export-btn" [disabled]="!selectedDateSchedules.length" (click)="$event.stopPropagation();exportCalendarDay()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export
+        </button>
       <button data-testid="jcd-btn-205" class="jcd-dlg-close" (click)="closeCalendarModal()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
+      </button></div>
     </div>
 
     <!-- Body -->
@@ -975,8 +986,9 @@ END ALL MONTHS DIALOG -->
       <!-- Right: schedule list -->
       <div class="jcd-cal-right">
         <div class="jcd-cal-date-label">{{ selectedCalendarDate | date:'EEEE, MMMM d' }}</div>
+        <div class="jcd-dlg-search" (click)="$event.stopPropagation()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" data-testid="jcd-inp-dlg-search-cal" [(ngModel)]="dlgQuery" placeholder="Search name" aria-label="Search name" autocomplete="off"></div>
         <div class="jcd-sched-list">
-          <div *ngFor="let schedule of selectedDateSchedules"
+          <div *ngFor="let schedule of selectedDateSchedules | nameSearch:dlgQuery:dlgNameOfSchedule"
             class="jcd-sched-item"
             [class.jcd-sched-active]="!schedule.cancelled && !schedule.attended"
             [class.jcd-sched-done]="schedule.attended"
@@ -1028,9 +1040,13 @@ END ALL MONTHS DIALOG -->
           <div class="jcd-dlg-sub">Continuity · Upgrade · Referral · Addon</div>
         </div>
       </div>
+      <div style="display:flex;align-items:center;gap:6px"><button data-testid="jcd-btn-cura-export" class="jcd-dlg-export-btn" (click)="$event.stopPropagation();exportCura()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export
+        </button>
       <button data-testid="jcd-btn-208" class="jcd-dlg-close" (click)="closeCURAModal()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
+      </button></div>
     </div>
 
     <!-- Tabs -->
@@ -1049,29 +1065,30 @@ END ALL MONTHS DIALOG -->
       </button>
     </div>
 
+    <div class="jcd-dlg-search" (click)="$event.stopPropagation()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" data-testid="jcd-inp-dlg-search-cura" [(ngModel)]="dlgQuery" placeholder="Search name" aria-label="Search name" autocomplete="off"></div>
     <!-- Tab content -->
     <div class="jcd-cura-content">
       <div *ngIf="curaActiveTab===0">
         <ng-container *ngIf="originalData['continuitySales']?.data?.length > 0; else curaEmpty0">
-          <div class="jcd-cura-table-wrap"><table class="jcd-cura-table"><thead><tr><th>S.No</th><th>Name</th></tr></thead><tbody><tr *ngFor="let row of originalData['continuitySales'].data; let i = index"><td>{{ i+1 }}</td><td>{{ row.name }}</td></tr></tbody></table></div>
+          <div class="jcd-cura-table-wrap"><table class="jcd-cura-table"><thead><tr><th>S.No</th><th>Name</th></tr></thead><tbody><tr *ngFor="let row of originalData['continuitySales'].data | nameSearch:dlgQuery:'name'; let i = index"><td>{{ i+1 }}</td><td>{{ row.name }}</td></tr></tbody></table></div>
         </ng-container>
         <ng-template #curaEmpty0><div class="jcd-cura-empty"><p>No data available</p></div></ng-template>
       </div>
       <div *ngIf="curaActiveTab===1">
         <ng-container *ngIf="originalData['upgradeSales']?.data?.length > 0; else curaEmpty1">
-          <div class="jcd-cura-table-wrap"><table class="jcd-cura-table"><thead><tr><th>S.No</th><th>Name</th></tr></thead><tbody><tr *ngFor="let row of originalData['upgradeSales'].data; let i = index"><td>{{ i+1 }}</td><td>{{ row.name }}</td></tr></tbody></table></div>
+          <div class="jcd-cura-table-wrap"><table class="jcd-cura-table"><thead><tr><th>S.No</th><th>Name</th></tr></thead><tbody><tr *ngFor="let row of originalData['upgradeSales'].data | nameSearch:dlgQuery:'name'; let i = index"><td>{{ i+1 }}</td><td>{{ row.name }}</td></tr></tbody></table></div>
         </ng-container>
         <ng-template #curaEmpty1><div class="jcd-cura-empty"><p>No data available</p></div></ng-template>
       </div>
       <div *ngIf="curaActiveTab===2">
         <ng-container *ngIf="originalData['referralSales']?.data?.length > 0; else curaEmpty2">
-          <div class="jcd-cura-table-wrap"><table class="jcd-cura-table"><thead><tr><th>S.No</th><th>Name</th></tr></thead><tbody><tr *ngFor="let row of originalData['referralSales'].data; let i = index"><td>{{ i+1 }}</td><td>{{ row.name }}</td></tr></tbody></table></div>
+          <div class="jcd-cura-table-wrap"><table class="jcd-cura-table"><thead><tr><th>S.No</th><th>Name</th></tr></thead><tbody><tr *ngFor="let row of originalData['referralSales'].data | nameSearch:dlgQuery:'name'; let i = index"><td>{{ i+1 }}</td><td>{{ row.name }}</td></tr></tbody></table></div>
         </ng-container>
         <ng-template #curaEmpty2><div class="jcd-cura-empty"><p>No data available</p></div></ng-template>
       </div>
       <div *ngIf="curaActiveTab===3">
         <ng-container *ngIf="originalData['addonSales']?.data?.length > 0; else curaEmpty3">
-          <div class="jcd-cura-table-wrap"><table class="jcd-cura-table"><thead><tr><th>S.No</th><th>Name</th></tr></thead><tbody><tr *ngFor="let row of originalData['addonSales'].data; let i = index"><td>{{ i+1 }}</td><td>{{ row.name }}</td></tr></tbody></table></div>
+          <div class="jcd-cura-table-wrap"><table class="jcd-cura-table"><thead><tr><th>S.No</th><th>Name</th></tr></thead><tbody><tr *ngFor="let row of originalData['addonSales'].data | nameSearch:dlgQuery:'name'; let i = index"><td>{{ i+1 }}</td><td>{{ row.name }}</td></tr></tbody></table></div>
         </ng-container>
         <ng-template #curaEmpty3><div class="jcd-cura-empty"><p>No data available</p></div></ng-template>
       </div>
@@ -1096,10 +1113,15 @@ END ALL MONTHS DIALOG -->
           <div class="jcd-dlg-sub">{{ dialogConfig.table.data.length }} records</div>
         </div>
       </div>
+      <div style="display:flex;align-items:center;gap:6px"><button data-testid="jcd-btn-modal-export" class="jcd-dlg-export-btn" [disabled]="!dialogConfig.table.data.length" (click)="$event.stopPropagation();exportModalTable()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export
+        </button>
       <button data-testid="jcd-btn-215" class="jcd-dlg-close" (click)="closeModalOverlay()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
+      </button></div>
     </div>
+    <div class="jcd-dlg-search" (click)="$event.stopPropagation()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" data-testid="jcd-inp-dlg-search-modal" [(ngModel)]="dlgQuery" placeholder="Search name" aria-label="Search name" autocomplete="off"></div>
     <!-- Table -->
     <div class="jcd-modal-body">
       <div class="jcd-cura-table-wrap">
@@ -1111,7 +1133,7 @@ END ALL MONTHS DIALOG -->
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let row of dialogConfig.table.data; let i = index">
+            <tr *ngFor="let row of dialogConfig.table.data | nameSearch:dlgQuery:dlgRowText; let i = index">
               <td style="text-align:center;color:var(--text-muted);font-size:11px">{{ i+1 }}</td>
               <td *ngFor="let col of dialogConfig.table.columns">{{ formatCellValue(row, col) }}</td>
             </tr>
