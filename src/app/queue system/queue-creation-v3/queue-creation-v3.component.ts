@@ -1,7 +1,7 @@
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { ENTER, COMMA } from '@angular/cdk/keycodes';
 import { Component, ElementRef, Inject, OnInit, TemplateRef, ViewChild } from '@angular/core';
-import { collection, deleteDoc, doc, Firestore, getDoc, getDocs, or, orderBy, query, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
+import { arrayRemove, arrayUnion,collection, deleteDoc, doc, Firestore, getDoc, getDocs, or, orderBy, query, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
 import { FormGroup, Validators, FormBuilder, FormControl, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { MatChipInputEvent, MatChipsModule } from '@angular/material/chips';
 import { MatDialogRef, MAT_DIALOG_DATA, MatDialog } from '@angular/material/dialog';
@@ -165,7 +165,8 @@ export class QueueCreationV3Component {
       description: [null, { validators: [Validators.required], updateOn: "change" }],
       introdescription: [null, { validators: [Validators.required], updateOn: "change" }],
       products: this.formbuilder.array([]),
-      eventid : [null, { validators: [Validators.required], updateOn: "change" }]
+      eventid : [null, { validators: [Validators.required], updateOn: "change" }],
+      liveeventid : [null,]
     });
 
     this.authguard.username().then((e) => this.loggedInProfile = e)
@@ -234,7 +235,8 @@ export class QueueCreationV3Component {
         totalcapacity: data.totalcapacity ?? null,
         description: data.description ?? null,
         introdescription : data.introdescription ?? null,
-        eventid : [null , undefined, ''].includes(data.eventid) || Array.isArray(data.eventid) ? data.eventid : [data.eventid ]
+        eventid : [null , undefined, ''].includes(data.eventid) || Array.isArray(data.eventid) ? data.eventid : [data.eventid ],
+        liveeventid : data.liveeventid ?? null
       });
 
       // Get EVent Arena
@@ -998,6 +1000,7 @@ addNextStage(mainIndex: number) {
           packageeligibility: value.packageeligibility,
           queuewelcomemessage,
           eventid : value.eventid ?? [],
+          liveeventid : value.liveeventid ?? null,
           // isahrequired : value.isahrequired,
           // ahperson : value.ahperson,
           // ischangeworkreq: value.ischangeworkreq,
@@ -1145,7 +1148,21 @@ addNextStage(mainIndex: number) {
 
         let queueRef = doc(this.firestore,"queue generation", metadata["docid"])
         batch.set(queueRef, metadata, { merge: true })
-
+        // Map Live Event
+        var initialLiveEventId = this.data?.liveeventid ?? null
+        var selectedLiveEventId = metadata["liveeventid"]
+        if (selectedLiveEventId != initialLiveEventId) {
+          if (![null, undefined].includes(initialLiveEventId)) {
+            batch.update(doc(this.firestore, 'event collection', initialLiveEventId), {
+              mappedqueue: arrayRemove(queueRef)
+            })
+          }
+          if (![null, undefined].includes(selectedLiveEventId)) {
+            batch.update(doc(this.firestore, 'event collection', selectedLiveEventId), {
+              mappedqueue: arrayUnion(queueRef)
+            })
+          }
+        }
         for (let i = 0; i < value.products.length; i++){
           const productid = value.products[i]['productref'].id;
           if(value.products[i]['deliveryref'] === null){
