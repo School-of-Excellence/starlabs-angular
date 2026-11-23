@@ -263,6 +263,17 @@
                   </mat-select>
                 </mat-form-field>
               </div>
+              <div class="subform text-center">
+                <h4 class="text-secondary text-center mb-4" style="font-size: 16px;">Map Live Event to Queue</h4>
+                <mat-form-field appearance="outline" style="width: 350px;padding: 20px;">
+                  <mat-select data-testid="qcv3-sel-20b" placeholder="Select Live Event" formControlName="liveeventid">
+                    <mat-option [value]="null">None</mat-option>
+                    <mat-option *ngFor="let event of eventList" [value]="event.docid">
+                      {{event.name}}
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </div>
               <div class="subform text-center"  formArrayName="products">
                 <h4 class="text-secondary text-center mb-4" style="font-size: 16px;">Map Event To Products</h4>
                 <div class="text-left" *ngFor="let control of productsArray.controls;let i = index" [formGroupName]="i">

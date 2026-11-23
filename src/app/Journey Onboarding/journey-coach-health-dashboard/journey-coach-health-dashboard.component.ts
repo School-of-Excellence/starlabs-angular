@@ -2599,7 +2599,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.dialog.open(ParticipantSlideoverComponent, {
       data,
       width: 'min(520px, 100vw)',
-      height: '100vh',
+      height: '100dvh',
       position: { right: '0', top: '0' },
       panelClass: this.isDark ? ['jchd-slideover-panel', 'jchd-overlay-dark'] : 'jchd-slideover-panel',
       // a11y: label the dialog by the participant-name heading and move focus into the panel

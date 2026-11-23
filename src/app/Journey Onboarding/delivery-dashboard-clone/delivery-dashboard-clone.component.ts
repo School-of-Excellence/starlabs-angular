@@ -313,6 +313,7 @@ export class DeliveryDashboardCloneComponent {
         { key: 'implementationSpecialist', label: 'IMPLEMENTATION SPECIALIST', perParticipant: true },
         { key: 'initiatedLabel', label: 'INITIATION DATE', perParticipant: true },
         { key: 'appointmentDate', label: 'APPOINTMENT DATE & TIME', perParticipant: false },
+        { key: 'ongoingDays', label: 'ONGOING DAYS', perParticipant: false },
         { key: 'stage', label: 'STAGE', perParticipant: false },
         { key: 'status', label: 'STATUS', perParticipant: false },
     ];
@@ -1441,6 +1442,15 @@ export class DeliveryDashboardCloneComponent {
                     return latest;
                 };
 
+                // An open cycle (no status / initiated / ongoing) beats a completed one (operator 2026-11-23).
+                // A new cycle that hasn't started has no initiated / ongoing / completed date, so on dates alone
+                // the old completed cycle always won and the participant never reached Ready to Start
+                // (WiSH: Praveena Dorathi, Sherry Sethi). Earlier completed cycles still count in Delivered.
+                const isOpen = (r: any) => (r?.status || '').toString().toLowerCase().trim() !== 'completed';
+                if (isOpen(item) !== isOpen(existing)) {
+                    if (isOpen(item)) latestItemMap.set(key, item);
+                    continue;
+                }
                 if (getLatestProduct(item?.statusdate) > getLatestProduct(existing?.statusdate)) {
                     latestItemMap.set(key, item);
                 }
@@ -7447,7 +7457,7 @@ export class DeliveryDashboardCloneComponent {
         needsAttention: "Needs attention — Stuck (ongoing, more than 7 days since the last booked appointment, nothing booked ahead) and Not consuming (initiated 7+ days, not ongoing). Separate lists, not a slice of In delivery.",
         stuck: "Stuck — in delivery but nothing is happening.\n• Status \"ongoing\" and product mode Priority Mode.\n• More than 7 days since the last BOOKED appointment, attended or not (cancelled ones ignored). No booked appointment yet: since delivery went ongoing.\n• No appointment booked ahead.\n• Date filter: NOT used — counted from today. Longest stuck first.",
         idle: 'Initiated – Not Consuming — status "initiated" for 7 days or more without moving to ongoing.',
-        yetToStart: "Yet to Start — ready to be initiated now.\n• Latest record has no status yet.\n• Participant eligible: mode is not Installation Event / Event / Integration, and the minimum is paid (or nothing is owed).\n• Also: customer status Active, finance Regular or Fully paid, and no other active product.\n• Date filter: NOT used — always today's state.\n• Same people as Ready to Start, counted per product.\n• \"Latest record\" = the most recent cycle of that product for the participant, by its initiated / ongoing / completed date.",
+        yetToStart: "Yet to Start — ready to be initiated now.\n• Latest record has no status yet.\n• Participant eligible: mode is not Installation Event / Event / Integration, and the minimum is paid (or nothing is owed).\n• Also: customer status Active, finance Regular or Fully paid, and no other active product.\n• Date filter: NOT used — always today's state.\n• Same people as Ready to Start, counted per product.\n• \"Latest record\" = the participant's current cycle of that product: an open cycle (no status, initiated or ongoing) wins over a completed one; otherwise the most recent by initiated / ongoing / completed date.",
         init: "Init — initiated but delivery not started.\n• Latest record status is \"initiated\".\n• Participant eligible (mode allowed, minimum paid).\n• Date filter: USED — the initiated date must fall in the selected period. \"All time\" counts every initiated product.\n• A record with no initiated date is always counted, whatever the period.",
         started: "Started — delivery began in the selected period.\n• Latest record status is \"ongoing\".\n• Participant eligible (mode allowed, minimum paid).\n• Date filter: USED — the date it went ongoing must fall in the selected period.\n• A record with no ongoing date is always counted, whatever the period.\n• A part of Ongoing.",
         ongoing: "Ongoing — everything currently in delivery.\n• Latest record status is \"ongoing\", eligible or not.\n• Date filter: NOT used — counted whenever delivery started.",
@@ -7456,7 +7466,7 @@ export class DeliveryDashboardCloneComponent {
         addons: "Add-on — Eligible products (no status yet) taken on a package named \"Addons\".\n• Eligible = Purchased + Bonus + Add-on.\n• Date filter: NOT used.",
         purchased: "Purchased — Eligible products (no status yet) bought on a regular package (not \"Bonus\" and not \"Addons\").\n• Eligible = Purchased + Bonus + Add-on.\n• Date filter: NOT used.",
         notEligible: "Not Eligible — products in Overall (no status yet) that cannot be started:\n• participant mode is Installation Event, Event or Integration, OR\n• less than the product minimum is paid while money is still owed.\n• Date filter: NOT used.",
-        total: "Overall — every product not initiated yet, eligible or not.\n• Latest record has NO status (initiated, ongoing and completed are all left out).\n• Overall = Eligible + Not Eligible.\n• Never loaded: cancelled or shifted records, and customers who are not Active / Non active (e.g. discontinued).\n• Date filter: NOT used.\n• \"Latest record\" = the most recent cycle of that product for the participant, by its initiated / ongoing / completed date.",
+        total: "Overall — every product not initiated yet, eligible or not.\n• Latest record has NO status (initiated, ongoing and completed are all left out).\n• Overall = Eligible + Not Eligible.\n• Never loaded: cancelled or shifted records, and customers who are not Active / Non active (e.g. discontinued).\n• Date filter: NOT used.\n• \"Latest record\" = the participant's current cycle of that product: an open cycle (no status, initiated or ongoing) wins over a completed one; otherwise the most recent by initiated / ongoing / completed date.",
         eligible: "Eligible — products not initiated yet that can be started.\n• Latest record has NO status (initiated products are left out).\n• Participant mode is not Installation Event / Event / Integration.\n• Minimum payment is paid, or nothing is owed.\n• Date filter: NOT used — always today's state.\n• Eligible = Purchased + Bonus + Add-on. One per participant per product.",
     };
 
@@ -8003,18 +8013,24 @@ export class DeliveryDashboardCloneComponent {
             implementationSpecialist: this.getSpecialistNames(appointments.filter(a => a['cancelled'] !== true), 'implementation'),
             initiatedDate: this.getDateFromFieldPublic(item.statusdate.initiated),
             initiatedLabel: this.formatDate(item.statusdate.initiated),
-            appointments: appointments.map(a => this.buildWeeklyAppointment(a)),
+            appointments: appointments.map(a => this.buildWeeklyAppointment(a, this.getDateFromFieldPublic(item.statusdate.initiated))),
         };
     }
 
-    private buildWeeklyAppointment(appointment: any) {
+    private buildWeeklyAppointment(appointment: any, initiated: Date | null) {
         let statusKey = 'booked';
         if (appointment['cancelled'] === true) statusKey = 'cancelled';
         else if (appointment['attended']) statusKey = 'completed';
 
+        // Ongoing Days (operator 2026-11-23): calendar days from the Initiation Date to the appointment date.
+        const start: Date = appointment['starttime'].toDate();
+        const dayOnly = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+        const ongoingDays = initiated ? Math.round((dayOnly(start) - dayOnly(initiated)) / 86400000) : '-';
+
         return {
-            start: appointment['starttime'].toDate(),
+            start,
             appointmentDate: this.formatDateTime(appointment['starttime']),
+            ongoingDays,
             stage: this.resolveAppointmentType(appointment) || '-',
             statusKey,
             status: this.weeklyStatusLabels[statusKey],
@@ -8059,6 +8075,7 @@ export class DeliveryDashboardCloneComponent {
             'Implementation Specialist': row.implementationSpecialist,
             'Initiation Date': row.initiatedLabel,
             'Appointment Date & Time': row.appointmentDate,
+            'Ongoing Days': row.ongoingDays,
             'Stage': row.stage,
             'Status': row.status,
         }));
@@ -8068,7 +8085,7 @@ export class DeliveryDashboardCloneComponent {
     // helper functions
     private toTableRows(participant: any, appointments: any[], sno: number): any[] {
         if (appointments.length === 0) {
-            return [{ ...participant, sno, isFirst: true, appointmentDate: '-', stage: '-', status: '-' }];
+            return [{ ...participant, sno, isFirst: true, appointmentDate: '-', ongoingDays: '-', stage: '-', status: '-' }];
         }
         return appointments.map((appointment, index) => ({
             ...participant, ...appointment, sno, isFirst: index === 0
