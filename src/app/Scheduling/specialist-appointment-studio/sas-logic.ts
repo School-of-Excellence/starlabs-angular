@@ -115,8 +115,8 @@ export function availStatus(windows: AvailWindow[], appts: Appt[], now: Date): A
 }
 
 /* ---------- Appointments ---------- */
-/* MarkAppointmentStatusComponent stores a no-show as cancelled with this reason. The screen never shows
-   "no-show": it is a cancellation like any other, and this reason text is hidden. */
+/* MarkAppointmentStatusComponent stores a no-show as cancelled with this reason. A no-show is a cancellation
+   like any other; the calendar card says "Cancelled · no-show" (Muskan's review, 2026-11-23). */
 export const NO_SHOW_REASON = "Client didn't show up";
 
 export interface Appt {
@@ -133,6 +133,33 @@ export function apptStatus(a: Appt, now: Date): ApptStatus {
   if (a.end <= now) return 'Pending';
   return 'Booked';
 }
+
+/* The calendar card's status line for a cancelled session: a no-show says so, every other one is just
+   "Cancelled". Who cancelled is not shown (operator, 2026-11-23). */
+export const isNoShow = (a: Appt) => a.cancelled && a.cancelledReason?.trim().toLowerCase() === NO_SHOW_REASON.toLowerCase();
+export const cancelLabel = (a: Appt): string => (isNoShow(a) ? 'Cancelled · no-show' : 'Cancelled');
+
+/* ---------- Calendar status filter (Muskan's review, 2026-11-23) ----------
+   The legend sits on top as one button per status, with the period's count; selecting one shows only that. */
+export type CalStatus = 'open' | 'booked' | 'live' | 'done' | 'pending' | 'cancel' | 'unused';
+export const CAL_STATUSES: { key: CalStatus; label: string; color: string }[] = [
+  { key: 'open', label: 'Open for booking', color: 'var(--bt-success)' },
+  { key: 'booked', label: 'Booked', color: 'var(--bt-primary)' },
+  { key: 'live', label: 'In session', color: 'var(--bt-primary-deep)' },
+  { key: 'done', label: 'Completed', color: 'var(--bt-success-deep)' },
+  { key: 'pending', label: 'Completion pending', color: 'var(--bt-warning)' },
+  { key: 'cancel', label: 'Cancelled', color: 'var(--bt-danger)' },
+  { key: 'unused', label: 'Unused', color: 'var(--bt-ink-25)' },
+];
+const APPT_CAL: Record<ApptStatus, CalStatus> = {
+  Booked: 'booked', 'In session': 'live', Completed: 'done', Pending: 'pending', Cancelled: 'cancel',
+};
+export const sessionCal = (a: Appt, now: Date): CalStatus => APPT_CAL[apptStatus(a, now)];
+/* A window shown on its own reads as open while it has a bookable start time, otherwise as unused. */
+export const windowCal = (state: WindowState): CalStatus => (state === 'open' ? 'open' : 'unused');
+/* Each appointment shows once: a window gets its own card only while it still has an open start time or
+   never held a session (cancelled ones included). Otherwise its session cards already show that time. */
+export const windowShown = (state: WindowState, sessions: number): boolean => state === 'open' || sessions === 0;
 
 /* ---------- Hours summary ---------- */
 export interface Hours {
@@ -155,6 +182,37 @@ export function hoursSummary(windows: AvailWindow[], appts: Appt[]): Hours {
     availMin, bookedMin, deliveredMin, cancelledMin, completed,
     unutilisedMin: Math.max(0, availMin - deliveredMin),
     pct: availMin ? (deliveredMin / availMin) * 100 : 0,
+  };
+}
+
+/* Home / Overview summary cards (operator, 2026-11-24): four parts that add up to the total, so
+   Total available = Booked + Not booked + Delivered + Cancelled.
+   Total = availability window hours · Delivered = sessions marked completed · Cancelled = cancelled sessions
+   (no-shows included) · Booked = live sessions not completed yet (upcoming, in session, or ended and waiting
+   for a status — the "needs update" part) · Not booked = what is left. Utilisation = Delivered ÷ Total.
+   perHost: a session takes time from each of its specialists' windows, so in the all-specialists view it counts
+   once per host. A cancelled slot that is booked again counts in both, so Not booked absorbs it (never below 0). */
+export interface SummaryHours {
+  totalMin: number; bookedMin: number; booked: number; pendingMin: number; pending: number;
+  notBookedMin: number; deliveredMin: number; completed: number; cancelledMin: number; cancelled: number; pct: number;
+}
+export function summaryHours(windows: AvailWindow[], appts: Appt[], now: Date, perHost = false): SummaryHours {
+  const totalMin = windows.reduce((a, w) => a + windowMinutes(w), 0);
+  const s = { bookedMin: 0, booked: 0, pendingMin: 0, pending: 0, deliveredMin: 0, completed: 0, cancelledMin: 0, cancelled: 0 };
+  for (const x of appts) {
+    const m = minutesBetween(x.start, x.end) * (perHost ? Math.max(1, x.hostIds.length) : 1);
+    const st = apptStatus(x, now);
+    if (st === 'Completed') { s.deliveredMin += m; s.completed++; }
+    else if (st === 'Cancelled') { s.cancelledMin += m; s.cancelled++; }
+    else {
+      s.bookedMin += m; s.booked++;
+      if (st === 'Pending') { s.pendingMin += m; s.pending++; }
+    }
+  }
+  return {
+    totalMin, ...s,
+    notBookedMin: Math.max(0, totalMin - s.bookedMin - s.deliveredMin - s.cancelledMin),
+    pct: totalMin ? (s.deliveredMin / totalMin) * 100 : 0,
   };
 }
 
