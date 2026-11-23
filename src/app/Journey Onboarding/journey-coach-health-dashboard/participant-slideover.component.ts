@@ -151,6 +151,12 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
             <span class="so-num" *ngIf="!row.email && !row.number">—</span>
           </div>
         </div>
+        <!-- Close sits beside the name; the labelled actions get their own row below. Three pills +
+             close never fit next to the name in a ≤520px panel, and the overflow made the autofocused
+             close button scroll the whole panel sideways (2026-11-23). -->
+        <button class="so-close" type="button" matTooltip="Close" aria-label="Close panel" (click)="close()">
+          <mat-icon>close</mat-icon>
+        </button>
         <div class="so-head-actions">
           <!-- Always rendered (operator directive, 2026-08-26): the *ngIf used to hide this whenever
                the participant had no Needs-Attention issue, so coaches saw no control at all and
@@ -173,9 +179,6 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
           <button class="so-flag-btn" type="button" data-testid="jcso-export" aria-label="Export participant"
                   matTooltip="Download this participant's profile, logs, follow-ups and every section as Excel" (click)="exportParticipant()">
             <mat-icon>download</mat-icon><span>Export</span>
-          </button>
-          <button class="so-close" type="button" matTooltip="Close" aria-label="Close panel" (click)="close()">
-            <mat-icon>close</mat-icon>
           </button>
         </div>
       </header>
@@ -697,6 +700,8 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
     .so-root {
       display: flex; flex-direction: column; height: 100%; background: var(--so-bg);
       color: var(--so-ink); font-size: 13px;
+      /* size rules below follow the PANEL width, not the viewport */
+      container-type: inline-size; container-name: so; overflow-x: hidden;
     }
     .num, .so-num, .so-tl-date, .so-count, .so-sub, .so-status {
       font-family: var(--so-mono); font-variant-numeric: tabular-nums;
@@ -704,9 +709,13 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
     }
 
     .so-header {
-      display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+      display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start;
+      column-gap: 12px; row-gap: 12px;
       padding: 18px 20px 12px; border-bottom: 1px solid var(--so-border);
     }
+    .so-id { min-width: 0; }
+    .so-meta .so-copy { min-width: 0; overflow-wrap: anywhere; }
+    .so-copy-name { overflow-wrap: anywhere; }
     .so-name { margin: 0; font-size: 22px; font-weight: 700; line-height: 1.15; letter-spacing: -0.4px; }
     .so-meta { margin-top: 3px; color: var(--so-ink2); font-size: 12.5px; display: flex; align-items: baseline; flex-wrap: wrap; }
     .so-dot { margin: 0 6px; color: var(--so-muted); }
@@ -728,7 +737,9 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
     .so-close:active { transform: scale(0.94); }
     .so-close mat-icon { font-size: 18px; width: 18px; height: 18px; }
 
-    .so-head-actions { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; }
+    .so-head-actions {
+      grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0;
+    }
     .so-flag {
       width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
       border: none; border-radius: 999px; background: rgba(118,118,128,.12); color: var(--so-muted);
@@ -812,8 +823,8 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
 
     .so-kv { margin: 0; display: grid; grid-template-columns: 1fr; gap: 7px; }
     .so-kv > div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
-    .so-kv dt { margin: 0; color: var(--so-ink2); font-size: 12px; flex: 0 0 auto; }
-    .so-kv dd { margin: 0; text-align: right; font-weight: 600; color: var(--so-ink); font-size: 12.5px; }
+    .so-kv dt { margin: 0; color: var(--so-ink2); font-size: 12px; flex: 0 1 auto; min-width: 0; }
+    .so-kv dd { margin: 0; text-align: right; font-weight: 600; color: var(--so-ink); font-size: 12.5px; min-width: 0; overflow-wrap: anywhere; }
     .so-kv dd.cap { text-transform: capitalize; }
     .so-sub { color: var(--so-muted); font-weight: 500; }
 
@@ -841,8 +852,9 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
 
     .so-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
     .so-list-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
-    .so-list-main { font-size: 12.5px; color: var(--so-ink); }
+    .so-list-main { font-size: 12.5px; color: var(--so-ink); min-width: 0; overflow-wrap: anywhere; }
     .so-list-side { display: flex; align-items: baseline; gap: 8px; flex: 0 0 auto; }
+
     .so-status { font-size: 11.5px; font-weight: 600; color: #c25e00; text-transform: capitalize; }
 
     /* status pills for events / appointments (compact, list-side) */
@@ -1018,6 +1030,21 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
     .so-btn-primary { background: var(--so-accent); color: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.10); }
     .so-btn-primary:hover { background: #0a6ae0; }
     .so-btn-primary:disabled { opacity: .4; cursor: default; box-shadow: none; }
+
+    /* narrow panel (phones): tighter gutters, list rows stack, header pills go icon-only */
+    @container so (max-width: 420px) {
+      .so-header { padding: 14px 16px 10px; }
+      .so-pills, .so-sec, .so-footer { padding-left: 16px; padding-right: 16px; }
+      .so-reason { margin-left: 16px; margin-right: 16px; }
+      .so-list-row { flex-direction: column; align-items: flex-start; gap: 4px; }
+      .so-list-side { flex-wrap: wrap; }
+      .so-coach-row { flex-wrap: wrap; }
+      .so-coach-select { max-width: 100%; }
+    }
+    @container so (max-width: 340px) {
+      .so-head-actions .so-flag-btn { padding: 0 10px; }
+      .so-head-actions .so-flag-btn span { display: none; }
+    }
   `],
 })
 export class ParticipantSlideoverComponent implements OnInit {
