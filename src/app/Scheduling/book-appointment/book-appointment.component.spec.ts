@@ -35,6 +35,32 @@ describe('BookAppointmentComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  /* The studio's lookup → Book passes a participant (operator, 2026-11-24): it is picked like a dropdown pick,
+     only for an A&H role and only once the roles are in. */
+  it('picks the participantId input for an A&H role, after the roles load', () => {
+    const select = spyOn(component, 'onProfileSelect').and.resolveTo();
+    const c: any = component;
+    component.participantId = 'p9';
+    component.ngOnChanges({ participantId: { currentValue: 'p9' } as any });
+    expect(select).not.toHaveBeenCalled();                // roles not loaded yet
+    c.rolesLoaded = true; c.superRole = true;
+    c.openParticipant();                                  // what the roles callback does
+    expect(component.selectedUser).toBe('p9');
+    expect(select).toHaveBeenCalledTimes(1);
+    component.ngOnChanges({ participantId: { currentValue: 'p9' } as any });
+    expect(select).toHaveBeenCalledTimes(1);              // already picked: no reload
+  });
+
+  it('never switches a non-A&H user away from their own profile', () => {
+    const select = spyOn(component, 'onProfileSelect').and.resolveTo();
+    const c: any = component;
+    c.rolesLoaded = true; c.superRole = false; component.selectedUser = 'me';
+    component.participantId = 'p9';
+    component.ngOnChanges({ participantId: { currentValue: 'p9' } as any });
+    expect(component.selectedUser).toBe('me');
+    expect(select).not.toHaveBeenCalled();
+  });
+
   /* The studio's Book Session filter; without it (/bookappointment) nothing is hidden. */
   it('narrows products and appointment types only when a filter is given', () => {
     const products = [

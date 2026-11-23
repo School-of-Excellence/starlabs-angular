@@ -23,6 +23,7 @@ import { MatInputModule } from '@angular/material/input';
 import { limit } from '@angular/fire/firestore';  // add 'limit' to the existing firestore import
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTableModule } from '@angular/material/table';
+import { MatExpansionModule } from '@angular/material/expansion';
 // Pure business rules — thresholds, bands, date maths, funnel arithmetic and label rules — live in a
 // dependency-free sibling engine so they can be unit-tested without this component's Firestore stack.
 // Extracted 2026-09-10; see delivery-dashboard.engine.ts for what moved and why.
@@ -190,7 +191,8 @@ interface UtilizationRow {
         ProfilePictureComponent,
         FormOverlayViewComponent,
         SpecialistAppointmentSlotsComponent,
-        MatTableModule 
+        MatTableModule,
+        MatExpansionModule
     ],
     providers: [DatePipe],
     templateUrl: './delivery-dashboard-clone.component.html',
@@ -256,9 +258,11 @@ export class DeliveryDashboardCloneComponent {
     selectedProductId: string | null = null;
     groupedAll: { [key: string]: any[] } = {};
     groupedFiltered: { [key: string]: any[] } = {};
+    /** Eligible + (no status OR initiated) — the Stages board's Total Eligible source. */
+    groupedStagePool: { [key: string]: any[] } = {};
     groupedThisMonth: { [key: string]: any[] } = {};
     groupedNextMonth: { [key: string]: any[] } = {};
-    modalType: 'all' | 'filtered' | 'thismonth' | 'nextmonth' | 'bonus' | 'purchased' | 'noteligible' | 'nonactive' = 'all';
+    modalType: 'all' | 'filtered' | 'thismonth' | 'nextmonth' | 'bonus' | 'addons' | 'purchased' | 'noteligible' | 'nonactive' = 'all';
     stageModalType: string = '';
     groupedScheduled: any = {};
     groupedAwaiting: { [key: string]: any[] } = {};
@@ -309,11 +313,12 @@ export class DeliveryDashboardCloneComponent {
         { key: 'implementationSpecialist', label: 'IMPLEMENTATION SPECIALIST', perParticipant: true },
         { key: 'initiatedLabel', label: 'INITIATION DATE', perParticipant: true },
         { key: 'appointmentDate', label: 'APPOINTMENT DATE & TIME', perParticipant: false },
+        { key: 'ongoingDays', label: 'ONGOING DAYS', perParticipant: false },
         { key: 'stage', label: 'STAGE', perParticipant: false },
         { key: 'status', label: 'STATUS', perParticipant: false },
     ];
     weeklyColumnKeys = this.weeklyColumns.map(col => col.key);
-    private readonly weeklyStatusLabels: { [key: string]: string } = { booked: 'Booked', completed: 'Completed' };
+    private readonly weeklyStatusLabels: { [key: string]: string } = { booked: 'Booked', completed: 'Completed', cancelled: 'Cancelled' };
     private eisRoleTypeMap: { [roleId: string]: 'diagnostics' | 'implementation' } = {};
 
     // Hidden products (by name)
@@ -393,6 +398,14 @@ export class DeliveryDashboardCloneComponent {
 
     // Store unfiltered data for re-filtering
     allMatchedProductsRaw: any[] = [];
+    /** Every completed record (all cycles, any customer status incl. discontinued) — feeds Delivered only. */
+    completedRecordsRaw: any[] = [];
+    /** Every loaded record, unfiltered (cancelled / shifted / discontinued too) — read by "Why not here?" only. */
+    everyProductRecordRaw: any[] = [];
+    /** Latest record per participant+product, as used by the overview (set in applyDateFilter). */
+    private latestRecordKeys = new Set<string>();
+    /** Stuck candidates' appointment facts (from getRecentAppointmentDetails), keyed by participantproductid. */
+    private stuckFacts = new Map<string, { days: number | null; hasFuture: boolean; basis: string; lastDate: Date | null }>();
 
     showHiddenCompletionProducts: boolean = false;
 
@@ -482,6 +495,19 @@ export class DeliveryDashboardCloneComponent {
             "Celebration Call"
         ],
 
+        "ctdAppointment": [
+            "Total Eligible",
+            "Aspiration Form",
+            "ATC Understanding Validation",
+            "My Evolution Wishlist",
+            "Impact Valuation Activity",
+            "Diagnostics",
+            "Implementation 1",
+            "Implementation 2",
+            "Review",
+            "Completion"
+        ],
+
         "criticalSupport": [
             "Total Eligible",
             "Request",
@@ -495,6 +521,8 @@ export class DeliveryDashboardCloneComponent {
 
         "eiCustomSolutions": [
             "Total Eligible",
+            "This Month",
+            "Next Month",
             "Onboarding",
             "Diagnostics",
             "Implementation",
@@ -511,7 +539,9 @@ export class DeliveryDashboardCloneComponent {
         {
             label: 'Critical Support',
             value: 'Critical Support Diagnostics and Implementation'
-        }
+        },
+        // Exact product (not the merged "CTD Diagnostics & Implementation" card) — operator 2026-11-18: appointment product only.
+        { label: 'CTD D&I (Appointment)', value: 'CTD Diagnostics & Implementation (Appointment)' }
     ];
 
     stagesConfig: any = {
@@ -528,6 +558,10 @@ export class DeliveryDashboardCloneComponent {
             'Implementation',
             'Post Session Check-in',
             'Celebration Call'
+        ],
+        'CTD D&I (Appointment)': [
+            'Aspiration Form', 'ATC Understanding Validation', 'My Evolution Wishlist', 'Impact Valuation Activity',
+            'Diagnostics', 'Implementation 1', 'Implementation 2', 'Review'
         ]
     };
 
@@ -688,6 +722,12 @@ export class DeliveryDashboardCloneComponent {
             diagnostics: 'preprocess',
             implementation: 'diagnostics',
             review: 'implementation'
+        },
+        ctdAppointment: {
+            diagnostics: 'impactValuation',
+            'implementation 1': 'diagnostics',
+            'implementation 2': 'implementation1',
+            review: 'implementation2'
         }
     };
 
@@ -711,16 +751,19 @@ export class DeliveryDashboardCloneComponent {
 
     productData: any = {
         eiStarterPack: {
-            totalEligible: [], onBoarding: [], preprocess: [], diagnostics: [],
+            totalEligible: [], pastMonth: [], thisMonth: [], nextMonth: [], onBoarding: [], preprocess: [], diagnostics: [],
             implementation: [], reports: [], celebrationCall: []
         },
         eiCustomSolutions: {
-            totalEligible: [], onBoarding: [], diagnostics: [], implementation: [],
+            totalEligible: [], thisMonth: [], nextMonth: [], onBoarding: [], diagnostics: [], implementation: [],
             review: [], celebrationCall: []
         },
         criticalSupport: {
             totalEligible: [], request: [], preprocess: [], diagnostics: [],
             implementation: [], review: [], postForm: [], completion: []
+        },
+        ctdAppointment: {
+            totalEligible: [], aspiration: [], atcValidation: [], thirdForm: [], impactValuation: [], diagnostics: [], implementation1: [], implementation2: [], review: [], completion: []
         }
     };
 
@@ -937,7 +980,7 @@ export class DeliveryDashboardCloneComponent {
 
             const scheduledCards = stage.all || [];
             const completedCards = this.getStageCompletedCards(stageKey);
-            const waitingCards = this.getNotScheduledCards(stageKey);
+            const waitingCards = this.getNotScheduledCards(stageKey, false);
 
             for (const app of scheduledCards) {
                 const profileId = this.getStageModalProfileId(app);
@@ -988,7 +1031,7 @@ export class DeliveryDashboardCloneComponent {
         if (!appointmentTypeName) return 'N/A';
 
         const match = this.allAppointments.find((app: any) =>
-            app.appointmentTypeName === appointmentTypeName &&
+            this.ctdStageType(app.appointmentTypeName) === appointmentTypeName &&
             this.getStageModalProfileId(app) === profileId
         );
         if (!match?.hosts?.length) return 'N/A';
@@ -1322,6 +1365,31 @@ export class DeliveryDashboardCloneComponent {
         'integration mode',
     ]);
 
+    /** Cycle number of each record (1 = first) within its participant+product, ordered by its earliest status date. */
+    private cycleOrdinalMap(records: any[]): Map<string, number> {
+        const byKey = new Map<string, Map<string, any>>();
+        for (const r of records) {
+            const pid = r?.productref?.id;
+            if (!pid || !r?.profileid) continue;
+            const key = `${r.profileid}__${pid}`;
+            if (!byKey.has(key)) byKey.set(key, new Map());
+            byKey.get(key)!.set(r.id || r.docid, r);
+        }
+        const firstDate = (r: any): number => {
+            const times = ['initiated', 'started', 'ongoing', 'completed']
+                .map(s => this.getDateFromFieldPublic(r?.statusdate?.[s])?.getTime())
+                .filter((t): t is number => !!t);
+            return times.length ? Math.min(...times) : Number.POSITIVE_INFINITY;
+        };
+        const out = new Map<string, number>();
+        for (const group of byKey.values()) {
+            Array.from(group.values())
+                .sort((a, b) => firstDate(a) - firstDate(b))
+                .forEach((r, i) => out.set(r.id || r.docid, i + 1));
+        }
+        return out;
+    }
+
     async applyDateFilter() {
         this.invalidateMemos();
         try {
@@ -1374,11 +1442,22 @@ export class DeliveryDashboardCloneComponent {
                     return latest;
                 };
 
+                // An open cycle (no status / initiated / ongoing) beats a completed one (operator 2026-11-23).
+                // A new cycle that hasn't started has no initiated / ongoing / completed date, so on dates alone
+                // the old completed cycle always won and the participant never reached Ready to Start
+                // (WiSH: Praveena Dorathi, Sherry Sethi). Earlier completed cycles still count in Delivered.
+                const isOpen = (r: any) => (r?.status || '').toString().toLowerCase().trim() !== 'completed';
+                if (isOpen(item) !== isOpen(existing)) {
+                    if (isOpen(item)) latestItemMap.set(key, item);
+                    continue;
+                }
                 if (getLatestProduct(item?.statusdate) > getLatestProduct(existing?.statusdate)) {
                     latestItemMap.set(key, item);
                 }
             }
             const latestItems = Array.from(latestItemMap.values());
+            this.latestRecordKeys = new Set(latestItems.map((i: any) => i?.id || i?.docid));
+            const groupedStagePool = {};
 
             for (const item of latestItems) {
                 const productId = item?.productref?.id;
@@ -1399,7 +1478,14 @@ export class DeliveryDashboardCloneComponent {
                 const tentativestart = item?.tentativestart || null;
                 const packageId = item?.packageref?.id;
 
-                if (!['completed', 'ongoing'].includes(status)) {
+                // Stages board pool: eligible, no status OR initiated (Onboarding's Waiting list needs initiated).
+                if (isEligible && (!status || status === 'initiated')) {
+                    (groupedStagePool[productId] ||= []).push(item);
+                }
+
+                // Overview "not started" pool (Overall / Eligible / Not Eligible / Purchased / Bonus / Add-on /
+                // This & Next Month): NO status only. Initiated left it (operator 2026-11-19).
+                if (!status) {
                     (groupedAll[productId] ||= []).push(item);
 
                     if (isEligible) {
@@ -1423,8 +1509,11 @@ export class DeliveryDashboardCloneComponent {
                             }
                         }
 
+                        // Eligible = Purchased + Bonus + Add-on (disjoint, by package).
                         if (packageId && this.bonusPackageLookup[packageId]) {
                             (groupedBonus[productId] ||= []).push(item);
+                        } else if (packageId && this.addonsPackageLookup[packageId]) {
+                            (groupedAddons[productId] ||= []).push(item);
                         } else {
                             (groupedPurchased[productId] ||= []).push(item);
                         }
@@ -1441,12 +1530,7 @@ export class DeliveryDashboardCloneComponent {
                     funnelData[productId].ongoing.push({ ...item, cycle });
                 }
 
-                if (status === 'completed') {
-                    const completedDate = this.getDateFromFieldPublic(statusdate['completed']);
-                    if (this.isDateInRange(completedDate)) {
-                        funnelData[productId].completed.push({ ...item, cycle });
-                    }
-                }
+                // Delivered is built below from completedRecordsRaw (every cycle, discontinued included).
 
                 if (isEligible) {
                     const isYetToStart = !status && this.isReadyToStart(item);
@@ -1466,7 +1550,29 @@ export class DeliveryDashboardCloneComponent {
                 }
             }
 
+            // Delivered (operator 2026-11-19): EVERY completed record completed inside the period — earlier
+            // cycles of a participant who has since started a new one, and discontinued customers, both count.
+            // Cancelled / shifted records never reach completedRecordsRaw (status must be "completed").
+            const cycleOrdinal = this.cycleOrdinalMap(this.completedRecordsRaw.concat(this.allMatchedProductsRaw));
+            for (const item of this.completedRecordsRaw) {
+                const productId = item?.productref?.id;
+                if (!productId || !item?.profileid) continue;
+                if (!this.itemPassesProductFilter(item)) continue;
+                const completedDate = this.getDateFromFieldPublic(item?.statusdate?.['completed']);
+                // An undated completion can't be placed in a period. The latest cycle of a loaded customer keeps
+                // the old "always counted" rule; the records this change adds (earlier cycles, discontinued
+                // customers) count undated only under All time — otherwise they'd swell every period.
+                const isExtra = !this.latestRecordKeys.has(item.id || item.docid);
+                if (!completedDate && isExtra && this.dateRangeStart) continue;
+                if (!this.isDateInRange(completedDate)) continue;
+                if (!funnelData[productId]) {
+                    funnelData[productId] = { awaiting: [], initiated: [], started: [], ongoing: [], completed: [] };
+                }
+                funnelData[productId].completed.push({ ...item, cycle: cycleOrdinal.get(item.id || item.docid) || 1 });
+            }
+
             // assign
+            this.groupedStagePool = groupedStagePool;
             this.groupedAll = groupedAll;
             this.groupedFiltered = groupedFiltered;
             this.groupedThisMonth = groupedThisMonth;
@@ -1500,9 +1606,10 @@ export class DeliveryDashboardCloneComponent {
         this.participantLoading = true;
         // Clear previous product's data immediately so stale cards don't show while loading
         this.productData = {
-            eiStarterPack: { totalEligible: [], onBoarding: [], preprocess: [], diagnostics: [], implementation: [], reports: [], celebrationCall: [] },
-            eiCustomSolutions: { totalEligible: [], onBoarding: [], diagnostics: [], implementation: [], review: [], celebrationCall: [] },
-            criticalSupport: { totalEligible: [], request: [], preprocess: [], diagnostics: [], implementation: [], review: [], postForm: [], completion: [] }
+            eiStarterPack: { totalEligible: [], pastMonth: [], thisMonth: [], nextMonth: [], onBoarding: [], preprocess: [], diagnostics: [], implementation: [], reports: [], celebrationCall: [] },
+            eiCustomSolutions: { totalEligible: [], thisMonth: [], nextMonth: [], onBoarding: [], diagnostics: [], implementation: [], review: [], celebrationCall: [] },
+            criticalSupport: { totalEligible: [], request: [], preprocess: [], diagnostics: [], implementation: [], review: [], postForm: [], completion: [] },
+            ctdAppointment: { totalEligible: [], aspiration: [], atcValidation: [], thirdForm: [], impactValuation: [], diagnostics: [], implementation1: [], implementation2: [], review: [], completion: [] }
         };
         const productId = this.getCardIdForProduct(product);
         this.selectedProductLabel = product;
@@ -1526,6 +1633,10 @@ export class DeliveryDashboardCloneComponent {
             this.selectedColumns = this.columns.criticalSupport;
             await this.filterProductData('criticalSupport', product, productId);
             await this.filterStageData('criticalSupport');
+        } else if (product === 'CTD D&I (Appointment)') {
+            this.selectedColumns = this.ctdColumns();
+            await this.filterProductData('ctdAppointment', product, productId);
+            await this.filterStageData('ctdAppointment');
         }
         this.participantLoading = false;
         this.stagesLoading = false;
@@ -1602,7 +1713,10 @@ export class DeliveryDashboardCloneComponent {
 
                             const hasChanges = this.allAppointments !== updatedAppointments;
                             if (hasChanges) {
-                                this.allAppointments = updatedAppointments;
+                                // Keep the submitted forms (formsByClient) alongside: replacing the list with
+                                // appointments only dropped every form stage until the forms feed fired again.
+                                this.loadedAppointments = updatedAppointments;
+                                this.allAppointments = [...updatedAppointments, ...this.loadedForms];
 
                                 if (this.selectedProductLabel) {
                                     await this.selectProduct(this.selectedProductLabel);
@@ -1619,7 +1733,8 @@ export class DeliveryDashboardCloneComponent {
                             if (denied) {
                                 console.warn("Appointments not accessible for this role; degrading gracefully.", err);
                                 this.appointmentsAccessible = false;
-                                this.allAppointments = [];
+                                this.loadedAppointments = [];
+                                this.allAppointments = [...this.loadedForms];
                             } else {
                                 console.error("Error loading appointments:", err);
                             }
@@ -1643,23 +1758,27 @@ export class DeliveryDashboardCloneComponent {
     async filterProductData(productType: string, product: string, productId: string) {
         let productData: any = {
             eiStarterPack: {
-                totalEligible: [], onBoarding: [], preprocess: [], diagnostics: [],
+                totalEligible: [], pastMonth: [], thisMonth: [], nextMonth: [], onBoarding: [], preprocess: [], diagnostics: [],
                 implementation: [], reports: [], celebrationCall: []
             },
             eiCustomSolutions: {
-                totalEligible: [], onBoarding: [], diagnostics: [], implementation: [],
+                totalEligible: [], thisMonth: [], nextMonth: [], onBoarding: [], diagnostics: [], implementation: [],
                 review: [], celebrationCall: []
             },
             criticalSupport: {
                 totalEligible: [], request: this.ticketRequest.length ? this.ticketRequest : [],
                 preprocess: [], diagnostics: [], implementation: [], review: [], postForm: [], completion: []
+            },
+            ctdAppointment: {
+                totalEligible: [], aspiration: [], atcValidation: [], thirdForm: [], impactValuation: [], diagnostics: [], implementation1: [], implementation2: [], review: [], completion: []
             }
         };
 
         this.selectedProductType = productType;
         const allAppointments = this.allAppointments;
         try {
-            const productItemsAll = this.getCardGroupedFiltered(productId);
+            // Stage pool, not the overview's Eligible: it still holds initiated products.
+            const productItemsAll = this.getCardProductIds(productId).flatMap((pid) => this.groupedStagePool[pid] || []);
 
             const totalEligible = productItemsAll.filter(data => {
                 const status = (data?.status || '').toString().toLowerCase().trim();
@@ -1678,11 +1797,26 @@ export class DeliveryDashboardCloneComponent {
             else if (this.selectedProductType === 'eiCustomSolutions') {
                 productData.eiCustomSolutions.totalEligible.push(...totalEligible);
             }
+            else if (this.selectedProductType === 'ctdAppointment') {
+                productData.ctdAppointment.totalEligible.push(...totalEligible.filter(i => this.inCtdCycle(i)));
+            }
+
+            // Past / This / Next Month columns: not-started products by the tentative start set in journey
+            // planning (participantsproduct.tentativestart), by calendar month from today. A view of Total Eligible,
+            // not a move out of it — they stay there too, so Onboarding's Waiting pool is unchanged.
+            const monthBuckets = productData[this.selectedProductType];
+            if (this.selectedProductType === 'eiStarterPack' || this.selectedProductType === 'eiCustomSolutions') {
+                for (const item of totalEligible) {
+                    const bucket = this.tentativeStartMonthBucket(item?.tentativestart);
+                    if (bucket && monthBuckets[bucket]) monthBuckets[bucket].push(item);
+                }
+            }
 
             // Total Eligible
             const ongoingData = this.getCardFunnel(productId)?.ongoing || [];
 
             for (let data of ongoingData) {
+                if (productType === 'ctdAppointment' && !this.inCtdCycle(data)) continue;
                 let appointments = Array.from(allAppointments.values() || [])
                     .filter((app: any) => app.participantproductid === data.docid);
                 await Promise.all(
@@ -1707,6 +1841,8 @@ export class DeliveryDashboardCloneComponent {
                         productData.eiStarterPack.totalEligible.push(mergedData);
                     } else if (this.selectedProductType === 'eiCustomSolutions') {
                         productData.eiCustomSolutions.totalEligible.push(mergedData);
+                    } else if (this.selectedProductType === 'ctdAppointment') {
+                        productData.ctdAppointment.totalEligible.push(mergedData);
                     }
                 }
                 else if (attendedAppointments.length > 0) {
@@ -1741,7 +1877,7 @@ export class DeliveryDashboardCloneComponent {
                                 ...diagnosticsAppointment
                             });
                         } else if (onboardedAppointment) {
-                            productData.eiCustomSolutions.onBoarded.push({
+                            productData.eiCustomSolutions.onBoarding.push({
                                 ...mergedData,
                                 ...onboardedAppointment
                             });
@@ -1830,6 +1966,14 @@ export class DeliveryDashboardCloneComponent {
                             });
                         }
                     }
+                    // ========================= CTD D&I (APPOINTMENT) =========================
+                    // Furthest done step wins, in the cycle's delivery order: 4 forms (submitted), then
+                    // Diagnostics, Implementation ×2, Review (attended). Alias types fold in via ctdStageType.
+                    else if (this.selectedProductType === 'ctdAppointment') {
+                        const step = this.ctdFurthestStep(attendedAppointments);
+                        const target = step ? productData.ctdAppointment[step.key] : productData.ctdAppointment.totalEligible;
+                        target.push(step?.app ? { ...mergedData, ...step.app } : mergedData);
+                    }
                 }
             }
 
@@ -1850,6 +1994,8 @@ export class DeliveryDashboardCloneComponent {
                     productData.criticalSupport.completion.push(data);
                 } else if (productType === 'eiCustomSolutions') {
                     productData.eiCustomSolutions.celebrationCall.push(data);
+                } else if (productType === 'ctdAppointment') {
+                    if (this.inCtdCycle(data)) productData.ctdAppointment.completion.push(data);
                 }
             }
             Object.assign(this.productData, productData);
@@ -1905,6 +2051,10 @@ export class DeliveryDashboardCloneComponent {
         this.ticketRequestSubscription.add(sub);
     }
 
+    /** The two halves of allAppointments, kept apart so either live feed can refresh without losing the other. */
+    private loadedAppointments: any[] = [];
+    private loadedForms: any[] = [];
+
     async FilterReportData(productId: string) {
         if (this.formsSubscription) {
             this.formsSubscription.unsubscribe();
@@ -1959,10 +2109,9 @@ export class DeliveryDashboardCloneComponent {
                 );
                 updatedForms.push(...formResults);
             }
-            this.allAppointments = [
-                ...Array.from(this.allAppointments.values()),
-                ...updatedForms
-            ];
+            // Replace, don't append: appending re-added every form on each forms refresh (duplicates).
+            this.loadedForms = updatedForms;
+            this.allAppointments = [...this.loadedAppointments, ...updatedForms];
             if (this.selectedProductLabel) await this.selectProduct(this.selectedProductLabel);
         });
         this.formsSubscription.add(sub);
@@ -2055,6 +2204,9 @@ export class DeliveryDashboardCloneComponent {
                 { key: 'review', appointmentType: 'EI Review' },
                 { key: 'celebration call', appointmentType: 'EI Celebration Call' }
             ];
+        } else if (product === 'ctdAppointment') {
+            this.buildCtdStageData();
+            return;
         }
 
         stageConfig.forEach(stage => {
@@ -2063,7 +2215,24 @@ export class DeliveryDashboardCloneComponent {
         });
     }
 
-    getNotScheduledCards(stageKey: string): any[] {
+    /** Stages search box: does this participant's name contain the typed text? Empty box matches everyone. */
+    private matchesStageSearch(profileId: string): boolean {
+        const q = (this.searchText || '').toLowerCase().trim();
+        if (!q) return true;
+        return (this.mapMetaData?.[profileId]?.name || '').toLowerCase().includes(q);
+    }
+
+    /** Scheduled appointments of a stage column, narrowed by the Stages search box. */
+    getStageScheduledCards(stageKey: string): any[] {
+        return (this.stageData?.[stageKey]?.all || []).filter((app: any) => this.matchesStageSearch(this.getStageModalProfileId(app)));
+    }
+
+    getNotScheduledCards(stageKey: string, applySearch = true): any[] {
+        const cards = this.getNotScheduledCardsAll(stageKey);
+        return applySearch ? cards.filter((c: any) => this.matchesStageSearch(c?.profileid || c?.clientid)) : cards;
+    }
+
+    private getNotScheduledCardsAll(stageKey: string): any[] {
         const productType = this.selectedProductType;
         const populationSourceKey = this.stagePopulationSource[productType]?.[stageKey];
         const appointmentTypeName = this.stageAppointmentTypeMap[stageKey];
@@ -2081,7 +2250,11 @@ export class DeliveryDashboardCloneComponent {
             });
         }
 
-        const bookedProfileIds = this.getBookedProfileIdsForAppointmentType(appointmentTypeName);
+        // CTD: booked = a scheduled (not attended, not cancelled) appointment in this very column. The generic
+        // "any appointment of the type" test would hide everyone waiting for their 2nd Implementation.
+        const bookedProfileIds = productType === 'ctdAppointment'
+            ? new Set<string>((this.stageData?.[stageKey]?.all || []).map((a: any) => this.getStageModalProfileId(a)).filter(Boolean))
+            : this.getBookedProfileIdsForAppointmentType(appointmentTypeName);
         return populationPool.filter((card: any) => {
             const profileId = card?.profileid || card?.clientid;
             const alreadyHasAppointment = profileId ? bookedProfileIds.has(profileId) : false;
@@ -2097,6 +2270,7 @@ export class DeliveryDashboardCloneComponent {
         const populationPool = this.productData?.[productType]?.[populationSourceKey] || [];
         return populationPool
             .filter((card: any) => !!card?.productonboarding || !!card?.productonboardingscheduled)
+            .filter((card: any) => this.matchesStageSearch(card?.profileid || card?.clientid))
             .map((card: any) => {
                 const hostRef = card?.productonboardedby?.[0];
                 const hostId = (hostRef?.id || hostRef?.path?.split('/')?.pop()) ?? null;
@@ -2145,12 +2319,125 @@ export class DeliveryDashboardCloneComponent {
     private getBookedProfileIdsForAppointmentType(appointmentTypeName: string): Set<string> {
         const bookedProfileIds = new Set<string>();
         for (const appointment of this.allAppointments) {
-            const isMatchingType = appointment.appointmentTypeName === appointmentTypeName;
+            const isMatchingType = this.ctdStageType(appointment.appointmentTypeName) === appointmentTypeName;
             if (!isMatchingType) continue;
             const profileId = appointment.profileid || appointment.clientid || appointment.bookedby?.id;
             if (profileId) bookedProfileIds.add(profileId);
         }
         return bookedProfileIds;
+    }
+
+    /**
+     * CTD has two extra appointment types that belong to an existing stage. Fold them in so
+     * "CTD Implementation Appointment" counts as Implementation and "CTD Review/Validation" as Review.
+     * Every other type name passes through unchanged, so other products are not affected.
+     */
+    private static readonly CTD_STAGE_ALIASES: Record<string, string> = {
+        'CTD Implementation Appointment': 'CTD Implementation',
+        'CTD Review/Validation': 'CTD Review',
+    };
+    ctdStageType(appointmentTypeName: string): string {
+        return DeliveryDashboardCloneComponent.CTD_STAGE_ALIASES[appointmentTypeName] ?? appointmentTypeName;
+    }
+
+    // ===== CTD D&I (Appointment): two delivery versions (operator 2026-11-19) =====
+    // 1st Cycle:  CTD Aspiration Form → ATC Understanding Validation → My Evolution Wishlist → CTD – Impact Valuation
+    //             Activity (forms) → CTD Diagnostics → CTD Implementation → CTD Implementation → CTD Review (appointments)
+    // Next Cycle: same, with My Pocket ATC as the third form.
+    // The version comes from the enrolment's participantsproduct.deliverytype ("1st Cycle"; empty counts as 1st Cycle).
+    ctdCycle: 'first' | 'next' = 'first';
+
+    setCtdCycle(cycle: 'first' | 'next'): void {
+        if (this.ctdCycle === cycle) return;
+        this.ctdCycle = cycle;
+        this.stageTabFilter = {};
+        if (this.selectedProductLabel === 'CTD D&I (Appointment)') this.selectProduct(this.selectedProductLabel);
+    }
+
+    /** Is this enrolment on the CTD version the toggle shows? */
+    inCtdCycle(item: any): boolean {
+        const t = (item?.deliverytype || '').toString().toLowerCase().trim();
+        const isFirst = !t || t.includes('1st') || t.includes('first');
+        return this.ctdCycle === 'first' ? isFirst : !isFirst;
+    }
+
+    private ctdThirdFormName(): string {
+        return this.ctdCycle === 'first' ? 'My Evolution Wishlist' : 'My Pocket ATC';
+    }
+
+    ctdColumns(): string[] {
+        return ['Total Eligible', 'Aspiration Form', 'ATC Understanding Validation', this.ctdThirdFormName(),
+            'Impact Valuation Activity', 'Diagnostics', 'Implementation 1', 'Implementation 2', 'Review', 'Completion'];
+    }
+
+    /** Form names compared without case, spacing or dash style ("CTD – Impact…" = "CTD - Impact…"). */
+    private normFormName(name: any): string {
+        return (name || '').toString().toLowerCase().replace(/[\u2010-\u2015-]/g, '-').replace(/\s+/g, ' ').trim();
+    }
+
+    private ctdFormSteps(): { key: string; form: string }[] {
+        return [
+            { key: 'aspiration', form: 'CTD Aspiration Form' },
+            { key: 'atcValidation', form: 'ATC Understanding Validation' },
+            { key: 'thirdForm', form: this.ctdThirdFormName() },
+            { key: 'impactValuation', form: 'CTD – Impact Valuation Activity' },
+        ];
+    }
+
+    /** Furthest step an enrolment has done (submitted form / attended appointment), or null for none. */
+    private ctdFurthestStep(done: any[]): { key: string; app: any } | null {
+        const ofType = (type: string) => done.filter(a => this.ctdStageType(a?.appointmentTypeName) === type);
+        const review = ofType('CTD Review');
+        if (review.length) return { key: 'review', app: review[0] };
+        const impl = ofType('CTD Implementation');
+        if (impl.length >= 2) return { key: 'implementation2', app: impl[1] };
+        if (impl.length === 1) return { key: 'implementation1', app: impl[0] };
+        const diag = ofType('CTD Diagnostics');
+        if (diag.length) return { key: 'diagnostics', app: diag[0] };
+        const steps = this.ctdFormSteps();
+        for (let i = steps.length - 1; i >= 0; i--) {
+            const want = this.normFormName(steps[i].form);
+            const form = done.find(a => a?.formname && this.normFormName(a.formname) === want);
+            if (form) return { key: steps[i].key, app: form };
+        }
+        return null;
+    }
+
+    /**
+     * Stage columns for CTD: only this product's enrolments on the selected cycle (CTD appointment types are shared
+     * with the CTD queue, Platinum and Diagnostics (Appointment) products). Implementation is split per enrolment by
+     * start time: the 1st CTD Implementation loaded this month → Implementation 1, later ones → Implementation 2.
+     */
+    private buildCtdStageData(): void {
+        const productId = this.getCardIdForProduct('CTD D&I (Appointment)');
+        const ids = new Set((this.allMatchedProductsRaw || [])
+            .filter((i: any) => i?.productref?.id === productId && this.inCtdCycle(i))
+            .map((i: any) => i.docid));
+        const apps = (this.allAppointments || []).filter((a: any) =>
+            ids.has(a?.participantproductid) && !a?.formname && /^CTD /.test(this.ctdStageType(a?.appointmentTypeName) || ''));
+        const ofType = (type: string) => apps.filter((a: any) => this.ctdStageType(a.appointmentTypeName) === type);
+
+        const impl1: any[] = [];
+        const impl2: any[] = [];
+        const byEnrolment = new Map<string, any[]>();
+        for (const a of ofType('CTD Implementation')) {
+            const list = byEnrolment.get(a.participantproductid) || [];
+            list.push(a);
+            byEnrolment.set(a.participantproductid, list);
+        }
+        const ms = (a: any) => this.toDateOrNull(a?.starttime)?.getTime() ?? 0;
+        for (const list of byEnrolment.values()) {
+            list.sort((x, y) => ms(x) - ms(y)).forEach((a, i) => (i === 0 ? impl1 : impl2).push(a));
+        }
+
+        this.stageData['diagnostics'] = this.bucketStageAppointments(ofType('CTD Diagnostics'));
+        this.stageData['implementation 1'] = this.bucketStageAppointments(impl1);
+        this.stageData['implementation 2'] = this.bucketStageAppointments(impl2);
+        this.stageData['review'] = this.bucketStageAppointments(ofType('CTD Review'));
+        this.stageAppointmentTypeMap['diagnostics'] = 'CTD Diagnostics';
+        this.stageAppointmentTypeMap['implementation 1'] = 'CTD Implementation';
+        this.stageAppointmentTypeMap['implementation 2'] = 'CTD Implementation';
+        this.stageAppointmentTypeMap['review'] = 'CTD Review';
     }
 
     getStageModalProfileId(app: any): string {
@@ -2186,7 +2473,17 @@ export class DeliveryDashboardCloneComponent {
         } = this.getTodayAndTomorrowRange();
 
         const appointmentsForType = this.allAppointments
-            .filter(app => app.appointmentTypeName === appointmentTypeName);
+            .filter(app => this.ctdStageType(app.appointmentTypeName) === appointmentTypeName);
+        return this.bucketStageAppointments(appointmentsForType);
+    }
+
+    /** Split one stage's appointments into scheduled (with today / tomorrow / overdue), completed and cancelled. */
+    private bucketStageAppointments(appointmentsForType: any[]) {
+        const {
+            startOfToday,
+            startOfTomorrow,
+            endOfTomorrow
+        } = this.getTodayAndTomorrowRange();
 
         const scheduledAppointments = appointmentsForType
             .filter(app => app.attended === false && !app.cancelled);
@@ -2231,25 +2528,35 @@ export class DeliveryDashboardCloneComponent {
     updateFilteredCards() {
         const search = this.searchText?.toLowerCase().trim() || '';
         let sources: any = {};
+        // Drop indexes left over from a product with more columns (filteredCardsMap is reused across products).
+        Object.keys(this.filteredCardsMap).forEach(k => delete this.filteredCardsMap[k as any]);
         if (this.selectedProductType === 'eiStarterPack') {
             sources = {
+                // Index = position in columns.eiStarterPack. The three month columns used to be skipped,
+                // shifting every later column by three (Next Month showed Diagnostics, etc.).
                 0: this.productData.eiStarterPack.totalEligible || [],
-                1: this.productData.eiStarterPack.onBoarding || [],
-                2: this.productData.eiStarterPack.preprocess || [],
-                3: this.productData.eiStarterPack.diagnostics || [],
-                4: this.productData.eiStarterPack.implementation || [],
-                5: this.productData.eiStarterPack.reports || [],
-                6: this.productData.eiStarterPack.celebrationCall || []
+                1: this.productData.eiStarterPack.pastMonth || [],
+                2: this.productData.eiStarterPack.thisMonth || [],
+                3: this.productData.eiStarterPack.nextMonth || [],
+                4: this.productData.eiStarterPack.onBoarding || [],
+                5: this.productData.eiStarterPack.preprocess || [],
+                6: this.productData.eiStarterPack.diagnostics || [],
+                7: this.productData.eiStarterPack.implementation || [],
+                8: this.productData.eiStarterPack.reports || [],
+                9: this.productData.eiStarterPack.celebrationCall || []
             };
         }
         else if (this.selectedProductType === 'eiCustomSolutions') {
             sources = {
+                // Index = position in columns.eiCustomSolutions.
                 0: this.productData.eiCustomSolutions.totalEligible || [],
-                1: this.productData.eiCustomSolutions.onBoarding || [],
-                2: this.productData.eiCustomSolutions.diagnostics || [],
-                3: this.productData.eiCustomSolutions.implementation || [],
-                4: this.productData.eiCustomSolutions.review || [],
-                5: this.productData.eiCustomSolutions.celebrationCall || []
+                1: this.productData.eiCustomSolutions.thisMonth || [],
+                2: this.productData.eiCustomSolutions.nextMonth || [],
+                3: this.productData.eiCustomSolutions.onBoarding || [],
+                4: this.productData.eiCustomSolutions.diagnostics || [],
+                5: this.productData.eiCustomSolutions.implementation || [],
+                6: this.productData.eiCustomSolutions.review || [],
+                7: this.productData.eiCustomSolutions.celebrationCall || []
             };
         }
         else if (this.selectedProductType === 'criticalSupport') {
@@ -2262,6 +2569,21 @@ export class DeliveryDashboardCloneComponent {
                 5: this.productData.criticalSupport.review || [],
                 6: this.productData.criticalSupport.postForm || [],
                 7: this.productData.criticalSupport.completion || []
+            };
+        }
+        else if (this.selectedProductType === 'ctdAppointment') {
+            sources = {
+                // Index = position in ctdColumns().
+                0: this.productData.ctdAppointment.totalEligible || [],
+                1: this.productData.ctdAppointment.aspiration || [],
+                2: this.productData.ctdAppointment.atcValidation || [],
+                3: this.productData.ctdAppointment.thirdForm || [],
+                4: this.productData.ctdAppointment.impactValuation || [],
+                5: this.productData.ctdAppointment.diagnostics || [],
+                6: this.productData.ctdAppointment.implementation1 || [],
+                7: this.productData.ctdAppointment.implementation2 || [],
+                8: this.productData.ctdAppointment.review || [],
+                9: this.productData.ctdAppointment.completion || []
             };
         }
 
@@ -2450,18 +2772,31 @@ export class DeliveryDashboardCloneComponent {
                 .subscribe(async (snapshot: any[]) => {
                     snapshots[index] = snapshot;
                     const productMap = new Map<string, any>();
+                    const completedMap = new Map<string, any>();
+                    const everyRecord: any[] = [];
                     for (const snap of snapshots) {
                         if (!snap) continue;
                         for (const data of snap) {
+                            everyRecord.push(data);
                             if (
                                 activeProfileIds.has(data['profileid']) &&
                                 !rejectedStatuses.has(data['status']?.toLowerCase())
                             ) {
                                 productMap.set(data.id, data);
                             }
+                            // Delivered (operator 2026-11-19): every completed cycle counts, including
+                            // discontinued customers. Kept apart so it feeds Delivered only.
+                            if (
+                                this.mapMetaData[data['profileid']] &&
+                                (data['status'] || '').toString().toLowerCase().trim() === 'completed'
+                            ) {
+                                completedMap.set(data.id, data);
+                            }
                         }
                     }
                     this.allMatchedProductsRaw = Array.from(productMap.values());
+                    this.completedRecordsRaw = Array.from(completedMap.values());
+                    this.everyProductRecordRaw = everyRecord;
                     // Journey onboarding date is only a FALLBACK for DAYS WAITING: needed just for
                     // not-yet-initiated products that have no product onboarding call booked.
                     await this.loadJourneyProductMapFor(
@@ -3706,7 +4041,7 @@ export class DeliveryDashboardCloneComponent {
         return this.getCardProductIds(cardId).reduce((sum, pid) => sum + this.getNonActiveSub(pid), 0);
     }
 
-    openCardModal(cardId: string, type: 'all' | 'filtered' | 'thismonth' | 'nextmonth' | 'bonus' | 'purchased' | 'noteligible' | 'nonactive') {
+    openCardModal(cardId: string, type: 'all' | 'filtered' | 'thismonth' | 'nextmonth' | 'bonus' | 'addons' | 'purchased' | 'noteligible' | 'nonactive') {
         this.selectedProductId = cardId;
         this.modalType = type;
         this.selectedStatus = 'all';
@@ -3718,6 +4053,7 @@ export class DeliveryDashboardCloneComponent {
             case 'thismonth': source = this.getCardGroupedThisMonth(cardId); break;
             case 'nextmonth': source = this.getCardGroupedNextMonth(cardId); break;
             case 'bonus': source = this.getCardGroupedBonus(cardId); break;
+            case 'addons': source = this.getCardGroupedAddons(cardId); break;
             case 'purchased': source = this.getCardGroupedPurchased(cardId); break;
             case 'noteligible': source = this.getCardGroupedNotEligible(cardId); break;
             case 'nonactive': source = this.getCardGroupedNonActive(cardId); break;
@@ -3855,6 +4191,15 @@ export class DeliveryDashboardCloneComponent {
 
     isDateInNextMonth(date: Date): boolean {
         return isDateInNextMonth(date);
+    }
+
+    /** Which month column a tentative start lands in, by calendar month from today; null when outside all three. */
+    private tentativeStartMonthBucket(ts: any): 'pastMonth' | 'thisMonth' | 'nextMonth' | null {
+        const d = this.toDateOrNull(ts);
+        if (!d) return null;
+        const now = new Date();
+        const diff = (d.getFullYear() - now.getFullYear()) * 12 + (d.getMonth() - now.getMonth());
+        return diff === -1 ? 'pastMonth' : diff === 0 ? 'thisMonth' : diff === 1 ? 'nextMonth' : null;
     }
 
     isDateInRange(date: Date | null): boolean {
@@ -4409,7 +4754,7 @@ export class DeliveryDashboardCloneComponent {
                 { key: 'appointment', label: 'APPOINTMENT', width: '12%', type: 'text' },
                 { key: 'appointmentstatus', label: 'APPOINTMENT STATUS', type: 'text', width: '130px' },
                 { key: 'issuetype', label: 'ISSUE TYPE', width: '10%', type: 'text' },
-                { key: 'date', label: 'APPOINTMENT DATE', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
+                { key: 'date', label: 'LAST BOOKED APPT', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
                 { key: 'stuckdays', label: 'DAYS STUCK', width: '10%', type: 'number' },
                 { key: 'subscriptionstart', label: 'SUBSCRIPTION START', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
                 { key: 'subscriptionend', label: 'SUBSCRIPTION END', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
@@ -7108,16 +7453,103 @@ export class DeliveryDashboardCloneComponent {
         awaiting: 'Awaiting Initiation — products not initiated yet (no status), for participants whose mode is not installation event / event / integration. One row per participant. Days waiting count from the product onboarding call, else the onboarding of their ongoing journey.',
         ready: 'Ready to Start — products not initiated yet where the participant is Active, finance is Regular or Fully paid, has no parallel product, and has paid at least the product minimum (or owes nothing). One row per participant.',
         inDelivery: 'In delivery — every product with status "ongoing" (delivery has started), across all products including hidden ones. Not limited by the date filter.',
-        delivered: 'Delivered — products with status "completed" whose completion date falls in the selected period, across all products.',
-        needsAttention: 'Stuck and Not consuming are separate lists — they are not a slice of In delivery.',
-        stuck: 'Stuck — status "ongoing" in Priority Mode, more than 15 days since the last attended appointment (no attended appointment yet: since delivery went ongoing), and no appointment booked ahead. Longest first.',
+        delivered: "Delivered — every product cycle completed in the selected period, across all products.\n• Any record with status \"completed\" whose completion date falls in the period — earlier cycles count too, even if the participant has since started a new cycle.\n• Discontinued customers' completed products are included.\n• Cancelled or shifted records are never counted.\n• Date filter: USED. No completion date: the latest cycle is always counted; earlier cycles and discontinued customers only under \"All time\".\n• One per cycle — a participant who completed two cycles in the period counts twice.",
+        needsAttention: "Needs attention — Stuck (ongoing, more than 7 days since the last booked appointment, nothing booked ahead) and Not consuming (initiated 7+ days, not ongoing). Separate lists, not a slice of In delivery.",
+        stuck: "Stuck — in delivery but nothing is happening.\n• Status \"ongoing\" and product mode Priority Mode.\n• More than 7 days since the last BOOKED appointment, attended or not (cancelled ones ignored). No booked appointment yet: since delivery went ongoing.\n• No appointment booked ahead.\n• Date filter: NOT used — counted from today. Longest stuck first.",
         idle: 'Initiated – Not Consuming — status "initiated" for 7 days or more without moving to ongoing.',
-        yetToStart: 'Yet to Start — no status yet; participant Active, finance Regular or Fully paid, no parallel product, minimum paid.',
-        init: 'Init — status "initiated", initiated within the selected period (eligible participants: mode allowed, minimum paid).',
-        started: 'Started — status "ongoing" whose delivery began (went ongoing) within the selected period (eligible participants). A part of Ongoing.',
-        ongoing: 'Ongoing — every product currently in delivery (status "ongoing"), whenever it started.',
-        done: 'Done — status "completed", completed within the selected period.',
+        yetToStart: "Yet to Start — ready to be initiated now.\n• Latest record has no status yet.\n• Participant eligible: mode is not Installation Event / Event / Integration, and the minimum is paid (or nothing is owed).\n• Also: customer status Active, finance Regular or Fully paid, and no other active product.\n• Date filter: NOT used — always today's state.\n• Same people as Ready to Start, counted per product.\n• \"Latest record\" = the participant's current cycle of that product: an open cycle (no status, initiated or ongoing) wins over a completed one; otherwise the most recent by initiated / ongoing / completed date.",
+        init: "Init — initiated but delivery not started.\n• Latest record status is \"initiated\".\n• Participant eligible (mode allowed, minimum paid).\n• Date filter: USED — the initiated date must fall in the selected period. \"All time\" counts every initiated product.\n• A record with no initiated date is always counted, whatever the period.",
+        started: "Started — delivery began in the selected period.\n• Latest record status is \"ongoing\".\n• Participant eligible (mode allowed, minimum paid).\n• Date filter: USED — the date it went ongoing must fall in the selected period.\n• A record with no ongoing date is always counted, whatever the period.\n• A part of Ongoing.",
+        ongoing: "Ongoing — everything currently in delivery.\n• Latest record status is \"ongoing\", eligible or not.\n• Date filter: NOT used — counted whenever delivery started.",
+        done: "Done — product cycles completed in the selected period.\n• Any record with status \"completed\" — earlier cycles count too, even if a newer cycle is open.\n• Discontinued customers included; eligible or not.\n• Date filter: USED — the completion date must fall in the selected period.\n• No completion date: the latest cycle is always counted; earlier cycles and discontinued customers only under \"All time\".\n• One per cycle.",
+        bonus: "Bonus — Eligible products (no status yet) given on a package named \"Bonus\".\n• Eligible = Purchased + Bonus + Add-on.\n• Date filter: NOT used.",
+        addons: "Add-on — Eligible products (no status yet) taken on a package named \"Addons\".\n• Eligible = Purchased + Bonus + Add-on.\n• Date filter: NOT used.",
+        purchased: "Purchased — Eligible products (no status yet) bought on a regular package (not \"Bonus\" and not \"Addons\").\n• Eligible = Purchased + Bonus + Add-on.\n• Date filter: NOT used.",
+        notEligible: "Not Eligible — products in Overall (no status yet) that cannot be started:\n• participant mode is Installation Event, Event or Integration, OR\n• less than the product minimum is paid while money is still owed.\n• Date filter: NOT used.",
+        total: "Overall — every product not initiated yet, eligible or not.\n• Latest record has NO status (initiated, ongoing and completed are all left out).\n• Overall = Eligible + Not Eligible.\n• Never loaded: cancelled or shifted records, and customers who are not Active / Non active (e.g. discontinued).\n• Date filter: NOT used.\n• \"Latest record\" = the participant's current cycle of that product: an open cycle (no status, initiated or ongoing) wins over a completed one; otherwise the most recent by initiated / ongoing / completed date.",
+        eligible: "Eligible — products not initiated yet that can be started.\n• Latest record has NO status (initiated products are left out).\n• Participant mode is not Installation Event / Event / Integration.\n• Minimum payment is paid, or nothing is owed.\n• Date filter: NOT used — always today's state.\n• Eligible = Purchased + Bonus + Add-on. One per participant per product.",
     };
+
+    /**
+     * Hover text for the Stages board (operator 2026-11-19), written like logicTip: who is counted, by which
+     * status / field, over which window, one row per what. Appointments on this board are only those starting
+     * in the current calendar month (filterAppointmentsByType('all') on selectedMonth — no month picker here).
+     * Keep in step with filterProductData / filterStageData / filterAppointmentsForStage / getNotScheduledCards.
+     */
+    private readonly stageColTips: Record<string, Record<string, string>> = {
+        eiStarterPack: {
+            'past month': 'Past Month — EI Starter Pack products not started yet (no status, or "initiated"; eligible) whose tentative start set in journey planning falls in last calendar month. They stay in Total Eligible too. One per product.',
+            'this month': 'This Month — EI Starter Pack products not started yet (no status, or "initiated"; eligible) whose tentative start set in journey planning falls in this calendar month. They stay in Total Eligible too. One per product.',
+            'next month': 'Next Month — EI Starter Pack products not started yet (no status, or "initiated"; eligible) whose tentative start set in journey planning falls in next calendar month. They stay in Total Eligible too. One per product.',
+        },
+        eiCustomSolutions: {
+            'this month': 'This Month — EI Solution products not started yet (no status, or "initiated"; eligible) whose tentative start set in journey planning falls in this calendar month. They stay in Total Eligible too. One per product.',
+            'next month': 'Next Month — EI Solution products not started yet (no status, or "initiated"; eligible) whose tentative start set in journey planning falls in next calendar month. They stay in Total Eligible too. One per product.',
+        },
+        ctdAppointment: {
+            "total eligible": "Total Eligible — CTD D&I (Appointment) products on the selected cycle with no status or status \"initiated\" (participant mode not installation event / event / integration; minimum paid or nothing owed), plus \"ongoing\" products with no submitted CTD form and no attended CTD appointment this calendar month. One per product.",
+            "aspiration form": "Aspiration Form — \"ongoing\" products on the selected cycle whose furthest step is a submitted CTD Aspiration Form. One per product.",
+            "atc understanding validation": "ATC Understanding Validation — \"ongoing\" products on the selected cycle whose furthest step is a submitted ATC Understanding Validation form. One per product.",
+            "my evolution wishlist": "My Evolution Wishlist (1st Cycle) — \"ongoing\" 1st Cycle products whose furthest step is a submitted My Evolution Wishlist form. One per product.",
+            "my pocket atc": "My Pocket ATC (Next Cycle) — \"ongoing\" Next Cycle products whose furthest step is a submitted My Pocket ATC form. One per product.",
+            "impact valuation activity": "Impact Valuation Activity — \"ongoing\" products on the selected cycle whose furthest step is a submitted CTD – Impact Valuation Activity form. One per product.",
+            "diagnostics": "Diagnostics — \"ongoing\" products on the selected cycle whose furthest step is an attended CTD Diagnostics appointment this calendar month. One per product. The cards below follow the All / Scheduled / Waiting tab.",
+            "implementation 1": "Implementation 1 — \"ongoing\" products on the selected cycle with one attended CTD Implementation (or CTD Implementation Appointment) this calendar month and no Review. One per product. The cards below follow the All / Scheduled / Waiting tab.",
+            "implementation 2": "Implementation 2 — \"ongoing\" products on the selected cycle with two or more attended CTD Implementation appointments this calendar month and no Review. One per product. The cards below follow the All / Scheduled / Waiting tab.",
+            "review": "Review — \"ongoing\" products on the selected cycle with an attended CTD Review (or CTD Review/Validation) appointment this calendar month. One per product. The cards below follow the All / Scheduled / Waiting tab.",
+            "completion": "Completion — CTD D&I (Appointment) products on the selected cycle with status \"completed\", completed within the selected period. One per product.",
+        },
+    };
+
+    /** Who sits in the column a stage's Waiting list is drawn from (CTD only; other products show the column name). */
+    private readonly stagePoolRule: Record<string, Record<string, string>> = {
+        ctdAppointment: {
+            impactValuation: 'Impact Valuation Activity (furthest step: CTD – Impact Valuation Activity form submitted)',
+            diagnostics: 'Diagnostics (furthest step: CTD Diagnostics attended)',
+            implementation1: 'Implementation 1 (one CTD Implementation attended)',
+            implementation2: 'Implementation 2 (two CTD Implementations attended)',
+        },
+    };
+
+    private readonly stagePoolLabel: Record<string, string> = {
+        totalEligible: 'Total Eligible', onBoarding: 'Onboarding', preprocess: 'Pre-Process',
+        diagnostics: 'Diagnostics', implementation: 'Implementation', review: 'Review',
+    };
+
+    stageColTip(col: string): string {
+        return this.stageColTips[this.selectedProductType]?.[col.toLowerCase().trim()] || '';
+    }
+
+    stageStatTip(col: string, kind: 'completed' | 'cancelled' | 'all' | 'scheduled' | 'waiting'): string {
+        const key = col.toLowerCase().trim();
+        const product = this.selectedProductType;
+        const type = this.stageAppointmentTypeMap[key] || col;
+        const isOnboarding = key === 'onboarding';
+        const isCtd = product === 'ctdAppointment';
+        const typeText = isCtd && key.startsWith('implementation') ? 'CTD Implementation / CTD Implementation Appointment'
+            : isCtd && key === 'review' ? 'CTD Review / CTD Review/Validation' : type;
+        switch (kind) {
+            case 'completed':
+                return `Completed — ${typeText} appointments starting this calendar month marked attended (or form submitted). One per appointment.`
+                    + (this.terminalStageKey[product] === key ? ' On this last stage, products with status "completed" are added too, once per participant.' : '');
+            case 'cancelled':
+                return `Cancelled — ${typeText} appointments starting this calendar month marked cancelled. This board loads only non-cancelled appointments, so it stays 0.`;
+            case 'all':
+                return isOnboarding
+                    ? 'All — Scheduled + Waiting: every not-started product, onboarding call booked or not.'
+                    : `All — Scheduled + Waiting: everyone due for ${typeText} this calendar month, booked or not.`;
+            case 'scheduled':
+                return isOnboarding
+                    ? 'Scheduled — products with no status yet whose product onboarding call is booked or done. One per product.'
+                    : `Scheduled — ${typeText} appointments starting this calendar month, not attended and not cancelled; past-due ones stay here until marked attended. One per appointment.`;
+            case 'waiting': {
+                if (isOnboarding) return 'Waiting — products with no status yet and no product onboarding call booked. One per product.';
+                const pool = this.stagePopulationSource[product]?.[key];
+                const from = (pool && this.stagePoolRule[product]?.[pool]) || (pool ? (this.stagePoolLabel[pool] || pool) : 'the previous column');
+                return `Waiting — products in ${from} with no ${typeText} appointment booked this calendar month. One per product.`;
+            }
+        }
+    }
 
     // ===== Search inside every mat-select (ngx-mat-select-search, operator 2026-11-18) =====
     /** Text typed into each select's search box, keyed by select. */
@@ -7137,7 +7569,7 @@ export class DeliveryDashboardCloneComponent {
     readonly cardOptLabel = (cardId: string): string => this.getCardName(cardId);
 
     private readonly IDLE_DAYS = 7;
-    private readonly STUCK_DAYS = 15;
+    private readonly STUCK_DAYS = 7;   // operator 2026-11-19: was 15
     private stuckCasesCache: any[] = [];
     private stuckKey = '';
 
@@ -7323,7 +7755,7 @@ export class DeliveryDashboardCloneComponent {
                     // The three appointment columns below were hardcoded 'N/A' / a status date.
                     // getRecentAppointmentDetails() overwrites them from the participant's most
                     // recent ATTENDED appointment; these are the values shown when there is none.
-                    appointment: 'No attended appointment',
+                    appointment: 'No booked appointment',
                     appointmentstatus: '—',
                     issuetype: status === 'ongoing' ? 'Stuck mid-flow' : 'Initiated · stalled',
                     date: null,
@@ -7412,7 +7844,7 @@ export class DeliveryDashboardCloneComponent {
      *
      * WHO (rule from mahalakshmi-development delivery-dashboard-new, operator 2026-11-12): candidates are
      * IN DELIVERY (status 'ongoing' + product mode 'priority mode', chosen in populateActionableCohorts);
-     * stuck = more than STUCK_DAYS (15) since the last ATTENDED appointment (none → since statusdate.ongoing)
+     * stuck = more than STUCK_DAYS (7) since the last BOOKED appointment, attended or not (none → since statusdate.ongoing)
      * AND no future appointment booked. Longest stuck first.
      *
      * COLUMNS (joshua-development 0bb85765, operator 2026-11-18): APPOINTMENT / APPOINTMENT STATUS /
@@ -7435,8 +7867,9 @@ export class DeliveryDashboardCloneComponent {
             return;
         }
 
-        // Read ALL appointments of the candidate products and split them like her buckets:
-        //   cancelled → ignored · attended → keep the latest (by end) · scheduled with start > now → future booking
+        // Read ALL appointments of the candidate products:
+        //   cancelled → ignored · start <= now → keep the latest BOOKED one (attended or not; operator
+        //   2026-11-19, was latest attended) · start > now → future booking
         const lastAttendedMap = new Map<string, { end: Date; appt: any }>();
         const hasFutureMap = new Map<string, boolean>();
         const now = Date.now();
@@ -7457,12 +7890,12 @@ export class DeliveryDashboardCloneComponent {
                     const ppId = a['participantproductid'];
                     if (a['cancelled'] === true) continue;
                     const start = this.toDateOrNull(a['starttime']) || this.toDateOrNull(a['appointmentstart']);
-                    const end = this.toDateOrNull(a['endtime']) || this.toDateOrNull(a['appointmentend']) || start;
-                    if (a['attended'] === true) {
-                        const kept = lastAttendedMap.get(ppId);
-                        if (end && (!kept || end.getTime() > kept.end.getTime())) lastAttendedMap.set(ppId, { end, appt: a });
-                    } else if (start && start.getTime() > now) {
+                    if (!start) continue;
+                    if (start.getTime() > now) {
                         hasFutureMap.set(ppId, true);
+                    } else {
+                        const kept = lastAttendedMap.get(ppId);
+                        if (!kept || start.getTime() > kept.end.getTime()) lastAttendedMap.set(ppId, { end: start, appt: a });
                     }
                 }
             } catch (err) {
@@ -7477,26 +7910,29 @@ export class DeliveryDashboardCloneComponent {
 
         for (const item of stuckItems) {
             const last = lastAttendedMap.get(item.participantproductid) || null;
-            // No attended appointment yet → count from when delivery went ongoing.
+            // No booked appointment yet → count from when delivery went ongoing.
             const lastActivity = last?.end || this.toDateOrNull(item.ongoingdate);
             item.recentappointmentdate = last?.end || null;
             item.actualstuckdays = lastActivity ? this.daysSinceTs(lastActivity) : null;
             item.stuckdays = item.actualstuckdays;
             item.stuckdaysbasis = last ? 'appointment' : 'status';
             item.hasfutureappointment = hasFutureMap.get(item.participantproductid) === true;
+            this.stuckFacts.set(item.participantproductid, {
+                days: item.actualstuckdays, hasFuture: item.hasfutureappointment,
+                basis: item.stuckdaysbasis, lastDate: last?.end || null,
+            });
             if (last) {
                 const appt = last.appt;
-                item.date = appt['endtime'] ?? last.end;
+                item.date = appt['starttime'] ?? last.end;
                 item.appointment = this.resolveAppointmentType(appt) || 'Appointment';
-                // Every kept row passed attended == true, so the status is not a guess.
-                item.appointmentstatus = 'Attended';
+                item.appointmentstatus = appt['attended'] === true ? 'Attended' : 'Not attended';
                 // Wired but usually inert: the coach is most likely in the appointment's `hosts`
                 // array rather than a flat `assignedto` field (Joshua's note, 0bb85765).
                 item.assignedto = appt['assignedto'] || item.assignedto || 'Unassigned';
             }
         }
 
-        // Stuck = more than STUCK_DAYS (15) since last activity AND nothing booked ahead; longest first.
+        // Stuck = more than STUCK_DAYS (7) since the last booked appointment AND nothing booked ahead; longest first.
         this.stuckCasesCache = stuckItems
             .filter(item => item.actualstuckdays !== null && item.actualstuckdays > this.STUCK_DAYS && !item.hasfutureappointment)
             .sort((x, y) => (y.actualstuckdays ?? 0) - (x.actualstuckdays ?? 0));
@@ -7548,8 +7984,8 @@ export class DeliveryDashboardCloneComponent {
             requests.push(runInInjectionContext(this.injector, () =>
                 getDocs(query(
                     collection(this.firestore, 'appointments'),
-                    where('participantproductid', 'in', chunk),
-                    where('cancelled', '==', false)
+                    // Cancelled appointments included (operator 2026-11-19) — shown with status Cancelled.
+                    where('participantproductid', 'in', chunk)
                 ))
             ));
         }
@@ -7566,25 +8002,35 @@ export class DeliveryDashboardCloneComponent {
     }
 
     private weeklyParticipants(item: any, appointmentsByProduct: Map<string, any[]>) {
-        const appointments = (appointmentsByProduct.get(item.docid) || []).sort((a, b) => a['starttime'].toMillis() - b['starttime'].toMillis());
+        const appointments = (appointmentsByProduct.get(item.docid) || [])
+            .filter(a => a['starttime']?.toMillis)
+            .sort((a, b) => a['starttime'].toMillis() - b['starttime'].toMillis());
 
         return {
             name: this.mapMetaData[item.profileid]?.['name'] || item.profileid,
-            diagnosticsSpecialist: this.getSpecialistNames(appointments, 'diagnostics'),
-            implementationSpecialist: this.getSpecialistNames(appointments, 'implementation'),
+            // Specialists from kept (non-cancelled) appointments only.
+            diagnosticsSpecialist: this.getSpecialistNames(appointments.filter(a => a['cancelled'] !== true), 'diagnostics'),
+            implementationSpecialist: this.getSpecialistNames(appointments.filter(a => a['cancelled'] !== true), 'implementation'),
             initiatedDate: this.getDateFromFieldPublic(item.statusdate.initiated),
             initiatedLabel: this.formatDate(item.statusdate.initiated),
-            appointments: appointments.map(a => this.buildWeeklyAppointment(a)),
+            appointments: appointments.map(a => this.buildWeeklyAppointment(a, this.getDateFromFieldPublic(item.statusdate.initiated))),
         };
     }
 
-    private buildWeeklyAppointment(appointment: any) {
+    private buildWeeklyAppointment(appointment: any, initiated: Date | null) {
         let statusKey = 'booked';
-        if (appointment['attended']) statusKey = 'completed';
+        if (appointment['cancelled'] === true) statusKey = 'cancelled';
+        else if (appointment['attended']) statusKey = 'completed';
+
+        // Ongoing Days (operator 2026-11-23): calendar days from the Initiation Date to the appointment date.
+        const start: Date = appointment['starttime'].toDate();
+        const dayOnly = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+        const ongoingDays = initiated ? Math.round((dayOnly(start) - dayOnly(initiated)) / 86400000) : '-';
 
         return {
-            start: appointment['starttime'].toDate(),
+            start,
             appointmentDate: this.formatDateTime(appointment['starttime']),
+            ongoingDays,
             stage: this.resolveAppointmentType(appointment) || '-',
             statusKey,
             status: this.weeklyStatusLabels[statusKey],
@@ -7629,6 +8075,7 @@ export class DeliveryDashboardCloneComponent {
             'Implementation Specialist': row.implementationSpecialist,
             'Initiation Date': row.initiatedLabel,
             'Appointment Date & Time': row.appointmentDate,
+            'Ongoing Days': row.ongoingDays,
             'Stage': row.stage,
             'Status': row.status,
         }));
@@ -7638,7 +8085,7 @@ export class DeliveryDashboardCloneComponent {
     // helper functions
     private toTableRows(participant: any, appointments: any[], sno: number): any[] {
         if (appointments.length === 0) {
-            return [{ ...participant, sno, isFirst: true, appointmentDate: '-', stage: '-', status: '-' }];
+            return [{ ...participant, sno, isFirst: true, appointmentDate: '-', ongoingDays: '-', stage: '-', status: '-' }];
         }
         return appointments.map((appointment, index) => ({
             ...participant, ...appointment, sno, isFirst: index === 0
@@ -7689,5 +8136,296 @@ export class DeliveryDashboardCloneComponent {
         this.formOverlay.mapWorkshop = this.mapWorkshop;
         this.formOverlay.mapWorkshopNew = this.mapWorkshopNew;
         this.formOverlay.viewFormOverlay(row);
+    }
+
+    // ─────────────────────────── "Why not here?" (operator 2026-11-19) ───────────────────────────
+    // Membership (✓ / ✗) is read from the SAME lists the dashboard counts (grouped*, funnelData, the
+    // Needs-attention cohorts), so the dialog cannot disagree with the screen. The reason text re-checks the
+    // rule each list applies — keep it in step with applyDateFilter, populateActionableCohorts,
+    // getRecentAppointmentDetails and isReadyToStart.
+    whyOpen = false;
+    whyQuery = '';
+    // Multi-select filters (operator 2026-11-19): an empty selection means "all".
+    whySection: string[] = [];   // section keys
+    whyProduct: string[] = [];   // product ids
+    whyStatus: string[] = [];    // product statuses (e.g. "ongoing", "no status")
+    whyProfileId: string | null = null;
+    whyMatchList: { id: string; name: string; status: string }[] = [];
+    whyResults: { pid: string; product: string; card: string; status: string; summary: string; inNow: string[];
+        rows: { key: string; label: string; isIn: boolean; reason: string }[] }[] = [];
+    readonly whySections = [
+        { key: 'overall', label: 'Product Overview · Overall (Total)' },
+        { key: 'eligible', label: 'Product Overview · Eligible' },
+        { key: 'notEligible', label: 'Product Overview · Not Eligible' },
+        { key: 'purchased', label: 'Product Overview · Purchased' },
+        { key: 'bonus', label: 'Product Overview · Bonus' },
+        { key: 'addons', label: 'Product Overview · Add-on' },
+        { key: 'yetToStart', label: 'Funnel · Yet to Start' },
+        { key: 'init', label: 'Funnel · Init' },
+        { key: 'started', label: 'Funnel · Started' },
+        { key: 'ongoing', label: 'Funnel · Ongoing' },
+        { key: 'delivered', label: 'Delivered / Done' },
+        { key: 'awaiting', label: 'Awaiting Initiation' },
+        { key: 'ready', label: 'Ready to Start' },
+        { key: 'stuck', label: 'Needs attention · Stuck' },
+        { key: 'idle', label: 'Needs attention · Not consuming' },
+    ];
+
+    openWhyDialog() {
+        this.whyOpen = true;
+        this.whyQuery = '';
+        this.whyProfileId = null;
+        this.whyMatchList = [];
+        this.whyResults = [];
+    }
+
+    closeWhyDialog() {
+        this.whyOpen = false;
+    }
+
+    onWhyQuery() {
+        this.whyProfileId = null;
+        this.whyResults = [];
+        // Names are stored with stray double spaces ("Karan  Sawhney") — collapse them on both sides.
+        const squash = (v: string) => v.toLowerCase().replace(/\s+/g, ' ').trim();
+        const q = squash(this.whyQuery);
+        const out: { id: string; name: string; status: string }[] = [];
+        if (q.length >= 2) {
+            for (const [id, meta] of Object.entries<any>(this.mapMetaData)) {
+                const name = (meta?.['name'] || '').toString();
+                if (!squash(name).includes(q)) continue;
+                out.push({ id, name, status: (meta?.['customerstatus'] || 'no status').toString() });
+                if (out.length >= 10) break;
+            }
+        }
+        this.whyMatchList = out;
+    }
+
+    pickWhy(match: { id: string; name: string }) {
+        this.whyProfileId = match.id;
+        this.whyQuery = match.name;
+        this.whyMatchList = [];
+        this.whyProduct = [];
+        this.whyStatus = [];
+        this.runWhy();
+    }
+
+    get whyFilteredResults() {
+        return this.whyResults.filter(r =>
+            (!this.whyProduct.length || this.whyProduct.includes(r.pid)) &&
+            (!this.whyStatus.length || this.whyStatus.includes(r.status)));
+    }
+
+    /** Status filter options: the statuses this participant's products actually have. */
+    get whyStatusOptions(): string[] {
+        return Array.from(new Set(this.whyResults.map(r => r.status)));
+    }
+
+    /** Panel header badge: one section chosen → ✓ In / ✗ Not in; several → "In k of n selected"; none → all sections. */
+    whyHeaderBadge(result: { rows: any[]; inNow: string[] }): { text: string; isIn: boolean } {
+        const rows = this.whyRowsFor(result);
+        const inCount = rows.filter(r => r.isIn).length;
+        if (this.whySection.length === 1) {
+            return { text: inCount ? '✓ In' : '✗ Not in', isIn: inCount > 0 };
+        }
+        const of = this.whySection.length ? `${rows.length} selected` : `${rows.length} sections`;
+        return { text: `In ${inCount} of ${of}`, isIn: inCount > 0 };
+    }
+
+    /** Short trigger text for a multi-select: "All", the single label, or "<first> +N". */
+    whyTriggerText(selected: string[], labelOf: (v: string) => string, all: string): string {
+        if (!selected.length) return all;
+        const first = labelOf(selected[0]);
+        return selected.length === 1 ? first : `${first} +${selected.length - 1}`;
+    }
+
+    whySectionLabel = (key: string) => this.whySections.find(x => x.key === key)?.label || key;
+    whyProductLabel = (pid: string) => this.whyResults.find(r => r.pid === pid)?.product || pid;
+    whyStatusLabel = (st: string) => st.replace(/\b\w/g, c => c.toUpperCase());
+
+    runWhy() {
+        const id = this.whyProfileId;
+        if (!id) { this.whyResults = []; return; }
+        const meta = this.mapMetaData[id] || {};
+        const productIds = Array.from(new Set(
+            this.everyProductRecordRaw
+                .filter(r => r?.profileid === id)
+                .map(r => r?.productref?.id)
+                .filter((pid: string) => !!pid && !!this.cardLabelForProductId(pid))
+        )) as string[];
+        this.whyResults = productIds.map(pid => this.explainWhy(id, pid, meta));
+    }
+
+    whyRowsFor(result: { rows: any[] }) {
+        return !this.whySection.length ? result.rows : result.rows.filter(r => this.whySection.includes(r.key));
+    }
+
+    private whyPeriodLabel(): string {
+        if (!this.dateRangeStart) return 'All time';
+        const f = (d: Date | null) => d ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '…';
+        return `the selected period (${f(this.dateRangeStart)} – ${f(this.dateRangeEnd)})`;
+    }
+
+    private explainWhy(id: string, pid: string, meta: any) {
+        const product = this.mapProductName?.[pid] || this.mapProduct?.[pid] || pid;
+        const card = this.cardLabelForProductId(pid) || '';
+        const st = (r: any) => (r?.status || '').toString().toLowerCase().trim();
+        const mine = (r: any) => r?.profileid === id && r?.productref?.id === pid;
+        const has = (list: any[] | undefined) => (list || []).some(mine);
+        const fmt = (ts: any) => {
+            const d = this.toDateOrNull(ts);
+            return d ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'no date';
+        };
+
+        const every = this.everyProductRecordRaw.filter(mine);
+        const loaded = this.allMatchedProductsRaw.filter(mine);
+        const latest = loaded.find(r => this.latestRecordKeys.has(r?.id || r?.docid)) || null;
+        const s = st(latest);
+        const sd = latest?.statusdate || {};
+        const cust = (meta['customerstatus'] || '').toString().toLowerCase().trim();
+        const mode = (meta['participantmode'] || '').toString().toLowerCase().trim();
+        const paid = parseInt(meta['pp_totalpaid'] ?? '0') || 0;
+        const value = parseInt(meta['pp_totalpurchasevalue'] ?? '0') || 0;
+        const balance = value - paid;
+        const minPay = parseInt(latest?.['minimumpayment']) || 0;
+        const modeOk = !this.excludedModes.has(mode);
+        const payOk = balance <= 0 || paid >= minPay;
+        const eligible = modeOk && payOk;
+        const period = this.whyPeriodLabel();
+        const filterHidden = !this.itemPassesProductFilter({ productref: { id: pid } });
+        const statusTxt = s ? `"${s}"` : 'no status';
+        const statuses = Array.from(new Set(every.map(r => st(r) || 'no status'))).map(x => `"${x}"`).join(', ');
+
+        // Why nothing of this product is loaded at all (applies to every section except Delivered).
+        let gate = '';
+        if (filterHidden) {
+            gate = `The Products filter at the top hides ${card}.`;
+        } else if (!loaded.length) {
+            gate = !['active', 'non active'].includes(cust)
+                ? `Customer status is "${meta['customerstatus'] || 'not set'}" — only Active / Non active customers are loaded here.`
+                : `Every record of this product is ${statuses} — cancelled and shifted records are never loaded.`;
+        }
+        const latestNote = loaded.length > 1 ? ` (latest of ${loaded.length} cycles — older cycles don't count here)` : '';
+        const modeTxt = `Participant mode is "${meta['participantmode']}" — Installation Event / Event / Integration are excluded.`;
+        const payTxt = `Paid ₹${paid.toLocaleString('en-IN')} against a ₹${minPay.toLocaleString('en-IN')} minimum while ₹${balance.toLocaleString('en-IN')} is still owed.`;
+        // The rule passes but the list hasn't got them: the dashboard is still loading (or just refreshed).
+        const PASS = 'The rule passes, but the list doesn\'t have them yet — the dashboard may still be loading. Reopen in a moment.';
+        const notStarted = () => gate || (s ? `Latest record is ${statusTxt}${latestNote} — only products with no status are counted here.` : PASS);
+        const eligibility = () => !modeOk ? modeTxt : !payOk ? payTxt : PASS;
+
+        const readiness = () => {
+            if (gate || s) return notStarted();
+            if (!eligible) return eligibility();
+            const fails: string[] = [];
+            if (cust !== 'active') fails.push(`customer status is "${meta['customerstatus'] || 'not set'}" (needs Active)`);
+            const fin = (meta['financialstatus'] || '').toString().toLowerCase().trim();
+            if (!['regular', 'fully paid'].includes(fin)) fails.push(`finance status is "${meta['financialstatus'] || 'not set'}" (needs Regular or Fully paid)`);
+            const parallel = this.getParallelProduct(id, pid);
+            if (parallel) fails.push(`has another active product: ${parallel}`);
+            return fails.length ? `Not ready — ${fails.join('; ')}.` : PASS;
+        };
+
+        const pkg = latest?.packageref?.id;
+        const pkgKind = pkg && this.bonusPackageLookup[pkg] ? 'Bonus' : pkg && this.addonsPackageLookup[pkg] ? 'Add-on' : 'Purchased';
+        const pkgReason = (want: string) => (gate || s) ? notStarted() : !eligible ? eligibility()
+            : pkgKind === want ? PASS
+            : `Package is ${pkgKind === 'Purchased' ? 'a regular one' : `"${pkgKind}"`} — counted in ${pkgKind}, not ${want}.`;
+
+        const funnel: any = this.funnelData?.[pid] || {};
+        const statusStep = (want: string, dateKey: string) => {
+            if (gate) return gate;
+            if (s !== want) return `Latest record is ${statusTxt}${latestNote} — this step needs "${want}".`;
+            if (!eligible) return eligibility();
+            const d = this.getDateFromFieldPublic(sd[dateKey]);
+            if (this.isDateInRange(d)) return PASS;
+            return `${want === 'initiated' ? 'Initiated' : 'Went ongoing'} on ${fmt(sd[dateKey])} — outside ${period}.`;
+        };
+
+        const deliveredReason = () => {
+            if (filterHidden) return gate;
+            const done = this.completedRecordsRaw.filter(mine);
+            if (!done.length) return `No completed cycle of this product — its records are ${statuses || 'none'}.`;
+            const inPeriod = done.some(r => {
+                const d = this.getDateFromFieldPublic(r?.statusdate?.['completed']);
+                return d ? this.isDateInRange(d) : (this.latestRecordKeys.has(r?.id || r?.docid) || !this.dateRangeStart);
+            });
+            if (inPeriod) return PASS;
+            return `Completed on ${done.map(r => fmt(r?.statusdate?.['completed'])).join(', ')} — outside ${period}.`;
+        };
+
+        const noStatusLoaded = loaded.filter(r => !st(r));
+        const awaitingIn = (this.originalData?.['awaitingInitiation']?.data || []).some((r: any) => r?.profileid === id)
+            && noStatusLoaded.length > 0 && modeOk && !filterHidden;
+        const awaitingReason = () => gate
+            || (!noStatusLoaded.length ? `No record of this product is without a status (records: ${statuses}).` : !modeOk ? modeTxt : PASS);
+
+        const ongoingLoaded = loaded.filter(r => st(r) === 'ongoing');
+        const stuckIn = !filterHidden && this.stuckCasesCache.some((r: any) => ongoingLoaded.some(o => o?.docid === r?.participantproductid));
+        const stuckReason = () => {
+            if (gate) return gate;
+            if (!ongoingLoaded.length) return `No "ongoing" record (latest is ${statusTxt}) — Stuck only checks products in delivery.`;
+            const priority = ongoingLoaded.filter(r => (r?.mode || '').toString().toLowerCase().trim() === 'priority mode');
+            if (!priority.length) return `Product mode is "${ongoingLoaded[0]?.mode || 'not set'}" — Stuck only checks Priority Mode.`;
+            const f = this.stuckFacts.get(priority[0]?.docid);
+            if (!f) return 'Appointment check has not finished yet — reopen in a moment.';
+            if (f.hasFuture) return 'Has an appointment booked ahead.';
+            if ((f.days ?? 0) > this.STUCK_DAYS) return PASS;
+            const since = f.lastDate ? `the last booked appointment (${fmt(f.lastDate)})` : 'delivery went ongoing (no booked appointment yet)';
+            return `Only ${f.days ?? 0} day${f.days === 1 ? '' : 's'} since ${since} — Stuck needs more than ${this.STUCK_DAYS}.`;
+        };
+
+        const initiatedLoaded = loaded.filter(r => st(r) === 'initiated');
+        const idleIn = !filterHidden
+            && (this.originalData?.['currentJourneyInitiated']?.data || []).some((r: any) => r?.profileid === id)
+            && initiatedLoaded.some(r => (this.daysSinceTs(r?.statusdate?.['initiated']) ?? -1) >= this.IDLE_DAYS);
+        const idleReason = () => {
+            if (gate) return gate;
+            if (!initiatedLoaded.length) return `No "initiated" record (latest is ${statusTxt}).`;
+            const d = this.daysSinceTs(initiatedLoaded[0]?.statusdate?.['initiated']);
+            if (d !== null && d >= this.IDLE_DAYS) return PASS;
+            return d === null ? 'Initiated with no initiated date recorded.' : `Initiated ${d} day${d === 1 ? '' : 's'} ago — needs ${this.IDLE_DAYS} or more.`;
+        };
+
+        const readyIn = has(funnel.awaiting)
+            && (this.originalData?.['readyForInitiation']?.data || []).some((r: any) => r?.profileid === id);
+
+        const rows = ([
+            ['overall', has(this.groupedAll[pid]), notStarted],
+            ['eligible', has(this.groupedFiltered[pid]), () => (gate || s) ? notStarted() : eligibility()],
+            ['notEligible', has(this.groupedNotEligible[pid]), () => (gate || s) ? notStarted() : eligible ? 'Participant is eligible — counted in Eligible.' : PASS],
+            ['purchased', has(this.groupedPurchased[pid]), () => pkgReason('Purchased')],
+            ['bonus', has(this.groupedBonus[pid]), () => pkgReason('Bonus')],
+            ['addons', has(this.groupedAddons[pid]), () => pkgReason('Add-on')],
+            ['yetToStart', has(funnel.awaiting), readiness],
+            ['init', has(funnel.initiated), () => statusStep('initiated', 'initiated')],
+            ['started', has(funnel.started), () => statusStep('ongoing', 'ongoing')],
+            ['ongoing', has(funnel.ongoing), () => gate || (s === 'ongoing' ? PASS : `Latest record is ${statusTxt}${latestNote} — Ongoing needs "ongoing".`)],
+            ['delivered', has(funnel.completed), deliveredReason],
+            ['awaiting', awaitingIn, awaitingReason],
+            ['ready', readyIn, readiness],
+            ['stuck', stuckIn, stuckReason],
+            ['idle', idleIn, idleReason],
+        ] as [string, boolean, () => string][]).map(([key, isIn, why]) => ({
+            key,
+            label: this.whySections.find(x => x.key === key)?.label || key,
+            isIn,
+            reason: isIn ? 'In this section.' : why(),
+        }));
+
+        // Product status shown on the panel: the latest record the dashboard uses; when nothing of this product
+        // is loaded (cancelled / shifted / discontinued), the most recent record of any status.
+        const recency = (r: any) => Math.max(0, ...['initiated', 'started', 'ongoing', 'completed']
+            .map(k => this.getDateFromFieldPublic(r?.statusdate?.[k])?.getTime() || 0));
+        const shown = latest || [...every].sort((a, b) => recency(b) - recency(a))[0];
+        const status = st(shown) || 'no status';
+
+        const summary = [
+            `Customer: ${meta['customerstatus'] || 'not set'}`,
+            `Mode: ${meta['participantmode'] || 'not set'}`,
+            `Latest record: ${loaded.length ? statusTxt : 'not loaded'}`,
+            `${every.length} record${every.length === 1 ? '' : 's'} (${statuses || 'none'})`,
+        ].join(' · ');
+
+        return { pid, product, card, status, summary, inNow: rows.filter(r => r.isIn).map(r => r.label), rows };
     }
 }

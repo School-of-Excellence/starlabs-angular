@@ -611,6 +611,16 @@
   color: var(--blue-fg);
   border-color: var(--blue-22);
 }
+/* Journey multi-select: the mat-select trigger overlays the pill invisibly (same trick as the native
+   selects above); the overlay panel lives in the CDK container so the opacity does not hide it. */
+.jchd-pill-select .jchd-pill-mselect {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.jchd-pill-select .jchd-pill-mselect ::ng-deep .mat-mdc-select-trigger { height: 100%; }
+.jchd-pill-select .jchd-pill-label { max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
 
 /* disabled pill (e.g. Clear filters with no active filters) */
 .jchd-pill:disabled {
@@ -818,7 +828,18 @@
 }
 
 /* dropdown overlay (rendered at document root) — calm iOS panel + accent checkmarks.
-   Scoped via the panelClass we set on each mat-select. */
+   Scoped via the panelClass we set on each mat-select.
+   The panel lives OUTSIDE .jchd-wrap, where the --surface / --ink tokens are undefined, so it rendered
+   transparent with dark text — invisible in dark mode (2026-11-20). The tokens are re-declared here,
+   with a dark set applied through the jchd-fp-dark panelClass the template adds when isDark. */
+::ng-deep .jchd-fp-panel.mat-mdc-select-panel {
+  --surface: #ffffff; --ink: #1c1c1e; --hairline: rgba(60, 60, 67, 0.14);
+  --blue: #007aff; --blue-08: rgba(0, 122, 255, 0.08); --blue-fg: #0060df;
+}
+::ng-deep .jchd-fp-panel.jchd-fp-dark.mat-mdc-select-panel {
+  --surface: #24242a; --ink: #f2f2f7; --hairline: rgba(255, 255, 255, 0.12);
+  --blue: #0a84ff; --blue-08: rgba(10, 132, 255, 0.14); --blue-fg: #64b5ff;
+}
 ::ng-deep .jchd-fp-panel.mat-mdc-select-panel {
   border-radius: 14px;
   padding: 6px;
@@ -3128,28 +3149,37 @@ td.mat-mdc-cell span {
    from the dashboard tokens automatically (dark included) with no jchd-overlay-dark / !important. */
 .ahd-backdrop { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center;
   justify-content: center; background: rgba(0,0,0,.42); padding: 24px; }
-.ahd-panel { width: min(420px,100%); max-height: 80vh; display: flex; flex-direction: column;
+.ahd-panel { width: min(760px,100%); max-height: 86vh; display: flex; flex-direction: column;
   background: var(--surface); color: var(--ink); border: 1px solid var(--hairline);
   border-radius: var(--r-lg); box-shadow: var(--card-shadow-hover); overflow: hidden; }
-.ahd-head { display: flex; align-items: center; gap: 10px; padding: 16px 18px 10px; }
+.ahd-head { display: flex; align-items: center; gap: 10px; padding: 12px 16px 8px; border-bottom: 1px solid var(--hairline); }
 .ahd-title { flex: 1 1 auto; display: flex; align-items: center; gap: 10px; margin: 0;
-  font-size: 16px; color: var(--ink); }
+  font-size: 15px; color: var(--ink); }
 .ahd-count { font-size: 12px; font-weight: 600; color: var(--ink-2); background: var(--surface-2);
   border-radius: 999px; padding: 2px 9px; }
 .ahd-close { border: none; background: none; font-size: 22px; line-height: 1; color: var(--ink-3);
   cursor: pointer; padding: 2px 6px; border-radius: 8px; }
 .ahd-close:hover { background: var(--fill-hover); color: var(--ink); }
-.ahd-body { display: flex; flex-direction: column; gap: 2px; padding: 4px 12px 14px; overflow-y: auto; }
+.ahd-body { display: flex; flex-direction: column; gap: 0; padding: 4px 8px 8px; overflow-y: auto; }
 .ahd-empty { color: var(--ink-2); font-size: 13px; padding: 12px 4px; }
 .ahd-row { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: none;
-  background: none; font: inherit; cursor: pointer; padding: 9px 8px; border-radius: 9px;
+  background: none; font: inherit; cursor: pointer; padding: 5px 8px; border-radius: 7px;
   transition: background .12s ease; }
 .ahd-row:hover:not([disabled]) { background: var(--surface-2); }
 .ahd-row[disabled] { cursor: default; opacity: .55; }
-.ahd-name { flex: 1 1 auto; font-size: 13.5px; color: var(--ink); white-space: nowrap; overflow: hidden;
+.ahd-name { flex: 1 1 auto; font-size: 13px; color: var(--ink); white-space: nowrap; overflow: hidden;
   text-overflow: ellipsis; }
-.ahd-date { font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
-.ahd-chev { color: var(--ink-4); font-size: 18px; }
+.ahd-date { font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; flex: none; }
+/* name + optional second line (coach change "from → to · by", log author) */
+/* compact (2026-11-20): one line per row on a wide panel — name column, then the detail; stacks on phones */
+.ahd-main { flex: 1 1 auto; min-width: 0; display: flex; align-items: baseline; gap: 14px; }
+.ahd-main .ahd-name { flex: 0 0 210px; }
+.ahd-detail { flex: 1 1 auto; min-width: 0; font-size: 12px; color: var(--ink-3); overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .ahd-main { flex-direction: column; align-items: stretch; gap: 1px; }
+  .ahd-main .ahd-name { flex: none; }
+}
+.ahd-chev { color: var(--ink-4); font-size: 16px; line-height: 1; }
 
 /* ================================================================================
    Origin-only rules carried over when the token/type remap (b76bbc6a + 48f2d0ff /
@@ -3280,3 +3310,58 @@ td.mat-mdc-cell span {
 }
 .jx-tabbar { align-items: center; }
 .jx-theme-toggle { margin-left: auto; }
+
+/* ---- Coach-set health legend counts are buttons that open the participant list (2026-11-20) ---- */
+.health-card button.hl-item {
+  border: 0; background: transparent; font: inherit; font-size: var(--fs-300); padding: 3px 6px; margin: -3px -6px;
+  border-radius: 8px; cursor: pointer; color: var(--ink-2);
+}
+.health-card button.hl-item:hover:not(:disabled) { background: var(--tile); }
+.health-card button.hl-item:disabled { cursor: default; opacity: .7; }
+.health-card button.hl-item:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+/* ---- Happiness quotient + JC Health logs card ---- */
+.hq-card { margin-bottom: var(--gap); height: auto; gap: 14px; }
+.hq-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.hq-bar .hq-head { margin-bottom: 0; margin-right: auto; }
+.hq-body { display: flex; flex-wrap: wrap; align-items: center; gap: 24px; transition: opacity .15s ease; }
+.hq-body.is-loading { opacity: .5; }
+.hq-metric { display: flex; align-items: baseline; gap: 8px; min-width: 150px; }
+.hq-pct { font-size: 44px; font-weight: var(--fw-bold); line-height: 1; color: var(--sem-green); font-variant-numeric: tabular-nums; }
+.hq-frac { border: 0; background: transparent; font: inherit; font-size: var(--fs-300); font-weight: var(--fw-medium);
+  color: var(--ink-3); font-variant-numeric: tabular-nums; padding: 2px 4px; border-radius: 6px; cursor: pointer; }
+.hq-frac:hover:not(:disabled) { background: var(--tile); color: var(--ink); }
+.hq-frac:disabled { cursor: default; }
+.hq-logs { flex: 1 1 380px; display: flex; flex-direction: column; gap: 10px; min-width: 0;
+  border-left: 1px solid var(--border-2); padding-left: 24px; }
+.hq-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; }
+.hq-row.health-card { padding: 0; box-shadow: none; background: transparent; }
+.hq-row .health-legend.hq-states { margin-top: 0; }
+.hq-types { gap: 6px 16px; }
+button.hq-type { border: 0; background: transparent; font: inherit; font-size: var(--fs-300); color: var(--ink-2);
+  padding: 2px 6px; margin: -2px -6px; border-radius: 6px; cursor: pointer; }
+button.hq-type b { color: var(--ink); font-variant-numeric: tabular-nums; }
+button.hq-type:hover { background: var(--tile); }
+button.hq-type:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.hq-k { font-size: var(--fs-300); color: var(--ink-2); }
+.hq-k b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.hq-frac:focus-visible, @media (max-width: 720px) {
+  .hq-logs { border-left: 0; padding-left: 0; }
+}
+
+/* Export on the drill overlay (2026-11-20) */
+.ahd-export { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--border-2); background: var(--surface);
+  color: var(--ink-2); font: inherit; font-size: var(--fs-200); font-weight: var(--fw-semibold); padding: 4px 10px;
+  border-radius: var(--r-pill); cursor: pointer; }
+.ahd-export mat-icon { font-size: 16px; width: 16px; height: 16px; }
+.ahd-export:hover:not(:disabled) { background: var(--tile); color: var(--ink); }
+.ahd-export:disabled { opacity: .5; cursor: default; }
+.ahd-export:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+/* Name search in the drill dialog (2026-11-20) */
+.ahd-search { display: flex; align-items: center; gap: 6px; margin: 8px 16px 4px; padding: 6px 10px;
+  border: 1px solid var(--border-2); border-radius: 9px; background: var(--surface-2); }
+.ahd-search mat-icon { font-size: 18px; width: 18px; height: 18px; color: var(--ink-3); }
+.ahd-search input { flex: 1 1 auto; min-width: 0; border: 0; outline: 0; background: transparent; font: inherit;
+  font-size: 13px; color: var(--ink); }
+.ahd-search:focus-within { border-color: var(--blue); }

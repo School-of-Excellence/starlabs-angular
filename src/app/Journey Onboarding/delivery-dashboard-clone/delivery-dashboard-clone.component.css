@@ -9636,6 +9636,14 @@ table.specialist-table tr:hover td {
   background: var(--p-amber);
 }
 
+:host .stages-pchip-dot-ctd {
+  background: var(--p-teal);
+}
+
+:host .stages-ctd-cycle {
+  margin-left: 10px;
+}
+
 :host .stages-pchip.active .stages-pchip-dot {
   box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.04);
 }
@@ -18864,3 +18872,99 @@ i.seat-chip {
 /* Stages header: Export (30px) sat lower than the 40px participant search beside it */
 :host .flow-section .header-right { display: flex; align-items: center; gap: 10px; }
 :host .flow-section .header-right .dd-btn { box-sizing: border-box; height: var(--dd-ctl-h); display: inline-flex; align-items: center; gap: 6px; }
+
+/* Add-on chip (operator 2026-11-19): the Participants group now has 5 chips — Total, Not Elig., Purch., Bonus, Add-on.
+   Same selectors as the 4-column rules above; later in the file, so these win. */
+:host .dd-app .dd-prow__chips,
+:host .dd-app .dd-prow>.dd-prow__chips,
+:host .dd-app .dd-prow > .dd-prow__chips {
+  grid-template-columns: repeat(5, 1fr) !important;
+}
+:host .dd-app .dd-prow__chips .dd-prow__chip:nth-child(5) .dd-prow__chip-num {
+  color: #0ea5e9 !important;
+}
+:host .dd-app .dd-prow__chips .dd-prow__chip:nth-child(5) .dd-prow__chip-num.zero {
+  color: #cbd5e1 !important;
+}
+/* 5 participant chips need a little more of the row: chips column 2.2fr → 2.7fr (header + rows stay in step). */
+:host .dd-app .dd-prow-colhead,
+:host .dd-app .dd-prow {
+  grid-template-columns:
+    minmax(160px, 1.8fr)
+    minmax(56px, 0.55fr)
+    minmax(64px, 0.6fr)
+    minmax(0, 2.7fr)
+    minmax(0, 2.6fr)
+    minmax(0, 1.3fr)
+    minmax(0, 1.1fr) !important;
+}
+
+/* "Why not here?" dialog (2026-11-19) */
+.dd-why-btn { margin-left: 10px; }
+.dd-why { width: min(920px, 94vw); max-height: 86vh; min-height: min(640px, 86vh); overflow: auto; }
+.dd-why__controls { display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 10px; }
+.dd-why__search { position: relative; flex: 1 1 200px; }
+.dd-why__input { width: 100%; height: 40px; padding: 0 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; box-sizing: border-box; }
+.dd-why__matches { position: absolute; z-index: 5; left: 0; right: 0; top: 42px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,.08); max-height: min(460px, 60vh); overflow: auto; }
+.dd-why__match { display: block; width: 100%; text-align: left; padding: 8px 12px; border: 0; background: none; cursor: pointer; font-size: 13px; }
+.dd-why__match:hover { background: #f3f4f6; }
+.dd-why__section { flex: 0 1 210px; }
+.dd-why__muted { color: #6b7280; font-weight: 400; }
+.dd-why__hint { color: #6b7280; font-size: 13px; padding: 6px 0; }
+.dd-why__product { border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; margin-top: 12px; }
+.dd-why__ptitle { font-weight: 600; font-size: 14px; }
+.dd-why__summary { font-size: 12px; color: #4b5563; margin: 4px 0; }
+.dd-why__now { font-size: 12.5px; margin-bottom: 8px; }
+.dd-why__table td { font-size: 12.5px; vertical-align: top; }
+.dd-why__table tr.is-in td { color: #047857; }
+.dd-why__mark { width: 22px; font-weight: 700; color: #b91c1c; }
+.dd-why__table tr.is-in .dd-why__mark { color: #047857; }
+.dd-why__sec { width: 230px; white-space: nowrap; font-weight: 500; }
+.dd-why__accordion { display: block; margin-top: 12px; }
+.dd-why__panel { margin-bottom: 8px !important; border: 1px solid #e5e7eb; border-radius: 10px !important; box-shadow: none !important; }
+.dd-why__phead { height: auto !important; min-height: 52px; padding-top: 10px !important; padding-bottom: 10px !important; }
+.dd-why__phead .mat-content { align-items: center; }
+.dd-why .dd-why__ptitle { flex: 1 1 auto; display: block; margin-right: 12px; line-height: 1.35; }
+.dd-why .dd-why__pdesc { flex: 0 0 auto; justify-content: flex-end; margin-right: 8px; }
+.dd-why__badge { font-size: 11.5px; font-weight: 600; padding: 2px 10px; border-radius: 999px; background: #fee2e2; color: #991b1b; white-space: nowrap; }
+.dd-why__badge.is-in { background: #dcfce7; color: #166534; }
+.dd-why__status { flex: 0 1 150px; }
+.dd-why .dd-why__pdesc { gap: 8px; align-items: center; }
+.dd-why__status-chip { font-size: 11.5px; font-weight: 600; padding: 2px 10px; border-radius: 999px; white-space: nowrap; background: #f3f4f6; color: #374151; }
+.dd-why__status-chip[data-status="initiated"] { background: #e0e7ff; color: #3730a3; }
+.dd-why__status-chip[data-status="ongoing"] { background: #fef3c7; color: #92400e; }
+.dd-why__status-chip[data-status="completed"] { background: #dcfce7; color: #166534; }
+.dd-why__status-chip[data-status="cancelled"], .dd-why__status-chip[data-status="shifted"] { background: #fee2e2; color: #991b1b; }
+
+/* "Why not here?" — compact layout, one filter row, taller dialog (operator 2026-11-19). Later rules win. */
+.dd-why {
+  min-height: min(760px, 88vh); max-height: 92vh; overflow: hidden;
+  --mat-form-field-container-height: 36px;
+  --mat-form-field-container-vertical-padding: 6px;
+  --mat-form-field-container-text-size: 13px;
+  --mat-select-trigger-text-size: 13px;
+}
+.dd-why .modal-header { padding: 10px 16px; }
+.dd-why .modal-header h3 { font-size: 15px; margin: 0; }
+.dd-why .modal-body { padding: 0 16px 12px; overflow-y: auto; }
+.dd-why .dd-why__controls {
+  position: sticky; top: 0; z-index: 6; background: #fff;
+  flex-wrap: nowrap; gap: 8px; align-items: center; margin: 0; padding: 10px 0 8px;
+}
+.dd-why .dd-why__search { flex: 1 1 0; min-width: 120px; }
+.dd-why .dd-why__input { height: 36px; font-size: 13px; padding: 0 10px; }
+.dd-why .dd-why__matches { top: 38px; }
+.dd-why .dd-why__section, .dd-why .dd-why__status { min-width: 0; }
+.dd-why .dd-why__controls .dd-why__section { flex: 0 1 190px; }
+.dd-why .dd-why__controls .dd-why__status { flex: 0 1 130px; }
+.dd-why .dd-why__hint { font-size: 12px; padding: 4px 0; }
+.dd-why .dd-why__accordion { margin-top: 4px; }
+.dd-why .dd-why__panel { margin-bottom: 6px !important; }
+.dd-why .dd-why__phead { min-height: 40px; padding: 6px 14px !important; }
+.dd-why .dd-why__ptitle { font-size: 13px; }
+.dd-why .dd-why__badge, .dd-why .dd-why__status-chip { font-size: 11px; padding: 1px 8px; }
+.dd-why .dd-why__summary { font-size: 11.5px; margin: 0 0 2px; }
+.dd-why .dd-why__now { font-size: 12px; margin-bottom: 6px; }
+::ng-deep .dd-why .mat-expansion-panel-body { padding: 0 14px 10px; }
+::ng-deep .dd-why .dd-why__table td { padding: 4px 8px !important; font-size: 12px; line-height: 1.35; }
+.dd-why .dd-why__sec { width: 210px; }

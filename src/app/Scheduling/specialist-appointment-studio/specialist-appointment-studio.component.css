@@ -76,6 +76,12 @@
 .sas-stat.is-accent b { color:var(--bt-primary-deep); }
 .sas-stat.is-up b { color:var(--bt-success-deep); }
 .sas-stat.is-warn b { color:var(--bt-warning-deep); }
+.sas-stat.is-bad b { color:var(--bt-danger-deep); }
+.sas-stat small.sas-stat-warn { color:var(--bt-warning-deep); font-weight:700; }
+/* Summary cards open the data behind their number (operator, 2026-11-24). */
+.sas-stat.is-click { cursor:pointer; transition:box-shadow .15s, transform .15s; }
+.sas-stat.is-click:hover { box-shadow:0 0 0 2px var(--bt-primary-tint), var(--bt-sh-card); transform:translateY(-1px); }
+.sas-stat small.sas-stat-link { cursor:pointer; text-decoration:underline dotted; text-underline-offset:2px; }
 
 /* ---------- buttons, controls ---------- */
 .sas-btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:40px; padding:0 16px; border:0;
@@ -153,6 +159,14 @@
 .sas-slot.is-sess.st-done { --sc:var(--bt-success); }
 .sas-slot.is-sess.st-warn { --sc:var(--bt-warning); background:var(--bt-warning-tint); }
 .sas-slot.is-sess.st-off { --sc:var(--bt-ink-25); text-decoration:line-through; }
+/* Cancelled sessions read red with who cancelled, not grey and struck through (Muskan's review, 2026-11-23). */
+.sas-slot.is-sess.st-cancel { --sc:var(--bt-danger); background:var(--bt-danger-tint); }
+.sas-slot.is-sess.st-cancel small.sas-sess-st { color:var(--bt-danger-deep); font-weight:700; }
+/* A session whose window has no card of its own (each appointment shows once) is not indented. */
+.sas-slot.is-sess.is-solo { margin-left:0; width:100%; }
+/* Full participant and session names on week cards, wrapped instead of cut off. */
+.sas-slot small.w { white-space:normal; overflow-wrap:anywhere; color:var(--bt-ink-70); }
+.sas-slot.is-sess small.sas-sess-st, .sas-slot.is-sess small.sas-slot-who { white-space:normal; overflow-wrap:anywhere; padding-right:0; }
 .sas-slot .sas-del { position:absolute; top:4px; right:4px; width:26px; height:26px; }
 .sas-slot .sas-del mat-icon { width:16px; height:16px; font-size:16px; }
 .sas-add-slot { border:1px dashed var(--bt-ink-25); background:none; border-radius:10px; min-height:32px; font-size:12px; font-weight:700; color:var(--bt-ink-45); }
@@ -165,6 +179,17 @@
 .sas-mc.is-today { box-shadow:inset 0 0 0 2px var(--bt-primary); }
 .sas-mc .ln { display:flex; align-items:center; gap:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--bt-ink-70); }
 .sas-mc .ln i { width:7px; height:7px; border-radius:50%; flex-shrink:0; background:var(--dc,var(--bt-ink-25)); }
+.sas-mc .ln.is-count { color:var(--di,var(--bt-ink-70)); font-weight:700; }
+/* Calendar status filter: the legend on top, one toggle per status with its count; wraps into chips on a phone. */
+.sas-calf { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:0 0 12px; }
+.sas-calf button:not(.sas-link) { display:inline-flex; align-items:center; gap:6px; border:1px solid var(--bt-line); background:var(--bt-card);
+  color:var(--bt-ink-70); border-radius:999px; padding:5px 10px; font:inherit; font-size:12px; font-weight:600; cursor:pointer; }
+.sas-calf button:not(.sas-link):hover { border-color:var(--bt-primary); }
+.sas-calf button.is-on { background:var(--bt-primary-tint); border-color:var(--bt-primary); color:var(--bt-primary-deep); }
+.sas-calf .sw { width:4px; height:14px; border-radius:2px; background:var(--sw); flex-shrink:0; }
+.sas-calf .n { min-width:18px; padding:0 5px; border-radius:999px; background:var(--bt-fill); color:var(--bt-ink); font-weight:800; font-size:11px; text-align:center; }
+.sas-calf button.is-danger .n { background:var(--bt-danger-tint); color:var(--bt-danger-deep); }
+.sas-calf button:focus-visible { outline:2px solid var(--bt-primary); outline-offset:2px; }
 
 /* ---------- dialog: add availability ---------- */
 .sas-dialog { display:block; width:min(760px,92vw); max-height:88vh; overflow:auto; background:var(--bt-card); padding:20px 22px; }
@@ -286,3 +311,14 @@
 .sas-legend span { display:inline-flex; align-items:center; gap:5px; }
 .sas-legend i { width:4px; height:14px; border-radius:2px; background:var(--lc); }
 .sas-legend mat-icon { width:14px; height:14px; font-size:14px; color:var(--bt-primary-deep); }
+
+/* Home lists have a fixed height and scroll inside their card instead of growing the page (operator, 2026-11-24):
+   the calendar's Week / Day grid, Availability, Upcoming and Past sessions. Headers stay in view. */
+.sas-tw.is-capped { max-height:440px; overflow:auto; }
+.sas-tw.is-capped thead th { position:sticky; top:0; z-index:1; background:var(--bt-card); }
+/* The calendar grid gets most of the screen: 220px leaves the card's header and filters in view; never under 720px. */
+.sas-wk-wrap.is-capped, .sas-dcols.is-capped { max-height:max(720px, calc(100vh - 220px)); overflow:auto; }
+.sas-wk-wrap.is-capped .sas-wk-h, .sas-dcols.is-capped .sas-wk-h { position:sticky; top:-8px; z-index:2; background:var(--bt-ground);
+  margin:-8px -8px 0; padding:8px 8px 4px; border-radius:var(--bt-r-sm) var(--bt-r-sm) 0 0; }
+/* Join in Upcoming sessions is a real button, not a text link. */
+.sas-btn.sas-join { min-height:32px; padding:0 12px; font-size:13px; }

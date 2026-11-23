@@ -13,11 +13,17 @@
         <span class="header-subtitle">Journey Transition Analysis</span>
       </div>
     </div>
+    <div style="display:flex;align-items:center;gap:8px">
+    <button data-testid="jcomd-btn-export" class="export-btn" [disabled]="loading || !filteredData.length" (click)="exportCrossover()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export
+    </button>
     <button data-testid="jcomd-btn-001" class="close-btn" (click)="closeDialog()">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M18 6L6 18M6 6l12 12"/>
       </svg>
     </button>
+    </div>
   </div>
 
   <!-- Main Content Area -->
@@ -132,6 +138,7 @@
             {{ selectedEntry.category }}: {{ selectedEntry.startpoint }} → {{ selectedEntry.endpoint }}
           </span>
         </div>
+        <button data-testid="jcomd-btn-panel-export" class="export-btn export-btn-sm" [disabled]="!selectedEntry?.profileIds?.length" (click)="exportSelectedEntry()">Export</button>
         <button data-testid="jcomd-btn-004" class="panel-close-btn" (click)="closeProfilePanel()">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M18 6L6 18M6 6l12 12"/>
@@ -142,11 +149,15 @@
       <div class="panel-content">
         <!-- Profile List -->
         <div class="profile-list" *ngIf="selectedEntry">
+          <label class="panel-search">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input type="search" data-testid="jcomd-inp-panel-search" [(ngModel)]="panelQuery" placeholder="Search name" aria-label="Search name" autocomplete="off">
+          </label>
           <div class="profile-count-badge">
             <span>{{ selectedEntry.profileIds.length }} Participants</span>
           </div>
           
-          <div data-testid="jcomd-div-005" class="profile-item" *ngFor="let profileId of selectedEntry.profileIds; let i = index" (click)="navigateToProfile(profileId)">
+          <div data-testid="jcomd-div-005" class="profile-item" *ngFor="let profileId of selectedEntry.profileIds | nameSearch:panelQuery:panelName; let i = index" (click)="navigateToProfile(profileId)">
             <div class="profile-sno">{{ i + 1 }}</div>
             <div class="profile-info">
               <span class="profile-id-text">{{ data.mapProfile[profileId] }}</span>
