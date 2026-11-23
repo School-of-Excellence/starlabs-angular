@@ -3,6 +3,7 @@ import {
   windowState, periodOf, shiftPeriod, overlapsAny, AvailWindow, Appt, NO_SHOW_REASON,
   openMinutes, availStatus, windowLabel, windowStatus, availableViews,
   fmtHours, scopeWindow, apptMatches, windowMatchesBooked, dayColumns, joinOpen, Slot, groupColumns, JointIndex, collapseJoint,
+  isNoShow, cancelLabel, sessionCal, windowCal, windowShown, CAL_STATUSES, summaryHours,
 } from './sas-logic';
 
 const T = (h: number, m = 0) => new Date(2026, 8, 28, h, m);
@@ -320,5 +321,72 @@ describe('sas-logic', () => {
   it('overlapsAny matches the existing availability rule', () => {
     expect(overlapsAny(T(10), T(11), [{ start: T(9), end: T(12) }])).toBeTrue();
     expect(overlapsAny(T(12), T(13), [{ start: T(9), end: T(12) }])).toBeFalse();
+  });
+
+  /* Calendar changes from Muskan's review (2026-11-23). */
+  describe('summaryHours (operator, 2026-11-24)', () => {
+    const now = T(13);
+    // Two 3h windows = 6h. Sessions: 1h completed, 1h cancelled (no-show), 1h ended unmarked, 1h upcoming.
+    const wins = [win({ start: T(9), end: T(12) }), win({ id: 'w2', start: T(12), end: T(15) })];
+    const appts = [
+      appt({ id: 'd', start: T(9), end: T(10), attended: true }),
+      appt({ id: 'c', start: T(10), end: T(11), cancelled: true, cancelledReason: NO_SHOW_REASON }),
+      appt({ id: 'p', start: T(11), end: T(12) }),
+      appt({ id: 'u', start: T(13, 30), end: T(14, 30) }),
+    ];
+    it('splits the total into four parts that add up', () => {
+      const s = summaryHours(wins, appts, now);
+      expect(s.totalMin).toBe(360);
+      expect([s.bookedMin, s.notBookedMin, s.deliveredMin, s.cancelledMin]).toEqual([120, 120, 60, 60]);
+      expect(s.bookedMin + s.notBookedMin + s.deliveredMin + s.cancelledMin).toBe(s.totalMin);
+      expect([s.booked, s.pending, s.pendingMin, s.completed, s.cancelled]).toEqual([2, 1, 60, 1, 1]);
+      expect(Math.round(s.pct)).toBe(17);                 // 1h of 6h
+    });
+    it('counts a joint session once per specialist in the all-specialists view', () => {
+      const joint = [appt({ id: 'j', start: T(9), end: T(10), attended: true, hostIds: ['p', 'q'] })];
+      expect(summaryHours(wins, joint, now).deliveredMin).toBe(60);
+      expect(summaryHours(wins, joint, now, true).deliveredMin).toBe(120);
+    });
+    it('never shows a negative Not booked', () => {
+      expect(summaryHours([win({ start: T(9), end: T(10) })], appts, now).notBookedMin).toBe(0);
+    });
+  });
+
+  describe('cancelled card label', () => {
+    it('names a no-show, case and spaces aside, and nothing else', () => {
+      expect(cancelLabel(appt({ cancelled: true, cancelledReason: NO_SHOW_REASON }))).toBe('Cancelled · no-show');
+      expect(cancelLabel(appt({ cancelled: true, cancelledReason: " client didn't show up " }))).toBe('Cancelled · no-show');
+      expect(cancelLabel(appt({ cancelled: true, cancelledReason: 'Cancelled By Client' }))).toBe('Cancelled');
+      expect(cancelLabel(appt({ cancelled: true }))).toBe('Cancelled');
+      expect(isNoShow(appt({ cancelledReason: NO_SHOW_REASON }))).toBeFalse();   // not cancelled: not a no-show
+    });
+  });
+
+  describe('calendar status filter', () => {
+    const now = T(11);
+    it('puts each session in one status', () => {
+      expect(sessionCal(appt({ attended: true }), now)).toBe('done');
+      expect(sessionCal(appt({ cancelled: true, cancelledReason: NO_SHOW_REASON }), now)).toBe('cancel');
+      expect(sessionCal(appt(), now)).toBe('pending');
+      expect(sessionCal(appt({ start: T(10, 30), end: T(11, 30) }), now)).toBe('live');
+      expect(sessionCal(appt({ start: T(13), end: T(14) }), now)).toBe('booked');
+    });
+    it('reads a window on its own as open or unused', () => {
+      expect(windowCal('open')).toBe('open');
+      expect(windowCal('full')).toBe('unused');
+      expect(windowCal('ended')).toBe('unused');
+      expect(windowCal('unused')).toBe('unused');
+    });
+    it('shows a window only while it is open or never held a session', () => {
+      expect(windowShown('open', 2)).toBeTrue();
+      expect(windowShown('full', 0)).toBeTrue();
+      expect(windowShown('unused', 0)).toBeTrue();
+      expect(windowShown('full', 1)).toBeFalse();
+      expect(windowShown('ended', 1)).toBeFalse();
+      expect(windowShown('unused', 1)).toBeFalse();   // only a cancelled session in it: the red card shows the time
+    });
+    it('lists every status once, in legend order', () => {
+      expect(CAL_STATUSES.map(s => s.key)).toEqual(['open', 'booked', 'live', 'done', 'pending', 'cancel', 'unused']);
+    });
   });
 });

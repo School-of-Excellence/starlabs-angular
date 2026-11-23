@@ -8,7 +8,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { Firestore, collection, doc, deleteDoc, writeBatch, QueryDocumentSnapshot } from '@angular/fire/firestore';
+import { Firestore, collection, doc, deleteDoc, writeBatch } from '@angular/fire/firestore';
 import { Router } from '@angular/router';
 import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 import { firstValueFrom, take } from 'rxjs';
@@ -24,10 +24,11 @@ import {
 } from './specialist-appointment.service';
 import {
   ViewRole, VIEW_LABEL, ownsProduct, AvailWindow, AvailStatus, Hours, Interval, Period, PeriodMode, ApptStatus,
-  WindowState, WindowStatus, WINDOW_STATUSES, SasFilter, NO_FILTER, BookedFilter, DayColumn, DayEntry, SlotGrouping, Appt,
+  WindowState, WindowStatus, WINDOW_STATUSES, SasFilter, NO_FILTER, DayColumn, DayEntry, SlotGrouping, Appt,
   apptStatus, availStatus, hoursSummary, fmtHours, periodOf, shiftPeriod, sameDay, mondayOf, openMinutes, windowState,
   windowStatus, scopeWindow, apptMatches, windowMatchesBooked, dayColumns, groupColumns, joinOpen, JOIN_LEAD_MIN,
-  NO_SHOW_REASON, daysBetween, overlapsAny, previewSlots, JointIndex, JointType, collapseJoint,
+  daysBetween, overlapsAny, previewSlots, JointIndex, JointType, collapseJoint,
+  CalStatus, CAL_STATUSES, SummaryHours, summaryHours, sessionCal, windowCal, windowShown, cancelLabel, isNoShow,
 } from './sas-logic';
 
 /* Specialist Appointment Studio: centralised appointments for CW specialists, mentor specialists and the
@@ -57,10 +58,10 @@ export const NAV: Record<Exclude<ViewRole, null>, NavItem[]> = {
 };
 
 const APPT_PILL: Record<ApptStatus, string> = {
-  Completed: 'is-success', Cancelled: 'is-neutral', 'In session': 'is-solid', Pending: 'is-warning', Booked: '',
+  Completed: 'is-success', Cancelled: 'is-danger', 'In session': 'is-solid', Pending: 'is-warning', Booked: '',
 };
 const APPT_CHIP: Record<ApptStatus, string> = {
-  Completed: 'st-done', Cancelled: 'st-off', 'In session': 'st-live', Pending: 'st-warn', Booked: 'st-booked',
+  Completed: 'st-done', Cancelled: 'st-cancel', 'In session': 'st-live', Pending: 'st-warn', Booked: 'st-booked',
 };
 const WINDOW_PILL: Record<WindowStatus, string> = {
   'Open for booking': 'is-success', 'Partly booked': 'is-success', 'Fully booked': '', 'Completion pending': 'is-warning',
@@ -68,6 +69,7 @@ const WINDOW_PILL: Record<WindowStatus, string> = {
 };
 const STATE_DOT: Record<WindowState, string> = { open: 'var(--bt-success)', full: 'var(--bt-primary)', ended: 'var(--bt-ink-25)', unused: 'var(--bt-ink-25)' };
 const byStart = (a: ApptRow, b: ApptRow) => a.appt.start.getTime() - b.appt.start.getTime();
+const emptyCalCounts = (): Record<CalStatus, number> => ({ open: 0, booked: 0, live: 0, done: 0, pending: 0, cancel: 0, unused: 0 });
 const roleLabel = (s: Specialist) => (s.role === 'mentor' ? 'Mentor' : 'CW');
 
 /* ======================================================================================
@@ -104,20 +106,20 @@ export class PersonPicker {
 
 /* Product · Delivery types · (Booked / Not booked). Picking a product limits the type list to that
    product's delivery-sequence types (sequence order), all ticked (operator, 2026-10-05). Options per
-   scope: SpecialistAppointmentService.filterOptions. Booked / Not booked is Home only. */
+   scope: SpecialistAppointmentService.filterOptions. The Booked / Not booked toggle was removed: the calendar's
+   status filter covers it (operator, 2026-11-23), so the bar always emits booked: 'all'. */
 export class FilterBar {
   loading = true;
   products: FilterProduct[] = [];
   types: FilterType[] = [];
   productId: string | null = null;
   typeIds: string[] = [];
-  booked: BookedFilter = 'all';
   qp = '';           // search text in the product dropdown
   qt = '';           // search text in the delivery-type dropdown
   readonly ready: Promise<void>;
 
   constructor(svc: SpecialistAppointmentService, scope: 'all' | 'mentor' | 'cw', profileId: string,
-    public showBooked: boolean, private changed: (f: SasFilter) => void) {
+    private changed: (f: SasFilter) => void) {
     this.ready = svc.filterOptions(scope, profileId)
       .then(o => { this.products = o.products; this.types = o.types; })
       .catch(e => console.error('Specialist appointment studio: filter options failed', e))
@@ -130,7 +132,7 @@ export class FilterBar {
     if (!p) return this.types;
     return p.typeIds.map(id => this.types.find(t => t.id === id)).filter((t): t is FilterType => !!t);
   }
-  get active() { return !!this.productId || this.typeIds.length > 0 || this.booked !== 'all'; }
+  get active() { return !!this.productId || this.typeIds.length > 0; }
 
   hit(q: string, label: string) { return !q.trim() || label.toLowerCase().includes(q.trim().toLowerCase()); }
   /* undefined = the search row was clicked, not an option. */
@@ -142,15 +144,14 @@ export class FilterBar {
     this.typeIds = p ? [...p.typeIds] : [];
     this.emit();
   }
-  setBooked(b: BookedFilter) { this.booked = b; this.emit(); }
-  clear() { this.productId = null; this.typeIds = []; this.booked = 'all'; this.emit(); }
+  clear() { this.productId = null; this.typeIds = []; this.emit(); }
 
   /* No type ticked: with a product, its own types (possibly none, which matches nothing); without one,
      no type filter. */
   emit() {
     const p = this.products.find(x => x.id === this.productId);
     const typeIds = this.typeIds.length ? [...this.typeIds] : p ? [...p.typeIds] : null;
-    this.changed({ productId: this.productId, typeIds, booked: this.booked });
+    this.changed({ productId: this.productId, typeIds, booked: 'all' });
   }
 }
 
@@ -244,15 +245,26 @@ export class ParticipantLookup {
 /* ======================================================================================
    Home (CW / Mentor: mode 'self') and Overview (A&H: mode 'all')
    ====================================================================================== */
-type PastFilter = 'pending' | 'completed' | 'cancelled';
-const PAST_PAGE = 10;          // rows added per Load more
-const PAST_FETCH = 25;         // appointments read per Firestore page
-const PAST_MAX_FETCHES = 8;    // per click, so a rare status can't read the whole history in one go
+/* Past sessions (Muskan's review, 2026-11-23): the sessions that ended in the period picked at the top (Day /
+   Week / Month), with status buttons and their counts. '' = All. A no-show counts under Cancelled. */
+type PastFilter = '' | 'completed' | 'cancelled' | 'pending';
+const PAST_MAX = 3000;         // sessions read for one range; above it the counts cover the latest 3000
+
 /* sessions = every session in the window (its status counts them all); cards = the ones drawn under it — in the
    all-specialists view a joint session is drawn once, under its first host's window (operator, 2026-10-05). */
-interface CalDay { date: Date; windows: { w: AvailWindow; state: WindowState; label: string; sessions: ApptRow[]; cards: ApptRow[]; open: number; joint: string | null }[]; loose: ApptRow[]; }
-/* joint: "2 bookable · 1 booked" for the day's joint delivery types, or null when it has none. */
-interface MonthCell { date: Date; out: boolean; lines: { label: string; color: string }[]; more: number; joint: string | null; }
+/* shown = the window gets its own card (windowShown and the status filter); cards and loose are already
+   narrowed to the status filter. */
+interface CalDay { date: Date; windows: { w: AvailWindow; state: WindowState; label: string; sessions: ApptRow[]; cards: ApptRow[]; open: number; joint: string | null; shown: boolean }[]; loose: ApptRow[]; }
+/* joint: "2 bookable · 1 booked" for the day's joint delivery types, or null when it has none.
+   ink = a session count line (e.g. "1 cancelled"), drawn bold in its status colour. */
+interface MonthCell { date: Date; out: boolean; lines: { label: string; color: string; ink?: string }[]; more: number; joint: string | null; }
+const MONTH_LINE: Partial<Record<CalStatus, string>> = {
+  booked: 'booked', live: 'in session', done: 'completed', pending: 'pending', cancel: 'cancelled',
+};
+const MONTH_INK: Partial<Record<CalStatus, string>> = {
+  booked: 'var(--bt-primary-deep)', live: 'var(--bt-primary-deep)', done: 'var(--bt-success-deep)',
+  pending: 'var(--bt-warning-deep)', cancel: 'var(--bt-danger-deep)',
+};
 
 export class HomeTab {
   readonly bar: PeriodBar;
@@ -265,7 +277,15 @@ export class HomeTab {
   loading = true;
   greeting = '';
   subtitle = '';
-  hours: Hours | null = null;
+  /* The summary cards: Total = Booked + Not booked + Delivered + Cancelled (summaryHours). */
+  summary: SummaryHours | null = null;
+  /* Not booked split in two that add up to it (operator, 2026-11-24): still open to book (future free start times)
+     and the rest — time that passed with no booking, or future gaps no start time fits. A cancelled slot that is
+     open again counts in Cancelled too, so the open part is capped at Not booked. */
+  get notBookedSplit(): { open: number; rest: number } {
+    const nb = this.summary?.notBookedMin ?? 0, open = Math.min(this.openMin, nb);
+    return { open, rest: nb - open };
+  }
   openMin = 0;
   days: CalDay[] = [];
   month: MonthCell[] = [];
@@ -278,18 +298,24 @@ export class HomeTab {
   groupBy: SlotGrouping = 'type';
   /* Product · types · booked filter. Product and types apply everywhere; booked only to the calendar. */
   filter: SasFilter = NO_FILTER;
+  /* Status filter on the plain Week and Month calendar ('' = all), with the period's count per status. */
+  calF: CalStatus[] = [];        // empty = every status; a summary card can set several (operator, 2026-11-24)
+  calCounts: Record<CalStatus, number> = emptyCalCounts();
+  readonly CAL_STATUSES = CAL_STATUSES;
   /* Bulk delete: the period's windows (filtered by product and types), future + unbooked selectable. */
   availList: AvailWindow[] = [];
   selected = new Set<string>();
   deleting = false;
   upcoming: ApptRow[] = [];
-  /* Past sessions load lazily: PAST_PAGE matching rows at a time, newest first, via Load more. */
-  past: ApptRow[] = [];
-  pastFilter: PastFilter = 'pending';
+  /* Past sessions: every session that ended in the period is read at once (pastRows), so each status button
+     can show its count; the product / type filter above and the status narrow it in memory. */
+  pastRows: ApptRow[] = [];
+  pastFilter: PastFilter = '';
+  pastCounts: Record<PastFilter, number> = { '': 0, completed: 0, cancelled: 0, pending: 0 };
+  past: ApptRow[] = [];        // after product, type and status
   pastLoading = false;
-  pastDone = false;
+  pastCapped = false;
   now = new Date();
-  private pastCursor: QueryDocumentSnapshot | null = null;
   private pastRun = 0;
   private loadRun = 0;
   private raw: { wins: AvailWindow[]; appts: ApptRow[]; up: ApptRow[] } = { wins: [], appts: [], up: [] };
@@ -301,7 +327,7 @@ export class HomeTab {
   constructor(private h: SpecialistAppointmentStudioComponent, public mode: 'self' | 'all') {
     this.bar = new PeriodBar(periodOf('week', new Date()), () => this.load(), true);
     const scope = mode === 'all' ? 'all' : h.svc.viewRole === 'mentor' ? 'mentor' : 'cw';
-    this.filterBar = new FilterBar(h.svc, scope, h.svc.profileId, true, f => this.onFilter(f));
+    this.filterBar = new FilterBar(h.svc, scope, h.svc.profileId, f => this.onFilter(f));
     this.lookup = new ParticipantLookup(h, () => this.bar.period, h.svc.viewRole === 'ah');
   }
 
@@ -347,7 +373,7 @@ export class HomeTab {
     const calFrom = p.mode === 'month' ? mondayOf(p.from) : p.from;
     const calTo = p.mode === 'month' ? new Date(calFrom.getTime() + 42 * 86400000) : p.to;
     try {
-      this.loadPast(true);
+      this.loadPast();
       const [wins, appts, up, joint] = await Promise.all([
         this.svc.windows(ids, calFrom, calTo),
         this.svc.appointments(ids, calFrom, calTo),
@@ -384,7 +410,7 @@ export class HomeTab {
     const wins = this.raw.wins.map(w => scopeWindow(w, f.typeIds)).filter((w): w is AvailWindow => !!w);
     const appts = this.raw.appts.filter(r => apptMatches(r.appt, f));
     const pWins = wins.filter(inP), pAppts = appts.map(r => r.appt).filter(inP);
-    this.hours = hoursSummary(pWins, pAppts);
+    this.summary = summaryHours(pWins, pAppts, this.now, this.allMode);
     this.openMin = pWins.reduce((a, w) => a + openMinutes(w, this.now), 0);
     this.upcoming = this.raw.up.filter(r => !r.appt.cancelled && !r.appt.attended && r.appt.end > this.now && apptMatches(r.appt, f));
     // Booked / Not booked narrows the calendar only; Not booked hides the sessions.
@@ -420,15 +446,18 @@ export class HomeTab {
   setGroup(g: SlotGrouping) { if (g !== this.groupBy) { this.groupBy = g; this.apply(); } }
 
   onFilter(f: SasFilter) {
-    const scopeChanged = f.productId !== this.filter.productId || String(f.typeIds) !== String(this.filter.typeIds);
     this.filter = f;
     this.lookup.setProduct(f.productId);
     this.apply();
-    if (scopeChanged) this.loadPast(true);
+    this.applyPast();
   }
 
+  /* Each appointment shows once (windowShown); the status filter (calF) narrows windows and session cards, and
+     calCounts counts every status in the period before that filter (Muskan's review, 2026-11-23). */
   private buildCalendar(wins: AvailWindow[], live: ApptRow[], period: Period) {
-    const dayOf = (d: Date): CalDay => {
+    const f = this.calF, keep = (c: CalStatus) => !f.length || f.includes(c);
+    const counts = emptyCalCounts();
+    const dayOf = (d: Date, count: boolean): CalDay => {
       const ws = wins.filter(w => sameDay(w.start, d))
         .sort((a, b) => a.start.getTime() - b.start.getTime() || this.svc.name(a.profileId).localeCompare(this.svc.name(b.profileId)));
       // A session belongs to a window of the same specialist that it starts inside, once per specialist:
@@ -440,17 +469,27 @@ export class HomeTab {
         sessions.forEach(r => used.add(key(r, w.profileId)));
         const cards = this.allMode ? sessions.filter(r => !carded.has(r.appt.id)) : sessions;
         cards.forEach(r => carded.add(r.appt.id));
-        return { w, state: windowState(w, this.now), label: windowStatus(w, sessions.map(r => r.appt), this.now) as string, sessions, cards, open: openMinutes(w, this.now), joint: this.windowJoint(w) };
+        const state = windowState(w, this.now), own = windowShown(state, sessions.length);
+        if (count) {
+          if (own) counts[windowCal(state)]++;
+          cards.forEach(r => counts[sessionCal(r.appt, this.now)]++);
+        }
+        return {
+          w, state, label: windowStatus(w, sessions.map(r => r.appt), this.now) as string, sessions,
+          cards: cards.filter(r => keep(sessionCal(r.appt, this.now))), open: openMinutes(w, this.now), joint: this.windowJoint(w),
+          shown: own && keep(windowCal(state)),
+        };
       });
       const placed = new Set([...used].map(k => k.split('|')[0]));
       const loose = live.filter(r => sameDay(r.appt.start, d) && !placed.has(r.appt.id));
-      return { date: d, windows, loose };
+      if (count) loose.forEach(r => counts[sessionCal(r.appt, this.now)]++);
+      return { date: d, windows, loose: loose.filter(r => keep(sessionCal(r.appt, this.now))) };
     };
     if (period.mode === 'day') {
-      this.days = [dayOf(period.from)];
+      this.days = [dayOf(period.from, false)];
       this.month = [];
     } else if (period.mode === 'week') {
-      this.days = Array.from({ length: 7 }, (_, i) => dayOf(new Date(period.from.getFullYear(), period.from.getMonth(), period.from.getDate() + i)));
+      this.days = Array.from({ length: 7 }, (_, i) => dayOf(new Date(period.from.getFullYear(), period.from.getMonth(), period.from.getDate() + i), true));
       this.month = [];
     } else {
       const start = mondayOf(period.from), mo = period.from.getMonth();
@@ -458,26 +497,75 @@ export class HomeTab {
       for (let i = 0; i < 42; i++) {
         const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
         if (i >= 35 && d.getMonth() !== mo) break;
-        const day = dayOf(d);
-        let lines: { label: string; color: string }[];
-        if (this.allMode) {
-          // Everyone at once: a count per day instead of every window.
-          const people = new Set(day.windows.map(x => x.w.profileId)).size;
-          const booked = [...day.windows.flatMap(x => x.sessions), ...day.loose].filter(r => !r.appt.cancelled).length;
-          lines = day.windows.length || booked ? [
-            { label: `${people} specialist${people === 1 ? '' : 's'} · ${day.windows.length} window${day.windows.length === 1 ? '' : 's'}`, color: STATE_DOT.open },
-            { label: `${booked} booked`, color: STATE_DOT.full },
-          ] : [];
-        } else {
-          lines = day.windows.map(x => ({
-            label: `${this.h.t(x.w.start)}–${this.h.t(x.w.end)}${x.sessions.length ? ' · ' + x.sessions.length + ' booked' : ''}`,
-            color: STATE_DOT[x.state],
-          }));
-        }
-        this.month.push({ date: d, out: d.getMonth() !== mo, lines: lines.slice(0, 3), more: Math.max(0, lines.length - 3), joint: this.dayJoint(day) });
+        const day = dayOf(d, d.getMonth() === mo);
+        const lines = this.monthLines(day);
+        this.month.push({ date: d, out: d.getMonth() !== mo, lines: lines.slice(0, 4), more: Math.max(0, lines.length - 4), joint: this.dayJoint(day) });
       }
       this.days = [];
     }
+    this.calCounts = counts;
+  }
+
+  /* Month cell: the windows that get a card (time and open / unused), then one count per session status,
+     e.g. "1 cancelled" in red. Everyone at once: a window summary instead of every window. */
+  private monthLines(day: CalDay): { label: string; color: string; ink?: string }[] {
+    const lines: { label: string; color: string; ink?: string }[] = [];
+    const shown = day.windows.filter(x => x.shown);
+    if (this.allMode) {
+      if (shown.length) {
+        const people = new Set(shown.map(x => x.w.profileId)).size;
+        lines.push({ label: `${people} specialist${people === 1 ? '' : 's'} · ${shown.length} window${shown.length === 1 ? '' : 's'}`, color: STATE_DOT.open });
+      }
+    } else {
+      shown.forEach(x => lines.push({
+        label: `${this.h.t(x.w.start)}–${this.h.t(x.w.end)} ${x.state === 'open' ? 'open' : x.w.end > this.now ? 'no open times' : 'unused'}`,
+        color: STATE_DOT[x.state],
+      }));
+    }
+    const n: Partial<Record<CalStatus, number>> = {};
+    [...day.windows.flatMap(x => x.cards), ...day.loose].forEach(r => { const c = sessionCal(r.appt, this.now); n[c] = (n[c] ?? 0) + 1; });
+    CAL_STATUSES.forEach(s => {
+      if (n[s.key] && MONTH_LINE[s.key]) lines.push({ label: `${n[s.key]} ${MONTH_LINE[s.key]}`, color: s.color, ink: MONTH_INK[s.key] });
+    });
+    return lines;
+  }
+
+  /* Select a status to show only it; select it again (or Show all) to clear. No reads: the data is in memory. */
+  setCalF(c: CalStatus | '') {
+    this.calF = !c || (this.calF.length === 1 && this.calF[0] === c) ? [] : [c];
+    this.apply();
+  }
+  isCalF(c: CalStatus) { return this.calF.includes(c); }
+  get calOn() { return this.calF.length > 0; }
+
+  /* Summary card → the data behind its number, with the filter that reproduces it (operator, 2026-11-24).
+     The calendar's counts match the cards for the same period, so Booked / Not booked / Cancelled go there;
+     Delivered and "needs a status update" go to Past sessions (a list with Update status); Total to Availability. */
+  showCard(k: 'total' | 'booked' | 'upcoming' | 'pending' | 'notbooked' | 'delivered' | 'cancelled') {
+    const cal = (f: CalStatus[]) => { this.calF = f; this.apply(); this.scrollTo('sas-home-calendar'); };
+    switch (k) {
+      case 'total': this.scrollTo('sas-home-avail'); break;
+      case 'booked': cal(['booked', 'live', 'pending']); break;
+      case 'upcoming': cal(['booked', 'live']); break;
+      case 'notbooked': cal(['open', 'unused']); break;
+      case 'cancelled': cal(['cancel']); break;
+      case 'pending': this.setPast('pending'); this.scrollTo('sas-home-past'); break;
+      case 'delivered': this.setPast('completed'); this.scrollTo('sas-home-past'); break;
+    }
+  }
+  private scrollTo(id: string) {
+    if (typeof document === 'undefined') return;
+    setTimeout(() => document.querySelector(`[data-testid="${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }
+  /* The plain Week and Month calendars carry the status filter; Day view and the filtered (slot) views keep their legend. */
+  get calFiltered() { return !this.slotMode && this.period.mode !== 'day'; }
+  /* Week column: anything left to draw after the each-once rule and the status filter. */
+  dayHasCards(d: CalDay) { return d.loose.length > 0 || d.windows.some(x => x.shown || x.cards.length > 0); }
+  /* A session card's status line: who cancelled, and "Completion pending" for an ended, unmarked session. */
+  cardStatus(r: ApptRow): string {
+    if (r.appt.cancelled) return cancelLabel(r.appt);
+    const s = this.status(r);
+    return s === 'Pending' ? 'Completion pending' : s;
   }
 
   isToday(d: Date) { return sameDay(d, this.now); }
@@ -487,41 +575,58 @@ export class HomeTab {
   chipClass(r: ApptRow) { return APPT_CHIP[this.status(r)]; }
   hostNames(r: ApptRow) { return r.appt.hostIds.map(id => this.svc.name(id)).join(', '); }
 
-  /* Completed · Cancelled · Status updation pending (ended, not marked). */
-  private pastMatches(r: ApptRow): boolean {
-    if (!apptMatches(r.appt, this.filter)) return false;
-    const s = this.status(r), f = this.pastFilter;
-    return f === 'pending' ? s === 'Pending' : f === 'completed' ? s === 'Completed' : s === 'Cancelled';
+  /* Past sessions' status group: Completed · Cancelled (no-shows included) · Completion pending (ended, not marked). */
+  private pastGroup(r: ApptRow): Exclude<PastFilter, ''> | null {
+    const s = this.status(r);
+    return s === 'Completed' ? 'completed' : s === 'Cancelled' ? 'cancelled' : s === 'Pending' ? 'pending' : null;
   }
 
-  /* Fetch raw pages (newest first) until PAST_PAGE more rows match the filter, or nothing older is left.
-     reset = start again (new filter, specialist or reload). A newer call cancels an older one. */
-  async loadPast(reset: boolean) {
-    const run = reset ? ++this.pastRun : this.pastRun;
-    if (reset) { this.past = []; this.pastCursor = null; this.pastDone = false; }
-    if (this.pastDone || (this.pastLoading && !reset)) return;
+  /* Read every session of the period that has ended (newest first). The top period bar drives it (operator,
+     2026-11-24): a future period has none. A newer call wins over an older one. */
+  async loadPast() {
+    const run = ++this.pastRun;
     this.pastLoading = true;
-    const host = this.hostIds ? this.hostIds[0] : null;
-    let found = 0;
+    const host = this.hostIds ? this.hostIds[0] : null, p = this.period;
+    // A session that starts in the period may end just after it, so the end-time bound runs a day longer.
+    const now = new Date(), until = new Date(p.to.getTime() + 86400000);
     try {
-      for (let i = 0; i < PAST_MAX_FETCHES && found < PAST_PAGE && !this.pastDone; i++) {
-        const page = await this.svc.pastPage(host, this.pastCursor, PAST_FETCH);
-        if (run !== this.pastRun) return;
-        this.pastCursor = page.cursor;
-        this.pastDone = page.done;
-        const hits = page.rows.filter(r => this.pastMatches(r));
-        this.past = [...this.past, ...hits];
-        found += hits.length;
-      }
+      const res = p.from >= now ? { rows: [], capped: false } : await this.svc.pastBetween(host, p.from, until < now ? until : now, PAST_MAX);
+      if (run !== this.pastRun) return;
+      // The period is by the session's start; the query bounds the end time, so trim to the start.
+      this.pastRows = res.rows.filter(x => x.appt.start >= p.from && x.appt.start < p.to);
+      this.pastCapped = res.capped;
     } catch (e) {
+      if (run !== this.pastRun) return;
       console.error('Specialist appointment studio: past sessions failed', e);
       this.h.snack.open('Could not load past sessions. Try again.', 'OK', { duration: 5000 });
+      this.pastRows = [];
     }
-    if (run === this.pastRun) this.pastLoading = false;
+    this.pastLoading = false;
+    this.applyPast();
   }
 
-  setPast(v: PastFilter | undefined) { if (!v) return; this.pastFilter = v; this.loadPast(true); }
-  reasonShown(r: ApptRow) { return r.appt.cancelled && r.appt.cancelledReason && r.appt.cancelledReason !== NO_SHOW_REASON; }
+  /* Counts follow the product / type filter and the dates; the status button then narrows the list. No reads. */
+  applyPast() {
+    const base = this.pastRows.filter(r => apptMatches(r.appt, this.filter) && this.pastGroup(r));
+    const n = { '': base.length, completed: 0, cancelled: 0, pending: 0 } as Record<PastFilter, number>;
+    base.forEach(r => n[this.pastGroup(r)!]++);
+    this.pastCounts = n;
+    this.past = this.pastFilter ? base.filter(r => this.pastGroup(r) === this.pastFilter) : base;
+  }
+  setPast(v: PastFilter) { this.pastFilter = v; this.applyPast(); }
+  /* Under a Cancelled badge: "No-show: the participant did not join", or the reason the specialist gave. */
+  pastNote(r: ApptRow): string | null {
+    if (!r.appt.cancelled) return null;
+    if (isNoShow(r.appt)) return 'No-show: the participant did not join';
+    return r.appt.cancelledReason?.trim() || null;
+  }
+  /* The product name under the participant (the Product column is gone, Muskan's review). */
+  productName(r: ApptRow): string {
+    return (r.appt.productId && this.filterBar.products.find(p => p.id === r.appt.productId)?.name) || '';
+  }
+  get pastProduct(): string | null {
+    return this.filter.productId ? this.filterBar.products.find(p => p.id === this.filter.productId)?.name ?? null : null;
+  }
 
   /* A date picked in Month view or a day header in Week view opens that day (operator, 2026-10-01). */
   gotoDay(d: Date) { this.bar.period = periodOf('day', d); this.load(); }
@@ -532,7 +637,7 @@ export class HomeTab {
     if (!e.booked) return this.waiting(e) ? 'Waiting for a partner' : 'Open';
     if (!e.appt) return 'Booked';
     const s = apptStatus(e.appt, this.now);
-    return s === 'Pending' ? 'Completion pending' : s;
+    return s === 'Pending' ? 'Completion pending' : s === 'Cancelled' ? cancelLabel(e.appt) : s;
   }
   entryClass(e: DayEntry) {
     if (!e.booked) return this.waiting(e) ? 'sas-slot s-wait' : 'sas-slot s-open';
@@ -985,6 +1090,8 @@ export class BookTab {
   readonly lookup: ParticipantLookup;
   filter: SasFilter = NO_FILTER;
   mode: 'calendar' | 'participant' = 'calendar';
+  /* The participant the By participant tab opens on (set by the lookup's Book button). */
+  participantId: string | null = null;
   groupBy: SlotGrouping = 'type';
   loading = false;
   days: { date: Date; groups: BookGroup[] }[] = [];
@@ -996,7 +1103,7 @@ export class BookTab {
   private run = 0;
 
   constructor(private h: SpecialistAppointmentStudioComponent) {
-    this.filterBar = new FilterBar(h.svc, 'all', h.svc.profileId, false, f => { this.filter = f; this.lookup.setProduct(f.productId); this.load(); });
+    this.filterBar = new FilterBar(h.svc, 'all', h.svc.profileId, f => { this.filter = f; this.lookup.setProduct(f.productId); this.load(); });
     this.bar = new PeriodBar(periodOf('week', new Date()), () => { this.lookup.applyPeriod(); this.load(); }, true, false);
     this.lookup = new ParticipantLookup(h, () => this.bar.period, true);
   }
@@ -1398,9 +1505,6 @@ export class SpecialistAppointmentStudioComponent implements OnInit, OnDestroy {
   readonly WINDOW_STATUSES = WINDOW_STATUSES;
   readonly WINDOW_PILL = WINDOW_PILL;
   readonly fmtHours = fmtHours;
-  readonly PAST_OPTIONS = [
-    { value: 'pending', label: 'Status updation pending' }, { value: 'completed', label: 'Completed' }, { value: 'cancelled', label: 'Cancelled' },
-  ];
   readonly ROLE_OPTIONS = [{ value: '', label: 'Mentors and CWs' }, { value: 'mentor', label: 'Mentors' }, { value: 'cw', label: 'CW specialists' }];
   /* Search text per dropdown (every dropdown is searchable, operator 2026-10-07). */
   q: Record<string, string> = {};
@@ -1480,11 +1584,13 @@ export class SpecialistAppointmentStudioComponent implements OnInit, OnDestroy {
     if (typeof window !== 'undefined') window.scrollTo(0, 0);
   }
 
-  /* Lookup → Book: open Book Session's calendar on that product and delivery type. */
-  async bookStep(productId: string, typeId: string) {
+  /* Lookup → Book: open Book Session's By participant tab on that product and delivery type, with the
+     participant already picked (operator, 2026-11-24; it used to open the Calendar tab). */
+  async bookStep(productId: string, typeId: string, participantId: string | null = null) {
     if (this.tab !== 'book') this.go('book');
     const b = this.book!;
-    b.mode = 'calendar';
+    b.mode = 'participant';
+    b.participantId = participantId;
     await b.filterBar.ready;
     b.filterBar.productId = productId;
     b.filterBar.typeIds = [typeId];
@@ -1540,17 +1646,12 @@ export class SpecialistAppointmentStudioComponent implements OnInit, OnDestroy {
     return `Opens at ${this.t(opens)}${sameDay(opens, this.clock) ? '' : ' on ' + this.datepipe.transform(opens, 'd MMM')}`;
   }
 
-  /* Join opens the appointment's Zoom meeting inside the app (AppointmentZoomViewComponent,
-     /openappointmentzoom/:id) in a new tab. That viewer reads appointments/{id}.zoomdata and only
-     starts when it is there, so say so here instead of opening an empty tab. */
+  /* Join takes the specialist to the Appointment Studio (/appointmentstudio) in this tab; they join the
+     session from there (operator, 2026-11-24). That screen opens on its own list — it takes no appointment
+     id — so nothing is passed. Still offered from 5 minutes before the start until the end. */
   join(r: ApptRow) {
     if (!this.canJoin(r)) return;
-    if (!r.raw?.['zoomdata']) {
-      this.snack.open('This session has no Zoom meeting yet.', 'OK', { duration: 4000 });
-      return;
-    }
-    const url = this.router.serializeUrl(this.router.createUrlTree(['/openappointmentzoom', r.appt.id]));
-    window.open(url, '_blank');
+    this.router.navigate(['/appointmentstudio']);
   }
 
   async copyZoom(r: ApptRow) {

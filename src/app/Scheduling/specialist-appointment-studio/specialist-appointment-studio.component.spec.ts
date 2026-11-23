@@ -22,7 +22,7 @@ function fakeSvc(over: Record<string, any> = {}): any {
     filterOptions: () => Promise.resolve({ products: [], types: [] }),
     specialists: () => Promise.resolve([]), mentors: () => Promise.resolve([]), atcModels: () => Promise.resolve([]),
     windows: () => Promise.resolve([]), appointments: () => Promise.resolve([]),
-    pastPage: () => Promise.resolve({ rows: [], cursor: null, done: true }),
+    pastBetween: () => Promise.resolve({ rows: [], capped: false }),
     productsFor: () => Promise.resolve([]), teamForAtcModels: () => Promise.resolve({ productIds: [], memberIds: [] }),
     typesFor: () => Promise.resolve([]), futureIntervals: () => Promise.resolve([]), unmarkedLastAppointment: () => Promise.resolve(null),
     jointTypes: () => Promise.resolve(new Map()), mapRoles: {},
@@ -130,74 +130,121 @@ describe('HomeTab · past sessions and Join', () => {
   beforeEach(async () => {
     const svc = fakeSvc({
       roles: { eis: true }, mapAppointment: { t: 'Journey Coach' },
-      pastPage: (_h: string | null, cursor: any, size: number) => {
-        const from = cursor ?? 0, rows = history.slice(from, from + size);
-        return Promise.resolve({ rows, cursor: from + rows.length, done: from + size >= history.length });
-      },
+      pastBetween: (_h: string | null, from: Date | null, to: Date) =>
+        Promise.resolve({ rows: history.filter(r => (!from || r.appt.end >= from) && r.appt.end <= to), capped: false }),
     });
     ({ fixture, c } = await make(svc));
     await settle(fixture);
     h = c.home!;
+    // A period that holds the whole 60-hour history, so the counts don't depend on today's weekday.
+    h.bar.emit({ mode: 'week', from: new Date(Date.now() - 5 * 86400000), to: new Date(Date.now() + 86400000) });
+    await settle(fixture);
   });
 
-  it('loads only the first page of pending sessions', () => {
-    // 25 appointments are read per Firestore page, so a page can add a few more than 10 matches.
-    expect(h.past.length).toBeGreaterThanOrEqual(10);
-    expect(h.past.length).toBeLessThan(20);
-    expect(h.past.every(r => !r.appt.attended && !r.appt.cancelled)).toBeTrue();
-    expect(fixture.nativeElement.querySelector('[data-testid="sas-home-past-more"]')).toBeTruthy();
+  /* Muskan's review (2026-11-23): status buttons with counts over the top period, no-shows under Cancelled. */
+  it('counts every status in the period, no-shows under Cancelled, and lists them all in a scrolling box', () => {
+    expect(h.pastCounts).toEqual({ '': 60, completed: 20, cancelled: 20, pending: 20 });
+    expect(h.pastFilter).toBe('');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-testid="sas-home-past-st-cancelled"]')?.textContent).toContain('20');
+    expect(fixture.nativeElement.querySelector('[data-testid="sas-home-past-st-cancelled"]')?.classList.contains('is-danger')).toBeTrue();
+    const past = fixture.nativeElement.querySelector('[data-testid="sas-home-past"]');
+    expect(past.querySelectorAll('[data-testid="sas-home-past-row"]').length).toBe(60);   // no Show all: the box scrolls
+    expect(past.querySelector('.sas-tw')?.classList.contains('is-capped')).toBeTrue();
+    expect(fixture.nativeElement.querySelector('[data-testid="sas-home-past-count"]')?.textContent).toContain('60 sessions');
   });
 
-  it('adds the next page on Load more, and stops when history runs out', async () => {
-    const first = h.past.length;
-    await h.loadPast(false);
-    expect(h.past.length).toBeGreaterThan(first);
-    while (!h.pastDone) await h.loadPast(false);
+  it('splits Not booked into still open + passed or unusable, adding up (operator, 2026-11-24)', () => {
+    h.summary = { ...h.summary!, notBookedMin: 300 };
+    h.openMin = 120;
+    expect(h.notBookedSplit).toEqual({ open: 120, rest: 180 });
+    h.openMin = 500;                                     // a re-opened cancelled slot: open is capped
+    expect(h.notBookedSplit).toEqual({ open: 300, rest: 0 });
+  });
+
+  it('Delivered and "needs a status update" cards open Past sessions on that status', () => {
+    h.showCard('delivered');
+    expect(h.pastFilter).toBe('completed');
     expect(h.past.length).toBe(20);
-    expect(new Set(h.past.map(r => r.appt.id)).size).toBe(h.past.length);
+    h.showCard('pending');
+    expect(h.pastFilter).toBe('pending');
+    expect(h.past.every(r => !r.appt.attended && !r.appt.cancelled)).toBeTrue();
   });
 
-  it('starts again when the filter changes, and never says no-show', async () => {
-    h.pastFilter = 'cancelled';
-    await h.loadPast(true);
+  it('a status button narrows the list in memory', () => {
+    h.setPast('pending');
+    expect(h.past.length).toBe(20);
+    expect(h.past.every(r => !r.appt.attended && !r.appt.cancelled)).toBeTrue();
+    h.setPast('');
+    expect(h.past.length).toBe(60);
+  });
+
+  it('Cancelled shows a red badge, "No-show" under a no-show and the reason under the rest', () => {
+    h.setPast('cancelled');
     fixture.detectChanges();
     expect(h.past.every(r => r.appt.cancelled)).toBeTrue();
-    const text: string = fixture.nativeElement.textContent;
-    expect(text.toLowerCase()).not.toContain('no-show');
-    expect(text).not.toContain(NO_SHOW_REASON);
+    const notes = h.past.map(r => h.pastNote(r));
+    expect(notes.filter(n => n === 'No-show: the participant did not join').length).toBe(10);
+    expect(notes.filter(n => n === 'Cancelled By Client').length).toBe(10);
+    const pills = Array.from(fixture.nativeElement.querySelectorAll('[data-testid="sas-home-past-row"] .sas-pill')) as HTMLElement[];
+    expect(pills.length).toBe(20);
+    expect(pills.every(p => p.classList.contains('is-danger') && p.textContent!.trim() === 'Cancelled')).toBeTrue();
+  });
+
+  it('follows the period at the top: a one-day period reads that day, a future one reads nothing', async () => {
+    const day = (n: number) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - n); return d; };
+    h.bar.emit(periodOf('day', day(1)));
+    await settle(fixture);
+    expect(h.pastCounts['']).toBe(history.filter(r => r.appt.start >= day(1) && r.appt.start < day(0)).length);
+    h.bar.emit(periodOf('week', day(-14)));
+    await settle(fixture);
+    expect(h.pastCounts['']).toBe(0);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-testid="sas-home-past-empty"]')?.textContent).toContain('No past sessions in this week');
   });
 
   const soon = (startInMin: number): Appt => ({
     ...history[0].appt, id: 'APPT1', start: new Date(Date.now() + startInMin * 60000), end: new Date(Date.now() + (startInMin + 60) * 60000),
   });
 
-  it('Join opens the appointment in AppointmentZoomView, in a new tab', () => {
+  it('Join goes to the Appointment Studio in this tab (operator, 2026-11-24)', () => {
+    const nav = spyOn((c as any).router, 'navigate').and.resolveTo(true);
     const open = spyOn(window, 'open');
     c.clock = new Date();
-    c.join({ appt: soon(2), raw: { zoomdata: { id: 123 } } });
-    expect(open).toHaveBeenCalledWith('/openappointmentzoom/APPT1', '_blank');
+    c.join({ appt: soon(2), raw: {} });                  // no Zoom meeting needed any more
+    expect(nav).toHaveBeenCalledWith(['/appointmentstudio']);
+    expect(open).not.toHaveBeenCalled();
   });
 
   it('Join opens 5 minutes before the start and closes at the end', () => {
     c.clock = new Date();
-    const later = { appt: soon(30), raw: { zoomdata: {} } };
+    const later = { appt: soon(30), raw: {} };
     expect(c.canJoin(later)).toBeFalse();
     expect(c.joinTip(later)).toContain('Opens at');
     expect(c.canJoin({ appt: soon(4), raw: {} })).toBeTrue();
     expect(c.canJoin({ appt: soon(-30), raw: {} })).toBeTrue();
-    const ended = { appt: history[0].appt, raw: { zoomdata: {} } };
+    const ended = { appt: history[0].appt, raw: {} };
     expect(c.canJoin(ended)).toBeFalse();
     expect(c.joinTip(ended)).toBe('This session has ended');
-    const open = spyOn(window, 'open');
+    const nav = spyOn((c as any).router, 'navigate').and.resolveTo(true);
     c.join(later);
-    expect(open).not.toHaveBeenCalled();
+    c.join(ended);
+    expect(nav).not.toHaveBeenCalled();
   });
+});
 
-  it('Join does not open a tab when the session has no Zoom meeting', () => {
-    const open = spyOn(window, 'open');
-    c.clock = new Date();
-    c.join({ appt: soon(2), raw: {} });
-    expect(open).not.toHaveBeenCalled();
+/* ================================================================ Lookup → Book Session */
+describe('Participant lookup → Book Session', () => {
+  it('opens the By participant tab on that product and type, with the participant picked (operator, 2026-11-24)', async () => {
+    const booking = { typeRoles: () => Promise.resolve({ required: [], additional: [], eis: {} }), mergeSlots: () => [] };
+    const { c } = await make(fakeSvc({ roles: { scheduler: true } }), { template: '', booking });
+    await c.bookStep('P1', 't', 'p9');
+    const b = c.book!;
+    expect(c.tab).toBe('book');
+    expect(b.mode).toBe('participant');
+    expect(b.participantId).toBe('p9');
+    expect(b.filterBar.productId).toBe('P1');
+    expect(b.filterBar.typeIds).toEqual(['t']);
   });
 });
 
@@ -206,13 +253,16 @@ describe('HomeTab · calendar for all specialists', () => {
   it('shows every specialist\'s windows, each booking under its own specialist\'s window', async () => {
     const monday = new Date(); monday.setHours(0, 0, 0, 0); monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7) + 7);
     const at = (hr: number) => new Date(monday.getFullYear(), monday.getMonth(), monday.getDate(), hr);
-    const win = (id: string, who: string): any => ({ id, profileId: who, start: at(9), end: at(12), typeIds: ['t'], slots: [] });
+    // Anita's window still has an open start time (11:00), so it keeps its own card; Bala's is fully booked,
+    // so only its sessions show that time (each appointment shows once, Muskan's review 2026-11-23).
+    const open = { typeId: 't', start: at(11), end: at(12), booked: false, available: true };
+    const win = (id: string, who: string, slots: any[]): any => ({ id, profileId: who, start: at(9), end: at(12), typeIds: ['t'], slots });
     const row = (id: string, who: string[]): ApptRow => ({ raw: {}, appt: {
       id, start: at(10), end: at(11), attended: false, cancelled: false, cancelledReason: null,
       hostIds: who, participantId: 'p', typeId: 't', productId: null, zoomUrl: null } });
     const svc = fakeSvc({
       roles: { scheduler: true },
-      windows: () => Promise.resolve([win('wA', 'anita'), win('wB', 'bala')]),
+      windows: () => Promise.resolve([win('wA', 'anita', [open]), win('wB', 'bala', [])]),
       appointments: () => Promise.resolve([row('xB', ['bala']), row('xA', ['anita']), row('joint', ['anita', 'bala'])]),
     });
     const { fixture, c } = await make(svc);
@@ -224,8 +274,59 @@ describe('HomeTab · calendar for all specialists', () => {
     expect(day.windows.map(x => x.w.profileId)).toEqual(['anita', 'bala']);
     expect(day.windows[0].sessions.map(r => r.appt.id).sort()).toEqual(['joint', 'xA']);
     expect(day.windows[1].sessions.map(r => r.appt.id).sort()).toEqual(['joint', 'xB']);   // collaborative: under both
+    expect(day.windows.map(x => x.shown)).toEqual([true, false]);
     const who = Array.from(fixture.nativeElement.querySelectorAll('[data-testid="sas-home-window-who"]')).map((e: any) => e.textContent.trim());
-    expect(who).toEqual(['anita', 'bala']);
+    expect(who).toEqual(['anita']);
+    // Bala's session stands alone and names its specialist; the joint one is drawn once, under Anita's window.
+    const sessions = fixture.nativeElement.querySelectorAll('[data-testid="sas-home-session"]');
+    expect(sessions.length).toBe(3);
+    expect(Array.from(sessions).filter((e: any) => e.classList.contains('is-solo')).length).toBe(1);
+    // Status filter: the week's counts, and Booked narrows the calendar to sessions only.
+    expect(h.calCounts.open).toBe(1);
+    expect(h.calCounts.booked).toBe(3);
+    h.setCalF('booked');
+    expect(h.days[0].windows.every(x => !x.shown)).toBeTrue();
+    expect(h.days[0].windows.flatMap(x => x.cards).length).toBe(3);
+    h.setCalF('booked');   // selecting it again clears it
+    expect(h.calF).toEqual([]);
+    // A summary card sets several statuses at once (operator, 2026-11-24): Booked = booked + in session + pending.
+    h.showCard('booked');
+    expect(h.calF).toEqual(['booked', 'live', 'pending']);
+    expect(h.days[0].windows.every(x => !x.shown)).toBeTrue();
+    h.showCard('notbooked');
+    expect(h.days[0].windows.filter(x => x.shown).length).toBe(1);   // Anita's open window
+    expect(h.days[0].windows.flatMap(x => x.cards).length).toBe(0);
+    h.setCalF('');
+    expect(h.calOn).toBeFalse();
+  });
+
+  it('draws a cancelled session red, names a no-show, and counts it per day in Month view', async () => {
+    const monday = new Date(); monday.setHours(0, 0, 0, 0); monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7) + 7);
+    const at = (hr: number) => new Date(monday.getFullYear(), monday.getMonth(), monday.getDate(), hr);
+    const row = (id: string, reason: string | null): ApptRow => ({ raw: {}, appt: {
+      id, start: at(10), end: at(11), attended: false, cancelled: true, cancelledReason: reason,
+      hostIds: ['me'], participantId: 'p', typeId: 't', productId: null, zoomUrl: null } });
+    const svc = fakeSvc({
+      roles: { eis: true },
+      windows: () => Promise.resolve([{ id: 'w', profileId: 'me', start: at(9), end: at(12), typeIds: ['t'], slots: [] }]),
+      appointments: () => Promise.resolve([row('c1', 'Cancelled By Client'), row('c2', NO_SHOW_REASON)]),
+    });
+    const { fixture, c } = await make(svc);
+    const h = c.home!;
+    h.bar.emit({ mode: 'week', from: monday, to: new Date(monday.getTime() + 7 * 86400000) });
+    await settle(fixture);
+    const cards = Array.from(fixture.nativeElement.querySelectorAll('[data-testid="sas-home-session"]')) as HTMLElement[];
+    expect(cards.length).toBe(2);
+    expect(cards.every(e => e.classList.contains('st-cancel'))).toBeTrue();
+    const status = Array.from(fixture.nativeElement.querySelectorAll('[data-testid="sas-home-session-status"]')).map((e: any) => e.textContent.trim());
+    expect(status.sort()).toEqual(['Cancelled', 'Cancelled · no-show']);
+    expect(fixture.nativeElement.querySelectorAll('[data-testid="sas-home-window"]').length).toBe(0);   // only cancelled sessions in it
+    expect(h.calCounts.cancel).toBe(2);
+    expect(fixture.nativeElement.querySelector('[data-testid="sas-home-calf-cancel"]')?.classList.contains('is-danger')).toBeTrue();
+    h.bar.emit({ mode: 'month', from: new Date(monday.getFullYear(), monday.getMonth(), 1), to: new Date(monday.getFullYear(), monday.getMonth() + 1, 1) });
+    await settle(fixture);
+    const cell = h.month.find(m => m.date.getTime() === monday.getTime())!;
+    expect(cell.lines.map(l => l.label)).toEqual(['2 cancelled']);
   });
 });
 
@@ -266,15 +367,15 @@ describe('HomeTab · filters, Day view and bulk delete', () => {
   it('a type filter keeps only matching slots and counts hours from them', () => {
     h.onFilter({ productId: null, typeIds: ['a'], booked: 'all' });
     expect(h.dayCols.map(x => x.typeId)).toEqual(['a']);
-    expect(h.hours!.availMin).toBe(120);
+    expect(h.summary!.totalMin).toBe(120);
     h.onFilter({ productId: null, typeIds: null, booked: 'all' });
-    expect(h.hours!.availMin).toBe(180);
+    expect(h.summary!.totalMin).toBe(180);
   });
 
   it('Booked / Not booked narrows the calendar but not the stats', () => {
     h.onFilter({ productId: null, typeIds: null, booked: 'booked' });
     expect(h.dayCols.flatMap(x => x.entries).every(e => e.booked)).toBeTrue();
-    expect(h.hours!.availMin).toBe(180);
+    expect(h.summary!.totalMin).toBe(180);
     h.onFilter({ productId: null, typeIds: null, booked: 'open' });
     expect(h.dayCols.flatMap(x => x.entries).every(e => !e.booked)).toBeTrue();
   });
@@ -397,7 +498,7 @@ describe('Collaborative session pending — EI Diagnostics + EI Implementation',
   const win = (id: string, who: string): any => ({ id, profileId: who, start: at(9), end: at(12), typeIds: ['impl'],
     slots: [{ typeId: 'impl', start: at(10), end: at(11), booked: true, available: false }] });
 
-  /* pastPage / appointments behave like the Firestore queries: a specialist's own sessions are found through
+  /* pastBetween / appointments behave like the Firestore queries: a specialist's own sessions are found through
      the `hosts` array only (array-contains); A&H (null) gets everything. */
   function svcFor(viewer: { roles: any; id: string }, d: any) {
     const r = row(d), inHosts = (id: string) => (d.hosts ?? []).some((h: any) => h.id === id);
@@ -407,7 +508,7 @@ describe('Collaborative session pending — EI Diagnostics + EI Implementation',
       mapAppointment: { impl: 'EI Implementation' },
       windows: (ids: string[] | null) => Promise.resolve([win('wd', 'diag'), win('wi', 'impl')].filter(w => !ids || ids.includes(w.profileId))),
       appointments: (ids: string[] | null) => Promise.resolve(!ids || ids.some(inHosts) ? [r] : []),
-      pastPage: (host: string | null) => Promise.resolve({ rows: !host || inHosts(host) ? [r] : [], cursor: null, done: true }),
+      pastBetween: (host: string | null) => Promise.resolve({ rows: !host || inHosts(host) ? [r] : [], capped: false }),
     });
   }
   async function homeOf(viewer: { roles: any; id: string }, d: any) {
@@ -445,7 +546,8 @@ describe('Collaborative session pending — EI Diagnostics + EI Implementation',
   it('once either specialist marks it, it is pending for neither (one shared doc)', async () => {
     for (const viewer of [diag, impl, ah]) {
       const { h, day } = await homeOf(viewer, raw({ attended: true }));
-      expect(h.past.length).withContext(viewer.id).toBe(0);                    // the Pending filter is empty
+      expect(h.pastCounts.pending).withContext(viewer.id).toBe(0);             // nothing waiting for a status
+      expect(h.pastCounts.completed).withContext(viewer.id).toBe(1);
       expect(day.windows.every(x => x.label === 'Completed')).withContext(viewer.id).toBeTrue();
       TestBed.resetTestingModule();
     }
@@ -545,9 +647,9 @@ describe('ParticipantLookup', () => {
 describe('Searchable dropdowns', () => {
   it('every dropdown filters its options by the typed text', async () => {
     const { c } = await make(fakeSvc(), { template: '', init: false });
-    c.q['past'] = 'comp';
-    expect(c.PAST_OPTIONS.filter(o => c.hit('past', o.label)).map(o => o.value)).toEqual(['completed']);
-    const fb = new FilterBar(fakeSvc(), 'all', 'me', false, () => {});
+    c.q['role'] = 'special';
+    expect(c.ROLE_OPTIONS.filter(o => c.hit('role', o.label)).map(o => o.value)).toEqual(['cw']);
+    const fb = new FilterBar(fakeSvc(), 'all', 'me', () => {});
     expect(fb.hit('lead', 'Leadership')).toBeTrue();
     expect(fb.hit('lead', 'Wellbeing')).toBeFalse();
     fb.pickProduct(undefined);                         // the search row, not an option
@@ -804,7 +906,7 @@ describe('FilterBar', () => {
       products: [{ id: 'P1', name: 'Leadership', typeIds: ['a', 'b'] }, { id: 'P2', name: 'Empty', typeIds: [] }],
       types: [{ id: 'a', name: 'Kick-off', duration: 60 }, { id: 'b', name: 'Review', duration: 30 }, { id: 'c', name: 'Other', duration: 45 }],
     }) });
-    fb = new FilterBar(svc, 'all', 'me', true, f => out.push(f));
+    fb = new FilterBar(svc, 'all', 'me', f => out.push(f));
     await fb.ready;
   });
 
@@ -822,10 +924,13 @@ describe('FilterBar', () => {
     expect(out.pop().typeIds).toEqual([]);
   });
 
-  it('Booked / Not booked, and Clear resets everything', () => {
-    fb.setBooked('open');
-    expect(out.pop().booked).toBe('open');
+  it('Clear resets everything, and the bar never narrows booked / not booked', () => {
+    fb.productId = 'P1';
+    fb.onProduct();
+    expect(fb.active).toBeTrue();
+    expect(out.pop().booked).toBe('all');
     fb.clear();
+    expect(fb.active).toBeFalse();
     expect(out.pop()).toEqual({ productId: null, typeIds: null, booked: 'all' });
   });
 });
