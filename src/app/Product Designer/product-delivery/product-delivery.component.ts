@@ -1,5 +1,5 @@
 import { Component, ViewChild } from '@angular/core';
-import { collection, collectionData, collectionSnapshots, Firestore, orderBy, query } from '@angular/fire/firestore';
+import { collection, collectionSnapshots, doc, documentId, Firestore, getDocs, query, where } from '@angular/fire/firestore';
 import { MatDialog } from '@angular/material/dialog';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
@@ -12,6 +12,18 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSortModule } from '@angular/material/sort';
+
+// Activity collection -> the field holding its display name + the type label shown in the list.
+// Mirrors the activity pickers in delivery-sequence.component.ts (VideoAsk = arenavideoask.title).
+const DELIVERY_SOURCES: Record<string, { field: string, type: string }> = {
+  'appointmenttype': { field: 'appointmenttype', type: 'Appointment' },
+  'delivery forms': { field: 'formname', type: 'Form' },
+  'delivery report': { field: 'reportname', type: 'Report' },
+  'delivery events': { field: 'eventname', type: 'Event' },
+  'delivery queue': { field: 'queuename', type: 'Queue' },
+  'delivery fieldwork': { field: 'fieldworkname', type: 'Fieldwork' },
+  'arenavideoask': { field: 'title', type: 'VideoAsk' },
+}
 
 @Component({
   selector: 'app-product-delivery',
@@ -34,6 +46,7 @@ export class ProductDeliveryComponent {
   productDeliverySource:MatTableDataSource<any> = new MatTableDataSource()
   mapProduct = {}
   mapDelivery = {}
+  private fetchedPaths = new Set<string>()
   private subscription = new Subject<void>();
 
   constructor(public firestore: Firestore, public dialog: MatDialog, public guard: AuthguardService, public router: Router) {
@@ -46,93 +59,8 @@ export class ProductDeliveryComponent {
     //     this.router.navigateByUrl('/')
     //   }
     // })
-    // Product
-    const productRef = collection(this.firestore,"products")
-    collectionSnapshots(productRef).pipe(takeUntil(this.subscription)).subscribe(prod =>{
-      for (let i = 0; i < prod.length; i++) {
-        const productDoc = prod[i];
-        this.mapProduct[productDoc.ref.path] = productDoc.data()["product"]
-      }      
-    })
-
-    // Appointment
-    const appointmenttypeRef = collection(this.firestore,"appointmenttype")
-    const appointmenttypeQuery = query(appointmenttypeRef,orderBy('appointmenttype'))
-    collectionSnapshots(appointmenttypeQuery).pipe(takeUntil(this.subscription)).subscribe(appt =>{
-      for (let i = 0; i < appt.length; i++) {
-        const apptDoc = appt[i];
-        this.mapDelivery[apptDoc.ref.path] = {
-          name: apptDoc.data()["appointmenttype"],
-          type: "Appointment"
-        }
-      }
-    })
-
-    // Form
-    const deliveryformsRef = collection(this.firestore,"delivery forms")
-    const deliveryformsQuery = query(deliveryformsRef,orderBy('formname'))
-    collectionSnapshots(deliveryformsQuery).pipe(takeUntil(this.subscription)).subscribe(form =>{
-      for (let i = 0; i < form.length; i++) {
-        const formDoc = form[i];
-        this.mapDelivery[formDoc.ref.path] = {
-          name: formDoc.data()["formname"],
-          type: "Form"
-        }
-      }
-    })
-
-    // Report
-    const deliveryreportRef = collection(this.firestore,"delivery report")
-    const deliveryreportQuery = query(deliveryreportRef,orderBy('reportname'))
-    collectionSnapshots(deliveryreportQuery).pipe(takeUntil(this.subscription)).subscribe(report =>{
-      for (let i = 0; i < report.length; i++) {
-        const reportDoc = report[i];
-        this.mapDelivery[reportDoc.ref.path] = {
-          name: reportDoc.data()["reportname"],
-          type: "Report"
-        }
-      }
-    })
-
-    // Event
-    const deliveryeventsRef = collection(this.firestore,"delivery events")
-    const deliveryeventsQuery = query(deliveryeventsRef,orderBy('eventname'))
-    collectionSnapshots(deliveryeventsQuery).pipe(takeUntil(this.subscription)).subscribe(event =>{
-      for (let i = 0; i < event.length; i++) {
-        const eventDoc = event[i];
-        this.mapDelivery[eventDoc.ref.path] = {
-          name: eventDoc.data()["eventname"],
-          type: "Event"
-        }
-      }
-    })
-
-    // Queue
-    const deliveryqueueRef = collection(this.firestore,"delivery queue")
-    const deliveryqueueQuery = query(deliveryqueueRef,orderBy('queuename'))
-    collectionSnapshots(deliveryqueueQuery).pipe(takeUntil(this.subscription)).subscribe(queue =>{
-      for (let i = 0; i < queue.length; i++) {
-        const queueDoc = queue[i];
-        this.mapDelivery[queueDoc.ref.path] = {
-          name: queueDoc.data()["queuename"],
-          type: "Queue"
-        }
-      }
-    })
-
-    // Fieldwork
-    const deliveryfieldworkRef = collection(this.firestore,"delivery fieldwork")
-    const deliveryfieldworkQuery = query(deliveryfieldworkRef,orderBy('fieldworkname'))
-    collectionSnapshots(deliveryfieldworkQuery).pipe(takeUntil(this.subscription)).subscribe(fieldwork =>{
-      for (let i = 0; i < fieldwork.length; i++) {
-        const fieldworkDoc = fieldwork[i];
-        this.mapDelivery[fieldworkDoc.ref.path] = {
-          name: fieldworkDoc.data()["fieldworkname"],
-          type: "Fieldwork"
-        }
-      }
-    })
-
+    // Products and delivery activities are NOT loaded up front any more. Only the documents that
+    // productToDeliverySequence actually references are fetched — see resolveNames().
   }
 
   ngOnInit(): void {
@@ -196,7 +124,60 @@ export class ProductDeliveryComponent {
       */
       this.productDeliverySource.data = data
       this.productDeliverySource.paginator = this.paginator
+      this.resolveNames(data)
     })
+  }
+
+  // Fetch ONLY the product + activity docs the mappings reference, once each. Paths are grouped by
+  // collection and read with documentId() 'in' queries (Firestore caps 'in' at 30 values per query),
+  // all in parallel. A path already fetched is skipped, so a re-emit of productToDeliverySequence only
+  // reads newly mapped docs. Names are read once — a rename shows after the screen is reopened.
+  private async resolveNames(rows: any[]) {
+    const idsByCollection: Record<string, string[]> = {}
+    const add = (path: string) => {
+      if (path == null || this.fetchedPaths.has(path)) return
+      const ref = doc(this.firestore, path)
+      const coll = ref.parent.id
+      // Same as before: an activity in a collection this screen has no name field for renders blank.
+      if (coll !== 'products' && DELIVERY_SOURCES[coll] == null) return
+      this.fetchedPaths.add(path);
+      (idsByCollection[coll] ??= []).push(ref.id)
+    }
+    for (const row of rows) {
+      add(row.product)
+      for (const option of row.sequence) {
+        for (const seq of option.deliverysequence) {
+          add(seq.activity)
+        }
+      }
+    }
+
+    const reads = []
+    for (const coll of Object.keys(idsByCollection)) {
+      const ids = idsByCollection[coll]
+      for (let i = 0; i < ids.length; i += 30) {
+        reads.push(getDocs(query(collection(this.firestore, coll), where(documentId(), 'in', ids.slice(i, i + 30)))))
+      }
+    }
+    const results = await Promise.all(reads)
+
+    const mapProduct = { ...this.mapProduct }
+    const mapDelivery = { ...this.mapDelivery }
+    for (const snap of results) {
+      for (const d of snap.docs) {
+        const coll = d.ref.parent.id
+        if (coll === 'products') {
+          mapProduct[d.ref.path] = d.data()['product']
+        } else {
+          mapDelivery[d.ref.path] = {
+            name: d.data()[DELIVERY_SOURCES[coll].field],
+            type: DELIVERY_SOURCES[coll].type
+          }
+        }
+      }
+    }
+    this.mapProduct = mapProduct
+    this.mapDelivery = mapDelivery
   }
   ngOnDestroy(){
     this.subscription.next()
