@@ -1,6 +1,6 @@
 import { CommonModule, DatePipe, Location } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Component, Input, OnChanges, OnInit } from '@angular/core';
+import { Component, Input, OnChanges, OnInit, SimpleChanges } from '@angular/core';
 import { collection, doc, Firestore, getDoc, getDocs, query, where } from '@angular/fire/firestore';
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -45,6 +45,10 @@ export class BookAppointmentComponent implements OnInit, OnChanges{
      participant's products and appointment types. null = no filter, so /bookappointment is unchanged. */
   @Input() filterProductId: string | null = null
   @Input() filterTypeIds: string[] | null = null
+  /* Optional participant to open on, set by the studio's participant lookup → Book (operator, 2026-11-24).
+     Picked the same way as /bookappointment?pid=…: A&H roles only, once the roles have loaded. */
+  @Input() participantId: string | null = null
+  private rolesLoaded = false
 
   shownProducts(products: any[]) {
     return (products ?? []).filter(p => !this.filterProductId || p.productid == this.filterProductId)
@@ -55,7 +59,8 @@ export class BookAppointmentComponent implements OnInit, OnChanges{
   }
 
   /* A picked appointment the new filter hides is dropped, with its date and slots. */
-  ngOnChanges() {
+  ngOnChanges(changes?: SimpleChanges) {
+    if (changes?.['participantId']) this.openParticipant()
     const a: any = this.selectedAppointment
     if (a && ((this.filterProductId && a.productid != this.filterProductId) || (this.filterTypeIds && !this.filterTypeIds.includes(a.id)))) {
       this.selectedAppointment = null
@@ -121,6 +126,7 @@ export class BookAppointmentComponent implements OnInit, OnChanges{
       var schedulerRole = data.scheduler != null ? data.scheduler : false
       var ahRole = data.ah != null ? data.ah : false
       this.superRole = adminRole || schedulerRole || ahRole
+      this.rolesLoaded = true
       var minimumDate:Date
       if(this.superRole){
         minimumDate = new Date()
@@ -140,7 +146,17 @@ export class BookAppointmentComponent implements OnInit, OnChanges{
         this.onProfileSelect()
       }
       this.mindate = datepipe.transform(minimumDate, "yyyy-MM-dd")
+      this.openParticipant()
     })
+  }
+
+  /* Select the participantId input, like a pick from the participant dropdown. Waits for the roles; only an A&H
+     role (superRole) picks someone else, everyone else always books for themselves. */
+  private openParticipant() {
+    const pid = this.participantId
+    if (!pid || !this.rolesLoaded || !this.superRole || pid === this.selectedUser) return
+    this.selectedUser = pid
+    this.onProfileSelect()
   }
 
   ngOnInit(): void {
