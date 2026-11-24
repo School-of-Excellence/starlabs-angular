@@ -11,7 +11,10 @@
   - their plans and journals.
 
   A merge of `origin/development` (`da26abf6`) is in progress. `PROGRESS.md` was the only conflict and is resolved here. `app.routes.ts` auto-merged and keeps `workshoplive/:id`. Not pushed, not deployed.
-- **starlabs-e2e-tests `main`**: **pushed through `97033dd`** (2026-11-20). Nothing is local.
+- **Uncommitted, for the operator to commit (2026-11-21 → 23):**
+  - **Workshop completed date + New Sign-ups:** `workshops.component.ts` and `workshop-dashboard.component.{ts,html,css}`, `.glance.ts` and its unit spec, the plan and journal `2026-11-21-dashboard-new-signups`.
+  - **Sale Achieved full-screen dialog:** the new folder `workshop-dashboard/sale-achieved-dialog/`, `watson-purchases.ts`, the dashboard component, the plan and journal `2026-11-23-sale-achieved-dialog`. ₹0 buyers are left out. The dialog is split into **New Sales**, **Funnel Sales** and **Upgrades**: the first sale is the person's first paid purchase ever, later purchases in the window by new customers are Funnel, and people who bought before the window are Upgrades. An "EiFlix New User" chip shows after the name of anyone in `new_user_data`, whether or not they have moved to existing. Only purchases on or after the person's enrolment day count. The header shows "Opt-in" (the registration start and end dates). The dialog lists every purchase in a Products column (no expand), and has filters for Product, Buyer type, Amount per purchase and Repeat buyers.
+- **starlabs-e2e-tests `main`**: **6 local commits, not pushed:** `89757d3` (WSU New Sign-ups), `5e51dbe` (WSD Sale Achieved dialog; its cases moved from the side panel), `da84451` (WSD New / Funnel / Upgrades hooks) `3b3e449` (WSD EiFlix New User chip) `ba1cbd0` (WSD-01 header Opt-in) and `1e32ffd` (WSD-02 products in the row + filters). Before that, pushed through `97033dd` (2026-11-20).
   - The full workshops suite passed: 275/0/33 (308 tests in 37 files).
   - The gate was MATCHED over all 27 app files.
   - The NUD, WDC-LATE, WPT and WLV cases match the committed branch.
@@ -34,7 +37,7 @@
   - Killing the emulator left `functions/package.json` on `index.emulator.js`. It was restored each time.
 
 ## Pending
-1. **Operator:** finish the merge (`git add PROGRESS.md`, `git commit`), then push `nanda-development`.
+1. **Operator:** commit the New Sign-ups and Sale Achieved dialog files. **Hub:** push `89757d3`, `5e51dbe`, `da84451`, `3b3e449`, `ba1cbd0` and `1e32ffd` when asked, after the full workshops suite.
 2. **Before deploying Workshop Live, Manage tag and Delivery on hold to production:**
    - add a `/workshoplive` route-config entry (via /routeconfiguration) with the same roles as /workshops, or everyone gets "Contact Admin";
    - fill `static meta data/Workshop Admin.clearworkshop`;

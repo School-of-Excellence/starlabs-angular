@@ -124,6 +124,9 @@
 .wdx-pill--gold{border-color:var(--accent-line);background:var(--accent-tint);color:var(--accent-ink);font-weight:600;letter-spacing:.04em}
 .wdx-pill--grey{background:#f1f3f6;border-color:var(--border);color:var(--t2)}
 .wdx-new{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:5px;background:var(--new-bg);color:var(--new);font:700 10.5px/1 'DM Sans',sans-serif;letter-spacing:.08em;text-transform:uppercase;flex:none}
+/* New Sign-ups panel (2026-11-21): someone moved to existing, in the New badge's shape and the Existing card's blue
+   (ink #075f92 on #e4f1f9 is 5.9:1). Sentence case: the words are long, and the text reads the same to a test. */
+.wdx-moved{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:5px;background:#e4f1f9;color:#075f92;font:600 11px/1 'DM Sans',sans-serif;letter-spacing:.01em;white-space:nowrap;flex:none}
 .wdx-tag{display:inline-flex;align-items:center;height:24px;padding:0 9px;border:1px solid var(--tag-line);border-radius:999px;background:var(--tag-bg);color:var(--tagc);font-size:12px;font-weight:600;white-space:nowrap;line-height:1}
 .wdx-type{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:6px;font-size:12px;font-weight:600;white-space:nowrap;line-height:1}
 .wdx-type--fac{background:var(--c-fac-bg);color:var(--c-fac)}
@@ -150,6 +153,8 @@ button.wdx-st:hover{border-color:currentColor;box-shadow:0 1px 0 rgba(0,0,0,.04)
 .wdx-meta{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;margin-bottom:12px;color:var(--t2);font-size:13px}
 .wdx-dates{display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
 .wdx-dates .wdx-ic{color:var(--accent-ink)}
+/* Opt-in (registration window) beside the workshop dates: a small label instead of a second calendar icon. */
+.wdx-optin-k{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--accent-ink)}
 .wdx-root .wdx-title{font:600 34px/1.12 'Playfair Display',Georgia,serif;color:var(--primary)}
 .wdx-root.wdx-root .wdx-title{letter-spacing:-.005em}
 .wdx-rule{display:block;width:40px;height:0;border-top:1.5px solid var(--accent);margin:13px 0 11px}
@@ -211,6 +216,9 @@ button.wdx-fig:hover .wdx-go,button.wdx-cell:hover .wdx-go{color:var(--primary);
 .wdx-groups>.wdx-grp{display:flex;flex-direction:column}
 .wdx-groups>.wdx-grp>.wdx-grp-h{flex-shrink:0}
 .wdx-groups>.wdx-grp>.wdx-grp-cells{flex:1 1 auto}
+/* A one-card group (the category-based layout's People, 2026-11-21): alone on a row it would stretch its card
+   across the full width; capped at two cards' width instead. Phones keep the full-width rule below. */
+.wdx-grp.wdx-grp-solo{max-width:336px}
 .wdx-cell{position:relative;display:flex;flex-direction:column;gap:4px;min-width:0;min-height:96px;padding:14px 18px 14px;border-right:1px solid var(--border-light);border-bottom:1px solid var(--border-light);background:var(--surface);text-align:left}
 button.wdx-cell{cursor:pointer;transition:background-color .15s}
 button.wdx-cell:hover{background:var(--hover)}
@@ -562,8 +570,6 @@ button.wdx-cell:disabled .wdx-go{visibility:hidden}
 .wdx-field input{height:36px;width:100%;min-width:0;padding:0 10px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:13px;color:var(--t1)}
 .wdx-field input::placeholder{color:var(--t3);opacity:1}
 .wdx-field input.wdx-is-set{border-color:var(--primary-line);background:var(--primary-tint);font-weight:600;color:var(--primary)}
-.wdx-total{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--success-line);border-radius:9px;background:#f3faf6;color:var(--t2);font-size:13px}
-.wdx-total b{color:var(--money);font:700 18px/1 'DM Sans',sans-serif}
 .wdx-fchips{display:flex;flex-wrap:wrap;gap:6px}
 .wdx-fchip{display:inline-flex;align-items:center;gap:4px;height:28px;padding:0 2px 0 10px;border:1px solid var(--border);border-radius:999px;background:var(--surface);font-size:12.5px;font-weight:500;color:var(--t1)}
 .wdx-fchip button{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;color:var(--t3)}
@@ -576,25 +582,15 @@ a.wdx-pp:hover,div.wdx-pp[role]:hover{background:var(--hover)}
 .wdx-pp-b{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
 .wdx-pp-n{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px}
 .wdx-pp-line{color:var(--t2);font-size:12.5px}
+.wdx-pp-contact{overflow-wrap:anywhere}
 .wdx-pp-tags{display:flex;flex-wrap:wrap;gap:5px}
 .wdx-pp-end{flex:none;display:flex;align-items:center;gap:8px;align-self:center;color:var(--t3)}
-.wdx-amt{color:var(--money);font-weight:700;font-size:14px}
-.wdx-amt-n{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:var(--success-bg);color:var(--success);font:700 11.5px/1 'DM Sans',sans-serif}
 .wdx-nologin{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 9px;border:1px solid var(--warn-line);border-radius:999px;background:var(--warn-bg);color:var(--warn);font-size:12px;font-weight:600;white-space:nowrap}
 .wdx-extbox{display:flex;flex-direction:column;gap:10px;margin:0 20px 12px 64px;padding:12px;border:1px solid var(--accent-line);border-radius:10px;background:var(--accent-tint)}
 .wdx-extbox-a{display:flex;justify-content:flex-end;gap:8px}
 .wdx-pp.wdx-is-picked{background:var(--accent-tint)}
 .wdx-pp-hint{color:var(--accent-ink);font-size:12.5px}
 .wdx-pn-empty{padding:28px 20px;color:var(--t3);font-size:13px;text-align:center}
-.wdx-hcard{width:300px;background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-pop);overflow:hidden}
-.wdx-hcard-h{padding:12px 14px;border-bottom:1px solid var(--border-light)}
-.wdx-hcard-h b{display:block;font-weight:600}
-.wdx-hcard-h span{color:var(--t3);font-size:12px}
-.wdx-hcard-r{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:baseline;padding:9px 14px;border-bottom:1px solid var(--border-light);font-size:12.5px}
-.wdx-hcard-r span:first-child{color:var(--t2);white-space:nowrap}
-.wdx-hcard-r b{font-weight:600;color:var(--t1)}
-.wdx-hcard-f{display:flex;justify-content:space-between;padding:10px 14px;background:var(--head);font-size:13px;color:var(--t2)}
-.wdx-hcard-f b{color:var(--money);font-weight:700}
 
 /* popovers / menus */
 .wdx-pop{width:320px;max-width:100%;background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-pop);overflow:hidden}
@@ -712,6 +708,7 @@ a.wdx-pp:hover,div.wdx-pp[role]:hover{background:var(--hover)}
   .wdx-fig-k{font-size:12.5px}
   .wdx-go span{display:none}
   .wdx-grp{flex-basis:100%}
+  .wdx-grp.wdx-grp-solo{max-width:none}
   .wdx-grp-cells{grid-template-columns:repeat(2,minmax(0,1fr))}
   .wdx-grp-cells > :last-child:nth-child(odd){grid-column:1 / -1}
   .wdx-cell{padding:12px 14px;min-height:88px}
@@ -752,7 +749,6 @@ a.wdx-pp:hover,div.wdx-pp[role]:hover{background:var(--hover)}
   .wdx-pn-count,.wdx-pn-body{padding-left:16px;padding-right:16px}
   .wdx-pp{padding:12px 16px}
   .wdx-extbox{margin-left:16px;margin-right:16px}
-  .wdx-hcard{width:100%}
 }
 /* Headline figures: the "Open list" words give way to the chevron alone when a figure is narrow,
    so they never sit on top of the figure's label (checker fix, 2026-11-17). */
@@ -1095,7 +1091,6 @@ div.wdx-menu.wdx-menu.wdx-menu.mat-mdc-select-panel{border-radius:12px;margin-to
   background:transparent;box-shadow:none;color:inherit;
 }
 .wdx-root .wdx-ppcard.mat-mdc-card:hover{background:var(--hover)}
-.wdx-root .wdx-ppcard.mat-mdc-card.wdx-is-picked{background:var(--accent-tint)}
 .wdx-ppcard > .wdx-pp{flex:1 1 0;min-width:0;border-bottom:0}
 .wdx-root a.wdx-pp{color:inherit;text-decoration:none}
 .wdx-root a.wdx-pp:hover{background:transparent}
@@ -1103,7 +1098,7 @@ div.wdx-menu.wdx-menu.wdx-menu.mat-mdc-select-panel{border-radius:12px;margin-to
 /* The mockup's ".wdx-root.wdx-root p" reset (0,2,1) zeroes these paragraphs' own padding. */
 .wdx-root .wdx-pn-list > .wdx-pn-empty{padding:28px 20px}
 .wdx-menu .wdx-pop-sec > .wdx-pop-empty{padding:4px 10px 8px}
-/* Sale amount / chat action: outside the profile link, laid out as the row's end slot. */
+/* Chat action: outside the profile link, laid out as the row's end slot. */
 .wdx-ppcard-end{flex:none;display:flex;align-items:center;gap:8px;padding:8px 20px 8px 0}
 .wdx-root .wdx-pp-caret.mat-icon{width:18px;height:18px;font-size:18px;line-height:18px;color:var(--t3)}
 .wdx-root .wdx-pp.wdx-is-picked .wdx-pp-caret.mat-icon{color:var(--accent-ink)}
@@ -1117,17 +1112,6 @@ div.wdx-menu.wdx-menu.wdx-menu.mat-mdc-select-panel{border-radius:12px;margin-to
   --mat-datepicker-toggle-icon-color:var(--t2);--mat-datepicker-toggle-active-state-icon-color:var(--primary);
   --mdc-icon-button-state-layer-size:32px;--mdc-icon-button-icon-size:18px;
 }
-
-/* ---------- purchases hover card (outside the panel, fixed above it) ---------- */
-.wdx-root.wdx-hcard--fixed{position:fixed;z-index:1002;max-width:calc(100vw - 24px)}
-/* placed with a max-height on phones (showSaleTip): the head and total stay, the list shrinks and scrolls */
-.wdx-root.wdx-hcard--fixed{display:flex;flex-direction:column}
-.wdx-root.wdx-hcard--fixed > .wdx-hcard-h,.wdx-root.wdx-hcard--fixed > .wdx-hcard-f{flex:none}
-.wdx-root.wdx-hcard--fixed > .wdx-hcard-list{flex:1 1 auto;min-height:0}
-.wdx-hcard-list{max-height:280px;overflow-y:auto}
-.wdx-hcard-list > .wdx-hcard-r:last-child{border-bottom:0}
-.wdx-hcard-r > :last-child{grid-column:3;text-align:right;white-space:nowrap}
-.wdx-hcard-r b{overflow-wrap:anywhere}
 
 /* ---------- filter chips: mat-chip (removed) skinned as .wdx-fchip ---------- */
 .wdx-fchips .wdx-fchip.mat-mdc-chip{
@@ -1257,7 +1241,6 @@ div.wdx-menu.wdx-menu.wdx-menu.mat-mdc-select-panel{border-radius:12px;margin-to
   .wdx-panel--fixed .wdx-pp{padding:12px 16px}
   .wdx-panel--fixed .wdx-ppcard-end{padding-right:16px}
   .wdx-panel--fixed .wdx-extbox{margin-left:16px;margin-right:16px}
-  .wdx-root.wdx-hcard--fixed{width:auto}
 }
 
 /* ==========================================================================
@@ -1416,6 +1399,8 @@ div.wdx-menu.wdx-menu.wdx-menu.mat-mdc-select-panel{border-radius:12px;margin-to
   --gl-started:#1f6fd1; --gl-notstarted:#6b7891; --gl-active:#0e8a80; --gl-completed:#2a9457;
   --gl-existing:#0b78b8; --gl-new:#6d45dc; --gl-notenrolled:#c93d6e; --gl-chat:#d0620f;
   --gl-stuck:#c27c06; --gl-inactive:#cf3f3f; --gl-joined:#2f6fe0; --gl-tags:#0e8a80;
+  /* New Sign-ups (2026-11-21): a leaf green, the one hue no People sibling or neighbour uses (4:1 on white) */
+  --gl-signups:#4a8a14;
   /* category-based and evergreen cards (purple = category, teal = Above Diagnostics, orange = Facilitator, as today) */
   --gl-cat:#8a44c8; --gl-coh:#0a8296; --gl-fac:#d0620f;
   /* Share Claimed: a warm gold (was the khaki #9a6a1c, which read as a dull beige wash; same icon contrast) */
@@ -1466,6 +1451,14 @@ div.wdx-menu.wdx-menu.wdx-menu.mat-mdc-select-panel{border-radius:12px;margin-to
 @container wdxcell (max-width:134px){
   .wdx-root .wdx-cell-k{align-items:flex-start;gap:7px}
   .wdx-root .wdx-cell-k>.wdx-ic{width:15px;height:15px;margin-top:1px;padding:0;border-radius:0;background:none}
+}
+/* New Sign-ups (2026-11-21): its window line ("10 Mar 2020 – 15 Apr 2020 (completed)", about 232px at 12.5px) sits
+   under the number, so each extra line lifts that number further above its siblings' bottom-aligned numbers. In a
+   narrow cell (content 160px or less: four People cards at 1440, two across on a phone, the category layout's lone
+   card) it is a size smaller, which keeps it to two lines ("10 Mar 2020 –" / "15 Apr 2020 (completed)") where 12.5px
+   took three. Measured on the real sheet: the second line is 145px at 12.5px and 133px at 11.5px in a 139px cell. */
+@container wdxcell (max-width:160px){
+  .wdx-root .wdx-cell-s.wdx-signups-win{font-size:11.5px}
 }
 
 /* ---------- group headers: tinted in the group colour, with the group name in that colour ---------- */

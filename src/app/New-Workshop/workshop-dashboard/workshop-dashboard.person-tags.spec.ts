@@ -157,16 +157,17 @@ describe('WorkshopDashboard — Manage tag (person menu)', () => {
     });
 
     it('leaves a panel without tag chips alone, and someone not in the panel', () => {
-      const sale = panel('saleAchieved');
-      sale.patchPersonTagChips('p2', 't2', true);
-      expect(sale.enrolledTagNames).toEqual({ p1: ['Alpha'] });
+      // Not in Chat Group shows no tag chips (Sale Achieved, the example here before, no longer opens the panel).
+      const chat = panel('notInChatGroup');
+      chat.patchPersonTagChips('p2', 't2', true);
+      expect(chat.enrolledTagNames).toEqual({ p1: ['Alpha'] });
       const other = panel('totalEnrolled', { selectedParticipants: [p1] });
       other.patchPersonTagChips('p2', 't2', true);
       expect(other.enrolledTagNames).toEqual({ p1: ['Alpha'] });
     });
 
     it("updates the Participant Data tags when that person is the one open there", () => {
-      const c = panel('saleAchieved', { selectedParticipantData: { profileid: 'p2' } });
+      const c = panel('notInChatGroup', { selectedParticipantData: { profileid: 'p2' } });
       c.patchPersonTagChips('p2', 't2', true);
       expect(c.selectedParticipantTags).toEqual(['Beta']);
       c.patchPersonTagChips('p1', 't2', true);   // someone else

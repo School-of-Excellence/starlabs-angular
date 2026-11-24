@@ -77,6 +77,38 @@ export function formatRupees(v: number): string {
   return '₹' + Math.round(Number(v) || 0).toLocaleString('en-IN');
 }
 
+/**
+ * Sale Achieved leaves out a buyer whose total is ₹0 (operator 2026-11-23): not listed, not counted. "₹0" uses the
+ * same rounding as formatRupees, so a total that would SHOW as ₹0 is the one dropped.
+ */
+export function isZeroRupees(v: number): boolean {
+  return Math.round(Number(v) || 0) === 0;
+}
+
+/**
+ * A PAID purchase line: an amount that shows as more than ₹0 (formatRupees' rounding). ₹0 lines, unknown amounts and
+ * negative lines are not sales (operator 2026-11-23: New Sales / Funnel Sales / Upgrades).
+ */
+export function isPaidAmount(v: number | null | undefined): boolean {
+  return typeof v === 'number' && Number.isFinite(v) && Math.round(v) > 0;
+}
+
+/**
+ * A person's FIRST SALE (operator 2026-11-23: "1st sale" = first purchase ever): the moment (ms) of their earliest
+ * PAID, DATED purchase across their whole Watson history — every purchase row of theirs, not just the window's.
+ * Undated purchases cannot be placed and are ignored; ₹0 lines are not sales. Several purchases at that same moment
+ * (one checkout) are all the first sale — the caller compares moments, so they tie. null with no paid dated purchase.
+ */
+export function firstSaleMs(rows: { date: Date | null; amount: number | null }[]): number | null {
+  let first: number | null = null;
+  for (const r of rows || []) {
+    if (!(r?.date instanceof Date) || isNaN(r.date.getTime()) || !isPaidAmount(r.amount)) continue;
+    const t = r.date.getTime();
+    if (first === null || t < first) first = t;
+  }
+  return first;
+}
+
 export function purchaseLabels(r: WatsonPurchaseRow): WatsonPurchaseRow & { dateLabel: string; amountLabel: string } {
   return { ...r, dateLabel: r.date ? formatDate(r.date, 'd MMM y', 'en-US') : '—', amountLabel: r.amount === null ? '—' : formatRupees(r.amount) };
 }
@@ -97,13 +129,29 @@ export function watsonFirestore(): any | null {
  *   enrolled profileid -> email -> EVERY Watson participant with that email (case-insensitive)
  *   -> their ParticipantPurchases -> only purchases dated inside the window.
  * Returns one entry per enrolled person with at least one purchase in the window, biggest buyer first.
+ * `firstPaidMs` is their first sale ever (firstSaleMs over ALL their purchases — the read has no date filter, so this
+ * needs no extra read): the dialog's New Sales / Funnel Sales / Upgrades split is decided by it.
  */
+/**
+ * A purchase made BEFORE the person enrolled in this workshop is not this workshop's sale (operator 2026-11-23):
+ * keeps the purchases dated on or after their enrolment DAY. Compared as local calendar days, so a purchase on the
+ * enrolment day counts even when it was earlier that day. Without an enrolment date nothing is dropped.
+ */
+export function purchasesFromEnrolment(rows: WatsonPurchaseRow[], enrolledMs: number | null | undefined): WatsonPurchaseRow[] {
+  if (enrolledMs === null || enrolledMs === undefined || !Number.isFinite(enrolledMs)) return rows;
+  const e = new Date(enrolledMs);
+  const day = new Date(e.getFullYear(), e.getMonth(), e.getDate()).getTime();
+  return rows.filter((r) => !!r.date && r.date.getTime() >= day);
+}
+
 export function buildSaleBuyers(
   emailByProfile: Map<string, string>,
   participantDocs: { id: string; data: any }[],
   purchaseDocs: any[],
   win: { start: Date; end: Date },
-): { profileid: string; rows: WatsonPurchaseRow[]; total: number }[] {
+  /** Each person's enrolment moment in this workshop (ms). Purchases before that day are left out. */
+  enrolledMsByProfile?: Map<string, number>,
+): { profileid: string; rows: WatsonPurchaseRow[]; total: number; firstPaidMs: number | null }[] {
   const pidsByEmail = new Map<string, Set<string>>();
   for (const d of participantDocs) {
     const key = String(d.data?.['email'] ?? '').trim().toLowerCase();
@@ -118,13 +166,15 @@ export function buildSaleBuyers(
     if (!docsByPid.has(key)) docsByPid.set(key, []);
     docsByPid.get(key)!.push(p);
   }
-  const out: { profileid: string; rows: WatsonPurchaseRow[]; total: number }[] = [];
+  const out: { profileid: string; rows: WatsonPurchaseRow[]; total: number; firstPaidMs: number | null }[] = [];
   emailByProfile.forEach((email, profileid) => {
     const pids = pidsByEmail.get(String(email).trim().toLowerCase());
     if (!pids) return;
-    const rows = purchasesInWindow(watsonPurchaseRows([...pids].flatMap((pid) => docsByPid.get(pid) || [])), win);
+    const history = watsonPurchaseRows([...pids].flatMap((pid) => docsByPid.get(pid) || []));
+    // In the window AND on or after the day they enrolled. The first-sale date still comes from the whole history.
+    const rows = purchasesFromEnrolment(purchasesInWindow(history, win), enrolledMsByProfile?.get(profileid));
     if (!rows.length) return;
-    out.push({ profileid, rows, total: rows.reduce((a, r) => a + (r.amount ?? 0), 0) });
+    out.push({ profileid, rows, total: rows.reduce((a, r) => a + (r.amount ?? 0), 0), firstPaidMs: firstSaleMs(history) });
   });
   return out.sort((a, b) => b.total - a.total);
 }

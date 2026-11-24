@@ -40,6 +40,8 @@
           <div class="wdx-meta">
             <span class="wdx-pill wdx-pill--gold">{{ workshopType }}</span>
             <span class="wdx-dates" *ngIf="workshopStartDateFormatted !== 'N/A'"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 9.8h17M8 3v4M16 3v4"/></svg>{{ workshopStartDateFormatted }} – {{ workshopEndDateFormatted }}</span>
+            <!-- Opt-in = the registration window (operator 2026-11-23). An open end reads "from <start>". -->
+            <span class="wdx-dates wdx-optin" data-testid="wdash-optin-dates" *ngIf="optinStartFormatted"><span class="wdx-optin-k">Opt-in</span>{{ optinEndFormatted ? optinStartFormatted + ' – ' + optinEndFormatted : 'from ' + optinStartFormatted }}</span>
           </div>
           <h1 class="wdx-title">{{ workshopTitle }}</h1>
           <span class="wdx-rule" aria-hidden="true"></span>
@@ -151,9 +153,10 @@
 
           <!-- Sale Achieved — live workshops only: enrolled people who bought in Watson between the
                registration start and one month after the workshop end (Watson read-only).
-               The amount is the headline; the number of buyers sits under it. -->
+               The amount is the headline; the number of buyers sits under it. The click opens the full-screen
+               Sale Achieved dialog (2026-11-23), not the side panel. -->
           <button type="button" class="wdx-fig wdx-fig--money metric-card" style="--tone:var(--gl-sale)" data-testid="wdash-sale-card" *ngIf="isLiveWorkshop"
-                  (click)="openSaleAchieved()"
+                  (click)="openSaleAchieved($any($event.currentTarget))"
                   matTooltip="Enrolled people who bought between registration start and one month after the workshop ended" matTooltipClass="wdx-mtip">
             <span class="wdx-fig-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 4.5h10M7 9h10M7 4.5h3.5a4.25 4.25 0 0 1 0 8.5H7l7.5 7"/></svg>Sale Achieved<span class="wdx-info" aria-hidden="true"><svg class="wdx-ic wdx-ic--xs" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8v.2"/></svg></span></span>
             <span class="wdx-fig-n metric-value" data-testid="wdash-sale-total">{{ saleAmountValue }}</span>
@@ -163,6 +166,28 @@
         </div>
 
         <div class="wdx-groups">
+          <!-- New Sign-ups (2026-11-21; specs/plans/2026-11-21-dashboard-new-signups.md): everyone in new_user_data created
+               between the registration start and the moment the workshop was marked completed (else its end date), people
+               moved to existing included. One card, drawn in the People group of either layout (ngTemplateOutlet).
+               Filters the new_user_data the dashboard already holds: like its People siblings it shows the quiet bar
+               and stays disabled while that loads, and says "—" if the read failed; with no usable dates it says "—",
+               stays disabled and the line under the number gives the reason. -->
+          <ng-template #wdxSignupsCard>
+            <button type="button" class="wdx-cell metric-card" style="--tone:var(--gl-signups)" data-testid="wdash-signups-card"
+                    [disabled]="signupsDisabled" [attr.aria-busy]="signupsLoading ? 'true' : null"
+                    (click)="onMetricClick('newSignups')"
+                    matTooltip="People who signed up between the registration start and the workshop's completion (or its end date), including people moved to existing"
+                    matTooltipClass="wdx-mtip">
+              <span class="wdx-cell-k"><svg class="wdx-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M13.5 3.5h-7a1 1 0 0 0-1 1v15a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V8.5z"/><path d="M13.5 3.5v5h5M12 11.5v6M9 14.5h6"/></svg><span>New Sign-ups</span></span>
+              @if (signupsLoading) {
+                <span class="wdx-cell-n wdx-cell-n--wait" data-testid="wdash-signups-loading"><span class="wdx-skel" aria-hidden="true"></span><span class="wdx-sr">Loading</span></span>
+              } @else {
+                <span class="wdx-cell-n metric-value" data-testid="wdash-signups-count">{{ signupsCountText }}</span>
+              }
+              <span class="wdx-cell-s wdx-signups-win" data-testid="wdash-signups-window">{{ signupsSubText }}</span>
+              <span class="wdx-go"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span>
+            </button>
+          </ng-template>
           <!-- Regular (not category-based) workshop. -->
           <ng-container *ngIf="workshopData?.categorybased !== true">
             <section class="wdx-grp wdx-grp--blue" style="--n:4">
@@ -193,7 +218,7 @@
                 </button>
               </div>
             </section>
-            <section class="wdx-grp wdx-grp--violet" [style.--n]="showNotInChatCard ? 4 : 3">
+            <section class="wdx-grp wdx-grp--violet" [style.--n]="showNotInChatCard ? 5 : 4">
               <div class="wdx-grp-h"><span class="wdx-eyebrow">People</span></div>
               <div class="wdx-grp-cells">
                 <!-- Existing / New / Not Enrolled split people by new_user_data, a large collection read once that the
@@ -232,6 +257,8 @@
                   }
                   <span class="wdx-go"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span>
                 </button>
+                <!-- New Sign-ups (2026-11-21): the card itself is the #wdxSignupsCard template above. -->
+                <ng-container *ngTemplateOutlet="wdxSignupsCard"></ng-container>
                 <!-- Only for a workshop with a chat group, and only while someone enrolled is missing from it. -->
                 <button type="button" class="wdx-cell metric-card" style="--tone:var(--gl-chat)" data-testid="wdash-chat-card" *ngIf="showNotInChatCard"
                         (click)="onMetricClick('notInChatGroup')" matTooltip="Enrolled people whose login is not yet in the workshop's chat group" matTooltipClass="wdx-mtip">
@@ -321,6 +348,14 @@
                   <span class="wdx-bar" aria-hidden="true"><i [style.width.%]="categoryBasedMetrics.facilitatorAvgProgress"></i></span>
                   <span class="wdx-go"><svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5L15 12l-5.5 5.5"/></svg></span>
                 </button>
+              </div>
+            </section>
+            <!-- New Sign-ups is on every workshop type (2026-11-21); this layout has no People group, so it gets one.
+                 wdx-grp-solo: when it wraps onto a row alone, the one card is not stretched across the whole row. -->
+            <section class="wdx-grp wdx-grp--violet wdx-grp-solo" style="--n:1">
+              <div class="wdx-grp-h"><span class="wdx-eyebrow">People</span></div>
+              <div class="wdx-grp-cells">
+                <ng-container *ngTemplateOutlet="wdxSignupsCard"></ng-container>
               </div>
             </section>
           </ng-container>
@@ -1464,7 +1499,7 @@
         <!-- Title: the proper label for every entry point (was `status | titlecase`, e.g. "Totalenrolled").
              The three named cards keep their literal titles. -->
         <h3 data-testid="wdash-panel-heading" class="wdx-pn-title">@switch (selectedStatusInfo?.status) {
-          @case ('saleAchieved') { Sale Achieved }
+          @case ('newSignups') { New Sign-ups }
           @case ('existUsersEnrolled') { Existing Participants }
           @case ('totalNewUsers') { New Users }
           @case ('totalNewUsersNotEnrolled') { {{ selectedStatusInfo?.subChallengeName }} }
@@ -1481,10 +1516,10 @@
           @default { {{ statusDisplayMap.get(selectedStatusInfo?.status) || (selectedStatusInfo?.status | titlecase) }} }
         }</h3>
         <!-- Subtitle: "challenge - step"; shown once when both sides match, and alone for journey days,
-             journey Completed and Sale Achieved (the sale window). -->
+             journey Completed and New Sign-ups (the sign-up window). -->
         <p data-testid="wdash-panel-title" class="wdx-pn-sub">{{ (selectedStatusInfo?.challengeName === selectedStatusInfo?.subChallengeName
               || selectedStatusInfo?.evergreenCompleted
-              || selectedStatusInfo?.status === 'saleAchieved'
+              || selectedStatusInfo?.status === 'newSignups'
               || (selectedStatusInfo?.status + '').startsWith('Day '))
             ? selectedStatusInfo?.subChallengeName
             : selectedStatusInfo?.challengeName + ' - ' + selectedStatusInfo?.subChallengeName }}</p>
@@ -1550,16 +1585,7 @@
       </label>
 
       <div class="wdx-pn-filterrow">
-        <h4 class="wdx-pn-flabel" *ngIf="selectedStatusInfo?.status !== 'saleAchieved'">Filter {{ filterOption | titlecase }} <b>({{ filteredParticipants.length }})</b></h4>
-        <h4 class="wdx-pn-flabel" *ngIf="selectedStatusInfo?.status === 'saleAchieved'">Buyers <b>({{ filteredParticipants.length }})</b></h4>
-
-        <!-- Sale Achieved sorts instead of the All / New / Exist filter. -->
-        <div class="wdx-seg" *ngIf="selectedStatusInfo?.status === 'saleAchieved'" role="group" aria-label="Sort buyers">
-          <button type="button" data-testid="wdash-sale-sort-amount" [class.on]="saleSort === 'amount'" [class.wdx-is-on]="saleSort === 'amount'"
-                  [attr.aria-pressed]="saleSort === 'amount'" (click)="setSaleSort('amount')">Amount</button>
-          <button type="button" data-testid="wdash-sale-sort-recent" [class.on]="saleSort === 'recent'" [class.wdx-is-on]="saleSort === 'recent'"
-                  [attr.aria-pressed]="saleSort === 'recent'" (click)="setSaleSort('recent')">Recent purchase</button>
-        </div>
+        <h4 class="wdx-pn-flabel">Filter {{ filterOption | titlecase }} <b>({{ filteredParticipants.length }})</b></h4>
 
         <!-- The Tag filter, shared by two menus: Total / Exist Users Enrolled (the filter menu) and New Users Enrolled
              (its own menu). Filter by the tags on each person's enrolment; ticking keeps the menu open. -->
@@ -1575,8 +1601,7 @@
         </ng-template>
 
         <ng-container *ngIf="selectedStatusInfo?.status !== 'totalNewUsers' &&
-                            selectedStatusInfo?.status !== 'totalNewUsersNotEnrolled' &&
-                            selectedStatusInfo?.status !== 'saleAchieved'">
+                            selectedStatusInfo?.status !== 'totalNewUsersNotEnrolled'">
           <button data-testid="wd-button-63" type="button" class="wdx-iconbtn wdx-iconbtn--boxed"
                   [matMenuTriggerFor]="filterMenu" aria-label="Filter participants"
                   matTooltip="Filter" matTooltipClass="wdx-mtip"
@@ -1858,32 +1883,6 @@
         </button>
       </div>
 
-      <!-- Sale Achieved: purchase date range inside the window, then the total of the buyers listed. -->
-      <ng-container *ngIf="selectedStatusInfo?.status === 'saleAchieved'">
-        <div class="wdx-range" role="group" aria-label="Purchase date range">
-          <label class="wdx-field">
-            <span>From</span>
-            <input type="date" data-testid="wdash-sale-from" [(ngModel)]="saleFrom" (ngModelChange)="applyFilterSide()"
-                   [ngModelOptions]="{standalone: true}" [min]="saleMin" [max]="saleTo || saleMax"
-                   aria-label="Purchases from" [class.wdx-is-set]="!!saleFrom">
-          </label>
-          <label class="wdx-field">
-            <span>To</span>
-            <input type="date" data-testid="wdash-sale-to" [(ngModel)]="saleTo" (ngModelChange)="applyFilterSide()"
-                   [ngModelOptions]="{standalone: true}" [min]="saleFrom || saleMin" [max]="saleMax"
-                   aria-label="Purchases to" [class.wdx-is-set]="!!saleTo">
-          </label>
-          <button type="button" class="wdx-iconbtn wdx-iconbtn--boxed" data-testid="wdash-sale-range-clear"
-                  *ngIf="saleFrom || saleTo" (click)="clearSaleRange()" aria-label="Clear the date range">
-            <svg class="wdx-ic wdx-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg>
-          </button>
-        </div>
-        <div class="wdx-total">
-          <span>Total value</span>
-          <b data-testid="wdash-sale-panel-total">{{ saleShownTotalLabel }}</b>
-        </div>
-      </ng-container>
-
       <!-- Removable filter chips, one row under the controls. Same panels and conditions as before;
            each chip's remove calls the same toggle as unticking it in the menu. -->
       <ng-container *ngIf="selectedStatusInfo?.status === 'existUsersEnrolled'">
@@ -1973,9 +1972,7 @@
       <!-- One mat-card.participant-card per person (the hub counts them); flattened into a list row. Tracked by person
            (2026-11-19): live updates rebuild the entries (Not in Chat Group on every enrolled snapshot), and a row that
            is rebuilt destroys the name's menu trigger without closing its menu, stranding the Manage tag submenu. -->
-      <mat-card class="participant-card wdx-ppcard" *ngFor="let participant of filteredParticipants; trackBy: trackPanelPerson"
-                [class.wdx-is-picked]="saleTipRow === participant"
-                (mouseenter)="showSaleTip(participant, $any($event.currentTarget))" (mouseleave)="hideSaleTip()">
+      <mat-card class="participant-card wdx-ppcard" *ngFor="let participant of filteredParticipants; trackBy: trackPanelPerson">
         <!-- A plain row: the side panel no longer opens /userprofile in a new tab (operator 2026-11-17). The hook
              stays on the row so existing hub references keep resolving. -->
         <div data-testid="wd-a-84"
@@ -1995,7 +1992,15 @@
                       [attr.aria-label]="'Options for ' + participant.name">{{ participant.name }}</button>
               <ng-template #wdxPlainName><span class="wdx-name participant-name">{{ participant.name }}</span></ng-template>
               <span class="wdx-new new-badge" *ngIf="isNewUserProfile(participant.profileid)">New</span>
+              <!-- New Sign-ups: someone moved to existing is still listed (they signed up in the window), marked so. -->
+              <span class="wdx-moved" data-testid="wdash-signup-moved"
+                    *ngIf="selectedStatusInfo?.status === 'newSignups' && participant.signupMoved">Moved to existing</span>
             </span>
+            <!-- New Sign-ups: email and phone from new_user_data, then the moment they signed up. -->
+            <ng-container *ngIf="selectedStatusInfo?.status === 'newSignups'">
+              <span class="wdx-pp-line wdx-pp-contact" data-testid="wdash-signup-contact" *ngIf="participant.signupContact">{{ participant.signupContact }}</span>
+              <span class="wdx-pp-line" data-testid="wdash-signup-date">Signed up {{ participant.signupLabel }}</span>
+            </ng-container>
             <ng-container *ngIf="workshopData?.categorybased === true">
               <span class="wdx-pp-line" *ngIf="participant.isFacilitator || participant.isCohort || participant.categoryName">
                 <ng-container *ngIf="participant.isFacilitator">Facilitator</ng-container>
@@ -2024,13 +2029,6 @@
               </ng-container>
             </span>
           </span>
-        </div>
-
-        <!-- Sale Achieved panel: how much this person bought in the window; hover the card for each purchase: date, name, amount. -->
-        <div class="wdx-ppcard-end" data-testid="wdash-sale-amount"
-             *ngIf="selectedStatusInfo?.status === 'saleAchieved' && participant.salePurchases?.length">
-          <span class="wdx-amt">{{ participant.saleTotalLabel }}</span>
-          <span class="wdx-amt-n" matTooltip="Number of purchases" matTooltipClass="wdx-mtip">{{ participant.salePurchases.length }}</span>
         </div>
 
         <!-- Chat group panel: one action per person — add their login to the group, or say why we cannot. -->
@@ -2168,25 +2166,4 @@
   <div data-testid="wd-close-participant-panel-90" class="panel-overlay wdx-scrim wdx-scrim--fixed"
        [class.overlay-visible]="showParticipantPanel" [class.wdx-is-open]="showParticipantPanel"
        (click)="closeParticipantPanel()"></div>
-</div>
-
-<!-- Purchases hover card for the Sale Achieved panel (same card as the EiFlix dashboard). Fixed above the
-     side panel (z-index 1002 > the panel's 1000); placed by showSaleTip(). -->
-<div *ngIf="saleTipRow" class="sale-tip wdx-root wdx-hcard wdx-hcard--fixed" data-testid="wdash-sale-tip" role="tooltip" [ngStyle]="saleTipStyle"
-     (mouseenter)="keepSaleTip()" (mouseleave)="hideSaleTip()">
-  <div class="wdx-hcard-h">
-    <b>{{ saleTipRow.name }}</b>
-    <span>Purchases · excl. GST</span>
-  </div>
-  <div class="wdx-hcard-list">
-    <div class="wdx-hcard-r" *ngFor="let s of saleTipRow.salePurchases">
-      <span>{{ s.dateLabel }}</span>
-      <b *ngIf="s.product">{{ s.product }}</b>
-      <span>{{ s.amountLabel }}</span>
-    </div>
-  </div>
-  <div class="wdx-hcard-f">
-    <span>Total · {{ saleTipRow.salePurchases.length }}</span>
-    <b>{{ saleTipRow.saleTotalLabel }}</b>
-  </div>
 </div>
