@@ -793,3 +793,11 @@ app-newusersprofile{display:block}
 .nx-root.nx-bsheet--panel .nx-channel{flex-direction:row;align-items:center;gap:14px;padding:12px 14px}
 
 @media (prefers-reduced-motion:reduce){.nx-root.nx-pop,.nx-root.nx-bsheet{animation:none}}
+
+/* ---------- person details (plan 2026-11-18): a click on a row opens them; the name is the keyboard way in ---------- */
+.nx-root .nx-table tbody tr.mat-mdc-row{cursor:pointer}
+.nx-root .nx-table tbody tr.mat-mdc-row td.nx-c-select{cursor:default}
+/* looks exactly like the name text it holds: no button chrome, only a focus ring and a hover underline */
+.nx-root .nx-namebtn{display:inline;min-width:0;padding:0;margin:0;border:0;border-radius:4px;background:none;font:inherit;color:inherit;text-align:left;cursor:pointer;overflow-wrap:anywhere}
+.nx-root .nx-namebtn:hover .nx-name{text-decoration:underline;text-decoration-color:var(--primary-line);text-underline-offset:3px}
+.nx-root .nx-namebtn:focus-visible{outline:2px solid var(--primary-light);outline-offset:2px}

@@ -17,12 +17,17 @@ import {
   joinedRecently,
   latestStepFinishedMs,
   needsAttention,
+  isSignupWindowSet,
+  newSignups,
   shortDay,
+  signupWindow,
+  signupWindowLabel,
   tagIdSetKey,
   topTags,
   weekdayDay,
   workshopTimeline,
 } from './workshop-dashboard.glance';
+import { formatDate } from './workshop-dashboard.engine';
 
 const at = (y: number, m: number, d: number, h = 0, min = 0) => new Date(y, m - 1, d, h, min).getTime();
 const HOUR = 60 * 60 * 1000;
@@ -303,6 +308,157 @@ describe('workshop-dashboard.glance', () => {
       expect(a.key).toBe(b.key);
       expect(a.ids).toEqual(['t1', 't2']);
       expect(tagIdSetKey([{ tags: ['t3'] }]).key).not.toBe(a.key);
+    });
+  });
+
+  // New Sign-ups (2026-11-21): the window is exact moments, both inclusive; the end is the completion moment when
+  // there is one, else the workshop end date. Pinned at each edge, for every date shape the docs can carry.
+  describe('signupWindow', () => {
+    const regStart = at(2026, 11, 7, 10, 0);
+    const planned = at(2026, 12, 6, 18, 0);
+    const completed = at(2026, 12, 1, 9, 30);
+
+    it('runs from the registration start to the completion moment when the workshop was marked completed', () => {
+      expect(signupWindow(ts(regStart), ts(completed), ts(planned))).toEqual({ start: regStart, end: completed, endKind: 'completed' });
+    });
+    it('falls back to the workshop end date without a completion moment', () => {
+      expect(signupWindow(ts(regStart), undefined, ts(planned))).toEqual({ start: regStart, end: planned, endKind: 'planned' });
+      expect(signupWindow(ts(regStart), null, ts(planned))).toEqual({ start: regStart, end: planned, endKind: 'planned' });
+    });
+    it('treats an unreadable completion moment as not set (falls back to the end date)', () => {
+      expect(signupWindow(ts(regStart), 'not a date', ts(planned))).toEqual({ start: regStart, end: planned, endKind: 'planned' });
+    });
+    it('uses the completion moment even when it is after the planned end', () => {
+      const late = at(2026, 12, 20, 12, 0);
+      expect(signupWindow(ts(regStart), ts(late), ts(planned))).toEqual({ start: regStart, end: late, endKind: 'completed' });
+    });
+    it('reads a Timestamp, a Date, a {seconds} object and an ISO string alike', () => {
+      const want = { start: regStart, end: planned, endKind: 'planned' };
+      expect(signupWindow(new Date(regStart), null, new Date(planned))).toEqual(want as any);
+      expect(signupWindow({ seconds: regStart / 1000 }, null, { seconds: planned / 1000 })).toEqual(want as any);
+      expect(signupWindow(new Date(regStart).toISOString(), null, new Date(planned).toISOString())).toEqual(want as any);
+      expect(signupWindow(ts(regStart), { seconds: completed / 1000 }, null)).toEqual({ start: regStart, end: completed, endKind: 'completed' });
+    });
+    it("says 'start' when the registration start is missing or unreadable, whatever the end", () => {
+      expect(signupWindow(undefined, ts(completed), ts(planned))).toEqual({ missing: 'start' });
+      expect(signupWindow(null, null, null)).toEqual({ missing: 'start' });
+      expect(signupWindow('garbage', null, ts(planned))).toEqual({ missing: 'start' });
+    });
+    it("says 'end' when there is neither a completion moment nor an end date", () => {
+      expect(signupWindow(ts(regStart), null, undefined)).toEqual({ missing: 'end' });
+      expect(signupWindow(ts(regStart), 'x', 'y')).toEqual({ missing: 'end' });
+    });
+    it('is not set when the start is after the end; a one-moment window is fine', () => {
+      expect(signupWindow(ts(planned), null, ts(regStart))).toEqual({ invalid: true });
+      expect(signupWindow(ts(planned), ts(regStart), ts(at(2027, 1, 1)))).toEqual({ invalid: true });
+      expect(signupWindow(ts(regStart), null, ts(regStart))).toEqual({ start: regStart, end: regStart, endKind: 'planned' });
+    });
+    it('counts a planned end saved with no time (local midnight) to the end of that day', () => {
+      const endDay = at(2026, 12, 6);   // 06 Dec 2026 00:00:00.000 local: the end time was left empty
+      const lastMs = new Date(2026, 11, 6, 23, 59, 59, 999).getTime();
+      expect(signupWindow(ts(regStart), null, ts(endDay))).toEqual({ start: regStart, end: lastMs, endKind: 'planned' });
+      expect(signupWindow(ts(regStart), null, new Date(endDay))).toEqual({ start: regStart, end: lastMs, endKind: 'planned' });
+      // someone who signed up at noon on the end day is in; the next day is out
+      const w = signupWindow(ts(regStart), null, ts(endDay));
+      const rows = newSignups({ noon: { created: ts(at(2026, 12, 6, 12, 0)) }, next: { created: ts(at(2026, 12, 7)) } }, w);
+      expect(rows.map(r => r.id)).toEqual(['noon']);
+      // and a registration start later that same day is still a window, not "not set correctly"
+      expect(signupWindow(ts(at(2026, 12, 6, 9, 0)), null, ts(endDay))).toEqual({ start: at(2026, 12, 6, 9, 0), end: lastMs, endKind: 'planned' });
+    });
+    it('keeps a planned end with a time, and a completion moment at midnight, exact', () => {
+      const oneMinutePast = at(2026, 12, 6, 0, 1);
+      expect(signupWindow(ts(regStart), null, ts(oneMinutePast))).toEqual({ start: regStart, end: oneMinutePast, endKind: 'planned' });
+      const midnight = at(2026, 12, 1);
+      expect(signupWindow(ts(regStart), ts(midnight), ts(planned))).toEqual({ start: regStart, end: midnight, endKind: 'completed' });
+    });
+    it("reads a date-only 'yyyy-mm-dd' string as that LOCAL day (start of day; a planned end runs to its last moment)", () => {
+      expect(signupWindow('2026-11-07', null, '2026-12-06')).toEqual({
+        start: at(2026, 11, 7), end: new Date(2026, 11, 6, 23, 59, 59, 999).getTime(), endKind: 'planned',
+      });
+      expect(signupWindow(' 2026-11-07 ', null, ts(planned))).toEqual({ start: at(2026, 11, 7), end: planned, endKind: 'planned' });
+      // a date-only created is that local day's midnight too
+      const w = { start: at(2026, 11, 7), end: planned, endKind: 'planned' as const };
+      expect(newSignups({ a: { created: '2026-11-07' } }, w).map(r => r.created)).toEqual([at(2026, 11, 7)]);
+    });
+    it('isSignupWindowSet tells a set window from the not-set states', () => {
+      expect(isSignupWindowSet(signupWindow(ts(regStart), null, ts(planned)))).toBeTrue();
+      expect(isSignupWindowSet({ missing: 'start' })).toBeFalse();
+      expect(isSignupWindowSet({ missing: 'end' })).toBeFalse();
+      expect(isSignupWindowSet({ invalid: true })).toBeFalse();
+      expect(isSignupWindowSet(null)).toBeFalse();
+    });
+  });
+
+  describe('signupWindowLabel', () => {
+    it('prints both ends in the dashboard date format, with "(completed)" when the end is the completion moment', () => {
+      const s = at(2026, 11, 7, 10, 0), e = at(2026, 12, 6, 18, 0);
+      expect(signupWindowLabel({ start: s, end: e, endKind: 'planned' })).toBe('07 Nov 2026 – 06 Dec 2026');
+      expect(signupWindowLabel({ start: s, end: e, endKind: 'completed' })).toBe('07 Nov 2026 – 06 Dec 2026 (completed)');
+      // the same formatter the rest of the dashboard uses
+      expect(signupWindowLabel({ start: s, end: e, endKind: 'planned' })).toBe(`${formatDate(new Date(s))} – ${formatDate(new Date(e))}`);
+    });
+    it('keeps each date (and the dash after the first) on one line for the card, with the same words', () => {
+      const s = at(2026, 11, 7, 10, 0), e = at(2026, 12, 6, 18, 0);
+      const card = signupWindowLabel({ start: s, end: e, endKind: 'completed' }, true);
+      expect(card).toBe('07\u00a0Nov\u00a02026\u00a0– 06\u00a0Dec\u00a02026 (completed)');
+      expect(card.replace(/\u00a0/g, ' ')).toBe(signupWindowLabel({ start: s, end: e, endKind: 'completed' }));
+      expect(signupWindowLabel({ missing: 'end' }, true)).toBe('Workshop end date is not set');
+    });
+    it('gives the reason when there is no window', () => {
+      expect(signupWindowLabel({ missing: 'start' })).toBe('Registration start date is not set');
+      expect(signupWindowLabel({ missing: 'end' })).toBe('Workshop end date is not set');
+      expect(signupWindowLabel({ invalid: true })).toBe('Dates are not set correctly');
+      expect(signupWindowLabel(null)).toBe('Registration start date is not set');
+    });
+  });
+
+  describe('newSignups', () => {
+    const start = at(2020, 3, 1, 9, 0);
+    const end = at(2020, 3, 31, 18, 0);
+    const win = { start, end, endKind: 'planned' as const };
+    const map: Record<string, any> = {
+      before:   { name: 'Before',   created: ts(start - 1) },
+      atStart:  { name: 'At Start', created: ts(start) },
+      inside:   { name: 'Inside',   created: new Date(at(2020, 3, 10, 12, 0)) },
+      moved:    { name: 'Moved',    created: { seconds: at(2020, 3, 20, 8, 0) / 1000 }, movedtoexist: true },
+      notMoved: { name: 'Kept',     created: new Date(at(2020, 3, 21, 8, 0)).toISOString(), movedtoexist: false },
+      atEnd:    { name: 'At End',   created: ts(end) },
+      after:    { name: 'After',    created: ts(end + 1) },
+      noDate:   { name: 'No Date' },
+      badDate:  { name: 'Bad Date', created: 'yesterday-ish' },
+      empty:    null,
+    };
+
+    it('lists everyone created inside the window, both ends included, newest first', () => {
+      expect(newSignups(map, win).map(s => s.id)).toEqual(['atEnd', 'notMoved', 'moved', 'inside', 'atStart']);
+    });
+    it('keeps people moved to existing and flags them', () => {
+      const rows = newSignups(map, win);
+      expect(rows.find(r => r.id === 'moved')?.moved).toBeTrue();
+      expect(rows.find(r => r.id === 'notMoved')?.moved).toBeFalse();
+      expect(rows.find(r => r.id === 'inside')?.moved).toBeFalse();
+    });
+    it('carries the created moment and the doc', () => {
+      const row = newSignups(map, win).find(r => r.id === 'atStart')!;
+      expect(row.created).toBe(start);
+      expect(row.doc).toBe(map['atStart']);
+    });
+    it('leaves out docs without a readable created date', () => {
+      const ids = newSignups(map, win).map(s => s.id);
+      expect(ids).not.toContain('noDate');
+      expect(ids).not.toContain('badDate');
+      expect(ids).not.toContain('empty');
+    });
+    it('orders equal moments by name, then id', () => {
+      const t = ts(at(2020, 3, 5));
+      const rows = newSignups({ z: { name: 'Bea', created: t }, y: { name: 'amy', created: t }, x: { name: 'Bea', created: t } }, win);
+      expect(rows.map(r => r.id)).toEqual(['y', 'x', 'z']);
+    });
+    it('is empty without a set window or without data', () => {
+      expect(newSignups(map, { missing: 'start' })).toEqual([]);
+      expect(newSignups(map, { invalid: true })).toEqual([]);
+      expect(newSignups(null, win)).toEqual([]);
+      expect(newSignups({}, win)).toEqual([]);
     });
   });
 });

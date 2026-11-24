@@ -234,6 +234,12 @@
                   matTooltip="Open Dashboard" (click)="dashboardNavigation(workshop)">
                   <mat-icon>dashboard</mat-icon>
                 </button>
+                <button data-testid="wor-live" mat-icon-button class="icon-btn live-btn" *ngIf="isActive(workshop)"
+                  matTooltip="Live" aria-label="Live" (click)="openLive(workshop)">
+                  <mat-icon>sensors</mat-icon>
+                </button>
+                <!-- keeps Edit and Duplicate in the same place on rows without the Live button -->
+                <span class="live-slot" *ngIf="!isActive(workshop)" aria-hidden="true"></span>
                 <button data-testid="wor-route-18" mat-icon-button class="icon-btn edit-btn" *ngIf="canEdit"
                   matTooltip="Edit Workshop" (click)="route('edit', workshop)">
                   <mat-icon>edit</mat-icon>
