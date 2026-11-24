@@ -986,7 +986,8 @@ export class WorkshopConfigurationv2Component implements OnInit, AfterViewInit, 
           newMap[id] = {
             profileid: t.profileid || '',
             uploaded: t.uploaded || null,
-            videourl: t?.hls?.url_stream && t.hls.url_stream.trim() !== '' ? t.hls.url_stream : (t.fileurl || null),
+            // Signed-URL migration (M-5): copy only the Publitio link, never fileurl (now a Storage path).
+            videourl: t?.hls?.url_stream && t.hls.url_stream.trim() !== '' ? t.hls.url_stream : null,
           };
         }
       }
