@@ -291,7 +291,18 @@
               <source [src]="videoUrl" type="video/mp4">
             </video>
           </ng-container>
-          <ng-template #novideo><span class="emptytext">{{ row.fileurl ? 'Not converted yet' : 'No video' }}</span></ng-template>
+          <!-- No playable video: the single status line below says why (one status per row, never two). -->
+          <ng-template #novideo></ng-template>
+          <!-- Signed-URL M-5: conversion status from videoAskHLS + Retry (writes only hlsstatus: 'retry') -->
+          <div *ngIf="conversion(row).showStatus" class="hlsstatus" data-testid="pva-hlsstatus" [attr.data-status]="conversion(row).status || 'none'"
+               [matTooltip]="row.hlserror || ''" [matTooltipDisabled]="!row.hlserror">
+            {{ conversion(row).label }}
+          </div>
+          <button *ngIf="isRetryVisible(row)" data-testid="pva-retry" mat-stroked-button type="button"
+                  [disabled]="isRetryDisabled(row)" (click)="requestRetry(row)">
+            Retry
+          </button>
+          <div *ngIf="retryError[row.docid]" class="emptytext" data-testid="pva-retry-error">{{ retryError[row.docid] }}</div>
         </td>
       </ng-container>
 

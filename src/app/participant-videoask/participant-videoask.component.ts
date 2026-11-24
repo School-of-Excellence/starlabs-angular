@@ -6,7 +6,7 @@ import { MatTable, MatTableDataSource, MatTableModule } from '@angular/material/
 import { AuthguardService } from '../authguard.service';
 import {
   arrayRemove, arrayUnion, collection, collectionData, doc, documentId, DocumentReference,
-  Firestore, getDocs, limit, orderBy, query, setDoc, updateDoc, where
+  Firestore, getDocs, limit, onSnapshot, orderBy, query, runTransaction, setDoc, updateDoc, where
 } from '@angular/fire/firestore';
 import { Subject, takeUntil } from 'rxjs';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -18,7 +18,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { videoAskHlsUrl } from '../shared/videoask-hls-url';
+import { videoAskConversionState, videoAskHlsUrl } from '../shared/videoask-hls-url';
 
 /** Collection a reference can point at -> the tag we show next to the title. */
 const KIND_LABEL = {
@@ -74,6 +74,11 @@ export class ParticipantVideoaskComponent {
 
   /** Signed-URL migration (M-5): play only the Publitio 480p file, never fileurl. */
   readonly hlsUrl = videoAskHlsUrl
+  /** Conversion status + whether Retry is offered (signed-URL M-5). */
+  readonly conversion = videoAskConversionState
+  /** Rows whose Retry was clicked here: keep the button visible (disabled) and watch the doc until done. */
+  private retryWatch = new Map<string, () => void>()
+  retryError: { [docid: string]: string } = {}
 
   form: FormGroup
 
@@ -196,6 +201,8 @@ export class ParticipantVideoaskComponent {
   ngOnDestroy() {
     this.destroy$.next()
     this.destroy$.complete()
+    this.retryWatch.forEach(unsubscribe => unsubscribe())
+    this.retryWatch.clear()
   }
 
   // ---------------------------------------------------------------- bootstrap
@@ -506,6 +513,65 @@ export class ParticipantVideoaskComponent {
   /** Videos are placeholders until clicked, so a page never opens N streams. */
   playVideo(row: any) {
     this.playing.add(row['docid'])
+  }
+
+  // ---------------------------------------------------------- conversion retry
+
+  /** Retry stays visible (disabled) after a click until the Cloud Function finishes. */
+  isRetryVisible(row: any): boolean {
+    return this.conversion(row).showRetry || this.retryWatch.has(row['docid'])
+  }
+
+  isRetryDisabled(row: any): boolean {
+    return this.conversion(row).busy || this.retryWatch.has(row['docid'])
+  }
+
+  /**
+   * Writes ONLY hlsstatus: 'retry'. The transaction re-reads the record so a stale row, a second
+   * click or another admin can never queue a retry on something already queued, running or done.
+   * The videoAskHLS Cloud Function claims it (retry -> inprogress) and sets success / failed.
+   */
+  async requestRetry(row: any) {
+    const docid = row['docid']
+    if (!docid || this.isRetryDisabled(row)) return
+    delete this.retryError[docid]
+    const ref = doc(this.firestore, 'participantvideoask', docid)
+    this.retryWatch.set(docid, () => {})
+    try {
+      const queued = await runTransaction(this.firestore, async tx => {
+        const snap = await tx.get(ref)
+        if (!snap.exists()) return false
+        if (!this.conversion(snap.data()).showRetry) return false
+        tx.update(ref, { hlsstatus: 'retry' })
+        return true
+      })
+      if (!queued) {
+        this.stopWatching(docid)
+        this.retryError[docid] = 'Status changed — reload to see it'
+        return
+      }
+      row['hlsstatus'] = 'retry'
+      // Follow this one record until the function finishes, so the status updates in place.
+      const unsubscribe = onSnapshot(ref, snap => {
+        const d: any = snap.data() || {}
+        Object.assign(row, {
+          hlsstatus: d.hlsstatus ?? null, hlserror: d.hlserror ?? null,
+          hls: d.hls ?? null, convertedtohls: d.convertedtohls === true,
+        })
+        if (d.hlsstatus === 'success' || d.hlsstatus === 'failed') this.stopWatching(docid)
+      }, () => this.stopWatching(docid))
+      this.retryWatch.set(docid, unsubscribe)
+    } catch (e) {
+      this.stopWatching(docid)
+      this.retryError[docid] = 'Retry failed — check your access and try again'
+      console.error('VideoAsk retry request failed', e)
+    }
+  }
+
+  private stopWatching(docid: string) {
+    const unsubscribe = this.retryWatch.get(docid)
+    if (unsubscribe) unsubscribe()
+    this.retryWatch.delete(docid)
   }
 
   // ------------------------------------------------------------ filter controls
