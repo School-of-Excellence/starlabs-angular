@@ -1,4 +1,4 @@
-import { WorkshopAccess, readAdminLists, EMPTY_ADMIN_LISTS } from './workshop-access.model';
+import { WorkshopAccess, readAdminLists, EMPTY_ADMIN_LISTS, NO_ACCESS, WORKSHOP_ACCESS_KEYS } from './workshop-access.model';
 
 /**
  * Clear (operator 2026-11-12): only the shared clear list or the workshop's own Clear tick gives it.
@@ -54,5 +54,44 @@ describe('WorkshopAccess — Clear', () => {
     expect(readAdminLists({ clearworkshop: 'a' }).clearWorkshop).toEqual([]);
     expect(readAdminLists(null).clearWorkshop).toEqual([]);
     expect(EMPTY_ADMIN_LISTS.clearWorkshop).toEqual([]);
+  });
+});
+
+/**
+ * Manage tag (operator 2026-11-19): the side-panel person menu's Manage tag is for the shared clear list ONLY.
+ * Unlike can('clear'), the workshop's own Clear tick does not give it, and neither does full dashboard access.
+ */
+describe('WorkshopAccess — inClearList (Manage tag)', () => {
+  const admins = ['admin', 'adminClear'];
+  const clearList = ['adminClear', 'listOnly'];
+  const grants: any = { ticked: ['qanda', 'clear'], adminClear: ['export'] };
+  const access = (id: string | null) => new WorkshopAccess(id, grants, admins, clearList);
+
+  it('is true for someone on the clear list', () => {
+    expect(access('adminClear').inClearList()).toBe(true);
+    expect(access('listOnly').inClearList()).toBe(true);   // even where the list alone does not open the dashboard
+  });
+
+  it("is false for someone with only this workshop's Clear tick, although can('clear') is true", () => {
+    const a = access('ticked');
+    expect(a.can('clear')).toBe(true);
+    expect(a.inClearList()).toBe(false);
+  });
+
+  it('is false for full dashboard access without the list, and for anyone else', () => {
+    expect(access('admin').inClearList()).toBe(false);
+    expect(access('stranger').inClearList()).toBe(false);
+    expect(new WorkshopAccess('adminClear', grants, admins).inClearList()).toBe(false);   // no list passed
+  });
+
+  it('is false with no signed-in profile, even when the list has a blank entry', () => {
+    expect(access(null).inClearList()).toBe(false);
+    expect(new WorkshopAccess('', grants, admins, ['', 'adminClear']).inClearList()).toBe(false);
+    expect(new WorkshopAccess(undefined, grants, admins, ['']).inClearList()).toBe(false);
+    expect(NO_ACCESS.inClearList()).toBe(false);
+  });
+
+  it('is not a grantable action: no Dashboard Access tick exists for it', () => {
+    expect(WORKSHOP_ACCESS_KEYS.some(k => /tag/i.test(k.key) || /tag/i.test(k.label))).toBe(false);
   });
 });

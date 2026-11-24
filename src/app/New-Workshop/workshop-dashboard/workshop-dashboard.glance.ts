@@ -14,7 +14,7 @@
  * rounded, so a DST change (a 23- or 25-hour day) never shifts a count by one — the rule
  * daysRemaining() in the engine already uses.
  */
-import { toMillis } from './workshop-dashboard.engine';
+import { formatDate, toMillis } from './workshop-dashboard.engine';
 
 export const GLANCE_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -349,4 +349,127 @@ export function tagIdSetKey(docs: { tags?: any }[] | null | undefined): { ids: s
     .filter((id): id is string => typeof id === 'string' && id.length > 0)
     .sort();
   return { ids, key: ids.join('\u0001') };
+}
+
+// =================================================================================================
+// 4. New Sign-ups (2026-11-21; specs/plans/2026-11-21-dashboard-new-signups.md)
+// =================================================================================================
+
+/** The window is set: both ends are epoch ms, both inclusive. */
+export interface SignupWindowSet {
+  start: number;
+  end: number;
+  /** 'completed' = the end is the moment the workshop was marked completed; 'planned' = the workshop end date. */
+  endKind: 'completed' | 'planned';
+}
+
+/**
+ * The New Sign-ups window, or why there is none: `{ missing: 'start' }` (no registration start date),
+ * `{ missing: 'end' }` (neither a completion date nor a workshop end date) or `{ invalid: true }` (the start is
+ * after the end).
+ */
+export type SignupWindow = SignupWindowSet | { missing: 'start' | 'end' } | { invalid: true };
+
+export function isSignupWindowSet(w: SignupWindow | null | undefined): w is SignupWindowSet {
+  return !!w && typeof (w as SignupWindowSet).start === 'number' && typeof (w as SignupWindowSet).end === 'number';
+}
+
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * A Timestamp / Date / {seconds} / ISO string as epoch ms; anything absent or unreadable is null. A date with no
+ * time ('yyyy-mm-dd', as older docs store it) is that LOCAL day's midnight, as Sale Achieved reads it (anyToDate in
+ * watson-purchases.ts) — `new Date('yyyy-mm-dd')` would be UTC midnight, 05:30 in India.
+ */
+function readMs(v: any): number | null {
+  if (typeof v === 'string' && DATE_ONLY.test(v.trim())) {
+    const [y, m, d] = v.trim().split('-').map(Number);
+    const t = new Date(y, m - 1, d).getTime();
+    return Number.isFinite(t) ? t : null;
+  }
+  const t = toMillis(v);
+  return t === null || !Number.isFinite(t) ? null : t;
+}
+
+/**
+ * A planned end saved without a time: both configuration screens make the end time optional, and a date picked
+ * alone is stored at local 00:00:00.000. That means the whole day, so the window runs to its last millisecond —
+ * otherwise everyone who signs up on the end day is left out while the label still names that day.
+ * Any other time of day is a real end time and stays exact.
+ */
+function wholeDayIfNoTime(ms: number): number {
+  const d = new Date(ms);
+  if (d.getHours() || d.getMinutes() || d.getSeconds() || d.getMilliseconds()) return ms;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999).getTime();
+}
+
+/**
+ * The New Sign-ups window (operator 2026-11-21): from the registration start date to the moment the workshop was
+ * marked completed, or, when it never was (or was switched back to pending, which clears that moment), to the
+ * workshop end date. Exact moments, both inclusive: the stored dates already carry their times, and the completion
+ * moment is a server time — except a planned end saved with no time (local midnight), which counts to the end of
+ * that day (wholeDayIfNoTime). A value that cannot be read as a date counts as not set. Pure: no clock is read.
+ */
+export function signupWindow(regStart: any, completedAt: any, plannedEnd: any): SignupWindow {
+  const start = readMs(regStart);
+  if (start === null) return { missing: 'start' };
+  const done = readMs(completedAt);
+  const planned = readMs(plannedEnd);
+  const end = done ?? (planned === null ? null : wholeDayIfNoTime(planned));
+  if (end === null) return { missing: 'end' };
+  if (start > end) return { invalid: true };
+  return { start, end, endKind: done !== null ? 'completed' : 'planned' };
+}
+
+/**
+ * The line under the New Sign-ups number and the side panel's subtitle: "07 Nov 2026 – 06 Dec 2026", with
+ * " (completed)" when the end is the completion moment; otherwise why there is no window. Dates in the dashboard's
+ * own format (formatDate), in the viewer's local time.
+ * `keepDatesTogether` (the narrow card): each date, and the dash after the first, is joined with no-break spaces,
+ * so a wrapping line breaks only after the dash or before "(completed)" — never inside a date ("15 Apr" / "2020").
+ * The words are the same either way.
+ */
+export function signupWindowLabel(w: SignupWindow | null | undefined, keepDatesTogether = false): string {
+  if (isSignupWindowSet(w)) {
+    const nb = (s: string) => (keepDatesTogether ? s.replace(/ /g, '\u00a0') : s);
+    const dash = keepDatesTogether ? '\u00a0– ' : ' – ';
+    return `${nb(formatDate(new Date(w.start)))}${dash}${nb(formatDate(new Date(w.end)))}${w.endKind === 'completed' ? ' (completed)' : ''}`;
+  }
+  if (w && (w as { invalid?: boolean }).invalid) return 'Dates are not set correctly';
+  if (w && (w as { missing?: string }).missing === 'end') return 'Workshop end date is not set';
+  return 'Registration start date is not set';
+}
+
+export interface NewSignup {
+  /** The new_user_data doc id (the person's profile id). */
+  id: string;
+  /** Their `created` moment, epoch ms. */
+  created: number;
+  /** Marked moved to existing (movedtoexist === true). Still counted: they signed up in the window. */
+  moved: boolean;
+  /** The new_user_data doc itself (name and contact details). */
+  doc: any;
+}
+
+/**
+ * Everyone in new_user_data (the map the dashboard already holds, by doc id) whose `created` moment falls inside
+ * the window, both ends included — moved-to-existing people too, and whether or not they enrolled anywhere.
+ * A doc with no `created`, or one that cannot be read as a date, is left out. Newest sign-up first; equal moments
+ * by name, then id, so the order never depends on the map's key order. Empty without a set window.
+ */
+export function newSignups(newUserMap: Record<string, any> | null | undefined, w: SignupWindow | null | undefined): NewSignup[] {
+  if (!isSignupWindowSet(w) || !newUserMap) return [];
+  const out: NewSignup[] = [];
+  for (const id of Object.keys(newUserMap)) {
+    const doc = newUserMap[id];
+    if (!doc || typeof doc !== 'object') continue;
+    const created = readMs(doc['created']);   // a 'yyyy-mm-dd' created is that local day's midnight, like the bounds
+    if (created === null || created < w.start || created > w.end) continue;
+    out.push({ id, created, moved: doc['movedtoexist'] === true, doc });
+  }
+  const nameOf = (s: NewSignup) => (s.doc?.['name'] ?? '').toString().trim();
+  return out.sort((a, b) =>
+    (b.created - a.created)
+    || nameOf(a).localeCompare(nameOf(b), undefined, { sensitivity: 'base', numeric: true })
+    || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }

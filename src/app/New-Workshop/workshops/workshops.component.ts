@@ -2,7 +2,7 @@ import { Component, OnInit} from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   Firestore, collectionData, collection, doc, updateDoc,
-  getDoc, addDoc, Timestamp, getDocs
+  getDoc, addDoc, Timestamp, getDocs, serverTimestamp, deleteField
 } from '@angular/fire/firestore';
 import { MatCardModule } from '@angular/material/card';
 import { CommonModule } from '@angular/common';
@@ -202,6 +202,11 @@ export class WorkshopsComponent implements OnInit {
     }
   }
 
+  /** The Live feed of completed steps (shown on Active rows only), in a new tab like the Dashboard. */
+  openLive(workshop: any): void {
+    window.open('/workshoplive/' + workshop.id, '_blank');
+  }
+
   private popupBannerOpening = false;
   /** EiFlix popup banner — edits the single `classify/eiflixpopupbanner` document. */
   async openPopupBannerDialog() {
@@ -374,12 +379,25 @@ export class WorkshopsComponent implements OnInit {
     }
     try {
       const workshopRef = doc(this.firestore, `workshopconfiguration/${workshop.docid}`);
-      await updateDoc(workshopRef, { workshopcompleted: isCompleted });
+      // Completed ON stamps the completion time (server clock); OFF clears it.
+      // The workshop dashboard's New Sign-ups window ends at this date when set,
+      // otherwise at the planned workshop end date.
+      await updateDoc(workshopRef, {
+        workshopcompleted: isCompleted,
+        workshopcompletedat: isCompleted ? serverTimestamp() : deleteField(),
+      });
       this.snackBar.open(
         `Workshop marked as ${isCompleted ? 'completed' : 'pending'} successfully!`,
         'Close', { duration: 2000 }
       );
       workshop.workshopcompleted = isCompleted;
+      // Mirror the write locally; the live collectionData stream replaces the
+      // row with the server-resolved timestamp moments later.
+      if (isCompleted) {
+        workshop.workshopcompletedat = Timestamp.now();
+      } else {
+        delete workshop.workshopcompletedat;
+      }
     } catch (error) {
       console.error('Error updating completion status:', error);
       event.source.checked = !isCompleted;
@@ -404,7 +422,9 @@ export class WorkshopsComponent implements OnInit {
       const workshopRef = doc(this.firestore, `workshopconfiguration/${workshop.docid}`);
       const workshopSnap = await getDoc(workshopRef);
       if (workshopSnap.exists()) {
-        const workshopData = workshopSnap.data();
+        // A copy never carries the source's completion date (the moment the SOURCE was marked completed);
+        // everything else is copied as before.
+        const { workshopcompletedat: _sourceCompletedAt, ...workshopData } = workshopSnap.data();
         const newDocRef = await addDoc(collection(this.firestore, 'workshopconfiguration'), {
           ...workshopData,
           created: Timestamp.now(),
