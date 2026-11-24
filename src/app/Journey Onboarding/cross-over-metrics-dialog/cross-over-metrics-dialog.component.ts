@@ -3,6 +3,8 @@ import { CommonModule } from '@angular/common';
 import { collection, Firestore, getDocs, query, where } from '@angular/fire/firestore';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { FormsModule } from '@angular/forms';
+import * as XLSX from 'xlsx';
+import { NameSearchPipe, nameSearch } from '../journey-coach-health-dashboard/name-search.pipe';
 
 interface CrossoverEntry {
   category: string;
@@ -16,7 +18,7 @@ interface CrossoverEntry {
 @Component({
   selector: 'app-cross-over-metrics-dialog',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, NameSearchPipe],
   templateUrl: './cross-over-metrics-dialog.component.html',
   styleUrl: './cross-over-metrics-dialog.component.css'
 })
@@ -162,7 +164,12 @@ export class CrossOverMetricsDialogComponent implements OnInit {
     });
   }
 
+  /** Name search in the participants side panel (2026-11-20); cleared when another combination opens. */
+  panelQuery = '';
+  readonly panelName = (pid: string): string => this.data?.mapProfile?.[pid] || pid;
+
   showProfiles(entry: CrossoverEntry) {
+    this.panelQuery = '';
     this.selectedEntry = entry;
     this.showProfilePanel = true;
   }
@@ -190,6 +197,32 @@ export class CrossOverMetricsDialogComponent implements OnInit {
 
   closeDialog() {
     this.dialogRef.close();
+  }
+
+  /** Export (2026-11-20): the filtered combinations, plus one row per participant behind them. */
+  exportCrossover(): void {
+    const wb = XLSX.utils.book_new();
+    const combos: any[][] = [['Category', 'Startpoint', 'Endpoint', 'Count']];
+    const people: any[][] = [['Category', 'Startpoint', 'Endpoint', 'Participant', 'Profile ID']];
+    for (const e of this.filteredData) {
+      combos.push([e.category, e.startpoint, e.endpoint, e.count]);
+      for (const pid of e.profileIds) people.push([e.category, e.startpoint, e.endpoint, this.data?.mapProfile?.[pid] ?? '', pid]);
+    }
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(combos), 'Combinations');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(people), 'Participants');
+    XLSX.writeFile(wb, `Crossover_metrics_${new Date().toISOString().split('T')[0]}.xlsx`);
+  }
+
+  /** Export the side panel's participant list for one combination. */
+  exportSelectedEntry(): void {
+    const e = this.selectedEntry;
+    if (!e) return;
+    const rows: any[][] = [['S.No', 'Participant', 'Profile ID']];
+    nameSearch(e.profileIds, this.panelQuery, this.panelName).forEach((pid, i) => rows.push([i + 1, this.data?.mapProfile?.[pid] ?? '', pid]));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Participants');
+    const name = `Crossover_${e.category}_${e.startpoint}_to_${e.endpoint}`.replace(/[^a-zA-Z0-9]+/g, '_');
+    XLSX.writeFile(wb, `${name}_${new Date().toISOString().split('T')[0]}.xlsx`);
   }
 
   getCategoryColor(category: string): string {

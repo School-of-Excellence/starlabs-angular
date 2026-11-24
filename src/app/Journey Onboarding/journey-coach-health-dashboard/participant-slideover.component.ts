@@ -7,6 +7,7 @@ import {
   doc, getDoc, getFirestore, DocumentReference,
 } from '@angular/fire/firestore';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef, MatDialogModule } from '@angular/material/dialog';
+import { exportXlsx, objectsToRows, fmtExportDate } from './export-xlsx';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -150,6 +151,12 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
             <span class="so-num" *ngIf="!row.email && !row.number">—</span>
           </div>
         </div>
+        <!-- Close sits beside the name; the labelled actions get their own row below. Three pills +
+             close never fit next to the name in a ≤520px panel, and the overflow made the autofocused
+             close button scroll the whole panel sideways (2026-11-23). -->
+        <button class="so-close" type="button" matTooltip="Close" aria-label="Close panel" (click)="close()">
+          <mat-icon>close</mat-icon>
+        </button>
         <div class="so-head-actions">
           <!-- Always rendered (operator directive, 2026-08-26): the *ngIf used to hide this whenever
                the participant had no Needs-Attention issue, so coaches saw no control at all and
@@ -169,8 +176,9 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
             <mat-icon>{{ row.flagged ? 'flag' : 'outlined_flag' }}</mat-icon>
             <span>{{ row.flagged ? 'Flagged' : 'Flag' }}</span>
           </button>
-          <button class="so-close" type="button" matTooltip="Close" aria-label="Close panel" (click)="close()">
-            <mat-icon>close</mat-icon>
+          <button class="so-flag-btn" type="button" data-testid="jcso-export" aria-label="Export participant"
+                  matTooltip="Download this participant's profile, logs, follow-ups and every section as Excel" (click)="exportParticipant()">
+            <mat-icon>download</mat-icon><span>Export</span>
           </button>
         </div>
       </header>
@@ -281,7 +289,7 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
               <span class="so-list-main">{{ f.note || 'Follow-up' }}</span>
               <span class="so-list-side">
                 <span class="so-pill" [ngClass]="f.overdue ? 'so-pill-cancel' : 'so-pill-neutral'">{{ f.dueDate ? ('Due ' + (f.dueDate | date:'d MMM')) : 'No date' }}</span>
-                <button type="button" class="so-fu-done" data-testid="jcso-fu-done" [disabled]="fuBusy.has(f.id)" (click)="markFollowUpDone(f.id)">Mark done</button>
+                <button type="button" class="so-fu-done" data-testid="jcso-fu-done" [disabled]="fuBusy.has(f.id)" (click)="openFollowUpDone(f)">Mark done</button>
               </span>
             </li>
           </ul>
@@ -592,14 +600,16 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
       <div class="so-composer">
         <div class="so-comp-top">
           <div class="so-comp-titles">
-            <div class="so-comp-eyebrow">New log</div>
+            <div class="so-comp-eyebrow">{{ fuDoneFor ? 'Mark follow-up done' : 'New log' }}</div>
             <h3 class="so-comp-title">{{ row.name }}</h3>
           </div>
           <button class="so-comp-x" type="button" aria-label="Cancel" (click)="cancelComposer()">
             <mat-icon>close</mat-icon>
           </button>
         </div>
-        <div class="so-seg" role="tablist" aria-label="Log type">
+        <!-- Mark done (2026-11-20): the composer opens locked to Note; Save writes the note AND closes the follow-up. -->
+        <p class="so-fu-ctx" *ngIf="fuDoneFor" data-testid="jcso-fu-done-ctx">Follow-up: {{ fuDoneFor.note || 'Follow-up' }}<span *ngIf="fuDoneFor.dueDate"> · due {{ fuDoneFor.dueDate | date:'d MMM' }}</span></p>
+        <div class="so-seg" role="tablist" aria-label="Log type" *ngIf="!fuDoneFor">
           <button type="button" class="so-seg-btn" [class.on]="composerType==='call'"
                   role="tab" [attr.aria-selected]="composerType==='call'" (click)="composerType='call'">Call</button>
           <button type="button" class="so-seg-btn" [class.on]="composerType==='health'"
@@ -663,14 +673,14 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
           <ng-container *ngIf="composerType==='note'">
             <label class="so-field">
               <span class="so-field-l">Note</span>
-              <textarea class="so-input" rows="3" [(ngModel)]="composerNote" placeholder="Add a note"></textarea>
+              <textarea class="so-input" rows="3" [(ngModel)]="composerNote" placeholder="Add a note" data-testid="jcso-comp-note"></textarea>
             </label>
           </ng-container>
         </div>
 
         <div class="so-comp-actions">
-          <button type="button" class="so-btn so-btn-ghost" (click)="cancelComposer()">Cancel</button>
-          <button type="button" class="so-btn so-btn-primary" [disabled]="!composerValid()" (click)="submitComposer()">Save</button>
+          <button type="button" class="so-btn so-btn-ghost" data-testid="jcso-comp-cancel" (click)="cancelComposer()">Cancel</button>
+          <button type="button" class="so-btn so-btn-primary" data-testid="jcso-comp-save" [disabled]="!composerValid()" (click)="submitComposer()">{{ fuDoneFor ? 'Save & mark done' : 'Save' }}</button>
         </div>
       </div>
     </ng-template>
@@ -690,6 +700,8 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
     .so-root {
       display: flex; flex-direction: column; height: 100%; background: var(--so-bg);
       color: var(--so-ink); font-size: 13px;
+      /* size rules below follow the PANEL width, not the viewport */
+      container-type: inline-size; container-name: so; overflow-x: hidden;
     }
     .num, .so-num, .so-tl-date, .so-count, .so-sub, .so-status {
       font-family: var(--so-mono); font-variant-numeric: tabular-nums;
@@ -697,9 +709,13 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
     }
 
     .so-header {
-      display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+      display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start;
+      column-gap: 12px; row-gap: 12px;
       padding: 18px 20px 12px; border-bottom: 1px solid var(--so-border);
     }
+    .so-id { min-width: 0; }
+    .so-meta .so-copy { min-width: 0; overflow-wrap: anywhere; }
+    .so-copy-name { overflow-wrap: anywhere; }
     .so-name { margin: 0; font-size: 22px; font-weight: 700; line-height: 1.15; letter-spacing: -0.4px; }
     .so-meta { margin-top: 3px; color: var(--so-ink2); font-size: 12.5px; display: flex; align-items: baseline; flex-wrap: wrap; }
     .so-dot { margin: 0 6px; color: var(--so-muted); }
@@ -721,7 +737,9 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
     .so-close:active { transform: scale(0.94); }
     .so-close mat-icon { font-size: 18px; width: 18px; height: 18px; }
 
-    .so-head-actions { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; }
+    .so-head-actions {
+      grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0;
+    }
     .so-flag {
       width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
       border: none; border-radius: 999px; background: rgba(118,118,128,.12); color: var(--so-muted);
@@ -805,8 +823,8 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
 
     .so-kv { margin: 0; display: grid; grid-template-columns: 1fr; gap: 7px; }
     .so-kv > div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
-    .so-kv dt { margin: 0; color: var(--so-ink2); font-size: 12px; flex: 0 0 auto; }
-    .so-kv dd { margin: 0; text-align: right; font-weight: 600; color: var(--so-ink); font-size: 12.5px; }
+    .so-kv dt { margin: 0; color: var(--so-ink2); font-size: 12px; flex: 0 1 auto; min-width: 0; }
+    .so-kv dd { margin: 0; text-align: right; font-weight: 600; color: var(--so-ink); font-size: 12.5px; min-width: 0; overflow-wrap: anywhere; }
     .so-kv dd.cap { text-transform: capitalize; }
     .so-sub { color: var(--so-muted); font-weight: 500; }
 
@@ -834,8 +852,9 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
 
     .so-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
     .so-list-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
-    .so-list-main { font-size: 12.5px; color: var(--so-ink); }
+    .so-list-main { font-size: 12.5px; color: var(--so-ink); min-width: 0; overflow-wrap: anywhere; }
     .so-list-side { display: flex; align-items: baseline; gap: 8px; flex: 0 0 auto; }
+
     .so-status { font-size: 11.5px; font-weight: 600; color: #c25e00; text-transform: capitalize; }
 
     /* status pills for events / appointments (compact, list-side) */
@@ -847,6 +866,7 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
     .so-fu-done { font: inherit; font-size: 11.5px; font-weight: 600; padding: 2px 9px; border-radius: 8px; border: none; cursor: pointer;
       color: var(--so-accent); background: rgba(0,122,255,.10); }
     .so-fu-done:disabled { opacity: .5; cursor: default; }
+    .so-fu-ctx { margin: 0 0 12px; font-size: 13px; color: var(--so-ink2, #6e6e73); }
 
     /* ticket category soft chip */
     .so-cat {
@@ -1010,6 +1030,21 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
     .so-btn-primary { background: var(--so-accent); color: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.10); }
     .so-btn-primary:hover { background: #0a6ae0; }
     .so-btn-primary:disabled { opacity: .4; cursor: default; box-shadow: none; }
+
+    /* narrow panel (phones): tighter gutters, list rows stack, header pills go icon-only */
+    @container so (max-width: 420px) {
+      .so-header { padding: 14px 16px 10px; }
+      .so-pills, .so-sec, .so-footer { padding-left: 16px; padding-right: 16px; }
+      .so-reason { margin-left: 16px; margin-right: 16px; }
+      .so-list-row { flex-direction: column; align-items: flex-start; gap: 4px; }
+      .so-list-side { flex-wrap: wrap; }
+      .so-coach-row { flex-wrap: wrap; }
+      .so-coach-select { max-width: 100%; }
+    }
+    @container so (max-width: 340px) {
+      .so-head-actions .so-flag-btn { padding: 0 10px; }
+      .so-head-actions .so-flag-btn span { display: none; }
+    }
   `],
 })
 export class ParticipantSlideoverComponent implements OnInit {
@@ -1081,6 +1116,8 @@ export class ParticipantSlideoverComponent implements OnInit {
   composerOpen = false;
   composerType: ComposerType = 'call';
   composerNote = '';
+  // Set while the composer is open from a follow-up's Mark done: Save logs the note, then closes it.
+  fuDoneFor: SlideoverFollowUp | null = null;
   callOutcome: 'reached' | 'noanswer' | 'scheduled' | 'other' = 'reached';
   callNextDate = '';                                  // yyyy-mm-dd from <input type="date">
   healthChoice: CoachHealthState = 'NEUTRAL';
@@ -1094,6 +1131,38 @@ export class ParticipantSlideoverComponent implements OnInit {
   ) {
     this.row = data.row;
     this.addressedLocal = data.addressed;
+  }
+
+  /** Export (2026-11-20): one workbook — a Profile sheet plus one sheet per loaded section, so the
+   *  download matches what the panel shows. Sections still loading or empty are skipped. */
+  exportParticipant(): void {
+    const r = this.row;
+    const h = r.coachHealthState;
+    const profile: unknown[][] = [['Field', 'Value'],
+      ['Name', r.name], ['Phone', r.number ?? ''], ['Email', r.email ?? ''], ['Profile ID', r.profileid],
+      ['Coach', r.coachname], ['Journey', r.journeyname], ['Journey status', r.journeystatus],
+      ['Customer status', r.customerstatus ?? ''], ['Financial status', r.financialstatus ?? ''],
+      ['Subscription end', fmtExportDate(r.subscriptionend)], ['Days to renewal', r.daysToRenewal ?? ''],
+      ['Last coach date', fmtExportDate(r.lastcoachdate)], ['Open tickets', r.openTickets],
+      ['Coach health', h ? h.state : 'Not assessed'], ['Coach health note', h?.note ?? ''], ['Coach health date', fmtExportDate(h?.date)],
+      ['Priority', `${r.priorityBand} (${r.priority})`], ['Reason', r.reason], ['Flagged', r.flagged ? 'Yes' : 'No'],
+      ['Going quiet', r.goingQuiet ? 'Yes' : 'No'], ['Total purchase', r.totalpurchasevalue ?? ''], ['Balance', r.balance ?? '']];
+    const list = (name: string, items: readonly object[] | null | undefined) => ({ name, rows: items?.length ? objectsToRows(items) : [] });
+    exportXlsx(`${r.name || r.profileid}_participant`, [
+      { name: 'Profile', rows: profile },
+      list('Activity log', this.data.activity ?? []),
+      list('Follow-ups', this.followUpList()),
+      list('Appointments', this.appointments),
+      list('Events', this.events),
+      list('Tickets', this.tickets),
+      list('Forms', this.forms),
+      list('Reports', this.reports),
+      list('Love letters', this.loveLetters),
+      list('Ask A&H', this.askAH),
+      list('Breakthroughs', this.breakthroughs),
+      list('AEL', this.ael),
+      list('Coach notes', this.coachNotes),
+    ]);
   }
 
   // local mirror of the addressed state so the button reflects the toggle immediately
@@ -1582,7 +1651,7 @@ export class ParticipantSlideoverComponent implements OnInit {
       autoFocus: false,
       restoreFocus: true,
     });
-    this.composerRef.afterClosed().subscribe(() => { this.composerOpen = false; });
+    this.composerRef.afterClosed().subscribe(() => { this.composerOpen = false; this.fuDoneFor = null; });
   }
 
   cancelComposer(): void {
@@ -1594,6 +1663,15 @@ export class ParticipantSlideoverComponent implements OnInit {
   /** Open follow-ups, read live from the dashboard (empty when the host passes none). */
   followUpList(): SlideoverFollowUp[] { return this.data.followUps?.() ?? []; }
   fuBusy = new Set<string>();
+  /** Mark done → open the Log composer locked to Note. Nothing is closed until the note is saved;
+   *  Cancel leaves the follow-up open. */
+  openFollowUpDone(f: SlideoverFollowUp): void {
+    if (this.fuBusy.has(f.id)) return;
+    this.resetComposer();
+    this.fuDoneFor = f;
+    this.composerType = 'note';
+    this.openComposer();
+  }
   async markFollowUpDone(id: string): Promise<void> {
     if (!this.data.onFollowUpDone || this.fuBusy.has(id)) return;
     this.fuBusy.add(id);
@@ -1601,6 +1679,7 @@ export class ParticipantSlideoverComponent implements OnInit {
   }
 
   private resetComposer(): void {
+    this.fuDoneFor = null;
     this.composerType = 'call';
     this.composerNote = '';
     this.callOutcome = 'reached';
@@ -1619,6 +1698,7 @@ export class ParticipantSlideoverComponent implements OnInit {
 
   submitComposer(): void {
     if (!this.composerValid()) return;
+    const fu = this.fuDoneFor;   // captured before resetComposer() clears it
     const note = this.composerNote.trim();
     if (this.composerType === 'call') {
       this.data.onLog('call', { outcome: this.callOutcome, note, nextActionDate: this.parseDate(this.callNextDate) });
@@ -1646,6 +1726,8 @@ export class ParticipantSlideoverComponent implements OnInit {
     this.composerRef?.close();
     this.composerOpen = false;
     this.resetComposer();
+    // Mark-done flow: the note is logged above; now close the follow-up (writes schedule_done).
+    if (fu) void this.markFollowUpDone(fu.id);
   }
 
   // ---- activity timeline display helpers ----

@@ -12,6 +12,8 @@
 
 | Delivered all cycles + discontinued, Total without initiated, Stuck from last booked appt at 7 days, Weekly cancelled, "Why not here?" dialog | uncommitted | `/delivery-dashboard` → funnel Delivered / Done, Products Overview chips, Needs attention, Stuck table, Weekly Report, header button | the three component files | `git checkout -- "src/app/Journey Onboarding/delivery-dashboard-clone/"` while uncommitted; afterwards `git revert <hash>`. Plan: `specs/plans/2026-11-19-delivery-dashboard-delivered-total-stuck-whynot.md` |
 
+| Latest record: open cycle beats completed; Weekly Report Ongoing Days | uncommitted | `/delivery-dashboard` → every "latest record" view (Overall / Eligible / Yet to Start / Ready to Start / Init / Started / Ongoing), Weekly Report | `delivery-dashboard-clone.component.ts` | `git checkout -- "src/app/Journey Onboarding/delivery-dashboard-clone/delivery-dashboard-clone.component.ts"` while uncommitted; afterwards `git revert <hash>` |
+
 Self-contained: no other screen depends on it. The `ctdStageType()` alias fold sits in shared stage helpers, but it only rewrites two CTD type names, so other products are unaffected and reverting it alone is safe.
 
 ## What changed
@@ -92,6 +94,7 @@ Known limit: appointments only load for the current month, so an Implementation 
 - **Undated completions.** 206 latest records have no completion date and the old rule counts them in every period — that is why Last 30 days already read ~220. The records this change adds (older cycles, discontinued) count undated only under All time, otherwise they swelled Last 30 days to 296. Last 30 days now 231; All time 2,593. The 206 undated latest records are a team decision (pending).
 - **Total excludes initiated.** Overview pool (Overall / Eligible / Not Eligible / Purchased / Bonus / Add-on / This & Next Month) = latest record with no status. The Stages board keeps its own `groupedStagePool` (no status OR initiated) because Onboarding's Waiting list is built from initiated products. Checked: every card still has Overall = Eligible + Not Eligible and Eligible = Purchased + Bonus + Add-on; 0 initiated in Overall.
 - **Stuck** counts from the latest non-cancelled appointment that has started, attended or not (was latest attended); column renamed LAST BOOKED APPT, status Attended / Not attended. `STUCK_DAYS` 15 → 7, label "stuck >7d". Live: 42 stuck, all ≥ 8 days, none booked ahead.
+- **Decision (operator, 2026-11-23): cancelled appointments stay out of "last booked".** Raised by Disha Shah (Critical Support): her 4 Nov appointment is `cancelled = true`, "Cancelled By Client", recorded 5 Nov (after the slot), so the row shows 30 Oct · Attended · 21 days. Counting cancelled bookings (→ 4 Nov · 16 days) was offered and declined. Don't change this without asking.
 - **Weekly Report** no longer filters `cancelled == false`; cancelled appointments show as Cancelled (filter option added). Specialist names still come from non-cancelled appointments only. EI Custom Solutions: 433 cancelled rows.
 - **"Why not here?"** header button. Membership ✓/✗ is read from the live lists (grouped*, funnelData, cohorts, stuck cache), so it can't disagree with the screen; the reason re-checks the rule. When the rule passes but the list hasn't got them, it says the dashboard is still loading (found when the dialog was opened mid-load and gave wrong reasons). Search collapses spaces — metadata names carry double spaces ("Karan  Sawhney").
 - Verified at All time: all 13 names the EI team expected in Delivered now appear (Tejal Sanghvi under the EI Solutions for Health card); Ashok Pillai and Jude Anthony Assey are out of Overall.
@@ -100,6 +103,14 @@ Known limit: appointments only load for the current month, so an Implementation 
 - Product status chip on each panel header + Status filter (`whyStatus`, options = the statuses this participant's products have). Status = the latest record the dashboard uses; when nothing of that product is loaded (cancelled / shifted / discontinued), the most recent record of any status. Product, Status and Section filters combine (operator).
 - Product / Status / Section are multi-select (empty = all; trigger shows "<first> +N"); header badge = ✓/✗ for one section, "In k of n selected" for several. Compact layout: 36px fields, filters in one sticky row (`flex-wrap: nowrap`), dialog `min-height: min(760px, 88vh)`, body scrolls under the filters. Checked at 1440 and 1024 wide (operator).
 - New hooks to register before push: `ddc-why-status`, `ddc-btn-whynot`, `ddc-why-overlay`, `ddc-why-dialog`, `ddc-why-close`, `ddc-why-name`, `ddc-why-match`, `ddc-why-section`, `ddc-why-product`, `ddc-why-panel`.
+
+## Ready to Start for multi-cycle participants + Weekly "Ongoing Days" (operator, 2026-11-23)
+
+- **Cause:** the latest-record pick compared only initiated / ongoing / completed dates. A new cycle that hasn't started has none of them, so the old completed cycle always won and the participant could never be Yet to Start / Ready to Start. Seen on WiSH: Praveena Dorathi (spelled "Dorathi" in metadata) and Sherry Sethi — both Active, finance Regular, no parallel product.
+- **Fix:** in `applyDateFilter`, an open cycle (no status / initiated / ongoing) beats a completed one; dates decide only between records of the same kind. Delivered is unaffected (it counts every completed cycle from `completedRecordsRaw`).
+- **Reach (live, 23 Nov):** 99 participant-products switched to their open cycle — 84 no status (now in Overall / Eligible / Not Eligible), 14 ongoing (now in Ongoing; the completed cycle had hidden them), 1 initiated. 17 participants entered Ready to Start, including both names. Overall = Eligible + Not Eligible still holds on every card; Delivered unchanged (231, Last 30 days).
+- **Risk to watch:** a stale never-started duplicate record now outranks a later completed cycle. Sherry Sethi has two such no-status WiSH records. The "Why not here?" dialog shows the cycle count in its summary.
+- **Weekly Report "Ongoing Days":** calendar days from Initiation Date to the appointment date, next to Appointment Date & Time, in the table and export. 30 WiSH rows are negative (appointment dated before initiation) — shown as-is.
 
 ## Pending
 
