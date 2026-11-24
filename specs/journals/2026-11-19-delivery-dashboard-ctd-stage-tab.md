@@ -14,6 +14,8 @@
 
 | Latest record: open cycle beats completed; Weekly Report Ongoing Days | uncommitted | `/delivery-dashboard` → every "latest record" view (Overall / Eligible / Yet to Start / Ready to Start / Init / Started / Ongoing), Weekly Report | `delivery-dashboard-clone.component.ts` | `git checkout -- "src/app/Journey Onboarding/delivery-dashboard-clone/delivery-dashboard-clone.component.ts"` while uncommitted; afterwards `git revert <hash>` |
 
+| WiSH scenarios: ongoing parallel product blocks Eligible + Awaiting; Overall counts any not-started cycle | uncommitted | `/delivery-dashboard` → Products Overview (Overall / Eligible / Not Eligible / Purchased / Bonus / Add-on / This & Next Month), Awaiting Initiation, "Why not here?" | `delivery-dashboard-clone.component.ts` | `git checkout -- "src/app/Journey Onboarding/delivery-dashboard-clone/delivery-dashboard-clone.component.ts"` while uncommitted; afterwards `git revert <hash>` |
+
 Self-contained: no other screen depends on it. The `ctdStageType()` alias fold sits in shared stage helpers, but it only rewrites two CTD type names, so other products are unaffected and reverting it alone is safe.
 
 ## What changed
@@ -111,6 +113,16 @@ Known limit: appointments only load for the current month, so an Implementation 
 - **Reach (live, 23 Nov):** 99 participant-products switched to their open cycle — 84 no status (now in Overall / Eligible / Not Eligible), 14 ongoing (now in Ongoing; the completed cycle had hidden them), 1 initiated. 17 participants entered Ready to Start, including both names. Overall = Eligible + Not Eligible still holds on every card; Delivered unchanged (231, Last 30 days).
 - **Risk to watch:** a stale never-started duplicate record now outranks a later completed cycle. Sherry Sethi has two such no-status WiSH records. The "Why not here?" dialog shows the cycle count in its summary.
 - **Weekly Report "Ongoing Days":** calendar days from Initiation Date to the appointment date, next to Appointment Date & Time, in the table and export. 30 WiSH rows are negative (appointment dated before initiation) — shown as-is.
+
+## WiSH scenarios: parallel products + multi-cycle in the overview (EI/WiSH team, 2026-11-25)
+
+Team list of 16 WiSH participants, three groups: (A) another product ongoing — Akhilandeshwari, Harrleenn, Jacky, Naga Suresh, Rajashree, Sameer, Shashank, Sunil, Preethi; (B) another WiSH cycle ongoing — Karpagambigai, Sanjeev, Sriram, Anand; (C) same as B in Integration Mode — Aishwarya, Shera, Swaroopa.
+
+- **Overall** no longer comes from the latest record: one per participant per product when ANY cycle has no status (prefers the latest record when it is that cycle). Why: with one cycle ongoing and a new one not started, the ongoing cycle is "latest" and the new one vanished from the overview (B, C).
+- **Eligible** additionally needs no ongoing parallel product; the rest of Overall is **Not Eligible** (operator chose this over leaving A unbucketed, so Overall = Eligible + Not Eligible holds).
+- **Awaiting Initiation** excludes the same ongoing parallel products.
+- **`ongoingParallelFor(profile, product)`**: other ids in metadata `activeproduct` (catches non-delivery products — Preethi's Expanding Horizon Consultation is only there), **ignoring names starting "Winning Heart"** (operator: a programme, not a delivery — many participants carry it), plus another cycle on the same card with status "ongoing". Ready to Start keeps its own `getParallelProduct` (unchanged, still counts Winning Heart) and the Stages pool is unchanged — both by decision.
+- Verified live: all 16 land as asked (A: Total + Not Eligible, out of Eligible / Awaiting; B, C: Total + Not Eligible, out of Awaiting). Identities hold on every card. Totals now: Overall 741, Eligible 435, Not Eligible 306, Awaiting 475 (23 Nov: 728 / 458 / — / 503).
 
 ## Pending
 
