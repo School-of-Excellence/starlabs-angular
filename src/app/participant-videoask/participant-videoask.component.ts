@@ -5,7 +5,7 @@ import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatTable, MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { AuthguardService } from '../authguard.service';
 import {
-  arrayRemove, arrayUnion, collection, collectionData, doc, DocumentReference,
+  arrayRemove, arrayUnion, collection, collectionData, doc, documentId, DocumentReference,
   Firestore, getDocs, limit, orderBy, query, setDoc, updateDoc, where
 } from '@angular/fire/firestore';
 import { Subject, takeUntil } from 'rxjs';
@@ -24,8 +24,12 @@ const KIND_LABEL = {
   'event collection': 'Live Event',
   'queue generation': 'Queue Event',
   'workshopconfiguration': 'Workshop',
-  'eiflix workshop': 'Workshop'
+  'eiflix workshop': 'Workshop',
+  'products': 'Product'
 }
+
+/** Row fields that can hold a reference, in the order the Event cell shows them. */
+const REF_FIELDS = ['arenaevent', 'queueref', 'workshopref', 'productref']
 
 /** Newest-first page size used only when no filter is active. */
 const DEFAULT_LIMIT = 200
@@ -84,9 +88,11 @@ export class ParticipantVideoaskComponent {
   liveEventList = []
   queueEventList = []
   workshopList = []
+  productList = []
   filteredLiveEventList = []
   filteredQueueEventList = []
   filteredWorkshopList = []
+  filteredProductList = []
 
   /**
    * Every event-ish doc keyed by its Firestore reference PATH, so a row is
@@ -98,7 +104,7 @@ export class ParticipantVideoaskComponent {
   loggedInProfileid = null
 
   // in-panel search text, one per dropdown
-  searchText = { profileid: '', template: '', live: '', queue: '', workshop: '' }
+  searchText = { profileid: '', template: '', live: '', queue: '', workshop: '', product: '' }
 
   // view state
   bootstrapping = true
@@ -131,6 +137,7 @@ export class ParticipantVideoaskComponent {
       live: [[],],
       queue: [[],],
       workshop: [[],],
+      product: [[],],
       range: new FormGroup({
         start: new FormControl(),
         end: new FormControl()
@@ -170,7 +177,7 @@ export class ParticipantVideoaskComponent {
     this.dataSource.sortingDataAccessor = (row: any, column: string) => {
       if (column === 'profileid') return (this.participantMap[row['profileid']] || '').toLowerCase()
       if (column === 'videoaskid') return (this.templateMap[row['videoaskid']] || '').toLowerCase()
-      if (column === 'event') return (this.eventLabel(row) || '').toLowerCase()
+      if (column === 'event') return this.eventRefs(row).map(ref => this.eventLabel(ref)).join(' ').toLowerCase()
       if (column === 'uploaded') return this.toMillis(row['uploaded'])
       if (column === 'addtohighlights') return row['addtohighlights'] ? 1 : 0
       return row[column]
@@ -206,13 +213,14 @@ export class ParticipantVideoaskComponent {
       .pipe(takeUntil(this.destroy$))
       .subscribe((tags: any[]) => this.videoAskTags = tags)
 
-    const [profiles, newProfiles, events, queues, workshops, templates] = await Promise.all([
+    const [profiles, newProfiles, events, queues, workshops, templates, deliverySequences] = await Promise.all([
       this.guard.getProfileMap(),
       this.guard.getProfileMapNewUser(),
       getDocs(collection(this.firestore, 'event collection')),
       getDocs(collection(this.firestore, 'queue generation')),
       getDocs(collection(this.firestore, 'workshopconfiguration')),
-      getDocs(collection(this.firestore, 'arenavideoask'))
+      getDocs(collection(this.firestore, 'arenavideoask')),
+      getDocs(collection(this.firestore, 'productToDeliverySequence'))
     ])
 
     this.participantList = [...profiles.list, ...newProfiles.list]
@@ -224,9 +232,16 @@ export class ParticipantVideoaskComponent {
     this.queueEventList = this.normalise(queues, 'queue', d => d['queuename'])
     this.workshopList = this.normalise(workshops, 'workshop', d => d['detailpage']?.['title'])
 
+    // Only products whose delivery sequence has a videoask step are offered.
+    const productSnapshots = await Promise.all(
+      this.chunk(this.videoAskProductIds(deliverySequences)).map(c =>
+        getDocs(query(collection(this.firestore, 'products'), where(documentId(), 'in', c)))))
+    this.productList = this.normalise({ docs: productSnapshots.flatMap(s => s.docs) }, 'product', d => d['product'])
+
     this.filteredLiveEventList = this.liveEventList
     this.filteredQueueEventList = this.queueEventList
     this.filteredWorkshopList = this.workshopList
+    this.filteredProductList = this.productList
 
     templates.docs.forEach(d => this.templateMap[d.id] = d.data()['title'])
     this.templateList = templates.docs
@@ -236,6 +251,23 @@ export class ParticipantVideoaskComponent {
 
     this.bootstrapping = false
     this.loadDefault()
+  }
+
+  /**
+   * Product ids whose productToDeliverySequence has at least one activity pointing at an
+   * arenavideoask doc. The activity sits in maps inside nested arrays, which Firestore cannot
+   * query, so the walk happens here. A mapping can be saved with no deliverysequence, or a step
+   * with no activity yet — those simply have no videoask step.
+   */
+  private videoAskProductIds(snapshot: any): string[] {
+    const ids = new Set<string>()
+    snapshot.docs.forEach(d => {
+      const data = d.data()
+      const hasVideoAsk = (data['deliveryoptions'] ?? []).some(option =>
+        (option['deliverysequence'] ?? []).some(step => step['activity']?.parent?.id === 'arenavideoask'))
+      if (hasVideoAsk) ids.add(data['product'].id)
+    })
+    return [...ids]
   }
 
   /** Flattens a snapshot into {docid,title,kind,path} and indexes it by path. */
@@ -284,7 +316,7 @@ export class ParticipantVideoaskComponent {
     this.filtersDirty = false
 
     const f = this.form.value
-    const hasEvent = f.live.length || f.queue.length || f.workshop.length
+    const hasEvent = f.live.length || f.queue.length || f.workshop.length || f.product.length
     const hasAny = hasEvent || f.profileid.length || f.template.length || this.rangeSet(f.range)
 
     if (!hasAny) return this.loadDefault()
@@ -303,6 +335,8 @@ export class ParticipantVideoaskComponent {
         queries.push(query(col, where('queueref', 'in', this.refs(c, 'queue generation')))))
       this.chunk(f.workshop).forEach(c =>
         queries.push(query(col, where('workshopref', 'in', this.refs(c, 'workshopconfiguration')))))
+      this.chunk(f.product).forEach(c =>
+        queries.push(query(col, where('productref', 'in', this.refs(c, 'products')))))
     } else if (f.profileid.length) {
       axis = 'profileid'
       this.chunk(f.profileid).forEach(c => queries.push(query(col, where('profileid', 'in', c))))
@@ -435,15 +469,13 @@ export class ParticipantVideoaskComponent {
 
   // --------------------------------------------------------------- row display
 
-  /** The single reference a row carries, whichever field it lives in. */
-  eventRef(row: any): DocumentReference {
-    return row['arenaevent'] ?? row['queueref'] ?? row['workshopref'] ?? null
+  /** Every reference a row carries, in REF_FIELDS order. */
+  eventRefs(row: any): DocumentReference[] {
+    return REF_FIELDS.filter(field => row[field]).map(field => row[field])
   }
 
   /** Indexed title, else the raw docid. */
-  eventLabel(row: any): string {
-    const ref = this.eventRef(row)
-    if (!ref) return ''
+  eventLabel(ref: DocumentReference): string {
     return this.eventIndex[ref.path] ? this.eventIndex[ref.path].title : ref.id
   }
 
@@ -452,9 +484,7 @@ export class ParticipantVideoaskComponent {
    * field held it — arenaevent does not always point at "event collection".
    * Unknown collection falls back to the full reference path.
    */
-  eventKind(row: any): string {
-    const ref = this.eventRef(row)
-    if (!ref) return ''
+  eventKind(ref: DocumentReference): string {
     const collectionName = ref.parent?.id
     return KIND_LABEL[collectionName] ? KIND_LABEL[collectionName] : ref.path
   }
@@ -492,6 +522,8 @@ export class ParticipantVideoaskComponent {
       this.filteredQueueEventList = this.queueEventList.filter(e => e.title.toLowerCase().includes(text))
     } else if (formcontrol === 'workshop') {
       this.filteredWorkshopList = this.workshopList.filter(e => e.title.toLowerCase().includes(text))
+    } else if (formcontrol === 'product') {
+      this.filteredProductList = this.productList.filter(e => e.title.toLowerCase().includes(text))
     }
   }
 
@@ -538,9 +570,9 @@ export class ParticipantVideoaskComponent {
     return `${lookup(values[0])}  +${values.length - 1}`
   }
 
-  /** Title for a selected event docid, across all three dimensions. */
+  /** Title for a selected event docid, across all four dimensions. */
   eventTitle = (docid: string): string => {
-    const match = [...this.liveEventList, ...this.queueEventList, ...this.workshopList]
+    const match = [...this.liveEventList, ...this.queueEventList, ...this.workshopList, ...this.productList]
       .find(e => e.docid === docid)
     return match ? match.title : docid
   }
@@ -556,7 +588,7 @@ export class ParticipantVideoaskComponent {
   /** Total filters currently applied to the form, for the "Clear" affordance. */
   activeFilterCount(): number {
     const f = this.form.value
-    let count = f.profileid.length + f.template.length + f.live.length + f.queue.length + f.workshop.length
+    let count = f.profileid.length + f.template.length + f.live.length + f.queue.length + f.workshop.length + f.product.length
     if (this.rangeSet(f.range)) count = count + 1
     return count
   }
@@ -567,6 +599,7 @@ export class ParticipantVideoaskComponent {
     if (this.selectedCount('live')) pills.push({ control: 'live', label: `Live Event: ${this.selectedLabel('live', this.eventTitle)}` })
     if (this.selectedCount('queue')) pills.push({ control: 'queue', label: `Queue Event: ${this.selectedLabel('queue', this.eventTitle)}` })
     if (this.selectedCount('workshop')) pills.push({ control: 'workshop', label: `Workshop: ${this.selectedLabel('workshop', this.eventTitle)}` })
+    if (this.selectedCount('product')) pills.push({ control: 'product', label: `Product: ${this.selectedLabel('product', this.eventTitle)}` })
     return pills
   }
 
@@ -599,14 +632,16 @@ export class ParticipantVideoaskComponent {
       live: [],
       queue: [],
       workshop: [],
+      product: [],
       range: { start: null, end: null }
     })
-    this.searchText = { profileid: '', template: '', live: '', queue: '', workshop: '' }
+    this.searchText = { profileid: '', template: '', live: '', queue: '', workshop: '', product: '' }
     this.filteredParticipantList = this.participantList
     this.filteredTemplateList = this.templateList
     this.filteredLiveEventList = this.liveEventList
     this.filteredQueueEventList = this.queueEventList
     this.filteredWorkshopList = this.workshopList
+    this.filteredProductList = this.productList
     this.filtersDirty = false
     this.loadDefault()
   }
