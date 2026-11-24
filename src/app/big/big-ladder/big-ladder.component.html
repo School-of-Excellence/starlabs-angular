@@ -142,6 +142,26 @@
           Non Educational Cohort Participants
           <b>{{ dashboardData.length - participantsInCohort.size }}</b>
         </button>
+
+        <div class="vertical-separator"></div>
+
+        <div class="fin-status">
+          <p class="fin-status__title">Finance status</p>
+
+          <div class="fin-status__pills">
+            <button type="button" class="fin-pill fin-pill--good" (click)="onFinanceStatusChange('good')" [class.is-active]="selectedFinanceHealth == 'good'">
+              <span class="fin-pill__dot"></span>
+              Good
+              <b class="fin-pill__count">{{ financeStatus['good'] }}</b>
+            </button>
+
+            <button type="button" class="fin-pill fin-pill--risk" (click)="onFinanceStatusChange('atrisk')" [class.is-active]="selectedFinanceHealth == 'atrisk'">
+              <span class="fin-pill__dot"></span>
+              At Risk
+              <b class="fin-pill__count">{{ financeStatus['atrisk'] }}</b>
+            </button>
+          </div>
+        </div>
       </div>
       <div class="filter-chips" *ngIf="getParticipantFilterChips().length > 0">
         <div class="chip" *ngFor="let chip of getParticipantFilterChips()">
@@ -207,7 +227,8 @@
             <div class="bl-row bl-r0">
               <div class="bl-cell bl-left"><span class="bl-rank">{{i + 1}}</span></div>
               <div class="bl-cell bl-left">
-                <span class="bl-avatar" style="background:linear-gradient(135deg,hsl(226 62% 52%),hsl(264 64% 42%))">{{getInital(participant.name)}}</span>
+                <!-- <span class="bl-avatar" style="background:linear-gradient(135deg,hsl(226 62% 52%),hsl(264 64% 42%))">{{getInital(participant.name)}}</span> -->
+                 <app-profile-picture [profileId]="participant['profileid']" [name]="participant['name']" [size]="40"> </app-profile-picture>
                 <span data-testid="bld-row-name" class="bl-person" (click)="openSidePanel(participant?.profileid)"><span class="bl-name">{{participant.name}}</span></span>
               </div>
               <div data-testid="bld-row-level" class="bl-cell bl-cell-click bl-left" (click)="openSidePanel(participant?.profileid)">
@@ -216,7 +237,7 @@
                   <div *ngIf="participant.bigParticipantLevel?.length === 0"> Field Preparation </div>
                 </div>
               </div>
-              <div class="bl-cell">{{participant.extendedlifeimpact}}</div>
+              <div class="bl-cell bl-cell-click" (click)="openSidePanel(participant?.profileid , 'extendedlifeimpact')" >{{participant.extendedlifeimpact}}</div>
               <div data-testid="bld-row-attended" class="bl-cell bl-cell-click" (click)="openSidePanel(participant?.profileid , 'attended')"> {{participant.eventAttended}}</div>
               <div data-testid="bld-row-studio" class="bl-cell bl-cell-click" (click)="openSidePanel(participant?.profileid , 'studio')"> {{participant.queueActivityLog}}</div>
               <div data-testid="bld-row-activity" class="bl-cell bl-cell-click" (click)="openSidePanel(participant?.profileid , 'activity')"> {{participant.bigActivity.completed}} / {{participant.bigActivity.overAll}}</div>
@@ -239,6 +260,9 @@
       </div>
 
       <div class="bl-tabs">
+        <label data-testid="bld-side-tab-level" class="bl-tab bl-tab-level" title="Extended Life Impact" [class.active-sidetab]="sidePanelCurrentTab === 'extendedlifeimpact'" (click)="sidePanelCurrentTab = 'extendedlifeimpact'">
+          <span class="bl-tab-l">Life Impact</span>
+        </label>
         <label data-testid="bld-side-tab-level" class="bl-tab bl-tab-level" title="Current level" [class.active-sidetab]="sidePanelCurrentTab === 'level'" (click)="sidePanelCurrentTab = 'level'">
           <span class="bl-tab-l">Level</span>
         </label>
@@ -258,6 +282,17 @@
 
       <!-- ══════════ PANELS ══════════ -->
       <div class="bl-panels">
+
+        <!-- ── extendedlifeimpact ── -->
+        <div class="bl-panel bl-p-att" *ngIf="sidePanelCurrentTab === 'extendedlifeimpact'">
+          <div class="bl-overview-grid">
+            <div class="bl-stat-card">
+              <div class="bl-stat-n">{{ sidePanelParticipant?.extendedlifeimpact }}</div>
+              <div class="bl-stat-l">Extended Life Impact</div>
+            </div>
+          </div>
+          <div class="bl-divider"></div>
+        </div>
 
         <!-- ── LEVEL ── -->
         <div class="bl-panel bl-p-level" *ngIf="sidePanelCurrentTab === 'level'">

@@ -1,9 +1,10 @@
 import { Component, OnInit } from '@angular/core';
-import { Firestore, getDocs, collection, query, where, DocumentReference, orderBy } from '@angular/fire/firestore';
+import { Firestore, getDocs, collection, query, where, DocumentReference, orderBy, getFirestore } from '@angular/fire/firestore';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatIconModule } from '@angular/material/icon';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 interface CohortActivities {
   completed: Array<any>,
@@ -14,13 +15,13 @@ interface CohortActivities {
 }
 
 type sortHeader = 'extendedlifeimpact' | 'eventAttended' | 'bigActivity' | 'eiflixConsumption' | 'queueActivityLog';
-type sidePanelTab = 'level' | 'studio' | 'activity' | 'content' | 'attended';
+type sidePanelTab = 'level' | 'studio' | 'activity' | 'content' | 'attended' | 'extendedlifeimpact';
 type customerStatus = 'all' | 'active' | 'non active';
 type cohortTab = | 'initiated' | 'completed' | 'missed' | 'review' | 'rework';
 
 @Component({
   selector: 'app-big-ladder',
-  imports: [CommonModule, FormsModule, MatPaginatorModule, MatIconModule],
+  imports: [CommonModule, FormsModule, MatPaginatorModule, MatIconModule , ProfilePictureComponent],
   templateUrl: './big-ladder.component.html',
   styleUrl: './big-ladder.component.css',
 })
@@ -34,6 +35,7 @@ export class BigLadderComponent implements OnInit {
   openParticipantSearch = false;
   showNonCohortParticipants = false;
   selectedCustomerStatus: customerStatus = 'all';
+  selectedFinanceHealth : 'all' | 'good' | 'atrisk' = 'all';
   selectedCohorts = [];
   selectedCohortCategory = ['studio', 'educational'];
 
@@ -51,7 +53,11 @@ export class BigLadderComponent implements OnInit {
   filteredDashbordData = [];
   activeParticipants = 0;
   nonactiveParticipants = 0;
-  participantsInCohort = new Set()
+  participantsInCohort = new Set();
+  financeStatus = {
+    good : 0,
+    atrisk : 0
+  }
 
   // overall data map
   bigJourney: string[] = [];
@@ -165,7 +171,7 @@ export class BigLadderComponent implements OnInit {
         // filter participants in cohort based on their journey ( only big participants )
         for (const pid of cohort['participantidlist'] ?? []) {
           const metadata = this.participantMetadataMap[pid] ?? null;
-          const journey = metadata['activejourney'] || metadata['lastcompletedjourney'] || null;
+          const journey = metadata?.['activejourney'] || metadata?.['lastcompletedjourney'] || null;
           if (this.bigJourney.includes(journey)) {
             participantList.push(pid);
             if (!['educational'].includes(category)) continue;
@@ -356,10 +362,13 @@ export class BigLadderComponent implements OnInit {
     const dashboardData = [];
     let activeParticipants = 0;
     let nonactiveParticipants = 0;
+    const financeStatus = {
+      good : 0,
+      atrisk : 0
+    }
 
     for (const metadata of allProfile) {
-      const journey =
-        metadata['activejourney'] || metadata['lastcompletedjourney'] || null;
+      const journey = metadata['activejourney'] || metadata['lastcompletedjourney'] || null;
       if (!this.bigJourney.includes(journey)) continue;
 
       const profileId = metadata['profileid'];
@@ -370,6 +379,7 @@ export class BigLadderComponent implements OnInit {
       const eiflixConsumption = this.eiflixConsumptionMap[profileId] ?? new Set();
       const queueActivityLog = this.queueActivityLog[profileId] ?? [];
       const bigParticipantLevel = this.bigParticipantLevel[profileId] ?? [];
+      const participantFinanceStatus = metadata['financialstatus'] ?? 'none';
 
       // sort uses same field values
       const participantMetrics = {
@@ -389,6 +399,17 @@ export class BigLadderComponent implements OnInit {
 
       if (customerStatus === 'active') {
         activeParticipants++;
+
+        // finance check - only  active
+
+        if (['regular' , 'fully paid'].includes(participantFinanceStatus)) {
+          financeStatus['good']++
+        } else if(['banned' , 'late' , 'defaulted' , 'locked' , 'discontinued'].includes(participantFinanceStatus)){
+          financeStatus['atrisk']++
+        } else {
+          console.log(participantFinanceStatus)
+        }
+
       } else if (customerStatus === 'non active') {
         nonactiveParticipants++;
       }
@@ -399,6 +420,7 @@ export class BigLadderComponent implements OnInit {
     this.filteredDashbordData = [...dashboardData];
     this.activeParticipants = activeParticipants;
     this.nonactiveParticipants = nonactiveParticipants;
+    this.financeStatus = financeStatus;
 
     this.sortTableHeader();
   }
@@ -423,6 +445,7 @@ export class BigLadderComponent implements OnInit {
     const filterData = data.filter((participant) => {
       const profileId = participant['profileid'];
       const customerStatus = participant['customerstatus'] ?? null;
+      const participantFinanceStatus = this.participantMetadataMap[profileId]?.['financialstatus'] ?? null;
 
       // search
       if (search.length > 0) {
@@ -445,6 +468,12 @@ export class BigLadderComponent implements OnInit {
         return false;
       }
 
+      if (this.selectedFinanceHealth !== 'all') {
+        if (customerStatus !== 'active') return false; 
+        const cond = this.selectedFinanceHealth === 'good' ? ['regular' , 'fully paid'].includes(participantFinanceStatus) : ['banned' , 'late' , 'defaulted' , 'locked' , 'discontinued'].includes(participantFinanceStatus);
+        if (!cond) return false;
+      }
+
       return true;
     });
 
@@ -455,6 +484,17 @@ export class BigLadderComponent implements OnInit {
   // function to handel customer status change
   onCustomerStatusSelect(type: customerStatus) {
     this.selectedCustomerStatus = type;
+    this.filterTable();
+  }
+
+  // function to handle finance filter
+
+  onFinanceStatusChange(type : 'all' | 'good' | 'atrisk'){
+    if (this.selectedFinanceHealth === type) {
+      this.selectedFinanceHealth = 'all';
+    } else {
+      this.selectedFinanceHealth = type;
+    }
     this.filterTable();
   }
 
@@ -778,7 +818,7 @@ export class BigLadderComponent implements OnInit {
   // ====================== Side Panel =====================================
 
   // function to open side panel
-  openSidePanel(profileId: string, panelView: sidePanelTab = 'level') {
+  async openSidePanel(profileId: string, panelView: sidePanelTab = 'level') {
     if (profileId) {
       const metadata = this.participantMetadataMap[profileId] ?? null;
       const eventsAttended = this.eventsAttended[profileId] ?? new Set();
@@ -786,6 +826,7 @@ export class BigLadderComponent implements OnInit {
       const eiflixConsumption = this.eiflixConsumptionMap[profileId] ?? new Set();
       const queueActivityLog = this.queueActivityLog[profileId] ?? [];
       const bigParticipantLevel = this.bigParticipantLevel[profileId] ?? [];
+      const extendedlifeimpact = await this.getExtendedImpactFullYears(profileId);
 
       const participantMetrics = {
         ...metadata,
@@ -794,11 +835,27 @@ export class BigLadderComponent implements OnInit {
         eiflixConsumption: [...eiflixConsumption],
         queueActivityLog: queueActivityLog,
         bigParticipantLevel: bigParticipantLevel,
+        extendedlifeimpact : extendedlifeimpact
       };
 
       this.sidePanelParticipant = participantMetrics;
       this.sidePanelCurrentTab = panelView;
     }
+  }
+
+
+  async getExtendedImpactFullYears(profileId : string){
+    let yearsSaved = 0;
+    if (profileId) {
+      const firebaseATC = getFirestore('firestore-atc');
+      const atcq = query(collection(firebaseATC , 'atc_alpha') , where('specialistinvolved' , 'array-contains' , profileId));
+      const atcSnap = await getDocs(atcq);
+      for (const atcRef of atcSnap.docs) {
+        const atc = atcRef.data();
+        yearsSaved += atc['extendedlifeimpact']?.[profileId] ?? 0;
+      };
+    } 
+    return yearsSaved
   }
 
   // function to close side panel

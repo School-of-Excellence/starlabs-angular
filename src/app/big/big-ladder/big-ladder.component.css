@@ -2442,3 +2442,117 @@
 .sel li:hover { background: #e8f2ff; }
 .sel .empty { color: #7b8190; cursor: default; }
 .sel .empty:hover { background: none; }
+
+/* finance */
+
+.fin-status {
+  display: flex;
+  /* flex-direction: column; */
+  align-items: center;
+  gap: 8px;
+}
+
+.fin-status__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+  color: #1f2937;
+}
+
+.fin-status__pills {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.fin-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 12px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.fin-pill:hover {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.fin-pill__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.fin-pill__count {
+  min-width: 28px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* Good (green) */
+.fin-pill--good .fin-pill__dot {
+  background: #16a34a;
+}
+.fin-pill--good .fin-pill__count {
+  background: #dcfce7;
+  color: #16a34a;
+}
+.fin-pill--good:hover {
+  background: #dcfce7;
+  border-color: #16a34a;
+}
+.fin-pill--good:focus-visible {
+  outline: 2px solid #16a34a;
+  outline-offset: 2px;
+}
+.fin-pill--good.is-active {
+  background: #dcfce7;
+  border-color: #16a34a;
+  color: #16a34a;
+}
+.fin-pill--good.is-active .fin-pill__count {
+  background: #16a34a;
+  color: #fff;
+}
+
+/* At Risk (red) */
+.fin-pill--risk .fin-pill__dot {
+  background: #dc2626;
+}
+.fin-pill--risk .fin-pill__count {
+  background: #fee2e2;
+  color: #dc2626;
+}
+.fin-pill--risk:hover {
+  background: #fee2e2;
+  border-color: #dc2626;
+}
+.fin-pill--risk:focus-visible {
+  outline: 2px solid #dc2626;
+  outline-offset: 2px;
+}
+.fin-pill--risk.is-active {
+  background: #fee2e2;
+  border-color: #dc2626;
+  color: #dc2626;
+}
+.fin-pill--risk.is-active .fin-pill__count {
+  background: #dc2626;
+  color: #fff;
+}
+
+/* vertical seperatore */
+.vertical-separator {
+  width: 2px;
+  height: 25px;
+  background-color: #515050;
+}
