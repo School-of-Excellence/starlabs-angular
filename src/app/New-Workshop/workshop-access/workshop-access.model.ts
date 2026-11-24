@@ -177,9 +177,18 @@ export class WorkshopAccess {
     return !!this.profileId && this.admins.includes(this.profileId);
   }
 
+  /**
+   * On the shared clear list itself (2026-11-19): Manage tag in the side-panel person menu. The list alone —
+   * this workshop's own Clear tick does not give it, and neither does full dashboard access. Deliberately not a
+   * WORKSHOP_ACCESS_KEYS entry, which would make it a tick in the Dashboard Access settings.
+   */
+  inClearList(): boolean {
+    return !!this.profileId && this.clearList.includes(this.profileId);
+  }
+
   can(key: WorkshopAccessKey): boolean {
     // Clear: only the clear list or this workshop's own tick — never full dashboard access.
-    if (key === 'clear') return this.granted.has('clear') || (!!this.profileId && this.clearList.includes(this.profileId));
+    if (key === 'clear') return this.granted.has('clear') || this.inClearList();
     if (this.isAdmin) return true;
     return this.granted.has(key);
   }

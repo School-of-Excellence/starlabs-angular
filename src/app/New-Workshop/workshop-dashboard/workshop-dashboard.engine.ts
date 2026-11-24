@@ -872,6 +872,77 @@ export function personMenuNoDataNote(enrolledDoc: { status?: any } | null | unde
   return 'Not started — no data in this workshop yet';
 }
 
+/** One segment tag in the person menu's Manage tag list (a newusertags doc of the segments type). */
+export interface SegmentTag { id: string; name: string; }
+
+/**
+ * Manage tag (operator 2026-11-19): the segment tags as the person menu lists them — the same list New Users
+ * offers. A tag with a blank name is left out (it would be an empty row), and so is a row with no id or a
+ * repeated id. Sorted A→Z ignoring case; tags whose names differ only in case keep the order they came in.
+ */
+export function segmentTagList(rows: readonly { id?: any; name?: any }[] | null | undefined): SegmentTag[] {
+  const out: SegmentTag[] = [];
+  const seen = new Set<string>();
+  for (const r of rows || []) {
+    const id = typeof r?.id === 'string' ? r.id : '';
+    const name = r?.name === null || r?.name === undefined ? '' : String(r.name).trim();
+    if (!id || !name || seen.has(id)) continue;
+    seen.add(id);
+    out.push({ id, name });
+  }
+  // Array.prototype.sort is stable, so names equal once lower-cased keep their incoming order.
+  return out.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+}
+
+/**
+ * The tag ids a person carries in this workshop: every tag on every enrolled doc of theirs. The operator says a
+ * person has one enrolment per workshop; if a second doc ever exists, a tag on either counts as carried.
+ */
+export function personTagIds(
+  enrolled: readonly { profileid?: any; tags?: any }[] | null | undefined,
+  profileid: string | null | undefined,
+): Set<string> {
+  const out = new Set<string>();
+  if (!profileid) return out;
+  for (const e of enrolled || []) {
+    if (e?.profileid !== profileid || !Array.isArray(e.tags)) continue;
+    for (const t of e.tags) if (typeof t === 'string' && t) out.add(t);
+  }
+  return out;
+}
+
+/** What choosing a tag in Manage tag writes: these enrolled docs, the tag added (true) or removed (false). */
+export interface TagTogglePlan { docIds: string[]; add: boolean; }
+
+/**
+ * Choosing a tag in Manage tag (2026-11-19): added when the person does not carry it (personTagIds), removed when
+ * they do — on every enrolled doc of theirs in this workshop, so their docs never disagree. Only their own docs.
+ * null = nothing to write (no person, no tag, or not enrolled here).
+ */
+export function tagTogglePlan(
+  enrolled: readonly { profileid?: any; id?: any; tags?: any }[] | null | undefined,
+  profileid: string | null | undefined,
+  tagId: string | null | undefined,
+): TagTogglePlan | null {
+  if (!profileid || !tagId) return null;
+  const docIds: string[] = [];
+  for (const e of enrolled || []) {
+    if (e?.profileid === profileid && typeof e.id === 'string' && e.id && !docIds.includes(e.id)) docIds.push(e.id);
+  }
+  if (!docIds.length) return null;
+  return { docIds, add: !personTagIds(enrolled, profileid).has(tagId) };
+}
+
+/**
+ * A doc's tag ids once a toggle has been written, as Firestore applies it: an add appends the id when it is not
+ * there yet (arrayUnion); a remove drops every copy (arrayRemove). The rest keep their order. A new array.
+ */
+export function applyTagToggle(tags: any, tagId: string, add: boolean): string[] {
+  const ids: string[] = Array.isArray(tags) ? tags.filter((t: any): t is string => typeof t === 'string') : [];
+  if (!add) return ids.filter(t => t !== tagId);
+  return ids.includes(tagId) ? ids : [...ids, tagId];
+}
+
 /**
  * new_user_data is read once and the dashboard no longer waits for it (2026-11-18), so a side panel opened
  * before it lands holds entries built without it: a new user's row says 'Unknown' and carries no contact
@@ -894,6 +965,56 @@ export function panelEntryFill(entry: any, profile: any, newProfile: any): { nam
   const noDetails = m === null || m === undefined || (typeof m === 'object' && Object.keys(m).length === 0);
   if (noDetails && profile && typeof profile === 'object' && Object.keys(profile).length > 0) out.metadata = profile;
   return out.name !== undefined || out.metadata !== undefined ? out : null;
+}
+
+/**
+ * new_user_data is read once, so someone who signs up and enrolls while the dashboard is open is in neither
+ * profile map: "Unknown", counted as Existing, and "No login yet" in Not in Chat Group (2026-11-19). These are
+ * the enrolled ids to look up on their own: unique, trimmed, non-empty, in neither `metaDocdata` (participant
+ * metadata) nor `newUserMap` (new_user_data), and not in `seen` (asked already: an id not found is an orphan
+ * enrolment and is not read again). An id with '/' cannot be a document id; one in a batch fails the whole
+ * query, so it is left out. Enrolment order is kept.
+ */
+export function missingProfileIds(
+  enrolledIds: readonly any[] | null | undefined,
+  metaDocdata: Record<string, any> | null | undefined,
+  newUserMap: Record<string, any> | null | undefined,
+  seen: ReadonlySet<string> | null | undefined,
+): string[] {
+  const has = (m: Record<string, any> | null | undefined, id: string) => !!m && Object.prototype.hasOwnProperty.call(m, id);
+  const out: string[] = [];
+  const taken = new Set<string>();
+  for (const raw of enrolledIds || []) {
+    const id = raw === null || raw === undefined ? '' : String(raw).trim();
+    if (!id || id.includes('/') || taken.has(id)) continue;
+    taken.add(id);
+    if (has(metaDocdata, id) || has(newUserMap, id) || seen?.has(id)) continue;
+    out.push(id);
+  }
+  return out;
+}
+
+/**
+ * The late-enrollee lookup's query snapshots → new_user_data docs by id, each with its `id` (as readNewUserData).
+ * A snapshot answered from the local cache is not an answer (2026-11-19 review): offline, the cache is empty, and
+ * these people would be taken for orphan enrolments and never asked again. It throws a transient 'unavailable'
+ * error instead, so the read is retried and, failing that, asked again later.
+ */
+export function newUserDocsById(
+  snaps: readonly { metadata?: { fromCache?: boolean }; docs: readonly { id: string; data: () => any }[] }[],
+): Record<string, any> {
+  if (snaps.some(s => s?.metadata?.fromCache === true)) {
+    throw Object.assign(new Error('new_user_data lookup answered from the cache, not the server'), { code: 'unavailable' });
+  }
+  const byId: Record<string, any> = {};
+  for (const snap of snaps) {
+    for (const d of snap.docs) {
+      const data: any = { ...(d.data() || {}) };
+      data['id'] = d.id;
+      byId[d.id] = data;
+    }
+  }
+  return byId;
 }
 
 /**

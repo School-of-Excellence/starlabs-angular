@@ -1,7 +1,7 @@
 import { Component, Input, OnInit, OnDestroy, AfterViewInit, HostListener, NgZone, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, FormArray, FormControl, AbstractControl, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
-import { Firestore, doc, updateDoc, collection, collectionSnapshots, getDocs, query, where, orderBy, getDoc, setDoc, deleteField } from '@angular/fire/firestore';
+import { Firestore, doc, updateDoc, collection, collectionSnapshots, getDocs, query, where, orderBy, getDoc, setDoc, deleteField, FieldPath } from '@angular/fire/firestore';
 import { Storage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
@@ -20,7 +20,9 @@ import {
   WorkshopAccessGrants,
   WorkshopAccessKey,
   WorkshopAdminLists,
+  readGrants,
 } from '../../workshop-access/workshop-access.model';
+import { EMPTY_QNA, QNA_FIELD, QnaSettings, buildQnaSettings, qnaFingerprint, readQnaSettings } from './qna-settings';
 import {
   MAIL_SOURCES,
   MAIL_TEMPLATES_COLLECTION,
@@ -952,12 +954,20 @@ export class WorkshopSettingsv2Component implements OnInit, AfterViewInit, OnDes
     if (this.accessLoaded || this.accessLoading) return;
     this.accessLoading = true;
     try {
-      const [people, lists, grants] = await Promise.all([
+      // One read of this workshop's settings document gives both its grants and its Q&A. A failed
+      // read fails the section (and so blocks Save) rather than showing empty values a save would store.
+      const [people, lists, settingsDoc] = await Promise.all([
         this.accessService.getParticipantDirectory(),
         this.accessService.refreshAdminLists(),
-        this.workshopId ? this.accessService.getWorkshopGrants(this.workshopId) : Promise.resolve({}),
+        this.workshopId
+          ? getDoc(doc(this.firestore, WORKSHOP_SETTINGS_COLLECTION, this.workshopId)).then(s => (s.exists() ? s.data() : null))
+          : Promise.resolve(null),
       ]);
+      const grants = readGrants(settingsDoc);
+      const qna = readQnaSettings(settingsDoc);
       this.zone.run(() => {
+        this.qna = qna;
+        this.qnaSavedPrint = qnaFingerprint(qna);
         this.accessPeople = people;
         this.accessNameMap = people.reduce((acc: Record<string, string>, p) => { acc[p.id] = p.name; return acc; }, {});
         this.adminLists = { dashboardAdmins: [...lists.dashboardAdmins], editAccess: [...lists.editAccess], newUsersAccess: [...lists.newUsersAccess], clearWorkshop: [...lists.clearWorkshop] };
@@ -1058,6 +1068,31 @@ export class WorkshopSettingsv2Component implements OnInit, AfterViewInit, OnDes
   }
   grantCount(id: string): number { return (this.accessGrants[id] || []).length; }
 
+  // ── Q&A for this workshop ──
+  // Stored as `q&a` in workshopsettings/{workshop id} (see qna-settings.ts) and saved by Save Access,
+  // but only when it changed, so saving access alone never creates the map on a workshop.
+  qna: QnaSettings = { ...EMPTY_QNA, admin: [] };
+  private qnaSavedPrint = qnaFingerprint(EMPTY_QNA);
+  get qnaDirty(): boolean { return qnaFingerprint(this.qna) !== this.qnaSavedPrint; }
+  setQnaText(key: 'title' | 'admintext', value: string): void {
+    this.qna = { ...this.qna, [key]: value ?? '' };
+    this.markAccessDirty();
+  }
+  inQnaAdmins(id: string): boolean { return this.qna.admin.includes(id); }
+  toggleQnaAdmin(id: string): void {
+    const cur = this.qna.admin;
+    this.qna = { ...this.qna, admin: cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id] };
+    this.markAccessDirty();
+  }
+  removeQnaAdmin(id: string): void {
+    this.qna = { ...this.qna, admin: this.qna.admin.filter(x => x !== id) };
+    this.markAccessDirty();
+  }
+  toggleQnaFlag(key: 'enablesplit' | 'enablevideotime' | 'samequestion' | 'allowlike'): void {
+    this.qna = { ...this.qna, [key]: !this.qna[key] };
+    this.markAccessDirty();
+  }
+
   private markAccessDirty(): void {
     this.accessDirty = true;
     this.accessJustSaved = false;
@@ -1083,6 +1118,20 @@ export class WorkshopSettingsv2Component implements OnInit, AfterViewInit, OnDes
       const savedBy = await this.accessService.currentProfileId();
       await this.accessService.saveAdminLists(this.adminLists);
       if (this.workshopId) await this.accessService.saveWorkshopGrants(this.workshopId, this.accessGrants, savedBy);
+      if (this.workshopId && this.qnaDirty) {
+        const qna = buildQnaSettings(this.qna);
+        // mergeFields: `q&a` is replaced whole and the rest of the document (access, mail) is left as it is.
+        // A FieldPath names it, because the field name contains `&`.
+        await setDoc(
+          doc(this.firestore, WORKSHOP_SETTINGS_COLLECTION, this.workshopId),
+          { workshopid: this.workshopId, [QNA_FIELD]: qna },
+          { mergeFields: ['workshopid', new FieldPath(QNA_FIELD)] },
+        );
+        this.zone.run(() => {
+          this.qna = { ...qna, admin: [...qna.admin] };
+          this.qnaSavedPrint = qnaFingerprint(qna);
+        });
+      }
       this.zone.run(() => {
         this.accessDirty = false;
         this.accessJustSaved = true;

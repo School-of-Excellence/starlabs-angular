@@ -15,17 +15,20 @@ import { RouterModule } from '@angular/router';
 import {
   Firestore, collection, doc, query, where,
   updateDoc, setDoc, Timestamp, Unsubscribe,
-  getDoc, getDocs, onSnapshot, getFirestore, documentId,
-  arrayUnion,
+  getDoc, getDocs, getDocsFromServer, onSnapshot, getFirestore, documentId,
+  arrayUnion, arrayRemove, writeBatch,
 } from '@angular/fire/firestore';
 import { MatDatepickerModule } from '@angular/material/datepicker';
-import { watsonFirestore, saleWindow, purchaseLabels, formatRupees, buildSaleBuyers, sortSaleBuyers, saleExportRows, saleBuyersInRange, saleBuyersTotal } from '../watson-purchases';
+import { watsonFirestore, saleWindow, purchaseLabels, formatRupees, buildSaleBuyers, isZeroRupees } from '../watson-purchases';
+// The Sale Achieved dialog COMPONENT is loaded lazily (openSaleAchieved); only its source type and the pure
+// new_user_data id helper (the dialog's "EiFlix New User" chip) are imported here.
+import { eiflixNewUserIds, type SaleAchievedSource } from './sale-achieved-dialog/sale-achieved';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { AuthguardService } from '../../authguard.service';
 import { MatDialog } from '@angular/material/dialog';
 import { debounceTime, firstValueFrom, Subject, takeUntil } from 'rxjs';
 import * as XLSX from 'xlsx';
-import { MatMenuModule } from '@angular/material/menu';
+import { MatMenuModule, MatMenuTrigger } from '@angular/material/menu';
 import { MatRadioModule } from '@angular/material/radio';
 import { FormsModule } from '@angular/forms';
 import { environment } from '../../../environments/environment.development';
@@ -50,12 +53,17 @@ import {
   moveButtonText, moveButtonTooltip, neverStartedIds, normalizeSubChallengeStatus, oldResultTooltip,
   personMenuNoDataNote,
   overallProgressLabel, participantTypeClass, participantTypeLabel,
-  filterParticipantsByName, panelEntryFill, retryRead,
+  filterParticipantsByName, panelEntryFill, retryRead, missingProfileIds, newUserDocsById,
+  SegmentTag, segmentTagList, personTagIds, tagTogglePlan, applyTagToggle,
 } from './workshop-dashboard.engine';
 // At a glance additions (2026-11-17): timeline, Completed, Joined recently, Needs attention, Top tags.
 import {
   GlanceJoined, GlanceTimeline, GlanceTopTag,
   emptyGlanceJoined, joinedRecently, needsAttention, tagIdSetKey, topTags, workshopTimeline,
+} from './workshop-dashboard.glance';
+// New Sign-ups (2026-11-21): new_user_data people created inside the registration-start → completion window.
+import {
+  NewSignup, SignupWindow, isSignupWindowSet, newSignups, signupWindow, signupWindowLabel,
 } from './workshop-dashboard.glance';
 
 @Component({
@@ -185,6 +193,9 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   workshopType = '';
   workshopStartDateFormatted = '';
   workshopEndDateFormatted = '';
+  /** Registration window ("Opt-in", operator 2026-11-23), shown in the header beside the workshop dates. */
+  optinStartFormatted = '';
+  optinEndFormatted = '';
 
   workshopId: string | null = null;
   workshopData: any = null;
@@ -238,6 +249,11 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
 
   can(key: WorkshopAccessKey): boolean { return this.access.can(key); }
   get canClear(): boolean { return this.can('clear'); }
+  /**
+   * Manage tag in the side-panel person menu (operator 2026-11-19): only the shared clear list. Not can('clear'):
+   * this workshop's own Clear tick does not give it.
+   */
+  get canManageTags(): boolean { return this.access.inClearList(); }
   get canEnroll(): boolean { return this.can('enroll'); }
   /** The forms sheet needs both: the right to export, and the right to see the forms. */
   get canExportForms(): boolean { return this.can('export') && this.can('allforms'); }
@@ -284,6 +300,22 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   private newUserDataReady: Promise<void> = Promise.resolve();
   /** The latest participant metadata the enrolled snapshot read, so the overlay can be rebuilt when new_user_data lands. */
   private participantMetaDocdata: Record<string, any> | null = null;
+  /**
+   * Enrolled snapshots seen (enrolledGen); the newest one whose metadata read has been applied (enrolledGenApplied);
+   * the newest one whose read has finished, applied, dropped or failed (enrolledGenDone) (2026-11-19). The handler
+   * awaits that read, so two snapshots close together can finish out of order. appliedEnrolledIds is the enrolled
+   * list the applied read was for: with participantMetaDocdata, a consistent pair for the late-enrollee lookup.
+   */
+  private enrolledGen = 0;
+  private enrolledGenApplied = 0;
+  private enrolledGenDone = 0;
+  private appliedEnrolledIds: string[] = [];
+  /**
+   * Late enrollees looked up in new_user_data on their own (fillMissingNewUsers, 2026-11-19). Asked = out now or
+   * done, never read again (an id not found is an orphan enrolment); pending = out now.
+   */
+  private lateNewUserAsked = new Set<string>();
+  private lateNewUserPending = new Set<string>();
   loading = true;
   error: string | null = null;
   isMovingParticipant: string | null = null;
@@ -303,7 +335,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     ['existUsersEnrolled', 'Existing Participants'],
     ['platform', 'Enrolled via'],
     ['notInChatGroup', 'Not in Chat Group'],
-    ['saleAchieved', 'Sale Achieved'],
+    ['newSignups', 'New Sign-ups'],
     ['completed', 'Completed'], ['inreview', 'In Review'], ['rework', 'Rework Required'],
     ['readyformobile', 'Ready for Mobile'], ['inprogress', 'In Progress'], ['notstarted', 'Not Started'],
     ['enrolled', 'All Enrolled'], ['activeParticipants', 'Active Participants'],
@@ -476,18 +508,89 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
    * metadata, fill in what an open side panel could not know, and re-derive every figure — so the People cards
    * show their numbers and enable, and New badges and new users' names appear everywhere (progress table,
    * Participant Data, panels, the lists behind the exports). Before the enrolled snapshot has read the metadata
-   * there is nothing to rebuild: that snapshot builds the overlay itself.
+   * there is nothing to rebuild: that snapshot builds the overlay itself. Also run when fillMissingNewUsers has
+   * found late enrollees (2026-11-19).
    */
   private onNewUserDataSettled(): void {
     this.ngZone.run(() => {
       if (this.participantMetaDocdata) {
         this.mapProfile = { ...this.participantMetaDocdata, ...this.newUserOverlay() };
+        // Enrolled after the one-time read (2026-11-19). Before recomputeNotInChat, so the ids it starts looking
+        // up are left out of Not in Chat Group meanwhile. Never awaited; only acts once the read is 'ready'.
+        void this.fillMissingNewUsers();
         this.refreshOpenPanelPeople();
         this.recomputeNotInChat();
         this.recomputeDerivedState();
       }
+      // New Sign-ups reads only new_user_data and the workshop doc, so it never waits for the metadata.
+      this.recomputeSignups();
       this.cdr.markForCheck();
     });
+  }
+
+  /**
+   * The late-enrollee lookup (fillMissingNewUsers): a dropped connection is retried twice (after 1s, then 3s) and
+   * the lookup gives up after 20s, so those people are not left out of Not in Chat Group for long (2026-11-19 review).
+   */
+  private static readonly LATE_NEW_USER_RETRY_DELAYS_MS = [1000, 3000];
+  private static readonly LATE_NEW_USER_TIMEOUT_MS = 20_000;
+
+  /**
+   * new_user_data is read once, so someone who signs up and enrolls while the dashboard is open is in neither
+   * profile map: "Unknown", counted as Existing, and "No login yet" in Not in Chat Group until a refresh
+   * (2026-11-19). Reads just those ids, then catches up as when the whole read landed. Only once that read is
+   * 'ready' (first paint never waits on this). The ids come from the enrolled list the latest applied metadata
+   * read was for, never a newer list whose read is still out (its new ids are missing from that metadata anyway;
+   * that handler calls this when it lands). Never awaited, never throws: on error (offline included) the ids are
+   * listed as before and asked again by the next call.
+   */
+  private async fillMissingNewUsers(): Promise<void> {
+    if (this.destroyed || this.newUserDataState !== 'ready' || !this.participantMetaDocdata) return;
+    const ids = missingProfileIds(this.appliedEnrolledIds,
+      this.participantMetaDocdata, this.mapProfileNew, this.lateNewUserAsked);
+    if (!ids.length) return;
+    ids.forEach(id => { this.lateNewUserAsked.add(id); this.lateNewUserPending.add(id); });
+    let found: Record<string, any>;
+    try {
+      found = await retryRead(() => this.readNewUsersByIds(ids), {
+        delaysMs: WorkshopDashboardComponent.LATE_NEW_USER_RETRY_DELAYS_MS,
+        timeoutMs: WorkshopDashboardComponent.LATE_NEW_USER_TIMEOUT_MS,
+      });
+    } catch (err) {
+      console.error('Could not look up late enrollees in new_user_data:', err);
+      ids.forEach(id => { this.lateNewUserAsked.delete(id); this.lateNewUserPending.delete(id); });
+      if (!this.destroyed) this.ngZone.run(() => { this.recomputeNotInChat(); this.cdr.markForCheck(); });
+      return;
+    }
+    ids.forEach(id => this.lateNewUserPending.delete(id));
+    if (this.destroyed) return;
+    if (Object.keys(found).length) {
+      // A new object: the dialogs handed the old map keep a consistent one.
+      this.mapProfileNew = { ...this.mapProfileNew, ...found };
+      this.onNewUserDataSettled();
+      // Sale Achieved takes new users' emails from the overlay, and the enrolled handler ran it before these
+      // people were known. A no-op unless the set of emails changed (2026-11-19 review).
+      void this.loadSaleAchieved();
+    } else {
+      // Orphan enrolments only: listed again, as before.
+      this.ngZone.run(() => { this.recomputeNotInChat(); this.cdr.markForCheck(); });
+    }
+  }
+
+  /**
+   * new_user_data docs for these ids, each with its `id` (as readNewUserData). Full SDK, never Lite: hub
+   * WNU-03/04 hold every Lite read of new_user_data to prove first paint does not wait for it (2026-11-19).
+   * From the server only: offline, getDocs would answer from the empty cache and these people would be taken
+   * for orphan enrolments for good; getDocsFromServer fails instead, so they are asked again (2026-11-19 review).
+   */
+  private async readNewUsersByIds(ids: string[]): Promise<Record<string, any>> {
+    const BATCH = 30;
+    const reads: Promise<any>[] = [];
+    for (let i = 0; i < ids.length; i += BATCH) {
+      reads.push(getDocsFromServer(query(collection(this.firestoreDefault, 'new_user_data'),
+        where(documentId(), 'in', ids.slice(i, i + BATCH)))));
+    }
+    return newUserDocsById(await Promise.all(reads));
   }
 
   /**
@@ -654,7 +757,6 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
-    if (this.saleTipTimer) clearTimeout(this.saleTipTimer);
     if (this.glanceClock) { clearInterval(this.glanceClock); this.glanceClock = null; }
     if (this.supportChatUnsub) { this.supportChatUnsub(); this.supportChatUnsub = null; }
     this.destroyed = true;
@@ -714,6 +816,8 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
         this.workshopData = { ...docSnap.data(), docid: docSnap.id };
         this.watchSupportChat(this.workshopData['selectedgroup']);
         this.updateWorkshopDisplayData();
+        // New Sign-ups: the window follows this live doc, so marking the workshop completed moves its end at once.
+        this.recomputeSignups();
         this.triggerRecalculation();
 
         if (this.workshopData.categorybased === true) {
@@ -1134,6 +1238,8 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     this.workshopType = this.workshopData.categorybased === true ? 'CP Workshop' : 'Workshop';
     this.workshopStartDateFormatted = this.formatDate(this.workshopData.detailpage?.workshopStartDate);
     this.workshopEndDateFormatted = this.formatDate(this.workshopData.detailpage?.workshopEndDate);
+    this.optinStartFormatted = this.formatDate(this.workshopData.detailpage?.registrationStartDate);
+    this.optinEndFormatted = this.formatDate(this.workshopData.detailpage?.registrationEndDate);
     if (this.workshopData.categorybased === true) {
       if (!this.displayedColumns.includes('type')) {
         // Email belongs immediately after the name, so Type goes in after Email rather than
@@ -1258,6 +1364,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     );
 
     const unsubscribe = onSnapshot(enrolledQuery, async (querySnap) => {
+      const gen = ++this.enrolledGen;
       this.enrolledParticipants = querySnap.docs.map(d => {
         const data = d.data();
         return {
@@ -1275,30 +1382,67 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       this.enrolledDelivered = true;
 
       const enrolledProfileIds = this.enrolledParticipants.map(p => p.profileid);
-      // NOT new_user_data (2026-11-18): the dashboard paints without it. Until it lands the overlay below is
-      // empty and the three People cards wait; onNewUserDataSettled then rebuilds this map from the docdata kept here.
-      const participantData = await this.getParticipantMetaMapForIds(enrolledProfileIds);
-      if (this.destroyed) return; // component torn down while awaiting
-      this.participantMetaDocdata = participantData.docdata;
-      // Overlay only the still-new users: a moved-to-existing person keeps their
-      // `participant metadata` (which carries activejourney / customerstatus).
-      this.mapProfile = { ...participantData.docdata, ...this.newUserOverlay() };
-      this.recomputeNotInChat();
-      void this.loadSaleAchieved();
-      // Participant progress lives in its own snapshot (setupParticipantWorkshopSnapshot);
-      // here we just re-derive from the current (live) participantWorkshopMap.
-      this.recomputeDerivedState();
-
-      if (this.loading) {
-        this.loading = false;
-        this.cdr.detectChanges();
-      }
+      // NOT new_user_data (2026-11-18): the dashboard paints without it. Until it lands the overlay is empty and
+      // the three People cards wait; onNewUserDataSettled then rebuilds the map from the docdata kept here.
+      await this.loadEnrolledMeta(gen, enrolledProfileIds);
     }, (error) => {
       this.error = `Error loading participants: ${error.message}`;
       this.loading = false;
     });
 
     this.unsubscribes.push(unsubscribe);
+  }
+
+  /**
+   * The enrolled snapshot's participant metadata read, then applyEnrolledMeta. A failed read is logged (it used to
+   * reject unhandled) and counts as finished, so Not in Chat Group stops waiting on it: the people it was to
+   * identify are listed as before, and the next enrolled snapshot reads again (2026-11-19 review).
+   */
+  private async loadEnrolledMeta(gen: number, enrolledIds: string[]): Promise<void> {
+    let docdata: Record<string, any>;
+    try {
+      docdata = (await this.getParticipantMetaMapForIds(enrolledIds)).docdata;
+    } catch (err) {
+      console.error('Error reading participant metadata for the enrolled list:', err);
+      if (this.destroyed) return;
+      this.enrolledGenDone = Math.max(this.enrolledGenDone, gen);
+      this.recomputeNotInChat();
+      this.cdr.markForCheck();
+      return;
+    }
+    if (this.destroyed) return; // component torn down while awaiting
+    this.applyEnrolledMeta(gen, enrolledIds, docdata);
+  }
+
+  /**
+   * What an enrolled snapshot does once its participant metadata has landed. Returns false, doing nothing, when a
+   * newer snapshot's read landed first (2026-11-19): this older id list would put late enrollees back to "Unknown",
+   * and the newer one has done all of this. An older read that lands first still applies, so first paint never
+   * waits for a later snapshot.
+   */
+  private applyEnrolledMeta(gen: number, enrolledIds: string[], docdata: Record<string, any>): boolean {
+    this.enrolledGenDone = Math.max(this.enrolledGenDone, gen);
+    if (gen < this.enrolledGenApplied) return false;
+    this.enrolledGenApplied = gen;
+    this.appliedEnrolledIds = enrolledIds;
+    this.participantMetaDocdata = docdata;
+    // Overlay only the still-new users: a moved-to-existing person keeps their
+    // `participant metadata` (which carries activejourney / customerstatus).
+    this.mapProfile = { ...docdata, ...this.newUserOverlay() };
+    // Enrolled after the one-time new_user_data read (2026-11-19). Before recomputeNotInChat, so the ids it
+    // starts looking up are left out of Not in Chat Group meanwhile. Never awaited: this goes on.
+    void this.fillMissingNewUsers();
+    this.recomputeNotInChat();
+    void this.loadSaleAchieved();
+    // Participant progress lives in its own snapshot (setupParticipantWorkshopSnapshot);
+    // here we just re-derive from the current (live) participantWorkshopMap.
+    this.recomputeDerivedState();
+
+    if (this.loading) {
+      this.loading = false;
+      this.cdr.detectChanges();
+    }
+    return true;
   }
 
   // Live listener for participant progress (the 'participant workshop' collection).
@@ -1427,13 +1571,175 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     return personMenuNoDataNote(id ? this.enrolledParticipants.find(e => e?.profileid === id) : undefined);
   }
 
-  /** True while the person menu is open: the Sale Achieved purchases card (z-index above the overlay) stays away. */
+  /** True while the person menu is open (a tag change puts focus back into it only while it is). */
   personMenuOpen = false;
+  /**
+   * The name that opened the person menu, and whose it is (2026-11-19 review). Material does not close a menu when
+   * its trigger is destroyed: the person menu just vanishes (menuClosed never fires, so personMenuOpen stays true)
+   * and an open Manage tag submenu is left floating. So when that person leaves the panel's list,
+   * closePersonMenuIfGone closes the chain first.
+   */
+  private personMenuTrigger: MatMenuTrigger | null = null;
+  private personMenuPid: string | null = null;
 
-  onPersonMenuOpened(): void {
+  onPersonMenuOpened(trigger?: MatMenuTrigger, p?: any): void {
     this.personMenuOpen = true;
-    this.keepSaleTip();
-    this.saleTipRow = null;
+    this.personMenuTrigger = trigger ?? null;
+    this.personMenuPid = p?.profileid ?? null;
+    // Manage tag: start reading the tag list now, so it is there by the time its submenu opens.
+    this.loadSegmentTags();
+  }
+
+  onPersonMenuClosed(): void {
+    this.personMenuOpen = false;
+    this.personMenuTrigger = null;
+    this.personMenuPid = null;
+  }
+
+  /**
+   * Runs whenever the panel's list is rebuilt (applyFilterSide): the person menu is closed — its submenu with it,
+   * as that listens for the person menu's close — while its row is still on the page, if the person is no longer
+   * listed. For example: their tag was just removed under a ticked Tag filter, or they were added to the chat group.
+   * Someone still listed keeps the menu open (trackPanelPerson keeps their row).
+   */
+  private closePersonMenuIfGone(): void {
+    const trigger = this.personMenuTrigger;
+    if (!trigger?.menuOpen) return;
+    const pid = this.personMenuPid;
+    if (pid && (this.filteredParticipants || []).some((x: any) => x?.profileid === pid)) return;
+    trigger.closeMenu();
+  }
+
+  /** The panel rows are tracked by person, so a rebuilt entry for the same person keeps its row (and menu). */
+  trackPanelPerson(i: number, p: any): any { return p?.profileid ?? i; }
+
+  // ───────── Manage tag (operator 2026-11-19; specs/plans/2026-11-19-dashboard-person-manage-tag.md) ─────────
+  // Only for the shared clear list (canManageTags). Lists the segment tags (the same list New Users offers) and
+  // adds or removes one on the person's enrolled doc for this workshop — its tags field and nothing else.
+
+  /** The segment tags, A→Z. Read once per visit, on the first person-menu open; never on the first-paint path. */
+  segmentTags: SegmentTag[] = [];
+  /** idle = not asked yet; a failed read is asked again the next time a person menu or the submenu opens. */
+  segmentTagsState: 'idle' | 'loading' | 'ready' | 'failed' = 'idle';
+  /** profileid + tag id while that change is being written: the item is disabled and shows a spinner. */
+  private personTagBusy = new Set<string>();
+
+  private loadSegmentTags(): void {
+    if (!this.canManageTags || this.segmentTagsState === 'loading' || this.segmentTagsState === 'ready') return;
+    this.segmentTagsState = 'loading';
+    // From the server only (2026-11-19 review): offline, getDocs would answer from the cache, which holds just the
+    // tags loadTagNames read by id — a partial list kept as 'ready' for the rest of the visit. getDocsFromServer
+    // fails instead, so the state goes to 'failed' and the next menu or submenu open asks again.
+    getDocsFromServer(query(collection(this.firestoreDefault, 'newusertags'), where('type', '==', 'newusersegments')))
+      .then(snap => {
+        if (this.destroyed) return;
+        const rows = snap.docs.map(d => ({ id: d.id, name: d.data()?.['name'] }));
+        // The names also serve the chips, Top tags and the export (they read tagNameCache).
+        for (const r of rows) this.tagNameCache.set(r.id, (r.name ?? '').toString().trim());
+        this.segmentTags = segmentTagList(rows);
+        this.segmentTagsState = 'ready';
+      })
+      .catch(err => {
+        console.error('Could not read the tag list:', err);
+        if (!this.destroyed) this.segmentTagsState = 'failed';
+      })
+      .finally(() => { if (!this.destroyed) this.cdr.markForCheck(); });
+  }
+
+  /** The Manage tag submenu opened: retry a failed read without making the user close the person menu. */
+  onPersonTagMenuOpened(): void { this.loadSegmentTags(); }
+
+  /** The line in the submenu while there is no list to show. '' = the list is showing. */
+  get segmentTagsNote(): string {
+    if (this.segmentTagsState === 'failed') return "Couldn't load tags";
+    if (this.segmentTagsState === 'ready') return this.segmentTags.length ? '' : 'No tags yet';
+    return 'Loading tags…';
+  }
+
+  trackSegmentTag(_i: number, t: SegmentTag): string { return t.id; }
+
+  /** Manage tag writes to an enrolled doc, so it is open only for someone enrolled in this workshop. */
+  personIsEnrolled(p: any): boolean {
+    const id = p?.profileid;
+    return !!id && (this.enrolledParticipants || []).some(e => e?.profileid === id);
+  }
+
+  /** The person's tag ids, cached per enrolled snapshot (a new array each time) — the template asks per tag. */
+  private personTagCache: { src: any[]; pid: string; set: Set<string> } | null = null;
+  private personTagSet(pid: string): Set<string> {
+    const c = this.personTagCache;
+    if (c && c.src === this.enrolledParticipants && c.pid === pid) return c.set;
+    const set = personTagIds(this.enrolledParticipants, pid);
+    this.personTagCache = { src: this.enrolledParticipants, pid, set };
+    return set;
+  }
+
+  /** The ✓: the live enrolled snapshot, so it follows a change as soon as it is made (and if it fails, back). */
+  personHasTag(p: any, tagId: string): boolean { return !!p?.profileid && this.personTagSet(p.profileid).has(tagId); }
+
+  private personTagKey(pid: string, tagId: string): string { return `${pid}/${tagId}`; }   // '/' cannot occur in a doc id
+  isPersonTagBusy(p: any, tagId: string): boolean {
+    return !!p?.profileid && this.personTagBusy.has(this.personTagKey(p.profileid, tagId));
+  }
+
+  /**
+   * Choose a tag: added when the person does not carry it, removed when they do (tagTogglePlan), on their enrolled
+   * doc(s) for this workshop in one batch — only the tags field. The click does not reach the menu panel, so the
+   * submenu stays open and several tags can be set in a row. A second click while it saves is ignored.
+   */
+  async togglePersonTag(event: Event, p: any, tag: SegmentTag): Promise<void> {
+    event.stopPropagation();
+    const pid = p?.profileid;
+    if (!this.canManageTags || !pid || !tag?.id) return;
+    const key = this.personTagKey(pid, tag.id);
+    if (this.personTagBusy.has(key)) return;
+    const plan = tagTogglePlan(this.enrolledParticipants, pid, tag.id);
+    if (!plan) return;
+    // Disabling the focused item drops keyboard focus to the page; it is put back once the item is enabled again.
+    const item = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+    const hadFocus = !!item && document.activeElement === item;
+    this.personTagBusy.add(key);
+    try {
+      const batch = writeBatch(this.firestoreDefault);
+      const change = plan.add ? arrayUnion(tag.id) : arrayRemove(tag.id);
+      for (const id of plan.docIds) batch.update(doc(this.firestoreDefault, 'workshop participant enrolled', id), { tags: change });
+      await batch.commit();
+      if (!this.destroyed) this.patchPersonTagChips(pid, tag.id, plan.add);
+    } catch (err) {
+      console.error('Could not update the tag:', err);
+      if (!this.destroyed) this.snackbarService.show('Could not update the tag');
+    } finally {
+      this.personTagBusy.delete(key);
+      if (!this.destroyed) {
+        this.cdr.detectChanges();
+        // Not into a menu that has just closed (its person left the panel: closePersonMenuIfGone).
+        if (hadFocus && this.personMenuOpen && item?.isConnected &&
+          (!document.activeElement || document.activeElement === document.body)) {
+          item.focus();
+        }
+      }
+    }
+  }
+
+  /**
+   * After a tag change: the side panel and Participant Data are click-time snapshots, so the chips they show for
+   * this person are brought in line here (the live enrolled snapshot already moves the ✓ and Top tags). The chips
+   * read the person's first enrolled doc, as when the panel opened, with the change applied.
+   */
+  private patchPersonTagChips(pid: string, tagId: string, add: boolean): void {
+    const names = this.tagNamesOf({ tags: applyTagToggle(this.firstEnrolledDocs().get(pid)?.tags, tagId, add) }, this.tagNameCache);
+    if (this.selectedParticipantData?.profileid === pid) this.selectedParticipantTags = names;
+    if (!this.showParticipantPanel || !this.showTagFilter) return;
+    if (!(this.selectedParticipants || []).some((x: any) => x?.profileid === pid)) return;
+    const next = { ...this.enrolledTagNames };
+    if (names.length) next[pid] = names; else delete next[pid];
+    this.enrolledTagNames = next;
+    // The panel's Tag filter offers the tags its people carry; a ticked one stays so it can be unticked.
+    const inPanel = new Set((this.selectedParticipants || []).map((x: any) => x?.profileid));
+    const options = new Set<string>(this.selectedTagFilters);
+    for (const id of Object.keys(next)) if (inPanel.has(id)) next[id].forEach(t => options.add(t));
+    this.enrolledTagOptions = [...options].sort((a, b) => a.localeCompare(b));
+    if (this.selectedTagFilters.length) this.applyFilterSide();
   }
 
   /**
@@ -1650,6 +1956,8 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
    */
   async onTopTagClick(tag: string): Promise<void> {
     this.onMetricClick('totalEnrolled');
+    // Display only: the panel header takes the Top tags card's colour (panelTone); the status stays 'totalEnrolled'.
+    if (this.selectedStatusInfo?.status === 'totalEnrolled') this.selectedStatusInfo = { ...this.selectedStatusInfo, from: 'topTags' };
     const load = this.enrolledTagLoad;
     await load;
     // Another panel (or another tag) was opened while the names were read.
@@ -1867,6 +2175,92 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     return this.enrolledParticipants.filter(p => !this.isNewUserProfile(p.profileid)).length;
   }
 
+  // ───────── New Sign-ups (2026-11-21; specs/plans/2026-11-21-dashboard-new-signups.md) ─────────
+  // Everyone in new_user_data created between the registration start date and the moment the workshop was marked
+  // completed (else the workshop end date), both ends included — people moved to existing too, enrolled here or
+  // not. A filter over the new_user_data map the dashboard already holds: no read of its own, nothing on the first
+  // paint path. Stored fields, recomputed when the workshop doc or that map changes (recomputeSignups), never per
+  // change-detection pass. Rules: workshop-dashboard.glance.ts.
+  signupWin: SignupWindow = { missing: 'start' };
+  /** The window as the panel's subtitle prints it, or why there is none. */
+  signupWindowText = signupWindowLabel({ missing: 'start' });
+  /** The same words for the narrow card, with each date kept on one line (no-break spaces inside the dates). */
+  signupCardWindowText = signupWindowLabel({ missing: 'start' }, true);
+  /** The people the card counts, newest sign-up first. Empty until new_user_data is ready. */
+  signupPeople: NewSignup[] = [];
+  /** What signupPeople was last built from: the map, the window, and whether the map was ready. */
+  private signupSrc: { map: any; win: string; ready: boolean } | null = null;
+
+  /** The quiet loading bar in place of the number: only while new_user_data loads and there is a window to count in
+   *  (with no usable dates the card says "—" straight away — there is nothing to wait for). */
+  get signupsLoading(): boolean {
+    return this.newUserDataState === 'loading' && isSignupWindowSet(this.signupWin);
+  }
+  /** Disabled while new_user_data loads, after that read failed, and when the dates make no window. */
+  get signupsDisabled(): boolean {
+    return this.newUserDataState !== 'ready' || !isSignupWindowSet(this.signupWin);
+  }
+  /** The number; '—' when there is nothing to count in (no window, or the read failed). */
+  get signupsCountText(): string {
+    return this.signupsDisabled ? '—' : String(this.signupPeople.length);
+  }
+  /** The line under the number: why the dates make no window; else that the read failed; else the window. */
+  get signupsSubText(): string {
+    if (isSignupWindowSet(this.signupWin) && this.newUserDataState === 'failed') return 'Sign-ups are unavailable right now';
+    return this.signupCardWindowText;
+  }
+
+  /**
+   * Re-derives the window from the live workshop doc and, when the window or the new_user_data map has changed, the
+   * people in it. An open New Sign-ups panel follows: its subtitle always, its list when the people changed — the
+   * search and the New / Exist pick stay.
+   */
+  private recomputeSignups(): void {
+    const dp = this.workshopData?.detailpage || {};
+    const win = signupWindow(dp['registrationStartDate'], this.workshopData?.['workshopcompletedat'], dp['workshopEndDate']);
+    this.signupWin = win;
+    this.signupWindowText = signupWindowLabel(win);
+    this.signupCardWindowText = signupWindowLabel(win, true);
+    const ready = this.newUserDataState === 'ready';
+    const winKey = isSignupWindowSet(win) ? `${win.start}-${win.end}` : '';
+    const src = this.signupSrc;
+    const changed = !src || src.map !== this.mapProfileNew || src.win !== winKey || src.ready !== ready;
+    if (changed) {
+      this.signupSrc = { map: this.mapProfileNew, win: winKey, ready };
+      this.signupPeople = ready ? newSignups(this.mapProfileNew, win) : [];
+    }
+    if (!this.showParticipantPanel || this.selectedStatusInfo?.status !== 'newSignups') return;
+    if (changed) this.selectedParticipants = this.signupPanelEntries();
+    this.selectedStatusInfo = {
+      ...this.selectedStatusInfo,
+      subChallengeName: this.signupWindowText,
+      count: this.selectedParticipants.length,
+    };
+    if (changed) this.applyFilterSide();
+  }
+
+  /**
+   * The New Sign-ups panel's entries, in the card's order (newest sign-up first). Name and contact details come from
+   * the person's new_user_data doc (metadata, which the search, the export and the senders read), moved to existing
+   * or not. The panel row adds the contact line, the sign-up moment and, for people moved to existing, a chip.
+   */
+  private signupPanelEntries(): any[] {
+    const str = (v: any) => (v === null || v === undefined ? '' : String(v).trim());
+    return this.signupPeople.map(s => {
+      const d = s.doc || {};
+      // A no-break space keeps "+91 9820000006" whole when the contact line wraps on a phone.
+      const phone = str(d['phonenumber']) ? [str(d['countryCode']), str(d['phonenumber'])].filter(Boolean).join('\u00a0') : '';
+      return {
+        profileid: s.id,
+        name: str(d['name']) || 'Unknown',
+        metadata: d,
+        signupMoved: s.moved,
+        signupLabel: formatDateTime(new Date(s.created)),
+        signupContact: [str(d['email']), phone].filter(Boolean).join(' · '),
+      };
+    });
+  }
+
   /** Customer statuses actually present among the enrolled existing users. */
   get customerStatusOptions(): string[] {
     const seen = new Set<string>();
@@ -1930,11 +2324,13 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   }
 
   /** Panels whose membership new_user_data decides: their cards stay disabled until it has landed. */
-  private static readonly NEW_USER_DATA_PANELS = ['existUsersEnrolled', 'totalNewUsers', 'totalNewUsersNotEnrolled', 'notInChatGroup'];
+  private static readonly NEW_USER_DATA_PANELS = ['existUsersEnrolled', 'totalNewUsers', 'totalNewUsersNotEnrolled', 'notInChatGroup', 'newSignups'];
 
   onMetricClick(metricType: string) {
     // The card is disabled until new_user_data has landed; never build these lists without it.
     if (WorkshopDashboardComponent.NEW_USER_DATA_PANELS.includes(metricType) && this.newUserDataState !== 'ready') return;
+    // New Sign-ups is also disabled while the dates make no window.
+    if (metricType === 'newSignups' && !isSignupWindowSet(this.signupWin)) return;
     // Every panel opens without an enrollment-date range or ticked tags (operator 2026-11-16).
     this.enrolledFrom = '';
     this.enrolledTo = '';
@@ -1964,13 +2360,14 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       this.selectedNotStartedTypeFilters = [];
       this.applyFilterSide();
 
-    } else if (metricType === 'saleAchieved') {
-      const list = this.saleAchievedParticipants;
+    } else if (metricType === 'newSignups') {
+      // New Sign-ups (2026-11-21): the people the card counts, newest sign-up first, moved to existing included.
+      const list = this.signupPanelEntries();
       this.selectedParticipants = list;
       this.selectedStatusInfo = {
-        status: 'saleAchieved',
-        challengeName: 'Sale Achieved',
-        subChallengeName: this.saleWindowLabel,
+        status: 'newSignups',
+        challengeName: 'New Sign-ups',
+        subChallengeName: this.signupWindowText,
         count: list.length
       };
       this.showParticipantPanel = true;
@@ -1978,6 +2375,10 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       this.sideSearch = '';
       this.selectedJourneyFilters = [];
       this.selectedCustomerStatusFilters = [];
+      this.selectedEnrollmentStatusFilters = [];
+      this.selectedTierFilters = [];
+      this.selectedCategoryFilters = [];
+      this.selectedNotStartedTypeFilters = [];
       this.applyFilterSide();
 
     } else if (metricType === 'notInChatGroup') {
@@ -2282,10 +2683,40 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   }
 
   closeParticipantPanel() {
-    this.saleTipRow = null;
     this.showParticipantPanel = false;
     this.selectedParticipants = [];
+    // The panel slides out for 0.3s after this: keep its header colour (panelTone) so it does not flash blue.
+    this.lastPanelTone = this.panelTone;
     this.selectedStatusInfo = null;
+  }
+
+  /** Side-panel header colour (2026-11-19, colour option A): the At a glance card that opened the panel, as one of
+   *  the --gl-* tokens on .wdx-root. Display only. */
+  private static readonly PANEL_TONES = new Map<string, string>([
+    ['totalEnrolled', 'var(--gl-enrolled)'],
+    ['totalStarted', 'var(--gl-started)'], ['notStarted', 'var(--gl-notstarted)'],
+    ['activeParticipants', 'var(--gl-active)'], ['active', 'var(--gl-active)'],
+    ['completedParticipants', 'var(--gl-completed)'], ['completed', 'var(--gl-completed)'],
+    ['existUsersEnrolled', 'var(--gl-existing)'], ['totalNewUsers', 'var(--gl-new)'],
+    ['totalNewUsersNotEnrolled', 'var(--gl-notenrolled)'], ['notInChatGroup', 'var(--gl-chat)'],
+    ['newSignups', 'var(--gl-signups)'],
+    ['joinedRecently', 'var(--gl-joined)'], ['startedStuck', 'var(--gl-stuck)'], ['inactiveRecently', 'var(--gl-inactive)'],
+    ['categoryEnrolled', 'var(--gl-cat)'], ['categoryCompleted', 'var(--gl-cat)'],
+    ['cohortParticipants', 'var(--gl-coh)'], ['cohortCompleted', 'var(--gl-coh)'],
+    ['facilitatorOnly', 'var(--gl-fac)'], ['facilitatorCompleted', 'var(--gl-fac)'],
+    ['shareClicked', 'var(--gl-share)'], ['shareClaimed', 'var(--gl-claim)'], ['purchase', 'var(--gl-purchase)']
+  ]);
+  /** The closing panel's colour, kept while it slides out (closeParticipantPanel). */
+  private lastPanelTone = 'var(--gl-enrolled)';
+  /** Blue for every other entry point. A Challenge Progress chip can reuse a status above ('completed'), but it
+   *  always carries its challenge index, so it stays blue. A Top tags row opens Total Enrolled's list but takes the
+   *  Top tags card's teal (from: 'topTags', set by onTopTagClick). */
+  get panelTone(): string {
+    const info = this.selectedStatusInfo;
+    if (!info) return this.lastPanelTone;
+    if (info.challengeIndex != null) return 'var(--gl-enrolled)';
+    if (info.from === 'topTags') return 'var(--gl-tags)';
+    return WorkshopDashboardComponent.PANEL_TONES.get(info.status) || 'var(--gl-enrolled)';
   }
 
   private communicationOpening = false;
@@ -2855,20 +3286,14 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     if (this.showEnrolledRange) {
       base = this.filterByEnrollmentDate(base);
     }
-    // Sale Achieved date range: only the purchases bought in it, totals recomputed (operator 2026-11-02).
-    if (this.selectedStatusInfo?.status === 'saleAchieved') {
-      base = saleBuyersInRange(base, this.saleFrom, this.saleTo);
-    }
     // Applied last, over whatever the other side filters left.
     this.filteredParticipants = filterParticipantsByName(base, this.sideSearch, p => this.sideNameFor(p));
-    // Sale Achieved sorts instead of filtering (operator 2026-10-14).
-    if (this.selectedStatusInfo?.status === 'saleAchieved') {
-      this.filteredParticipants = sortSaleBuyers(this.filteredParticipants, this.saleSort);
-    }
     // Total Enrolled: the chosen sort, over whatever the filters and search left (operator 2026-11-13).
     if (this.selectedStatusInfo?.status === 'totalEnrolled' && this.sideSort) {
       this.filteredParticipants = this.sortEnrolledPanel(this.filteredParticipants, this.sideSort);
     }
+    // Before the next render removes the row of the person whose menu is open (2026-11-19 review).
+    this.closePersonMenuIfGone();
   }
 
   /**
@@ -3312,38 +3737,63 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   /** Inputs of the last started lookup — a re-fire of the live enrolled listener with the same people and
    *  dates must NOT restart it (it used to, and the card sat on '…' while each run was thrown away). */
   private saleKey = '';
-  /** The panel row whose purchases are showing in the hover card. */
-  saleTipRow: any = null;
-  saleTipStyle: Record<string, string> = {};
-  private saleTipTimer: any = null;
-  /** The Sale Achieved panel sorts (no All/New/Old filter): biggest total, or latest purchase first. */
-  saleSort: 'amount' | 'recent' = 'amount';
-
-  setSaleSort(by: 'amount' | 'recent'): void {
-    this.saleSort = by;
-    this.applyFilterSide();
-  }
-  /** Panel date range (operator 2026-11-02), 'yyyy-mm-dd' or ''. Lists only the purchases bought in it. */
-  saleFrom = '';
-  saleTo = '';
-  /** The window's ends as 'yyyy-mm-dd' — the date pickers' min / max. */
+  /** The window's ends as 'yyyy-mm-dd' — the dialog's date pickers' min / max. */
   saleMin = '';
   saleMax = '';
+  /** True from the card's click until the dialog has opened (a double click opens one dialog). */
+  private saleDialogOpening = false;
+  private newUserIdsMemo: { map: any; ids: ReadonlySet<string> } | null = null;
 
-  /** The card opens the panel on the whole window; a reload of the buyers keeps a range already picked. */
-  openSaleAchieved(): void {
-    this.saleFrom = '';
-    this.saleTo = '';
-    this.onMetricClick('saleAchieved');
+  /**
+   * Every profileid with a new_user_data doc, moved to existing or not — the Sale Achieved dialog's "EiFlix New User"
+   * chip (operator 2026-11-23). From the map readNewUserData already loaded (no read); empty until it lands. Rebuilt
+   * only when that map is replaced, so the dialog's memo sees one Set per load. Not isNewUserProfile: the dashboard's
+   * own New rules leave moved-to-existing people out and stay as they are.
+   */
+  get newUserDataIds(): ReadonlySet<string> {
+    const map = this.mapProfileNew;
+    if (this.newUserIdsMemo?.map !== map) this.newUserIdsMemo = { map, ids: eiflixNewUserIds(map) };
+    return this.newUserIdsMemo!.ids;
   }
-  clearSaleRange(): void {
-    this.saleFrom = '';
-    this.saleTo = '';
-    this.applyFilterSide();
-  }
-  /** Total of the buyers the panel is listing right now (range and name search applied). */
-  get saleShownTotalLabel(): string {
-    return formatRupees(saleBuyersTotal(this.filteredParticipants));
+
+  /**
+   * The card opens the full-screen Sale Achieved dialog (operator 2026-11-23; plan:
+   * specs/plans/2026-11-23-sale-achieved-dialog.md) — the side panel no longer has a Sale Achieved mode.
+   * The dialog reads NOTHING itself: it gets a LIVE source, getters over the state loadSaleAchieved keeps, so a
+   * dialog opened while the lookup is still running shows its loading state and fills in when the lookup lands.
+   * Escape and its close button close it; focus goes back to the card.
+   */
+  async openSaleAchieved(card?: HTMLElement | null): Promise<void> {
+    if (this.saleDialogOpening) return;
+    this.saleDialogOpening = true;
+    try {
+      const { SaleAchievedDialogComponent } = await import('./sale-achieved-dialog/sale-achieved-dialog.component');
+      if (this.destroyed) return;
+      const self = this;
+      const source: SaleAchievedSource = {
+        get status() { return self.saleStatus; },
+        get buyers() { return self.saleAchievedParticipants; },
+        get windowLabel() { return self.saleWindowLabel; },
+        get min() { return self.saleMin; },
+        get max() { return self.saleMax; },
+        get workshopTitle() { return self.workshopData?.detailpage?.title || self.workshopTitle || ''; },
+        get canExport() { return self.can('export'); },
+        get newUserIds() { return self.newUserDataIds; },
+        download: (rows, fileName) => this.downloadCSV(this.createCSVContent(rows), fileName),
+      };
+      const ref = this.dialog.open(SaleAchievedDialogComponent, {
+        width: '100vw', height: '100vh', maxWidth: '100vw', maxHeight: '100vh',
+        panelClass: 'wsad-panel', ariaLabelledBy: 'wsad-heading',
+        autoFocus: 'first-tabbable', restoreFocus: true,
+        data: { source },
+      });
+      // restoreFocus returns focus to whatever had it; a click does not focus a button in every browser (Safari).
+      ref.afterClosed().subscribe(() => { if (card?.isConnected) card.focus(); });
+    } catch (e) {
+      console.error('Could not open the Sale Achieved dialog:', e);
+    } finally {
+      this.saleDialogOpening = false;
+    }
   }
 
   get isLiveWorkshop(): boolean { return this.workshopData?.workshoptype === 'liveworkshop'; }
@@ -3388,8 +3838,16 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     const emailOf = new Map<string, string>();
     ids.forEach(id => { const e = String(this.mapProfile[id]?.email ?? '').trim(); if (e) emailOf.set(id, e); });
     const asked = [...new Set([...emailOf.values()].flatMap(e => [e, e.toLowerCase()]))];
-    // Same people + same window as the run already started (or finished)? Keep it — don't restart.
-    const key = [...asked].sort().join('|') + '#' + win.start.getTime() + '-' + win.end.getTime();
+    // When each person enrolled in this workshop: a purchase before that day is not this workshop's sale
+    // (operator 2026-11-23). One enrolment doc per person per workshop.
+    const enrolledOf = new Map<string, number>();
+    this.enrolledParticipants.forEach(p => {
+      const ms = this.toMillis(p?.enrollmentdate);
+      if (p?.profileid && ms !== null && Number.isFinite(ms)) enrolledOf.set(p.profileid, ms);
+    });
+    // Same people + same window (+ same enrolment dates) as the run already started (or finished)? Keep it.
+    const key = [...asked].sort().join('|') + '#' + win.start.getTime() + '-' + win.end.getTime()
+      + '#' + [...enrolledOf].map(([id, ms]) => id + ':' + ms).sort().join('|');
     if (key === this.saleKey && (this.saleStatus === 'loading' || this.saleStatus === 'ready')) return;
     this.saleKey = key;
     const token = ++this.saleToken;
@@ -3410,7 +3868,9 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       bSnaps.forEach(snap => snap.forEach((d: any) => purchaseDocs.push(d.data() || {})));
       if (token !== this.saleToken || this.destroyed) return;
       // 3) Match and window (pure — see buildSaleBuyers).
-      const matched = buildSaleBuyers(emailOf, participantDocs, purchaseDocs, win);
+      // A buyer whose purchases in the window total ₹0 is not a sale (operator 2026-11-23): left out of the card's
+      // count, the dialog's list and its buyer count.
+      const matched = buildSaleBuyers(emailOf, participantDocs, purchaseDocs, win, enrolledOf).filter(m => !isZeroRupees(m.total));
       const grand = matched.reduce((a, m) => a + m.total, 0);
       const buyers = matched.map(m => ({
         ...this.buildParticipantEntry(m.profileid),
@@ -3418,7 +3878,10 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
         saleTotal: m.total,
         saleTotalLabel: formatRupees(m.total),
         // Latest purchase in the window — the "Recent purchase" sort key.
-        saleLastDate: Math.max(...m.rows.map(r => r.date ? r.date.getTime() : 0))
+        saleLastDate: Math.max(...m.rows.map(r => r.date ? r.date.getTime() : 0)),
+        // Their first sale EVER (from every purchase read above, not only the window's) — the dialog splits the
+        // window's purchases into New Sales / Funnel Sales / Upgrades by it (operator 2026-11-23). No extra read.
+        saleFirstPaidMs: m.firstPaidMs
       }));
       this.saleAchievedParticipants = buyers;
       this.saleTotalLabel = buyers.length ? formatRupees(grand) : '';
@@ -3431,46 +3894,9 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       this.saleTotalLabel = '';
       this.saleStatus = 'ready';
     }
-    // Keep an open Sale Achieved panel in step.
-    if (this.selectedStatusInfo?.status === 'saleAchieved') this.onMetricClick('saleAchieved');
+    // An open Sale Achieved dialog reads this state live (openSaleAchieved) — nothing to push to it.
   }
 
-  /**
-   * Purchases hover card on a Sale Achieved panel row — same card as the EiFlix dashboard's. The side
-   * panel is fixed at z-index 1000, so the card is fixed at 1002, placed beside the panel level with the
-   * row; with no room beside it (phones) it goes below the row, or above it when there is more room there.
-   * It never covers its own row (it used to be clamped onto a low row, hiding the name and its menu); the
-   * card shrinks to the room it has and its list scrolls. Not while the person menu is open.
-   */
-  showSaleTip(row: any, el: HTMLElement): void {
-    this.keepSaleTip();
-    if (this.personMenuOpen || this.selectedStatusInfo?.status !== 'saleAchieved' || !row?.salePurchases?.length || !el) { this.saleTipRow = null; return; }
-    const r = el.getBoundingClientRect();
-    const panel = (el.closest('.participant-panel') as HTMLElement | null)?.getBoundingClientRect();
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const tipMax = 360;
-    const roomLeft = panel ? panel.left : r.left;
-    if (roomLeft >= 320) {
-      this.saleTipStyle = { top: Math.max(8, Math.min(r.top, vh - tipMax - 8)) + 'px', right: (vw - roomLeft + 10) + 'px' };
-    } else {
-      // Rough card height (head + a row per purchase + total), so a short card still goes below when it fits.
-      const tipH = Math.min(tipMax, 104 + 38 * row.salePurchases.length);
-      const roomBelow = vh - r.bottom - 6 - 8;
-      const roomAbove = r.top - 6 - 8;
-      this.saleTipStyle = roomBelow >= tipH || roomBelow >= roomAbove
-        ? { top: (r.bottom + 6) + 'px', left: '12px', right: '12px', 'max-height': Math.max(0, roomBelow) + 'px' }
-        : { bottom: (vh - r.top + 6) + 'px', left: '12px', right: '12px', 'max-height': Math.max(0, roomAbove) + 'px' };
-    }
-    this.saleTipRow = row;
-  }
-  keepSaleTip(): void {
-    if (this.saleTipTimer) { clearTimeout(this.saleTipTimer); this.saleTipTimer = null; }
-  }
-  hideSaleTip(): void {
-    this.keepSaleTip();
-    this.saleTipTimer = setTimeout(() => { this.saleTipRow = null; this.saleTipTimer = null; }, 140);
-  }
   chatAddBusy = new Set<string>();
   chatAddAllBusy = false;
 
@@ -3570,8 +3996,19 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     const members = this.supportChatMembers;
     if (!this.supportChatGroupId || !members || this.newUserDataState !== 'ready') { this.notInChatParticipants = []; }
     else {
+      // Enrolled in a snapshot whose participant metadata read is still out (2026-11-19 review): nobody can tell
+      // yet who they are. Left out until that read (then the late-enrollee lookup) has landed, rather than flashing
+      // as "Unknown · No login yet" when the group changes meanwhile. Ids already looked up stay listed.
+      const unread = this.enrolledGenDone < this.enrolledGen
+        ? new Set(missingProfileIds(this.enrolledParticipants.map(p => p.profileid),
+          this.participantMetaDocdata, this.mapProfileNew, this.lateNewUserAsked))
+        : null;
       this.notInChatParticipants = this.enrolledParticipants
         .map(p => p.profileid)
+        .filter(id => !unread || !unread.has(id === null || id === undefined ? '' : String(id).trim()))
+        // Late enrollees still being looked up in new_user_data (2026-11-19): left out for that moment, not
+        // listed as "Unknown · No login yet" and not sent to the profile_data lookup below.
+        .filter(id => !this.lateNewUserPending.has(id))
         .filter(id => { const uid = this.uidOf(id); return !uid || !members.has(uid); })
         .map(id => ({ ...this.buildParticipantEntry(id), uid: this.uidOf(id) }));
       // Existing users still without a uid: try profile_data.user_ref once, then recompute.
@@ -3861,13 +4298,6 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     // New users' names and contact details come from new_user_data; an open panel's entries are filled in when it lands.
     await this.newUserDataReady;
     if (this.destroyed) return;
-    // Sale Achieved: one row per purchase — date, product, amount — in the panel's current order.
-    if (this.selectedStatusInfo?.status === 'saleAchieved') {
-      const rows = saleExportRows(this.filteredParticipants);
-      const name = `workshop-sale-achieved-${this.workshopData?.detailpage?.title || 'workshop'}-${new Date().toISOString().split('T')[0]}.csv`;
-      this.downloadCSV(this.createCSVContent(rows), name);
-      return;
-    }
     // Total Enrolled also exports each person's enrollment date and time, then their tag names
     // (operator 2026-11-12), last so the existing columns keep their positions. First enrolled doc per
     // person, as buildParticipantEntry reads it.
