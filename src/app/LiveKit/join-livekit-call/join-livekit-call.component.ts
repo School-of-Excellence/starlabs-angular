@@ -192,7 +192,9 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   // the audio playout delay for lip-sync (see startJitterController).
   private remoteVideoTracks = new Map<string, RemoteTrack>();
   // UI state — exact defaults from DfnControls.tsx
-  dfnEnabled = (typeof navigator !== 'undefined' ? (navigator.hardwareConcurrency || 4) : 4) >= 4; // off on <4-core devices
+  // 2026-11-24 (operator): default = browser's in-built noise suppression; Deep Filter Noise is opt-in
+  // from the mic menu. Revert = `(navigator.hardwareConcurrency || 4) >= 4` (DFN on for 4+ cores).
+  dfnEnabled = false;
   dfnAtten = 80;        // attenuation / noiseReductionLevel (0–100)
   dfnNorm = 1.2;        // makeup gain (1.0–2.5)
   dfnNormOn = true;     // normalize toggle
