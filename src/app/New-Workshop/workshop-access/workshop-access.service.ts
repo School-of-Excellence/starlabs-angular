@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { Firestore, doc, getDoc, setDoc, serverTimestamp } from '@angular/fire/firestore';
+import { Auth } from '@angular/fire/auth';
 import { AuthguardService } from '../../authguard.service';
 import {
   EMPTY_ADMIN_LISTS,
@@ -40,9 +41,12 @@ const DIRECTORY_CACHE_KEY = 'cache_workshopAccessDirectory';
 export class WorkshopAccessService {
   private firestore = inject(Firestore);
   private guard = inject(AuthguardService);
+  private auth = inject(Auth);
 
   private adminListsPromise: Promise<WorkshopAdminLists> | null = null;
   private profileIdPromise: Promise<string | null> | null = null;
+  /** The uid `profileIdPromise` was read for: another sign-in in the same tab reads again. */
+  private profileIdUid: string | null = null;
   private directoryPromise: Promise<WorkshopPerson[]> | null = null;
 
   /**
@@ -83,12 +87,18 @@ export class WorkshopAccessService {
     return this.directoryPromise;
   }
 
-  /** The signed-in person's profileid, or null when it cannot be resolved. */
+  /**
+   * The signed-in person's profileid, or null when it cannot be resolved. Kept per uid: logout does not reload
+   * the page, so a different admin signing in to the same tab must not inherit the last one's id (it decides
+   * screen access, and screens write it as "who did this").
+   */
   currentProfileId(): Promise<string | null> {
-    if (!this.profileIdPromise) {
+    const uid = this.auth.currentUser?.uid || this.guard.uid || null;
+    if (!this.profileIdPromise || this.profileIdUid !== uid) {
+      this.profileIdUid = uid;
       this.profileIdPromise = (async () => {
         try {
-          const roles: any = await this.guard.getRoles();
+          const roles: any = await this.guard.getRoles(uid || undefined);
           return roles?.['profile_ref']?.id || null;
         } catch (err) {
           console.error('Could not resolve the signed-in profile:', err);

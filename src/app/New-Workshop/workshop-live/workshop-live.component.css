@@ -1,0 +1,565 @@
+/* ==========================================================================
+   Workshop Live (2026-11-19) — white / light admin theme, same palette and type as /workshops and the
+   workshop dashboard (DM Sans, Playfair Display title, navy #1a3c5e).
+   Bootstrap 5 and two Material themes are global (body is .mat-typography): every class here is
+   prefixed wlv- (no Bootstrap names), typography is pinned on the root, and the element defaults those
+   sheets change (h1/p margins, table/th, button) are reset under the root.
+   Layout by the screen's own width (container query on .wlv-root):
+     1280px and up   a table of 8 columns (fixed: phone, status and time sized to their text; the rest shared)
+     1024-1279px     the same table, tighter (the time wraps between date and hour, 20px page sides)
+     600-1023px      cards, fields in two columns
+     below 600px     cards, fields in one column
+   The table never needs a sideways scroll: below 1024px it would, so it becomes cards instead.
+   Search box above the list, pager below it (plan "Addition: pagination and search"); both full width below 600px.
+   ========================================================================== */
+
+:host { display: block; }
+
+.wlv-root {
+  --primary: #1a3c5e;
+  --primary-light: #2a5a8e;
+  --primary-tint: #eef3f9;
+  --accent: #c8a96e;
+  --accent-ink: #7d5f26;
+  --bg: #f4f6f9;
+  --surface: #ffffff;
+  --head: #fafbfc;
+  --hover: #f8fafc;
+  --border: #dde3ec;
+  --border-light: #edf0f5;
+  --t1: #1a2535;
+  --t2: #56647b;
+  --t3: #617086;
+  --success: #2e7d52;
+  --success-bg: #e8f5ed;
+  --success-line: #bfe0cb;
+  /* darker than --success so the 12.5px chip text clears 4.5:1 on --success-bg (5.33:1) */
+  --success-ink: #2a7049;
+  --off-bg: #f1f3f6;
+  --fresh: #dff1e6;
+  --danger: #c0392b;
+  --danger-bg: #fdecea;
+  --skel: #e8edf3;
+  --shadow-sheet: 0 1px 2px rgba(26, 37, 53, .04), 0 10px 30px -20px rgba(26, 37, 53, .22);
+
+  container-type: inline-size;
+  container-name: wlv;
+  /* Exactly the scroll area under the app's toolbar (the shell's .mainscreen expression in app.component.css, kept
+     in sync): 100vh here left 64px of empty scroll, so a short page 2, a narrow search or the no-match state could
+     sit scrolled up with the title half under the toolbar. */
+  min-height: calc(100vh - clamp(40px, 7.4vh, 64px));
+  background: var(--bg);
+  color: var(--t1);
+  font: 400 14px/1.45 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  letter-spacing: normal;
+  text-align: left;
+  font-variant-numeric: lining-nums tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- hardening against the global sheets ---------- */
+.wlv-root *, .wlv-root *::before, .wlv-root *::after { box-sizing: border-box; }
+.wlv-root .wlv-title, .wlv-root .wlv-eyebrow, .wlv-root .wlv-state-title, .wlv-root .wlv-state-sub, .wlv-root .wlv-range,
+.wlv-root .wlv-hint {
+  margin: 0;
+  padding: 0;
+  letter-spacing: normal;
+}
+.wlv-root .wlv-btn, .wlv-root .wlv-pg-btn, .wlv-root .wlv-search-clear, .wlv-root .wlv-search-input {
+  font: inherit;
+  letter-spacing: inherit;
+  margin: 0;
+  text-transform: none;
+}
+.wlv-root :focus-visible { outline: 2px solid var(--primary-light); outline-offset: 2px; }
+
+.wlv-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- page + header ---------- */
+.wlv-page {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 28px 32px 56px;
+}
+
+.wlv-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid var(--border-light);
+}
+
+.wlv-head-text { min-width: 0; flex: 1 1 320px; }
+
+.wlv-root .wlv-eyebrow {
+  margin-bottom: 6px;
+  font: 600 11px/1.2 'DM Sans', sans-serif;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+}
+
+.wlv-root .wlv-title {
+  font: 600 28px/1.18 'Playfair Display', Georgia, serif;
+  color: var(--primary);
+  overflow-wrap: anywhere;
+}
+
+.wlv-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  font-size: 13px;
+  color: var(--t2);
+}
+
+.wlv-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 26px;
+  padding: 0 11px 0 9px;
+  border: 1px solid var(--success-line);
+  border-radius: 999px;
+  background: var(--success-bg);
+  color: var(--success-ink);
+  font-weight: 600;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+/* not in sync with the server (connecting, or the connection dropped): grey, no pulse */
+.wlv-live--off { border-color: var(--border); background: var(--off-bg); color: var(--t2); }
+.wlv-live--off .wlv-dot { background: var(--t3); }
+.wlv-live--off .wlv-dot::after { animation: none; opacity: 0; }
+
+.wlv-dot {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--success);
+  flex: none;
+}
+
+.wlv-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--success);
+  animation: wlv-pulse 1.8s cubic-bezier(.2, .6, .35, 1) infinite;
+}
+
+@keyframes wlv-pulse {
+  0% { transform: scale(1); opacity: .55; }
+  80%, 100% { transform: scale(2.6); opacity: 0; }
+}
+
+.wlv-count { color: var(--t1); font-weight: 600; }
+.wlv-updated { color: var(--t3); white-space: nowrap; }
+
+/* ---------- states ---------- */
+.wlv-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 56px 20px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sheet);
+  text-align: center;
+}
+
+.wlv-root .wlv-state-title { font-size: 15.5px; font-weight: 600; color: var(--t1); }
+.wlv-root .wlv-state-sub { font-size: 13.5px; color: var(--t2); max-width: 420px; }
+
+.wlv-state--error { border-color: #f1c4be; }
+.wlv-state--error .wlv-state-title { color: var(--danger); }
+
+.wlv-spinner {
+  width: 28px;
+  height: 28px;
+  margin-bottom: 4px;
+  border: 3px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: wlv-spin .7s linear infinite;
+}
+
+@keyframes wlv-spin { to { transform: rotate(360deg); } }
+
+.wlv-root .wlv-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 38px;
+  margin-top: 8px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color .15s ease, transform .1s ease;
+}
+.wlv-root .wlv-btn:hover { background: var(--primary-light); }
+.wlv-root .wlv-btn:active { transform: translateY(1px); }
+
+/* ---------- search ---------- */
+.wlv-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 14px;
+  /* page changes scroll here (the search row, then the list): a little air under the app's toolbar */
+  scroll-margin-top: 12px;
+}
+
+/* "Some participant details are still loading…": beside the box when there is room, else under it */
+.wlv-root .wlv-hint {
+  flex: 1 1 240px;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--t2);
+}
+
+.wlv-search {
+  position: relative;
+  flex: 0 1 440px;
+  min-width: 0;
+}
+
+.wlv-search-icon {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--t3);
+  pointer-events: none;
+}
+
+.wlv-root .wlv-search-input {
+  display: block;
+  width: 100%;
+  height: 42px;
+  padding: 0 44px 0 40px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--t1);
+  font-size: 14px;
+  line-height: normal;
+  box-shadow: 0 1px 2px rgba(26, 37, 53, .04);
+  -webkit-appearance: none;
+  appearance: none;
+  outline: none;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.wlv-root .wlv-search-input::placeholder { color: var(--t3); opacity: 1; }
+.wlv-root .wlv-search-input:hover { border-color: #c9d2de; }
+/* The border and a soft ring are the focus indicator (the root's outline would sit outside the ring). */
+.wlv-root .wlv-search-input:focus,
+.wlv-root .wlv-search-input:focus-visible {
+  outline: none;
+  border-color: var(--primary-light);
+  box-shadow: 0 0 0 3px rgba(42, 90, 142, .16);
+}
+/* The browser's own clear cross: this box has its own button. */
+.wlv-root .wlv-search-input::-webkit-search-cancel-button,
+.wlv-root .wlv-search-input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; }
+
+.wlv-root .wlv-search-clear {
+  position: absolute;
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--t3);
+  cursor: pointer;
+  transition: background-color .15s ease, color .15s ease;
+}
+.wlv-root .wlv-search-clear:hover { background: var(--off-bg); color: var(--t1); }
+.wlv-root .wlv-search-clear:focus-visible { outline-offset: 0; }
+
+/* ---------- the sheet ---------- */
+.wlv-sheet {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sheet);
+  /* A safety net only: the fixed columns fit from the card breakpoint up, so nothing scrolls sideways. */
+  overflow-x: auto;
+}
+
+.wlv-root .wlv-table {
+  width: 100%;
+  margin: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  caption-side: top;
+  /* Fixed columns: one long email must not take the room the challenge names need (auto layout gave it ~400px). */
+  table-layout: fixed;
+  color: var(--t1);
+  font-size: 13.5px;
+}
+
+.wlv-root .wlv-table th {
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--head);
+  color: var(--t3);
+  font: 600 11px/1.3 'DM Sans', sans-serif;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  text-align: left;
+  vertical-align: bottom;
+  overflow-wrap: anywhere;
+}
+
+/* Eight columns (Journey and Customer status after Email, plan "Addition: Journey and Customer status columns").
+   Phone, status and time are sized to their text ("+91 9999900000" 112px, "Discontinued" 83px, "28 Sept 2026,
+   10:45 pm" 148px, all at 13.5px plus the cell padding); name, email and journey take a share; main and sub split
+   what is left. Email gets its own share because it has no spaces (it breaks only before its '@', '.', '_', '+' or
+   '-': emailParts and <wbr>), while the challenge names wrap at their spaces: measured at 1280px, an 18-character local
+   part ("firstname.lastname") stays whole and main / sub still hold "Breakthrough"; the table is shorter overall than
+   with an equal three-way split. */
+.wlv-col--name { width: 15%; }
+.wlv-col--phone { width: 148px; }
+.wlv-col--email { width: 14%; }
+.wlv-col--journey { width: 11%; }
+.wlv-col--status { width: 120px; }
+.wlv-col--when { width: 180px; }
+
+.wlv-root .wlv-cell {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-light);
+  text-align: left;
+  vertical-align: top;
+  line-height: 1.4;
+  /* Only a word too long for its column breaks inside; an email breaks at its '@' and dots first (<wbr>). */
+  overflow-wrap: anywhere;
+}
+
+.wlv-root .wlv-row:last-child .wlv-cell { border-bottom: 0; }
+.wlv-root .wlv-row:hover .wlv-cell { background: var(--hover); }
+
+.wlv-cell--name { font-weight: 600; color: var(--t1); }
+.wlv-root .wlv-cell--phone { color: var(--t2); overflow-wrap: normal; }
+.wlv-cell--email { color: var(--t2); }
+.wlv-cell--sub { color: var(--t2); }
+.wlv-cell--journey, .wlv-cell--status { color: var(--t2); }
+/* A status is one or two short words: wrap at the space only, never inside "Discontinued" (a font a pixel wider than
+   the measured one would otherwise split it in the 1024-1279px column; the cell's right padding takes the overflow). */
+.wlv-root .wlv-cell--status { overflow-wrap: normal; }
+/* "New User" (both cells, a person still on new_user_data): the one value worth spotting down the column */
+.wlv-root .wlv-new { color: var(--primary); font-weight: 600; }
+.wlv-root .wlv-cell--when { color: var(--t1); overflow-wrap: normal; }
+.wlv-nw { white-space: nowrap; }
+.wlv-nil { color: var(--t3); }
+
+/* 1024-1279px: the same table, tighter (the time wraps between date and hour). The page's side padding drops to 20px
+   so that at 1024px email still holds "@example.com", and journey, main and sub "Breakthrough", unbroken. */
+@container wlv (min-width: 1024px) and (max-width: 1279.98px) {
+  .wlv-page { padding-left: 20px; padding-right: 20px; }
+  .wlv-col--name { width: 14%; }
+  .wlv-col--phone { width: 140px; }
+  .wlv-col--email { width: 14.5%; }
+  .wlv-col--journey { width: 11%; }
+  .wlv-col--status { width: 112px; }
+  .wlv-col--when { width: 116px; }
+  .wlv-root .wlv-table th, .wlv-root .wlv-cell { padding-left: 12px; padding-right: 12px; }
+}
+
+/* ---------- pager ---------- */
+.wlv-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  margin-top: 14px;
+  padding: 0 2px;
+}
+
+.wlv-root .wlv-range { font-size: 13px; color: var(--t2); }
+
+.wlv-pg {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.wlv-pg-label {
+  min-width: 92px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t1);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.wlv-root .wlv-pg-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--primary);
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color .15s ease, border-color .15s ease, transform .1s ease;
+}
+.wlv-root .wlv-pg-btn:first-child { padding-left: 8px; }
+.wlv-root .wlv-pg-btn:last-child { padding-right: 8px; }
+.wlv-root .wlv-pg-btn:hover:not(:disabled) { border-color: #c3cfde; background: var(--primary-tint); }
+.wlv-root .wlv-pg-btn:active:not(:disabled) { transform: translateY(1px); }
+.wlv-root .wlv-pg-btn:disabled { color: var(--t3); background: var(--off-bg); border-color: var(--border-light); cursor: default; }
+
+/* placeholder while the person (or the title) is looked up */
+.wlv-skel {
+  display: inline-block;
+  width: 96px;
+  max-width: 100%;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--skel);
+  vertical-align: middle;
+}
+.wlv-skel--name { width: 120px; }
+.wlv-skel--email { width: 150px; }
+.wlv-skel--short { width: 72px; }
+.wlv-skel--title { width: min(320px, 70%); height: 24px; border-radius: 6px; }
+
+/* a completion that arrived while the page is open */
+.wlv-root .wlv-row--fresh .wlv-cell { animation: wlv-fresh 2.4s ease-out both; }
+.wlv-root .wlv-row--fresh .wlv-cell:first-child { box-shadow: inset 3px 0 0 var(--success); }
+
+@keyframes wlv-fresh {
+  0%, 30% { background-color: var(--fresh); }
+  100% { background-color: transparent; }
+}
+
+/* ---------- below 1024px: cards ---------- */
+@container wlv (max-width: 1023.98px) {
+  .wlv-sheet { border: 0; border-radius: 0; background: none; box-shadow: none; overflow: visible; }
+  .wlv-root .wlv-table, .wlv-root .wlv-table tbody { display: block; width: 100%; }
+  .wlv-root .wlv-table thead, .wlv-root .wlv-table colgroup { display: none; }
+
+  .wlv-root .wlv-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+    margin-bottom: 10px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+    box-shadow: var(--shadow-sheet);
+  }
+
+  .wlv-root .wlv-cell {
+    display: grid;
+    /* 116px: the longest label, "Customer status" (110px), stays on one line */
+    grid-template-columns: 116px minmax(0, 1fr);
+    gap: 10px;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    white-space: normal;
+  }
+
+  .wlv-root .wlv-cell::before {
+    content: attr(data-label);
+    color: var(--t3);
+    font: 600 10.5px/1.9 'DM Sans', sans-serif;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+
+  .wlv-root .wlv-cell--name { display: block; font-size: 15px; padding-bottom: 4px; }
+  .wlv-root .wlv-cell--name::before { content: none; }
+
+  .wlv-root .wlv-row:hover .wlv-cell { background: none; }
+  .wlv-root .wlv-row--fresh { animation: wlv-fresh-card 2.4s ease-out both; }
+  .wlv-root .wlv-row--fresh .wlv-cell { animation: none; }
+  .wlv-root .wlv-row--fresh .wlv-cell:first-child { box-shadow: none; }
+  .wlv-root .wlv-row--fresh { border-color: var(--success-line); }
+}
+
+/* 600-1023px: the card's fields in two columns (name across the top) */
+@container wlv (min-width: 600px) and (max-width: 1023.98px) {
+  .wlv-root .wlv-row { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 32px; row-gap: 8px; padding: 14px 18px; }
+  .wlv-root .wlv-cell--name { grid-column: 1 / -1; }
+}
+
+/* below 600px: one column, a tighter page */
+@container wlv (max-width: 599.98px) {
+  .wlv-page { padding: 18px 16px 40px; }
+  .wlv-head { margin-bottom: 14px; padding-bottom: 14px; }
+  .wlv-root .wlv-title { font-size: 22px; }
+  .wlv-meta { gap: 6px 12px; }
+
+  /* search full width, 16px text so a phone does not zoom in on focus, bigger targets */
+  .wlv-search { flex: 1 1 100%; }
+  .wlv-root .wlv-hint { flex-basis: 100%; }
+  .wlv-root .wlv-search-input { height: 44px; font-size: 16px; }
+  .wlv-root .wlv-search-clear { width: 36px; height: 36px; right: 4px; }
+
+  /* pager: the range on top, then the buttons at either end with the page between them */
+  .wlv-pager { flex-direction: column; align-items: stretch; gap: 8px; margin-top: 4px; }
+  .wlv-pg { justify-content: space-between; }
+  .wlv-root .wlv-pg-btn { height: 40px; }
+  .wlv-root .wlv-range { text-align: center; }
+}
+
+@keyframes wlv-fresh-card {
+  0%, 30% { background-color: var(--fresh); }
+  100% { background-color: var(--surface); }
+}
+
+/* Last, so it beats both layouts: no motion, a plain tint for as long as the row is fresh. */
+@media (prefers-reduced-motion: reduce) {
+  .wlv-dot::after, .wlv-spinner { animation: none; }
+  .wlv-root .wlv-pg-btn, .wlv-root .wlv-search-input, .wlv-root .wlv-search-clear { transition: none; }
+  .wlv-root .wlv-pg-btn:active:not(:disabled) { transform: none; }
+  .wlv-root .wlv-row--fresh, .wlv-root .wlv-row--fresh .wlv-cell { animation: none; }
+  .wlv-root .wlv-row--fresh { background-color: var(--fresh); }
+}
