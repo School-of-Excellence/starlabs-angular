@@ -18,6 +18,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { videoAskHlsUrl } from '../shared/videoask-hls-url';
 
 /** Collection a reference can point at -> the tag we show next to the title. */
 const KIND_LABEL = {
@@ -70,6 +71,9 @@ export class ParticipantVideoaskComponent {
 
   displayedColumns: string[] = ['profileid', 'videoaskid', 'event', 'fileurl', 'uploaded', 'addtohighlights', 'tag']
   dataSource = new MatTableDataSource()
+
+  /** Signed-URL migration (M-5): play only the Publitio 480p file, never fileurl. */
+  readonly hlsUrl = videoAskHlsUrl
 
   form: FormGroup
 

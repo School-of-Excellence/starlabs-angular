@@ -10,6 +10,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatCard, MatCardContent, MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatProgressBar } from '@angular/material/progress-bar';
+import { videoAskHlsUrl } from '../../shared/videoask-hls-url';
 
 @Component({
   selector: 'app-big-profile',
@@ -32,6 +33,8 @@ export class BigProfileComponent {
   queueActivitylog:any={};
   videoAsk:any=[];
   selectedVideoIndex: number | null = null;
+  /** Signed-URL migration (M-5): play only the Publitio 480p file, never fileurl. */
+  readonly hlsUrl = videoAskHlsUrl;
   profileid: string ;
   //AHSpace
   ahSpace:any=[];

@@ -138,7 +138,7 @@ export const routes: Routes = [
   {path: 'arena_e_ticket_approve', loadComponent: () => import('./Events/arena-e-ticket-approve/arena-e-ticket-approve.component').then(m => m.ArenaETicketApproveComponent), canActivate: [authGuard]},
   {path: 'qr-scanner', loadComponent: () => import('./Events/qr-scanner/qr-scanner.component').then(m => m.QrScannerComponent), canActivate: [authGuard]},
   {path: 'event_attendance_log', loadComponent: () => import('./Events/event-attendance-log/event-attendance-log.component').then(m => m.EventAttendanceLogComponent), canActivate: [authGuard]},
-  {path: 'videoask-display', loadComponent: () => import('./Events/videoask-display/videoask-display.component').then(m => m.VideoaskDisplayComponent), canActivate:[authGuard]},
+  // {path: 'videoask-display', loadComponent: () => import('./Events/videoask-display/videoask-display.component').then(m => m.VideoaskDisplayComponent), canActivate:[authGuard]},
   {path: 'participantvideoask', loadComponent: () => import('./participant-videoask/participant-videoask.component').then(m => m.ParticipantVideoaskComponent), canActivate:[authGuard]},
   {path: 'overall_event_dashboard', loadComponent: () => import('./Events/live-event-dashboard/live-event-dashboard.component').then(m => m.LiveEventDashboardComponent), canActivate:[authGuard]},
   {path: 'live_event_dashboard', loadComponent: () => import('./Events/live-event-dashboard-v2/live-event-dashboard-v2.component').then(m => m.LiveEventDashboardV2Component), canActivate:[authGuard]},

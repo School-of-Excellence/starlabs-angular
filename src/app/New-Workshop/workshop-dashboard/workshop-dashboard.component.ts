@@ -37,6 +37,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { CommunicationSendersService } from './communication/communication-senders.service';
 import { readNewUserData } from './workshop-dashboard.new-user-data';
+import { videoAskHlsUrl } from '../../shared/videoask-hls-url';
 // Pure rules — extracted 2026-09-10; see workshop-dashboard.engine.ts for what moved and why.
 // The same engine backs workshop-dashboardv2.component.ts: the rules were byte-identical in both.
 import {
@@ -2573,9 +2574,10 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       if (!resultRef) { this.error = 'VideoAsk result not found'; return; }
       const docSnap = await getDoc(resultRef);
       if (!docSnap.exists()) { this.error = 'VideoAsk data not found'; return; }
-      const downloadURL = docSnap.data()['fileurl'];
-      if (!downloadURL) { this.error = 'VideoAsk URL not available'; return; }
-      window.open(downloadURL, '_blank');
+      // Signed-URL migration (M-5): play only the Publitio 480p file, never fileurl.
+      const videoUrl = videoAskHlsUrl(docSnap.data());
+      if (!videoUrl) { this.error = 'VideoAsk video not converted yet'; return; }
+      window.open(videoUrl, '_blank');
     } catch (error) {
       console.error('Error opening VideoAsk:', error);
       this.error = 'Failed to open VideoAsk. Please try again.';
@@ -4025,9 +4027,10 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       if (!resultRef) { alert('VideoAsk result not found for this participant.'); return; }
       const docSnap = await getDoc(resultRef);
       if (!docSnap.exists()) { alert('VideoAsk data not found.'); return; }
-      const downloadURL = (docSnap.data() as any)['fileurl'];
-      if (!downloadURL) { alert('VideoAsk URL not available.'); return; }
-      participant.vaUrl = downloadURL;
+      // Signed-URL migration (M-5): play only the Publitio 480p file, never fileurl.
+      const videoUrl = videoAskHlsUrl(docSnap.data());
+      if (!videoUrl) { alert('VideoAsk video not converted yet.'); return; }
+      participant.vaUrl = videoUrl;
       participant.vaPlaying = true;
     } catch (error) {
       console.error('Error loading VideoAsk video:', error);
