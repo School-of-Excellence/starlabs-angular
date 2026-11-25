@@ -115,6 +115,15 @@
           </td>
         </ng-container>
 
+        <ng-container matColumnDef="edit">
+          <th mat-header-cell *matHeaderCellDef> Edit </th>
+          <td mat-cell *matCellDef="let row">
+            <button data-testid="ava-btn-011" mat-icon-button type="button" (click)="onEdit(row)">
+              <mat-icon>edit</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+
         <ng-container matColumnDef="delete">
           <th mat-header-cell *matHeaderCellDef mat-sort-header> Delete </th>
           <td mat-cell *matCellDef="let row">
@@ -134,4 +143,22 @@
       <mat-paginator [pageSizeOptions]="[5, 10, 25, 100,300]"></mat-paginator>
     </div>
   </div>
+   <!-- edit dialog -->
+  <ng-template #editDialog>
+    <h2 mat-dialog-title>Edit</h2>
+    <mat-dialog-content>
+      <mat-form-field appearance="outline" class="w-100">
+        <mat-label>Title</mat-label>
+        <input data-testid="ava-inp-013" type="text" matInput [(ngModel)]="editForm.title">
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="w-100">
+        <mat-label>Description</mat-label>
+        <textarea data-testid="ava-txt-014" matInput [(ngModel)]="editForm.description" rows="6"></textarea>
+      </mat-form-field>
+    </mat-dialog-content>
+    <mat-dialog-actions align="end">
+      <button data-testid="ava-btn-015" mat-stroked-button type="button" mat-dialog-close>Cancel</button>
+      <button data-testid="ava-btn-016" mat-stroked-button type="button" (click)="onUpdate()">Update</button>
+    </mat-dialog-actions>
+  </ng-template>
 </main>
