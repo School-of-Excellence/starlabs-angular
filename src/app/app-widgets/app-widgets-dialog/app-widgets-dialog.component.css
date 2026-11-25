@@ -1,0 +1,21 @@
+.awd { display: flex; flex-direction: column; gap: 12px; min-width: min(620px, 80vw); }
+.awd-lede { margin: 0; color: rgba(0, 0, 0, .64); font-size: 14px; }
+.awd-add, .awd-edit { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; width: 100%; }
+.awd-app { flex: 0 1 200px; min-width: 150px; }
+.awd-grow { flex: 1 1 200px; min-width: 0; }
+.awd-search { width: 100%; }
+.awd-state { display: flex; gap: 10px; align-items: center; color: rgba(0, 0, 0, .6); margin: 8px 0; }
+.awd-err { color: #b42318; font-size: 13px; margin: 0; }
+.awd-err ul { margin: 4px 0 0; padding-left: 18px; }
+.awd-hint { color: #b42318; font-size: 12px; margin: -4px 0 0; }
+.awd-warn { color: #8a5a00; background: #fff4e0; border-radius: 8px; padding: 6px 10px; font-size: 13px; margin: 0; }
+.awd-list { list-style: none; margin: 0; padding: 0; border: 1px solid rgba(0, 0, 0, .12); border-radius: 10px; }
+.awd-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 8px 8px 14px; }
+.awd-row + .awd-row { border-top: 1px solid rgba(0, 0, 0, .08); }
+.awd-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
+.awd-name { font-weight: 600; overflow-wrap: anywhere; }
+.awd-key { display: block; font-weight: 400; font-size: 12px; color: rgba(0, 0, 0, .55); }
+.awd-used { font-size: 12px; color: rgba(0, 0, 0, .55); white-space: nowrap; margin-left: auto; }
+.awd-used.is-used { color: #0a6fb0; }
+.awd-actions { display: flex; align-items: center; gap: 4px; }
+.awd-full { flex-basis: 100%; }

@@ -78,3 +78,7 @@ CLAUDE.local.md
 
 # Test audio captures (DFN/Krisp A/B recordings — large binaries, regenerated on demand)
 test-audio/
+
+# App live preview: the Breakthroughs app's Home built for web (scripts/sync-app-preview.sh). Built, not tracked.
+/src/apppreview/*
+!/src/apppreview/README.md

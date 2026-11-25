@@ -42,6 +42,9 @@ export interface SegmentBoardStore {
   loadQueueTokens(): Promise<{ profileId: string; queueId: string; stage: string }[]>;
   // approved `event participation request` docs for these events: eventId -> profile ids (confirmed, not yet attended)
   loadConfirmed(eventIds: string[]): Promise<Record<string, string[]>>;
+  isDeveloper?(): boolean;
+  // app widgets for the segment's Home widgets picker (appwidgets, delete != true): {id, widget (app name), displayname}
+  loadAppWidgets?(): Promise<{ id: string; widget: string; displayname: string }[]>;                                  // shows the developer-only "App widgets" button (app Home widgets)
   loadCatalog(): Promise<{ journeys: { id: string; name: string }[]; products: { id: string; name: string }[]; modes?: { id: string; name: string }[];
     events?: { id: string; name: string; date: Date | null }[]; queues?: { id: string; name: string; stages: string[] }[]; countDefaults: { upCount: string[]; cpmCount: string[] } }>;
 }
@@ -332,9 +335,9 @@ function commitOrder(set,ids,updates){
 
 // ---------- history entries ----------
 // the config fields history tracks, in the stored doc's shapes (rule = plain condition list; {any:[…]} kept)
-const HIST_FIELDS=['name','description','status','journeys','groupid','rule','eligibility'];
+const HIST_FIELDS=['name','description','status','journeys','groupid','rule','eligibility','apptheme','tabwidgets.home'];
 function storedFields(x){
-  const out={name:x.name, description:x.description||'', status:x.status||'active', journeys:[...(x.journeys||[])], groupid:x.groupid||null};
+  const out={name:x.name, description:x.description||'', status:x.status||'active', journeys:[...(x.journeys||[])], groupid:x.groupid||null, apptheme:x.apptheme||null, 'tabwidgets.home':[...(x.tabwidgets?.home||[])]};
   if(x.mode==='auto'){ const r=x.rule; out.rule=Array.isArray(r)?r:(r?.all||r||[]); } else out.eligibility=x.eligibility||null;
   return out;
 }
@@ -666,6 +669,7 @@ function renderMain(){
         ${set.type==='master'?`<button class="btn quiet" data-act="history" title="Change history">${IC.history}<span>Change history</span></button>`:''}
         <button class="btn quiet" data-testid="sgb-show-archived" data-act="show-archived" aria-pressed="${S.showArchived}" title="Archived segments">${IC.archive}<span>${S.showArchived?'Back to segments':`Archived (${fmt(ARCHIVED.length)})`}</span></button>
       </div>
+      ${set.type==='master'&&store.isDeveloper?.()?`<button class="btn" data-testid="sgb-app-widgets" data-appwidgets="1" title="The app's Home widgets (developer only)">${IC.grip}<span>App widgets</span></button>`:''}
       ${set.type==='master'?`<button class="btn" data-testid="sgb-import-move" data-act="import-move" ${!edit||S.arranging||!imvTargets().length?'disabled':''} title="${imvTargets().length?'Import a list of participants and move them into a manual segment, after a review':'Create an active manual segment first'}">${IC.upload}<span>Import &amp; move</span></button>`:''}
       <button class="btn ${S.refreshing&&S.refreshing.size>1?'is-busy':''}" data-testid="sgb-refresh-all" data-act="refresh-all" ${!edit||S.arranging||S.refreshing||!set._auto.length?'disabled':''} title="Rebuild every active automated list from its conditions">${IC.refresh}<span>${S.refreshing&&S.refreshing.size>1?'Refreshing…':'Refresh all lists'}</span></button>
       <button class="btn primary" data-testid="sgb-new-seg" data-act="new-seg" ${!edit||S.arranging?'disabled':''}>${IC.plus}<span>New segment</span></button>
@@ -1283,12 +1287,85 @@ function conditionsHtml(set,s,compact){
     ${!compact&&edit?`<button class="btn" data-act="edit-seg" data-seg="${s.id}">Edit segment</button>`:''}
     ${compact?'':`<pre class="dev-note block">${esc(JSON.stringify({journeys:js.ids,rule:s.rule},null,2))}</pre>`}`;
 }
-const H_ACTION={create:'Created',edit:'Edited',archive:'Archived',unarchive:'Unarchived',reorder:'Moved',migrate:'New id',rename:'Renamed',delete:'Deleted','segment-added':'Segment added','segment-removed':'Segment removed','members-added':'Participants added','members-removed':'Participants removed'};
-const H_FIELD={id:'Segment id',groupid:'Group',segments:'Segments',deleted:'Deleted',name:'Name',description:'Description',status:'Status',journeys:'Journey',rule:'Conditions',eligibility:'Eligibility',position:'Board position',sequence:'Sequence',archived:'Archived',members:'Participants'};
+const H_ACTION={create:'Created',edit:'Edited',archive:'Archived',unarchive:'Unarchived',reorder:'Moved',migrate:'New id',rename:'Renamed',delete:'Deleted','segment-added':'Segment added','segment-removed':'Segment removed','members-added':'Participants added','members-removed':'Participants removed',tabwidgets:'App layout'};
+// app Home colour per segment: [stored value, label, swatch]
+const APP_THEMES=[['blue','uP! blue','#0A6FB0'],['magenta','LYL · CPM magenta','#B0127D'],['purple','B!G purple','#6E0399']];
+const themeLabel=v=>(APP_THEMES.find(a=>a[0]===v)||[])[1]||'';
+// app widgets for the Home widgets picker: id -> {widget, displayname}; refreshed each time the segment dialog opens
+let APPW=new Map(), APPW_STATE='none';   // none | loading | ok | error
+const appWName=id=>APPW.get(id)?.displayname||(APPW_STATE==='ok'?'Deleted widget':id);
+function refreshAppWidgets(){
+  if(!store.loadAppWidgets) return;
+  APPW_STATE=APPW.size?'ok':'loading'; renderHomeW();
+  store.loadAppWidgets().then(ws=>{ APPW=new Map(ws.map(w=>[w.id,w])); APPW_STATE='ok'; renderHomeW(); })
+    .catch(()=>{ APPW_STATE='error'; renderHomeW(); });
+}
+let hwSort=null;
+function hwSummary(){ const n=B.home.length; return n?`${n} widget${n===1?'':'s'} selected`:'Choose widgets…'; }
+function hwPickHtml(){   // the multi-select, same look as the journey picker
+  const all=[...APPW.values()].sort((a,b)=>a.displayname.localeCompare(b.displayname));
+  if(APPW_STATE==='loading'&&!all.length) return '<p class="subtle small">Loading app widgets…</p>';
+  if(APPW_STATE==='error') return '<p class="err">Couldn’t load the app widgets.</p>';
+  if(!all.length) return '<p class="subtle small">No app widgets yet. A developer adds them with “App widgets” at the top of the board.</p>';
+  return `<details class="fdrop ms"><summary class="ms-sum ${B.home.length?'has':''}" id="sHwSum" data-testid="sgb-dlg-hw">${esc(hwSummary())}</summary><div class="fpanel">
+      ${all.length>8?'<input type="search" class="ms-q" placeholder="Search widgets" aria-label="Search widgets">':''}
+      <div class="ms-tools"><button type="button" data-hwall="1">Select all</button><button type="button" data-hwall="0">Clear</button><span class="subtle small" id="sHwCount">${B.home.length} of ${all.length}</span></div>
+      <div class="checks">${all.map(w=>`<label data-name="${esc((w.displayname+' '+w.widget).toLowerCase())}"><input type="checkbox" data-testid="sgb-dlg-hw-option" data-hwpick="${esc(w.id)}" ${B.home.includes(w.id)?'checked':''}>${esc(w.displayname)}</label>`).join('')}</div></div></details>`;
+}
+function hwListHtml(){   // the picked widgets in screen order: drag the handle, or the arrows; × takes one off
+  if(!B.home.length) return '<p class="subtle small" style="margin:6px 0 0" data-testid="sgb-dlg-hw-empty">No widgets: people in this segment see “Your Home isn’t set up yet” in the app.</p>';
+  const last=B.home.length-1;
+  return `<p class="subtle small" style="margin:8px 0 0">Order on the app’s Home, top to bottom. Drag ⠿ or use the arrows.</p><ol class="seq-list hw-list" id="hwList" data-testid="sgb-dlg-hw-list">${B.home.map((id,i)=>{ const w=APPW.get(id);
+    return `<li class="seq-item ${w||APPW_STATE!=='ok'?'':'missing'}" data-hwid="${esc(id)}" data-testid="sgb-dlg-hw-row"><span class="seq-n">${i+1}</span><span class="seq-handle" aria-hidden="true" title="Drag">⠿</span><span class="grow">${esc(appWName(id))}</span>
+      <button type="button" class="icon-btn" data-hw="up" data-i="${i}" data-testid="sgb-dlg-hw-up" aria-label="Move up" ${i===0?'disabled':''}>↑</button><button type="button" class="icon-btn" data-hw="down" data-i="${i}" data-testid="sgb-dlg-hw-down" aria-label="Move down" ${i===last?'disabled':''}>↓</button><button type="button" class="icon-btn" data-hw="off" data-i="${i}" data-testid="sgb-dlg-hw-remove" aria-label="Remove">×</button></li>`; }).join('')}</ol>`;
+}
+function homeWHtml(){ return `<div id="sHwPick">${hwPickHtml()}</div><div id="sHwList">${hwListHtml()}</div><div id="sHwPrev">${hwPrevHtml()}</div>`; }
+// live app preview (plan §14): the app's real Home, built for web and served at /apppreview/ on this site, so it
+// shares this sign-in. "Preview as" = a profile from this segment (all participants if the list is empty).
+function hwPrevPeople(){
+  const ids=B.mode==='edit'?[...(LISTS.get(B.id)?.ids||[])]:[];
+  const ppl=(ids.length?ids.map(id=>PI.get(id)).filter(Boolean):P).slice(0,400);
+  return {ppl, fromSegment:!!ids.length};
+}
+function hwPrevSrc(){
+  const names=B.home.map(id=>APPW.get(id)?.widget).filter(Boolean);
+  return `/apppreview/index.html?widgets=${encodeURIComponent(names.join(','))}&theme=${encodeURIComponent(B.apptheme||'blue')}&pid=${encodeURIComponent(B.prevPid||'')}`;
+}
+function hwPrevHtml(){
+  if(!B.prevOn) return `<button type="button" class="btn ghost" data-hwprev="1" data-testid="sgb-dlg-hw-preview">Show app preview</button>`;
+  const {ppl,fromSegment}=hwPrevPeople();
+  if(!B.prevPid&&ppl.length) B.prevPid=ppl[0].pid;
+  return `<div class="hw-prev"><div class="hw-prev-bar"><label class="subtle small" for="sHwPrevPid">Preview as</label>
+      <select id="sHwPrevPid" data-testid="sgb-dlg-hw-preview-as">${ppl.map(x=>`<option value="${esc(x.pid)}" ${x.pid===B.prevPid?'selected':''}>${esc(x.name)}</option>`).join('')}</select>
+      <button type="button" class="btn ghost" data-hwprev="0">Hide</button></div>
+    ${fromSegment?'':'<p class="subtle small" style="margin:4px 0 0">This segment’s list is empty, so any participant can be picked.</p>'}
+    <div class="hw-phone"><iframe id="hwPrevFrame" title="App preview" src="${esc(hwPrevSrc())}" data-testid="sgb-dlg-hw-preview-frame"></iframe></div>
+    <p class="subtle small" style="margin:6px 0 0">The real app Home for this profile, read-only. Unsaved picks show here before you save.</p></div>`;
+}
+let hwPrevTimer=null;
+function hwPrevRefresh(){   // the picks, order or colour changed: reload the frame once things settle
+  const f=$('#hwPrevFrame'); if(!f) return;
+  clearTimeout(hwPrevTimer);
+  hwPrevTimer=setTimeout(()=>{ const src=hwPrevSrc(); if(f.getAttribute('src')!==src) f.setAttribute('src',src); },600);
+}
+function renderHwPrev(){ const box=$('#sHwPrev'); if(box) box.innerHTML=hwPrevHtml(); }
+function renderHwList(){   // list + dropdown summary/count/ticks; the dropdown itself stays open
+  const box=$('#sHwList'); if(!box) return; if(hwSort){hwSort.destroy();hwSort=null;}
+  box.innerHTML=hwListHtml();
+  const sum=$('#sHwSum'); if(sum){ sum.textContent=hwSummary(); sum.classList.toggle('has',!!B.home.length); }
+  const cnt=$('#sHwCount'); if(cnt) cnt.textContent=`${B.home.length} of ${APPW.size}`;
+  $$('#sHwPick input[data-hwpick]').forEach(i=>{ i.checked=B.home.includes(i.dataset.hwpick); });
+  if(sortableOk&&$('#hwList')) hwSort=new Sortable($('#hwList'),{handle:'.seq-handle',animation:150,onEnd:()=>{B.home=$$('#hwList .seq-item').map(li=>li.dataset.hwid);renderHwList();}});
+  hwPrevRefresh();
+}
+function renderHomeW(){ const box=$('#sHomeBox'); if(!box||!$('#segDlg')?.open) return; if(hwSort){hwSort.destroy();hwSort=null;} box.innerHTML=homeWHtml(); renderHwList(); }
+const H_FIELD={id:'Segment id',groupid:'Group',segments:'Segments',deleted:'Deleted',name:'Name',description:'Description',status:'Status',journeys:'Journey',rule:'Conditions',eligibility:'Eligibility',position:'Board position',sequence:'Sequence',archived:'Archived',members:'Participants','tabwidgets.home':'Home widgets',apptheme:'App colour'};
 function hVal(f,v){
   if(v===null||v===undefined||v===''||(Array.isArray(v)&&!v.length)) return '<span class="subtle">—</span>';
   if(f==='rule'||f==='eligibility'){ const r=Array.isArray(v)?{all:v}:v; try{ const ex=expand(r); return `<ul class="h-rules">${(ex.all||ex.any).map(n=>`<li>${esc(describe(n))}</li>`).join('')}</ul>${ex.any?'<span class="subtle small">any of these</span>':''}`; }catch(e){ return `<code>${esc(JSON.stringify(v))}</code>`; } }
   if(f==='journeys') return esc(v.map(id=>VAL.journeyId[id]||id).join(', '));
+  if(f==='tabwidgets.home') return `<ol class="h-rules">${v.map(id=>`<li>${esc(appWName(id))}</li>`).join('')}</ol>`;
+  if(f==='apptheme') return esc(themeLabel(v)||v);
   if(f==='status') return v==='inactive'?'Inactive':'Active';
   if(f==='groupid') return esc(groupName(v)||v);
   if(f==='segments'&&typeof v==='object') return esc([...(v.added||[]).map(id=>'+ '+segName(curSet(),id)),...(v.removed||[]).map(id=>'− '+segName(curSet(),id))].join(', ')||'—');
@@ -1567,10 +1644,11 @@ function openSegDlg(mode,segId){
   const set=curSet();
   if(mode==='edit'){
     const s=set._by.get(segId||S.drawer.id), auto=s.mode==='auto', ex=auto?expand(s.rule):null, comb=ex&&ex.any?'any':'all';
-    B={mode,id:s.id,groupid:liveGroupOf(s)?.id||'',name:s.name,description:s.description||'',scope:jScope([...(s.journeys||[])]),type:s.mode,comb,rows:auto?toRows(ex[comb]):[],sequence:s.sequence,status:s.status||'active',eligibility:s.eligibility||null};}
-  else B={mode:'create',newId:store.newSegmentId(),groupid:'',name:'',description:'',scope:{type:'journey',ids:[]},type:'auto',status:'active',comb:'all',rows:[],eligibility:null,
+    B={mode,id:s.id,groupid:liveGroupOf(s)?.id||'',name:s.name,description:s.description||'',scope:jScope([...(s.journeys||[])]),type:s.mode,comb,rows:auto?toRows(ex[comb]):[],sequence:s.sequence,status:s.status||'active',eligibility:s.eligibility||null,apptheme:APP_THEMES.some(a=>a[0]===s.apptheme)?s.apptheme:'',home:[...(s.tabwidgets?.home||[])].map(String),prevOn:false,prevPid:''};}
+  else B={mode:'create',newId:store.newSegmentId(),groupid:'',name:'',description:'',scope:{type:'journey',ids:[]},type:'auto',status:'active',comb:'all',rows:[],eligibility:null,apptheme:'',home:[],prevOn:false,prevPid:'',
     order:[...seqSegs(set).map(x=>x.id),NEW_ID]};   // where the new segment is checked; it starts last
   renderSegDlg(); $('#segDlg').showModal();
+  refreshAppWidgets();
 }
 function rowHtml(r,i){
   const f=FIELD[r.field], used=new Set(B.rows.map(x=>x.field));
@@ -1627,6 +1705,10 @@ function renderSegDlg(){
     h.push(`<label class="f">How participants get in</label><div class="radio-cards"><label><input type="radio" data-testid="sgb-dlg-type-auto" name="sType" value="auto" ${B.type==='auto'?'checked':''}> <b>Automated</b><span>Rules place people here and keep it up to date.</span></label><label><input type="radio" data-testid="sgb-dlg-type-manual" name="sType" value="manual" ${B.type==='manual'?'checked':''}> <b>Manual</b><span>People are placed here by hand and stay until moved.</span></label></div><p class="subtle small">You can’t change this after the segment is created.</p>`);
   h.push(`<label class="f">Status</label><div class="seg-toggle" role="radiogroup" aria-label="Status">${[['active','Active'],['inactive','Inactive']].map(([v,l])=>`<label><input type="radio" ${v==='active'?'data-testid="sgb-dlg-status-active"':'data-testid="sgb-dlg-status-inactive"'} name="sStatus" value="${v}" ${B.status===v?'checked':''}>${l}</label>`).join('')}</div>
     <p class="subtle small" id="sStatusHint" style="margin:6px 0 0">${statusHint()}</p>`);
+  // the Breakthroughs app Home colour for this segment (operator, 2026-11-11: required, set here in the segment config)
+  h.push(`<label class="f">App colour <span class="req">required</span></label><div class="theme-pick" role="radiogroup" aria-label="App colour">${APP_THEMES.map(([v,l,c])=>`<label><input type="radio" data-testid="sgb-dlg-theme-${v}" name="sTheme" value="${v}" ${B.apptheme===v?'checked':''}><span class="theme-dot" style="background:${c}" aria-hidden="true"></span>${l}</label>`).join('')}</div>
+    <p class="subtle small" style="margin:6px 0 0">The app’s Home uses this colour for everyone in this segment.</p>`);
+  h.push(`<label class="f">Home widgets <span class="opt">top to bottom</span></label><div id="sHomeBox">${homeWHtml()}</div>`);
   h.push(`<label class="f">Journey</label>
     <div id="sScopeBox">${scopeHtml()}</div>`);
   if(B.type==='auto'){
@@ -1695,6 +1777,8 @@ function buildDoc(){   // the Firestore document this dialog saves
   if(desc) doc.description=desc;
   if(B.groupid) doc.groupid=B.groupid;
   doc.mode=B.type; doc.status=B.status;
+  doc.apptheme=B.apptheme;
+  doc.tabwidgets={home:[...B.home]};   // merged on save: only tabwidgets.home is replaced
   doc.journeys=[...B.scope.ids];
   // rule is stored as a plain list of conditions, all of which must be true (no "all" wrapper);
   // only an older ANY rule (the Do Not Use segments) keeps its { any: [...] } form
@@ -1765,6 +1849,7 @@ async function saveSeg(){
   if(B.type==='auto'){const v=validRule(); if(v!==true) return err(v);}
   const name=B.name.trim();
   if(name.length<3) return err('Give the segment a name of at least 3 characters.');
+  if(!APP_THEMES.some(a=>a[0]===B.apptheme)) return err('Pick the app colour for this segment.');
   if(set.segments.some(x=>x.id!==(B.mode==='edit'?B.id:null)&&x.name.toLowerCase()===name.toLowerCase())) return err('This set already has a segment with that name.');
   const doc=buildDoc(), isNew=B.mode!=='edit';
   let changes=[], plan={updates:[],history:[]}, newOrder=null;
@@ -1774,6 +1859,8 @@ async function saveSeg(){
     if(name!==s.name) changes.push(`renamed from “${s.name}” to “${name}”`);
     const was=jScope(s.journeys); if(scopeKey(was)!==scopeKey(B.scope)) changes.push(`journey changed: ${scopeText(was)} → ${scopeText(B.scope)}`);
     const desc=B.description.trim(); if(desc!==(s.description||'')) changes.push(desc?'description updated':'description removed');
+    if(JSON.stringify((s.tabwidgets?.home||[]).map(String))!==JSON.stringify(B.home)) changes.push(`Home widgets: ${B.home.length} widget${B.home.length===1?'':'s'}`);
+    if((s.apptheme||'')!==B.apptheme) changes.push(`app colour: ${themeLabel(s.apptheme)||'none'} → ${themeLabel(B.apptheme)}`);
     if((liveGroupOf(s)?.id||'')!==(B.groupid||'')) changes.push(`group: ${groupName(liveGroupOf(s)?.id)||'none'} → ${groupName(B.groupid)||'none'}`);
     if(B.type==='auto'){const before=describeRule(s.rule), after=describeRule(buildRule()); if(before!==after) changes.push(`conditions changed: ${before} → ${after}`);}
     if(!changes.length){$('#segDlg').close(); toast('No changes to save.'); return;}
@@ -2169,6 +2256,19 @@ listen(root,'click',e=>{
       if(ja){const on=ja.dataset.jall==='1', picked=new Set(B.scope.ids);
         $$('#segDlg input[data-jg]').filter(i=>!i.closest('label').hidden).forEach(i=>{i.checked=on; on?picked.add(i.dataset.jg):picked.delete(i.dataset.jg);});
         B.scope.ids=SCOPE[B.scope.type].opts().map(o=>o[0]).filter(v=>picked.has(v)); syncJourney(); return;}
+      const hw=t.closest('[data-hw]');
+      if(hw){const act=hw.dataset.hw, i=+(hw.dataset.i??-1);
+        if(act==='off') B.home.splice(i,1);
+        else if((act==='up'&&i>0)||(act==='down'&&i<B.home.length-1)){const j=act==='up'?i-1:i+1; [B.home[i],B.home[j]]=[B.home[j],B.home[i]];}
+        renderHwList(); if(act==='up'||act==='down') $(`#hwList [data-hw="${act}"][data-i="${act==='up'?i-1:i+1}"]`)?.focus();
+        return;}
+      const hwp=t.closest('[data-hwprev]');
+      if(hwp){B.prevOn=hwp.dataset.hwprev==='1'; renderHwPrev(); return;}
+      const hwa=t.closest('[data-hwall]');
+      if(hwa){const on=hwa.dataset.hwall==='1';
+        $$('#sHwPick input[data-hwpick]').filter(i=>!i.closest('label').hidden).forEach(i=>{const id=i.dataset.hwpick, k=B.home.indexOf(id);
+          if(on&&k<0) B.home.push(id); if(!on&&k>=0) B.home.splice(k,1);});
+        renderHwList(); return;}
       const b=t.closest('[data-b]'), ms=t.closest('[data-msall]');
       if(ms){
         const row=ms.closest('.cond'), r=B.rows[+row.dataset.i], panel=ms.closest('.fpanel');
@@ -2321,6 +2421,9 @@ listen(root,'change',e=>{
   if(t.closest('#segDlg')){
     if(t.name==='sType'){B.type=t.value;renderSegDlg();return;}
     if(t.name==='sStatus'){B.status=t.value;$('#sStatusHint').textContent=statusHint();return;}
+    if(t.name==='sTheme'){B.apptheme=t.value;$('#sErr').textContent='';hwPrevRefresh();return;}
+    if(t.id==='sHwPrevPid'){B.prevPid=t.value;hwPrevRefresh();return;}
+    if(t.dataset.hwpick){const id=t.dataset.hwpick, k=B.home.indexOf(id); if(t.checked&&k<0) B.home.push(id); if(!t.checked&&k>=0) B.home.splice(k,1); renderHwList(); return;}
     if(t.id==='sComb'){B.comb=t.value;updatePreview();return;}
     if(t.dataset.jg){const js=new Set(B.scope.ids);t.checked?js.add(t.dataset.jg):js.delete(t.dataset.jg);
       B.scope.ids=SCOPE[B.scope.type].opts().map(o=>o[0]).filter(v=>js.has(v));syncJourney();return;}

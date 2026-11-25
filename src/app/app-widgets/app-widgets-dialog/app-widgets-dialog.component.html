@@ -1,0 +1,76 @@
+<h2 mat-dialog-title data-testid="awd-title">App widgets</h2>
+<mat-dialog-content class="awd">
+  <p class="awd-lede">Every widget the app can show. The <b>app name</b> is the one-word key the app looks for; the <b>display name</b> is what you see here and in Home layouts. Renaming an app name hides that widget in the app until the app knows the new name.</p>
+
+  <form class="awd-add" (ngSubmit)="add()">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="awd-app">
+      <mat-label>App name</mat-label>
+      <input matInput name="newApp" [(ngModel)]="newApp" data-testid="awd-inp-001" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="60" placeholder="upcomingevents">
+    </mat-form-field>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="awd-grow">
+      <mat-label>Display name</mat-label>
+      <input matInput name="newDisplay" [(ngModel)]="newDisplay" data-testid="awd-inp-003" autocomplete="off" maxlength="120" placeholder="Upcoming events">
+    </mat-form-field>
+    <button mat-flat-button color="primary" type="submit" data-testid="awd-btn-add" [disabled]="adding || !newApp.trim() || !newDisplay.trim() || !!appHint(newApp)">
+      {{ adding ? 'Adding…' : 'Add widget' }}
+    </button>
+  </form>
+  <p class="awd-hint" *ngIf="appHint(newApp) as h" data-testid="awd-app-hint">{{ h }}</p>
+  <p class="awd-err" *ngIf="addError" role="alert" data-testid="awd-add-error">{{ addError }}</p>
+
+  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="awd-search" *ngIf="rows.length > 6">
+    <mat-label>Search</mat-label>
+    <input matInput [(ngModel)]="search" data-testid="awd-inp-002" autocomplete="off">
+  </mat-form-field>
+
+  <div class="awd-state" *ngIf="loading && !loadError"><mat-spinner diameter="28"></mat-spinner><span>Loading widgets…</span></div>
+  <p class="awd-err" *ngIf="loadError" role="alert" data-testid="awd-load-error">{{ loadError }}</p>
+  <p class="awd-state" *ngIf="!loading && !loadError && !rows.length" data-testid="awd-empty">No widgets yet. Add the first one above.</p>
+
+  <ul class="awd-list" *ngIf="!loading && rows.length" data-testid="awd-list">
+    <li *ngFor="let r of shown; trackBy: trackId" class="awd-row" [attr.data-testid]="'awd-row-' + r.id">
+      <ng-container *ngIf="editId !== r.id; else editing">
+        <div class="awd-main">
+          <span class="awd-name">{{ r.displayname }}<code class="awd-key">{{ r.widget }}</code></span>
+          <span class="awd-used" [class.is-used]="r.usedBy.length" [matTooltip]="usedNames(r)">
+            {{ r.usedBy.length ? ('Used by ' + r.usedBy.length + ' segment' + (r.usedBy.length === 1 ? '' : 's')) : 'Not used' }}
+          </span>
+        </div>
+        <div class="awd-actions">
+          <button mat-icon-button type="button" data-testid="awd-btn-rename" [disabled]="rowBusy === r.id" matTooltip="Rename" (click)="startRename(r)" aria-label="Rename">
+            <mat-icon>edit</mat-icon>
+          </button>
+          <button mat-icon-button type="button" data-testid="awd-btn-delete" [disabled]="rowBusy === r.id" matTooltip="Delete" (click)="remove(r)" aria-label="Delete">
+            <mat-icon>delete_outline</mat-icon>
+          </button>
+        </div>
+      </ng-container>
+      <ng-template #editing>
+        <div class="awd-edit">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="awd-app">
+            <mat-label>App name</mat-label>
+            <input matInput [(ngModel)]="editApp" data-testid="awd-inp-rename-app" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="60" (keydown.escape)="cancelRename()">
+          </mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="awd-grow">
+            <mat-label>Display name</mat-label>
+            <input matInput [(ngModel)]="editDisplay" data-testid="awd-inp-rename-display" autocomplete="off" maxlength="120" (keydown.enter)="saveRename(r)" (keydown.escape)="cancelRename()">
+          </mat-form-field>
+          <button mat-button type="button" data-testid="awd-btn-rename-cancel" (click)="cancelRename()">Cancel</button>
+          <button mat-flat-button color="primary" type="button" data-testid="awd-btn-rename-save"
+            [disabled]="rowBusy === r.id || !editDisplay.trim() || !!appHint(editApp) || !editApp.trim()" (click)="saveRename(r)">Save</button>
+        </div>
+        <p class="awd-hint awd-full" *ngIf="appHint(editApp) as h">{{ h }}</p>
+        <p class="awd-warn awd-full" *ngIf="editApp.trim() !== r.widget && r.usedBy.length" data-testid="awd-rename-warn">
+          {{ r.usedBy.length }} segment{{ r.usedBy.length === 1 ? ' uses' : 's use' }} this widget. The app shows it there only once it knows the new app name.
+        </p>
+      </ng-template>
+      <div class="awd-err awd-full" *ngIf="rowError?.id === r.id" role="alert" data-testid="awd-row-error">
+        {{ rowError?.text }}
+        <ul *ngIf="rowError?.segments?.length"><li *ngFor="let s of rowError?.segments">{{ s.name }}</li></ul>
+      </div>
+    </li>
+  </ul>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button mat-dialog-close data-testid="awd-btn-close">Close</button>
+</mat-dialog-actions>

@@ -27,6 +27,11 @@
               "src/manifest.json",
               "src/coi-serviceworker.js",
               {
+                "glob": "**/*",
+                "input": "src/apppreview",
+                "output": "apppreview"
+              },
+              {
                 "glob": "apple-app-site-association",
                 "input": "src/.well-known",
                 "output": "/.well-known"

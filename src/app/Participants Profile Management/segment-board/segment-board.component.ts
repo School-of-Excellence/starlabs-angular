@@ -14,6 +14,8 @@ import { WatiInputComponent } from '../participants-analytics/wati-input/wati-in
 import { MapRecommendedplaylistToparticipantComponentComponent } from '../participants-analytics/map-recommendedplaylist-toparticipant.component/map-recommendedplaylist-toparticipant.component.component';
 import { GroupHistoryEntry, HistoryEntry, MigrationResult, MigrationRow, OrderUpdate, SegmentBoardStore, SegmentGroup, mountSegmentBoard } from './segment-board.engine';
 import { toParticipant } from './segment-board.facts';
+import { AppWidgetsDialogComponent } from '../../app-widgets/app-widgets-dialog/app-widgets-dialog.component';
+import { AppWidgetsService } from '../../app-widgets/app-widgets.service';
 
 // Same drag-and-drop library and version the standalone prototype uses (Arrange + sequence list).
 const SORTABLE_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js';
@@ -50,6 +52,7 @@ export class SegmentBoardComponent implements AfterViewInit, OnDestroy {
   private storage = inject(Storage);
   private http = inject(HttpClient);
   private authguard = inject(AuthguardService);
+  private appWidgets = inject(AppWidgetsService);
   /** profileid -> the full `participant metadata` doc, as the B!G Cohorts dialogs expect (mapParticipantMetaData there). */
   private meta = new Map<string, any>();
   private unmount: (() => void) | null = null;
@@ -62,10 +65,29 @@ export class SegmentBoardComponent implements AfterViewInit, OnDestroy {
     await this.loadSortable();
     if (this.destroyed) return;
     this.unmount = mountSegmentBoard(this.root.nativeElement, this.store);
+    this.root.nativeElement.addEventListener('click', this.onAppWidgetsClick);
+  }
+
+  /**
+   * The header's "App widgets" button (data-appwidgets, rendered by the engine, developer only) opens the app
+   * widget list dialog. Which widgets a segment shows, their order and its app colour are part of the segment's
+   * own New / Edit form (operator, 2026-11-11).
+   */
+  private onAppWidgetsClick = (e: Event) => {
+    const el = e.target as HTMLElement | null;
+    if (el?.closest?.('[data-appwidgets]') && this.isDeveloper()) {
+      this.dialog.open(AppWidgetsDialogComponent, { width: '640px', maxWidth: '95vw', autoFocus: false });
+    }
+  };
+
+  private isDeveloper(): boolean {
+    return !!(this.authguard.loggedinRoles as Record<string, unknown>)?.['developer'];
   }
 
   /** Reads and writes segmentboardconfig for the board. */
   private store: SegmentBoardStore = {
+    isDeveloper: () => this.isDeveloper(),
+    loadAppWidgets: () => this.appWidgets.listWidgets(),
     load: async () => {
       const snap = await getDocs(collection(this.firestore, CONFIG_COLLECTION));
       return snap.docs.map(d => ({ ...d.data(), id: d.id }));
@@ -75,6 +97,7 @@ export class SegmentBoardComponent implements AfterViewInit, OnDestroy {
       const batch = writeBatch(this.firestore);
       const data: Record<string, unknown> = { ...segment };
       delete data['createdAt']; delete data['createdBy']; delete data['updatedAt']; delete data['updatedBy']; delete data['_stored'];
+      // `apptheme` and `tabwidgets` ({home: [...]}) are part of the segment form; merge replaces only tabwidgets.home
       if (isNew) {
         batch.set(doc(this.firestore, CONFIG_COLLECTION, segment.id), { ...data, createdAt: serverTimestamp(), createdBy: pid });
       } else {
@@ -569,6 +592,7 @@ export class SegmentBoardComponent implements AfterViewInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.destroyed = true;
+    this.root?.nativeElement.removeEventListener('click', this.onAppWidgetsClick);
     this.unmount?.();
   }
 

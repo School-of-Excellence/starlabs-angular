@@ -174,6 +174,7 @@
 .sb-root .seg-toggle{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
 .sb-root .seg-toggle label{position:relative;display:flex;align-items:center;padding:7px 16px;cursor:pointer;font-weight:500}
 .sb-root .seg-toggle label+label{border-left:1px solid var(--border)}
+.sb-root .theme-dot{width:12px;height:12px;border-radius:50%;margin-right:8px;flex:none}
 .sb-root .seg-toggle input{position:absolute;opacity:0;pointer-events:none}
 .sb-root .seg-toggle label:has(input:checked){background:var(--primary-soft);color:var(--primary)}
 .sb-root .seg-toggle label:has(input:focus-visible){outline:2px solid var(--focus);outline-offset:-2px}
@@ -906,3 +907,16 @@
 @media (max-width:700px){.sb-root .imv-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .sb-root .imv-up{display:flex;align-items:flex-end;justify-content:space-between;gap:8px}
 .sb-root .imv-up .btn{margin-bottom:4px}
+/* segment form · app colour (wrapping pills) and Home widgets (multi-select + ordered list, reuses .fdrop.ms and .seq-list) */
+.sb-root .theme-pick{display:flex;flex-wrap:wrap;gap:8px}
+.sb-root .theme-pick label{position:relative;display:inline-flex;align-items:center;padding:7px 14px;border:1px solid var(--border);border-radius:999px;cursor:pointer;font-weight:500}
+.sb-root .theme-pick input{position:absolute;opacity:0;pointer-events:none}
+.sb-root .theme-pick label:has(input:checked){border-color:var(--primary);background:var(--primary-soft);color:var(--primary)}
+.sb-root .theme-pick label:has(input:focus-visible){outline:2px solid var(--focus);outline-offset:2px}
+.sb-root .hw-list .seq-item{gap:8px}
+.sb-root .hw-list .seq-item.missing .grow{color:#b42318;font-style:italic}
+.sb-root .hw-prev{margin-top:10px}
+.sb-root .hw-prev-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sb-root .hw-prev-bar select{flex:1;min-width:0}
+.sb-root .hw-phone{margin:8px auto 0;width:300px;max-width:100%;height:600px;border-radius:36px;border:10px solid #10161C;box-shadow:0 0 0 1px #3B444C,0 24px 48px -24px rgba(15,34,54,.45);overflow:hidden;background:#F3F7FA}
+.sb-root .hw-phone iframe{width:100%;height:100%;border:0;display:block}

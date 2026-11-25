@@ -2535,7 +2535,7 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
       segmentid: this.editingRow.selectedSegment,
       stagename: this.editingStageName,
       slottype: 'queue',
-      title: this.editingDateEntry.title,
+      title: this.editingDateEntry.title?.trim() || null, // empty → none, so the app shows the date and time
       description: this.editingDateEntry.description,
       startdate: Timestamp.fromDate(startDateTime),
       enddate: Timestamp.fromDate(endDateTime),
@@ -2676,7 +2676,7 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
         segmentid: row.selectedSegment,
         stagename: stageName,
         slottype: 'queue',
-        title: this.editingDateEntry.title,
+        title: this.editingDateEntry.title?.trim() || null,
         description: this.editingDateEntry.description,
         startdate: Timestamp.fromDate(startDateTime),
         enddate: Timestamp.fromDate(endDateTime),
@@ -2695,7 +2695,7 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
         dateEntry: {
           docid: newDocRef.id,
           slottype: 'queue',
-          title: this.editingDateEntry.title,
+          title: this.editingDateEntry.title?.trim() || null,
           description: this.editingDateEntry.description,
           startdate: new Date(this.editingDateEntry.startdate),
           enddate: new Date(this.editingDateEntry.enddate),
