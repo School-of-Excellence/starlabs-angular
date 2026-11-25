@@ -21,19 +21,16 @@
       <mat-icon class="edit-event-icon">edit</mat-icon>
       Edit event
     </button>
-    <!-- <button data-testid="pf-journey-card-toggle" type="button"
-        class="jtoggle"
-        *ngIf="segmentList.approved.length > 0"
-        [class.on]="showJourneyCard"
-        [attr.aria-pressed]="showJourneyCard"
-        [attr.aria-label]="showJourneyCard ? 'Hide approved by journey' : 'Show approved by journey'"
-        [matTooltip]="showJourneyCard ? 'Hide approved by journey' : 'Show approved by journey'"
-        matTooltipPosition="left"
-        matTooltipClass="sx-tip"
-        (click)="toggleJourneyCard()">
-      <mat-icon class="jtoggle-icon">{{ showJourneyCard ? 'close' : 'timeline' }}</mat-icon>
-      <span class="jtoggle-badge" *ngIf="!showJourneyCard">{{ segmentList.approved.length | number }}</span>
-    </button> -->
+    <button type="button"
+        class="ins-btn"
+        [class.on]="sidePanelView"
+        [attr.aria-expanded]="sidePanelView"
+        aria-haspopup="dialog"
+        aria-label="Open event insights"
+        title="Event insights"
+        (click)="toggleSidePanel()">
+      <mat-icon class="ins-btn-icon">tune</mat-icon>
+    </button>
   </div>
 
   <!-- ============ Load states ============ -->
@@ -1206,3 +1203,68 @@
     </div>
   </div>
 </ng-template>
+
+
+<!-- ===== Event insights side panel ===== -->
+<div class="ins-scrim" [class.on]="sidePanelView" (click)="sidePanelView = false"></div>
+
+<aside class="ins-panel" [class.on]="sidePanelView" role="dialog" aria-modal="true" aria-labelledby="insTitle" *ngIf="sidePanelView && sidePanelData">
+
+  <div class="ins-head">
+    <div class="ins-head-txt">
+      <b id="insTitle" class="ins-title">Event insights</b>
+      <small class="ins-sub">{{ arena?.title }}</small>
+    </div>
+    <button type="button" class="ins-close" aria-label="Close panel" (click)="toggleSidePanel()">×</button>
+  </div>
+
+  <div class="ins-body">
+
+    <!-- ===== CARD: Sales conversions (placeholder values) ===== -->
+    <section class="ins-card">
+      <input type="checkbox" class="ins-toggle" id="ins-card-1" checked>
+
+      <label class="ins-card-h" for="ins-card-1">
+        <span class="ins-bar" style="background:#1f5bd8"></span>
+        <span class="ins-card-txt">
+          <b class="ins-card-title">Sales conversions</b>
+          <small class="ins-card-sub">{{getConvertedSales}} of {{getPotentialSalesConvertion}} potential</small>
+        </span>
+        <span class="ins-rate">{{getConvertionRate(getConvertedSales , getPotentialSalesConvertion)}} %</span>                    
+        <mat-icon class="ins-arrow">expand_more</mat-icon>
+      </label>
+
+      <div class="ins-card-body">
+        <div>
+          <div class="ins-list">
+
+            <div class="ins-met">
+              <!-- <span class="ins-num" style="color:#e07a1f" (click)="toggleSelectedCtaType('addon')">{{sidePanelData?.['salesconversion']?.['addon']?.['converted']}}</span>        -->
+              <button type="button" class="ins-num" style="color:#e07a1f" (click)="toggleSelectedCtaType('addon')">{{ sidePanelData?.['salesconversion']?.['addon']?.['converted'] }}</button>
+              <span class="ins-lbl">Addon</span>
+              <span class="ins-pct">{{getConvertionRate(sidePanelData['salesconversion']?.['addon']?.['converted'] , sidePanelData['salesconversion']?.['addon']?.['total'])}}%</span>                           
+              <span class="ins-track"><i style="background:#e07a1f" [style.width]="`${getConvertionRate(sidePanelData['salesconversion']?.['addon']?.['converted'] , sidePanelData['salesconversion']?.['addon']?.['total'])}%`"></i></span>
+            </div>
+
+            <div class="ins-met">
+              <button type="button" class="ins-num" style="color:#1f5bd8" (click)="toggleSelectedCtaType('upgrade')">{{sidePanelData?.['salesconversion']?.['upgrade']?.['converted']}}</button>       
+              <span class="ins-lbl">Upgrade</span>
+              <span class="ins-pct">{{getConvertionRate(sidePanelData['salesconversion']?.['upgrade']?.['converted'] , sidePanelData['salesconversion']?.['upgrade']?.['total'])}}%</span>                           
+              <span class="ins-track"><i style="background:#1f5bd8" [style.width]="`${getConvertionRate(sidePanelData['salesconversion']?.['upgrade']?.['converted'] , sidePanelData['salesconversion']?.['upgrade']?.['total'])}%`"></i></span>
+            </div>
+
+            <div class="ins-met">
+              <button type="button"  class="ins-num" style="color:#7a4fc2" (click)="toggleSelectedCtaType('continuity')">{{sidePanelData?.['salesconversion']?.['continuity']?.['converted']}}</button>       
+              <span class="ins-lbl">Continuity</span>
+              <span class="ins-pct">{{getConvertionRate(sidePanelData['salesconversion']?.['continuity']?.['converted'] , sidePanelData['salesconversion']?.['continuity']?.['total'])}}%</span>                         
+              <span class="ins-track"><i style="background:#7a4fc2" [style.width]="`${getConvertionRate(sidePanelData['salesconversion']?.['continuity']?.['converted'] , sidePanelData['salesconversion']?.['continuity']?.['total'])}%`"></i></span>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </section>
+    <!-- ===== END CARD ===== -->
+
+  </div>
+</aside>

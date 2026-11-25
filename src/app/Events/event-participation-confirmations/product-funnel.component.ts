@@ -166,7 +166,7 @@ interface FilterChip {
   key?: string;
   label: string;
   value: string;
-  type: 'column' | 'search';
+  type: 'column' | 'search' | 'salescon';
 }
 
 interface ColumnConfig {
@@ -768,6 +768,22 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       visible: () => false,
       showFilter: true,
     },
+    ctatype : {
+      label: 'Cta Type',
+      type: 'enum',
+      defaultHtml: '—',
+      defaultColumn: false,
+      visible: () => true,
+      showFilter: true,
+    },
+    reqstatus : {
+      label: 'Request Status',
+      type: 'enum',
+      defaultHtml: '—',
+      defaultColumn: false,
+      visible: () => true,
+      showFilter: true,
+    }
   };
 
   // ================================== State =========================
@@ -936,6 +952,11 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
   participantProduct$ = new Subject<any>();
 
   showJourneyCard = false; 
+
+  sidePanelView = false;
+  sidePanelData = null;
+
+  selectedCtaType : 'addon' | 'upgrade' | 'continuity' | 'all' = 'all';
 
   // ================================== Constructor & Lifecycle =========================
 
@@ -2095,6 +2116,19 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
     return this.statusKey(metadata?.customerstatus) === this.customerFilter;
   }
 
+  private ctaFilter(pid : string) : boolean{
+    if (this.selectedCtaType === 'all') return true;
+    const req = this.getRecentRequestData(this.participantRequestMap[pid] ?? []);
+    if (req) {
+      const ctaType = req['ctatype'] ?? null;
+      const status = req['status'] ?? null;
+      if (ctaType === this.selectedCtaType && !['requested' , 'revoked'].includes(status)) {
+        return true
+      }
+    }
+    return false
+  }
+
   // function to check sales filter
   private salesType(pid): boolean {
     if (!this.isSalesSelected) return true;
@@ -2145,7 +2179,7 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
 
   get segmentRows() {
     return this.segmentMembers()
-      .filter((pid) => this.frMatches(pid) && this.customerMatches(pid) && this.salesType(pid) && this.ticketCategory(pid) && this.filterByCheckList(pid) && this.filterRows(pid))
+      .filter((pid) => this.frMatches(pid) && this.customerMatches(pid) && this.salesType(pid) && this.ticketCategory(pid) && this.filterByCheckList(pid) && this.filterRows(pid) && this.ctaFilter(pid))
       .sort((a, b) => this.sortRow(a, b));
   }
 
@@ -2155,7 +2189,7 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
   }
 
   get isFiltered(): boolean {
-    return this.financeFilter !== 'all' || this.customerFilter !== 'all' || this.journeyFilter !== 'all' || this.frFilter !== 'all' || this.searchText.trim().length > 0 || Object.keys(this.filterMap).length > 0;
+    return this.financeFilter !== 'all' || this.customerFilter !== 'all' || this.journeyFilter !== 'all' || this.frFilter !== 'all' || this.searchText.trim().length > 0 || Object.keys(this.filterMap).length > 0 || this.selectedCtaType !== 'all';
   }
 
   // function to handle page change
@@ -3706,6 +3740,10 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       value = Object.keys(meta['customersupport'] ?? {}).length;
     } else if (config.checklist) {
       value = this.isClear(this.checkListMap[column], pid, eventParticipationDoc?.['checklist'] ?? []) ? 'clear' : 'not clear';
+    } else if (column === 'ctatype') {
+      value = eventParticipationDoc['ctatype'] ?? null;
+    } else if (column === 'reqstatus') {
+      value = eventParticipationDoc['status'] ?? null;
     } else if (column === 'status') {
       if (this.segment === 'eligible') {
         return 'ready to approve';
@@ -4051,6 +4089,14 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       });
     }
 
+    if (this.selectedCtaType !== 'all') {
+      chips.push({
+        label: 'Sales Convertion',
+        value: this.selectedCtaType,
+        type: 'salescon',
+      });
+    }
+
     for (const [column, conditions] of Object.entries(this.filterMap)) {
       chips.push({
         key: column,
@@ -4069,6 +4115,8 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
       this.searchText = '';
     } else if (chip.type === 'column') {
       delete this.filterMap[chip.key];
+    } else if (chip.type == 'salescon') {
+      this.selectedCtaType = 'all';
     }
     this.pageIndex = 0;
   }
@@ -4370,7 +4418,7 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
 
   // function to get attribute options for checklist ( with search )
   getOptionsForChecklist(search: string) {
-    const skip = ['participantmode', 'emi status', 'email', 'phonenumber', 'paymentplan'];
+    const skip = ['participantmode', 'emi status', 'email', 'phonenumber', 'paymentplan' , 'segment' , 'ctatype'];
     const trimedSearch = search?.trim().toLocaleLowerCase();
     const columns = [];
     for (const [key, config] of Object.entries(this.columnRegistry)) {
@@ -4759,6 +4807,80 @@ export class ProductFunnelComponent implements OnInit, OnDestroy {
         // this.fetchSubEvent();
         this.router.navigateByUrl('/event-participation-confirmation')
       });
+  }
+
+  // ================== side panel ========================
+  toggleSidePanel() {
+    if (!this.sidePanelView) {
+      const sidePanelData = {};
+      sidePanelData['salesconversion'] = this.salesConvertionData();
+      this.sidePanelView = !this.sidePanelView;
+      this.sidePanelData = sidePanelData;
+    } else {
+      this.sidePanelData = null;
+      this.sidePanelView = false;
+    }
+  }
+  
+  trackByInsight = (_: number, card: any) => card.title;
+
+  salesConvertionData(){
+    const requestMap = Object.values(this.participantRequestMap).flat();
+    const ctaTypeOptions = {
+      addon : { total : 0 , converted : 0},
+      upgrade : { total : 0 , converted : 0},
+      continuity : { total : 0 , converted : 0}
+    }
+
+    for (const request of requestMap) {
+      const ctatype = request['ctatype'] ?? null;
+      const status = request['status'] ?? null;
+      if (ctatype && ctaTypeOptions[ctatype] && status) {
+        ctaTypeOptions[ctatype].total++
+        if (!['requested' , 'revoked'].includes(status)) {
+          ctaTypeOptions[ctatype].converted++
+        }
+      }
+    }
+
+    console.log(ctaTypeOptions)
+    return ctaTypeOptions
+  }
+
+  get getPotentialSalesConvertion() : number{
+    if (this.sidePanelData?.['salesconversion']) {
+      return Object.values(this.sidePanelData['salesconversion'])?.reduce((total , current)=>{
+        return current['total'] + total
+      } , 0) as number
+    }
+    return 0
+  }
+
+  get getConvertedSales() : number {
+    if (this.sidePanelData?.['salesconversion']) {
+      return Object.values(this.sidePanelData['salesconversion'])?.reduce((total , current)=>{
+        return current['converted'] + total
+      } , 0) as number
+    }
+    return 0
+  }
+
+  getConvertionRate(a : number , b : number){
+    if (a < b) {
+      return ((a / b) * 100).toFixed(1);
+    }
+    return 0;
+  }
+
+  toggleSelectedCtaType(cta : 'addon' | 'upgrade' | 'continuity'){
+    if (this.selectedCtaType === cta) {
+      this.selectedCtaType = 'all';
+    } else {
+      this.selectedCtaType = cta
+    }
+    this.segment = 'overallRequested';
+    this.defaultSelection();
+    this.toggleSidePanel();
   }
 
   // ================================== UI Helpers =========================

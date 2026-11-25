@@ -61,7 +61,7 @@
 
 
 /* ---------- sub-event cards ---------- */
-.fcard-wrap { display: flex; align-items: stretch; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+.fcard-wrap { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
 .fcard { min-width: 170px; padding: 10px 14px; background: #fff; border: 1px solid #eceef2; border-radius: 12px; cursor: pointer; transition: border-color .12s, box-shadow .12s; }
 .fcard:hover { border-color: #cfdcf7; box-shadow: 0 2px 8px rgba(31, 91, 216, .08); }
 .fcard.active { border-color: #1f5bd8; box-shadow: inset 0 0 0 1px #1f5bd8; }
@@ -813,4 +813,88 @@
   color: red;
   border: 1px solid red;
   background-color: white;
+}
+
+/* =========================================================================
+   Event insights (tune button + side panel)
+   ========================================================================= */
+
+/* ---------- tune button (after Edit event) ---------- */
+.ins-btn { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; margin: 0; padding: 0; border: 1px solid transparent; border-radius: 8px; background: none; color: #1d2330; cursor: pointer; transition: background .15s, color .15s, border-color .15s; }
+.ins-btn:hover { background: #eaf1ff; color: #1f5bd8; }
+.ins-btn.on { background: #eaf1ff; border-color: #cfdcf7; color: #1f5bd8; }
+.ins-btn:focus-visible { outline: 2px solid #1f5bd8; outline-offset: 2px; }
+.ins-btn-icon { width: 22px; height: 22px; font-size: 22px; line-height: 22px; }
+
+/* ---------- backdrop ---------- */
+.ins-scrim { position: fixed; inset: 0; z-index: 50; background: rgba(20, 28, 45, .45); opacity: 0; visibility: hidden; transition: opacity .2s, visibility .2s;}
+.ins-scrim.on { opacity: 1; visibility: visible; }
+
+/* ---------- panel ---------- */
+.ins-panel { position: fixed; top: 0; right: 0; bottom: 0; z-index: 60; display: flex; flex-direction: column; width: min(400px, 100vw); background: #f4f5f7; box-shadow: -12px 0 40px rgba(20, 30, 50, .18); transform: translateX(100%); visibility: hidden; transition: transform .25s ease, visibility .25s; font: 14px/1.4 Inter, system-ui, sans-serif; color: #1d2330; padding-top: 60px; }
+.ins-panel.on { transform: none; visibility: visible; }
+
+/* header */
+.ins-head { display: flex; align-items: flex-start; gap: 10px; padding: 18px 18px 12px; border-bottom: 1px solid #eceef2; background: #fff; }
+.ins-head-txt { flex: 1; min-width: 0; }
+.ins-title { display: block; font-size: 16px; font-weight: 600; }
+.ins-sub { color: #8a90a0; }
+.ins-close { padding: 2px 6px; border: 0; border-radius: 6px; background: none; color: #8a90a0; font-size: 22px; line-height: 1; cursor: pointer; }
+.ins-close:hover { background: #f6f8fb; color: #1d2330; }
+
+/* scrolling body */
+.ins-body { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 14px 16px 24px; overflow: auto; }
+
+/* ---------- expandable card ---------- */
+.ins-card { position: relative; border-radius: 14px; background: #fff; box-shadow: 0 1px 2px rgba(20, 30, 50, .04); overflow: hidden; }
+
+/* hidden checkbox that stores open / closed */
+.ins-toggle { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+/* card header (a <label> that toggles the checkbox) */
+.ins-card-h { display: flex; align-items: center; gap: 10px; width: 100%; margin: 0; padding: 14px 16px; color: inherit; text-align: left; cursor: pointer; }
+.ins-toggle:focus-visible + .ins-card-h { outline: 2px solid #1f5bd8; outline-offset: -2px; }
+.ins-bar { flex: none; width: 4px; height: 30px; border-radius: 2px; }
+.ins-card-txt { flex: 1; min-width: 0; }
+.ins-card-title { display: block; font-size: 15px; font-weight: 600; }
+.ins-card-sub { font-size: 12px; color: #8a90a0; }
+.ins-rate { font-size: 22px; font-weight: 600; }
+.ins-arrow { flex: none; color: #8a90a0; transition: transform .2s; }
+
+/* expand / collapse (animates the height) */
+.ins-card-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .22s ease; }
+.ins-card-body > div { overflow: hidden; }
+.ins-list { padding: 2px 16px 14px; border-top: 1px solid #eceef2; }
+
+/* open state */
+.ins-toggle:checked + .ins-card-h .ins-arrow { transform: rotate(180deg); }
+.ins-toggle:checked ~ .ins-card-body { grid-template-rows: 1fr; }
+
+/* ---------- metric rows: number on the left ---------- */
+.ins-met { display: grid; grid-template-columns: 52px 1fr auto; align-items: center; gap: 6px 12px; padding: 10px 0; }
+.ins-met + .ins-met { border-top: 1px dashed #eceef2; }
+.ins-num {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;          /* buttons don't inherit the font by default */
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1;
+  text-align: left;       /* a button centres its text by default */
+  cursor: pointer;
+}
+.ins-num:hover { text-decoration: underline; text-underline-offset: 3px; }
+.ins-num:focus-visible { outline: 2px solid #1f5bd8; outline-offset: 2px; border-radius: 4px; }
+.ins-lbl { font-size: 13px; }
+.ins-pct { font-size: 12px; font-weight: 600; color: #8a90a0; }
+.ins-track { grid-column: 2 / 4; height: 4px; border-radius: 2px; background: #eceef2; overflow: hidden; }
+.ins-track i { display: block; max-width: 100%; height: 100%; border-radius: 2px; }
+
+/* ---------- reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .ins-panel, .ins-scrim, .ins-card-body, .ins-arrow { transition: none; }
 }
