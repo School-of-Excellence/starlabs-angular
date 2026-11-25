@@ -120,15 +120,17 @@ export const EVPREP_LIVE_FROM = new Date('2026-10-01T00:00:00+05:30');
 export const ACTIVE_STATUSES = ['initiated', 'ongoing'];
 const STAGE_ACCENTS = ['#2563EB', '#7C3AED', '#D97706', '#0891B2', '#DB2777', '#65A30D'];
 
-export interface EvPrepVariation { variationid: string; variationname: string; stages: string[]; }
-export interface PrepUpdate { currentstage: string; completedstages: string[]; status: 'initiated' | 'ongoing' | 'completed'; }
+export interface EvPrepVariation { variationid: string; variationname: string; stages: string[]; stagetypes?: string[]; }
+export interface PrepUpdate { currentstage: string; completedstages: { stagename: string; stagetype: string; referenceid?: string; reference?: any }[]; status: 'initiated' | 'ongoing' | 'completed'; }
 
 /** Variation doc -> ordered stage names. Accepts `stage` or `stages`, as an array or a map (journey-pipeline rule). */
 export function normaliseVariation(id: string, v: any): EvPrepVariation {
   const raw = v?.stage ?? v?.stages ?? [];
   const list: any[] = Array.isArray(raw) ? raw : Object.values(raw || {});
-  const stages = list.map(s => (typeof s === 'string' ? s : s?.stagename)).filter((s: any) => typeof s === 'string' && s.trim() !== '');
-  return { variationid: v?.variationid || id, variationname: v?.variationname || v?.variationid || id, stages };
+  const named = list.filter(s => typeof s === 'string' ? s.trim() !== '' : typeof s?.stagename === 'string' && s.stagename.trim() !== '');
+  const stages = named.map(s => (typeof s === 'string' ? s : s.stagename));
+  const stagetypes = named.map(s => s?.stagetype || '');
+  return { variationid: v?.variationid || id, variationname: v?.variationname || v?.variationid || id, stages, stagetypes };
 }
 
 /** Column key for a stage name. Prefixed so it can never collide with the fixed first/last columns. */
@@ -192,14 +194,20 @@ export function isRemovedSale(s: any): boolean {
 
 /** Fields for a prep moved to column `toKey`, or a reason it cannot move there. Moves follow the card's own variation:
  *  a stage column sets that stage (completedstages = the stages before it), Ready for SE completes the prep. */
-export function planPrepMove(variation: EvPrepVariation | undefined, toKey: string): { update?: PrepUpdate; block?: string } {
+export function planPrepMove(variation: EvPrepVariation | undefined, toKey: string, existing?: any[]): { update?: PrepUpdate; block?: string } {
   if (!variation || variation.stages.length === 0) return { block: 'This participant\'s variation has no stages.' };
   const s = variation.stages;
+  const completed = (count: number) => s.slice(0, count).map((name, n) => {
+    const done: any = { stagename: name, stagetype: variation.stagetypes?.[n] || '' };
+    const old = (existing || []).find(c => c?.stagename === name);
+    if (old?.referenceid) { done.referenceid = old.referenceid; done.reference = old.reference; }
+    return done;
+  });
   if (toKey === LIVE_START) return { block: 'A started preparation cannot go back to Yet to start.' };
-  if (toKey === LIVE_DONE) return { update: { currentstage: s[s.length - 1], completedstages: [...s], status: 'completed' } };
+  if (toKey === LIVE_DONE) return { update: { currentstage: s[s.length - 1], completedstages: completed(s.length), status: 'completed' } };
   const i = s.findIndex(n => stageKey(n) === toKey);
   if (i < 0) return { block: `${variation.variationname} has no such stage.` };
-  return { update: { currentstage: s[i], completedstages: s.slice(0, i), status: i === 0 ? 'initiated' : 'ongoing' } };
+  return { update: { currentstage: s[i], completedstages: completed(i), status: i === 0 ? 'initiated' : 'ongoing' } };
 }
 
 /** Next / back column for a prep, along its own variation (null at the ends; back never returns to Yet to start). */

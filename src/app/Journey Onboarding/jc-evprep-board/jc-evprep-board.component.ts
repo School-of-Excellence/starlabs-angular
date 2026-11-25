@@ -310,7 +310,7 @@ export class JcEvprepBoardComponent implements OnInit, OnDestroy {
       if (p.start) {
         await this.startPrep(p.card, this.moveVariationId, text, by, now);
       } else {
-        const plan = planPrepMove(this.variation(p.card.prep?.variationid), p.to.key);
+        const plan = planPrepMove(this.variation(p.card.prep?.variationid), p.to.key, p.card.prep?.completedstages);
         if (plan.block || !plan.update) { this.moveError = plan.block || 'This move is not allowed.'; return; }
         await this.writeMove(p.card, plan.update, p.from.label, p.to.label, text, by, now);
       }

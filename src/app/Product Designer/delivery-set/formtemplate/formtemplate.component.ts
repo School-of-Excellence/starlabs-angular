@@ -80,6 +80,7 @@ export class FormtemplateComponent {
   @Input() participantformtemplateid:any
   @Input() inlineFormId: string = null;
   @Input() inlineQueueId: string = null;
+  @Input() inlineEpId: string = null;
   // clientform:any
   submittedClientForm
   showcontent : boolean = false
@@ -152,6 +153,7 @@ export class FormtemplateComponent {
   cohortsref: any;
   marathonref: any;
   participantAssignmentId: any;
+  epId: string = null;
   connectivityState: ConnectivityState = 'online';
   private connectivitySub: Subscription | null = null;
   private localDraft = inject(LocalDraftService);
@@ -189,7 +191,7 @@ export class FormtemplateComponent {
     } else {
       console.log('Not a B!G Activity');
     }
-    
+
     this.deliveryForm = this.fb.group({})
     this.draftDocid = doc(collection(this.firestoreForms,"temporary_forms")).id;
   }
@@ -205,6 +207,7 @@ export class FormtemplateComponent {
 
   async ngOnInit() {
     this.queueId = this.inlineQueueId ?? this.route.snapshot.queryParams['queueid'] ?? null;
+    this.epId = this.inlineEpId ?? this.route.snapshot.queryParams['epid'] ?? null;
     if(this.participantAssignmentId){
       getDoc(doc(this.firestoreDefault, 'big participants assignments', this.participantAssignmentId)).then(res => {
         this.currentstatus = res.data()['status'];
@@ -707,6 +710,8 @@ export class FormtemplateComponent {
         this.submittedClientForm['queuetokenref'] = this.participantQueueToken ? doc(this.firestoreForms, 'queue_token', this.participantQueueToken.docid) : null;
         this.submittedClientForm['stagename'] = this.participantQueueToken?.['currentstage'] ?? null;
         nextstage = await this.getNextStage();
+      } else if (this.epId) {
+        this.submittedClientForm['epid'] = this.epId;
       }
 
       // Set submission metadata
@@ -737,7 +742,7 @@ export class FormtemplateComponent {
       loadingRef.close();
       if (this.atcTargetId) {
         this.closeAtcFormTab();
-      } else if (this.queueId) {
+      } else if (this.queueId || this.epId) {
         this.submittedFormName = this.submittedClientForm['formname'];
         this.submissionComplete = true;
         if (this.isInline) {
@@ -855,6 +860,9 @@ export class FormtemplateComponent {
     console.log("submitformdata", this.submittedClientForm['docid']);
     const formDocRef = doc(this.firestoreForms, 'formsByClient', this.submittedClientForm['docid']);
     await setDoc(formDocRef, this.submittedClientForm);
+    if (this.epId && !this.queueId && !this.participantAssignmentId) {
+      await this.moveEvolutionPrep(this.submittedClientForm['docid'], this.submittedClientForm['formid']);
+    }
 
     // const activityref = doc(this.firestoreDefault, 'bigformassignment', this.submittedClientForm['docid']);
     const activityref = doc(this.firestoreDefault, 'formsByClient', this.submittedClientForm['docid']);
@@ -892,6 +900,40 @@ export class FormtemplateComponent {
       // Update queue token for queue submissions
       await this.updateQueueToken(nextstage);
     }
+  }
+
+  private async moveEvolutionPrep(submissionId: string, formid: string) {
+    const epRef = doc(this.firestoreDefault, 'evolution prep', this.epId);
+    const ep = (await getDoc(epRef)).data();
+    if (!ep) return;
+
+    const variation = (await getDoc(doc(this.firestoreDefault, 'evolution prep variation', ep['variationid']))).data();
+    const stages = variation?.['stages'] || [];
+
+    await runTransaction(this.firestoreDefault, async tx => {
+      const current = (await tx.get(epRef)).data();
+      const i = stages.findIndex(s => s.stagename === current['currentstage']);
+      const stage = stages[i];
+      const running = current['status'] === 'initiated' || current['status'] === 'ongoing';
+      const isForm = stage?.stagetype === 'form' || stage?.stagetype === 'AEL';
+      if (!running || !isForm || stage.reference?.id !== formid) return;
+
+      const completedstages = (current['completedstages'] || []).map(c => typeof c === 'string' ? { stagename: c, stagetype: '' } : c).filter(c => c.stagename !== stage.stagename);
+      completedstages.push({
+        stagename: stage.stagename,
+        stagetype: stage.stagetype,
+        referenceid: submissionId,
+        reference: doc(this.firestoreDefault, 'formsByClient', submissionId),
+      });
+
+      const next = stages[i + 1];
+      tx.update(epRef, {
+        completedstages,
+        currentstage: next ? next.stagename : stage.stagename,
+        status: next ? 'ongoing' : 'completed',
+        stagesince: serverTimestamp(),
+      });
+    });
   }
 
   private async updateQueueToken(nextstage: string) {
@@ -1057,7 +1099,7 @@ export class FormtemplateComponent {
       // never gains a `delete` field.
       const draftPayload = { ...this.submittedClientForm, atcid: this.atcid ?? null, delete: false };
 
-      //  save locally first 
+      //  save locally first
       this.localDraft.save(this.draftDocid, draftPayload, {
         formId:    this.submittedClientForm['formid'],
         profileId: this.profileid,
@@ -1139,7 +1181,7 @@ async getFormsOption() {
         .sort((a, b) => {
           const tA = a['date']?.toDate?.()?.getTime() ?? 0;
           const tB = b['date']?.toDate?.()?.getTime() ?? 0;
-          return tB - tA; 
+          return tB - tA;
         });
       drafts.push(...firestoreDrafts);
     }
@@ -1149,9 +1191,9 @@ async getFormsOption() {
     // before the field existed), so the scoping is applied to the result. `!atcid` catches missing AND null.
     const scoped = this.atcid ? drafts : drafts.filter(d => !d['atcid']);
 
-    if (scoped.length === 0) return; 
+    if (scoped.length === 0) return;
 
-    //  Deduplicate by docid 
+    //  Deduplicate by docid
     const seen = new Set<string>();
     this.allDrafts = scoped.filter(d => {
       if (seen.has(d['docid'])) return false;

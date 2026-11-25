@@ -1,0 +1,45 @@
+<div class="epp" data-testid="epp-root">
+  <h1>Evolution preparation</h1>
+  <p *ngIf="variationName" class="epp-variation" data-testid="epp-variation">{{ variationName }}</p>
+
+  <div *ngIf="loading" class="epp-msg" data-testid="epp-loading">Loading your preparation…</div>
+  <div *ngIf="!loading && error" class="epp-msg epp-error" data-testid="epp-error">{{ error }}</div>
+  <div *ngIf="!loading && !error && !prep" class="epp-msg" data-testid="epp-empty">
+    Your evolution preparation has not started yet. Your coach will start it after your onboarding.
+  </div>
+
+  <ng-container *ngIf="prep">
+    <ol class="epp-timeline" data-testid="epp-timeline">
+      <li *ngFor="let s of stages" class="epp-stage" [attr.data-state]="stateOf(s)" data-testid="epp-stage">
+        <span class="epp-dot"><mat-icon *ngIf="stateOf(s) === 'done'">check</mat-icon></span>
+        <span class="epp-stage-name" data-testid="epp-stage-name">{{ s.stagename }}</span>
+        <span *ngIf="stateOf(s) === 'current'" class="epp-stage-label">In progress</span>
+      </li>
+    </ol>
+
+    <section *ngIf="prep.status === 'completed'" class="epp-panel epp-complete" data-testid="epp-complete">
+      <mat-icon>celebration</mat-icon>
+      <h2>All stages complete</h2>
+      <p>You are ready for your Scope Enhancement.</p>
+    </section>
+
+    <section *ngIf="currentStage" class="epp-panel" data-testid="epp-current">
+      <h2 data-testid="epp-current-name">{{ currentStage.stagename }}</h2>
+
+      <ng-container *ngIf="formId; else coachStep">
+        <ng-container *ngIf="!showForm; else formOpen">
+          <p>Please fill in this form to move on to the next stage.</p>
+          <button type="button" class="epp-btn" data-testid="epp-open-form" (click)="showForm = true">Fill form</button>
+        </ng-container>
+        <ng-template #formOpen>
+          <app-formtemplate data-testid="epp-form" [isInline]="true" [inlineFormId]="formId" [inlineEpId]="prep.docid"
+            (formSubmitted)="showForm = false" (backClicked)="showForm = false"></app-formtemplate>
+        </ng-template>
+      </ng-container>
+
+      <ng-template #coachStep>
+        <p data-testid="epp-other">Your coach will guide you through this step.</p>
+      </ng-template>
+    </section>
+  </ng-container>
+</div>

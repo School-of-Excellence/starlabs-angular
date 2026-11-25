@@ -41,6 +41,8 @@ export const routes: Routes = [
   // {path: 'userprofile_old/:id', loadComponent: () => import('./Participants Profile Management/userprofile_old/userprofile_old.component').then(m => m.UserprofileComponent), canActivate: [authGuard]},
   {path: 'eiflixtelemetry', loadComponent: () => import('./eiflix-telemetry/eiflix-telemetry.component').then(m => m.EiflixTelemetryComponent), canActivate:[authGuard]},
   {path: 'evolutionprep-variation', loadComponent: () => import('./evolutionprep-variation/evolutionprep-variation.component').then(m => m.EvolutionPrepVariationComponent)},
+  {path: 'evolution-prep-pipeline', loadComponent: () => import('../app/evolution-prep-forms/evolution-prep-forms.component').then(m => m.EvolutionPrepPipelineComponent) },
+  {path: 'journey-pipeline', loadComponent: () => import('../app/journey-pipeline/journey-pipeline.component').then(m => m.JourneyPipelineComponent)},
   {
     path: 'content-upload-v2',
     loadComponent: () =>
