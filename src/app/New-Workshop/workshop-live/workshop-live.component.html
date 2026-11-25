@@ -1,0 +1,165 @@
+<!-- Workshop Live (2026-11-19): one row per completed sub challenge, newest first. Hooks: wlive- only.
+     Search (name, phone or email) and 20 rows a page, in the browser (plan: "Addition: pagination and search").
+     Journey and Customer status after Email ("New User" in both for a still-new user; plan: "Addition: Journey and
+     Customer status columns"). -->
+<div class="wlv-root">
+  <div class="wlv-page">
+    <header class="wlv-head">
+      <div class="wlv-head-text">
+        <p class="wlv-eyebrow">Live completions</p>
+        <h1 class="wlv-title" data-testid="wlive-title" [attr.aria-busy]="titlePending || null">
+          <span *ngIf="titlePending; else titleText" class="wlv-skel wlv-skel--title" aria-hidden="true"></span>
+          <ng-template #titleText>{{ title }}</ng-template>
+        </h1>
+      </div>
+      <div class="wlv-meta" *ngIf="state === 'ready' || state === 'empty'">
+        <span class="wlv-live" [class.wlv-live--off]="connection !== 'live'" data-testid="wlive-live" aria-live="polite"><span class="wlv-dot" aria-hidden="true"></span>{{ connection === 'live' ? 'Live' : (connection === 'offline' ? 'Reconnecting…' : 'Connecting…') }}</span>
+        <span class="wlv-count" data-testid="wlive-count">{{ countLabel }}</span>
+        <span class="wlv-updated" data-testid="wlive-updated">{{ updatedLabel }}</span>
+      </div>
+    </header>
+
+    <div *ngIf="state === 'loading'" class="wlv-state" data-testid="wlive-loading" role="status">
+      <span class="wlv-spinner" aria-hidden="true"></span>
+      <p class="wlv-state-title">Loading the live list…</p>
+    </div>
+
+    <div *ngIf="state === 'error'" class="wlv-state wlv-state--error" data-testid="wlive-error" role="alert">
+      <p class="wlv-state-title">Couldn't load the live list</p>
+      <p class="wlv-state-sub">{{ errorKind === 'missing'
+        ? 'No workshop matches this link. If it was only just created, try again in a moment.'
+        : 'Check your connection, then try again.' }}</p>
+      <button type="button" class="wlv-btn" data-testid="wlive-retry" (click)="retry()">Retry</button>
+    </div>
+
+    <div *ngIf="state === 'empty'" class="wlv-state" data-testid="wlive-empty">
+      <p class="wlv-state-title">No completed steps yet</p>
+      <p class="wlv-state-sub">Each step a participant completes shows up here as it happens.</p>
+    </div>
+
+    <ng-container *ngIf="state === 'ready'">
+      <div class="wlv-tools" role="search" #tools>
+        <div class="wlv-search">
+          <label class="wlv-sr" for="wlv-search-box">Search by name, phone or email</label>
+          <svg class="wlv-search-icon" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" focusable="false">
+            <circle cx="8.5" cy="8.5" r="5.75" fill="none" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M13 13l4.25 4.25" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+          <input #searchBox id="wlv-search-box" class="wlv-search-input" type="search" data-testid="wlive-search"
+            placeholder="Search by name, phone or email" autocomplete="off" autocapitalize="off" spellcheck="false"
+            enterkeyhint="search" [value]="searchText" (input)="onSearchInput(searchBox.value)"
+            (keydown.escape)="onSearchEscape($event)">
+          <button *ngIf="searchText" type="button" class="wlv-search-clear" data-testid="wlive-search-clear"
+            aria-label="Clear search" (click)="clearSearch()">
+            <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false">
+              <path d="M5.5 5.5l9 9M14.5 5.5l-9 9" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+        <!-- While a search is on and some people are still being looked up, the list can still grow. -->
+        <p *ngIf="searchWaiting && matchTotal > 0" class="wlv-hint">Some participant details are still loading, so more matches may appear.</p>
+      </div>
+      <!-- Read out after the user's own search or page change only (empty without either). -->
+      <p class="wlv-sr" role="status">{{ statusText }}</p>
+
+      <!-- Nothing matches: final only once every person is loaded (a person still loading matches nothing yet). -->
+      <div *ngIf="matchTotal === 0" class="wlv-state" data-testid="wlive-no-match" [attr.aria-busy]="searchWaiting || null">
+        <ng-container *ngIf="searchWaiting; else noMatchFinal">
+          <span class="wlv-spinner" aria-hidden="true"></span>
+          <p class="wlv-state-title">Still loading participant details…</p>
+          <p class="wlv-state-sub">Matching completions show here as soon as their details arrive.</p>
+        </ng-container>
+        <ng-template #noMatchFinal>
+          <p class="wlv-state-title">No completions match your search</p>
+          <p class="wlv-state-sub">Try part of a name, a phone number or an email address.</p>
+        </ng-template>
+        <button type="button" class="wlv-btn" data-testid="wlive-no-match-clear" (click)="clearSearch()">Clear search</button>
+      </div>
+
+      <!-- Explicit roles: below 1024px the rows become cards (display: grid), which drops the implicit table roles. -->
+      <div *ngIf="matchTotal > 0" class="wlv-sheet" #listTop>
+        <table class="wlv-table" role="table">
+          <caption class="wlv-sr">Completed steps, newest first</caption>
+          <colgroup>
+            <col class="wlv-col--name">
+            <col class="wlv-col--phone">
+            <col class="wlv-col--email">
+            <col class="wlv-col--journey">
+            <col class="wlv-col--status">
+            <col class="wlv-col--main">
+            <col class="wlv-col--sub">
+            <col class="wlv-col--when">
+          </colgroup>
+          <thead role="rowgroup">
+            <tr role="row">
+              <th scope="col" role="columnheader">Name</th>
+              <th scope="col" role="columnheader">Phone</th>
+              <th scope="col" role="columnheader">Email</th>
+              <th scope="col" role="columnheader">Journey</th>
+              <th scope="col" role="columnheader">Customer status</th>
+              <th scope="col" role="columnheader">Main challenge</th>
+              <th scope="col" role="columnheader">Sub challenge</th>
+              <th scope="col" role="columnheader">Completed</th>
+            </tr>
+          </thead>
+          <tbody role="rowgroup">
+            <tr *ngFor="let r of pageRows; trackBy: trackRow" class="wlv-row" role="row" data-testid="wlive-row"
+              [class.wlv-row--fresh]="fresh.has(r.key)" [attr.data-key]="r.key">
+              <td class="wlv-cell wlv-cell--name" role="cell" data-label="Name" data-testid="wlive-name" [attr.aria-busy]="r.personPending || null">
+                <span *ngIf="r.personPending; else nameText" class="wlv-skel wlv-skel--name" aria-hidden="true"></span>
+                <ng-template #nameText>{{ r.name }}</ng-template>
+              </td>
+              <td class="wlv-cell wlv-cell--phone" role="cell" data-label="Phone" data-testid="wlive-phone" [attr.aria-busy]="r.personPending || null">
+                <span *ngIf="r.personPending; else phoneText" class="wlv-skel" aria-hidden="true"></span>
+                <ng-template #phoneText>{{ r.phone }}</ng-template>
+              </td>
+              <td class="wlv-cell wlv-cell--email" role="cell" data-label="Email" data-testid="wlive-email" [attr.aria-busy]="r.personPending || null">
+                <span *ngIf="r.personPending; else emailText" class="wlv-skel wlv-skel--email" aria-hidden="true"></span>
+                <!-- one element (a grid item in the card layout); <wbr> lets a narrow column break before the '@' -->
+                <ng-template #emailText><span class="wlv-val"><ng-container *ngFor="let part of r.emailParts; let i = index"><wbr *ngIf="i">{{ part }}</ng-container></span></ng-template>
+              </td>
+              <!-- "New User" in both for a still-new user; the person's journey (by name) and status otherwise; "—" without one -->
+              <td class="wlv-cell wlv-cell--journey" role="cell" data-label="Journey" data-testid="wlive-journey" [attr.aria-busy]="r.journeyPending || null">
+                <span *ngIf="r.journeyPending; else journeyText" class="wlv-skel wlv-skel--short" aria-hidden="true"></span>
+                <ng-template #journeyText><span class="wlv-val" [class.wlv-new]="r.newUser">{{ r.journey }}</span></ng-template>
+              </td>
+              <td class="wlv-cell wlv-cell--status" role="cell" data-label="Customer status" data-testid="wlive-status" [attr.aria-busy]="r.statusPending || null">
+                <span *ngIf="r.statusPending; else customerStatusText" class="wlv-skel wlv-skel--short" aria-hidden="true"></span>
+                <ng-template #customerStatusText><span class="wlv-val" [class.wlv-new]="r.newUser">{{ r.status }}</span></ng-template>
+              </td>
+              <td class="wlv-cell wlv-cell--main" role="cell" data-label="Main challenge" data-testid="wlive-main">{{ r.mainName || '—' }}</td>
+              <td class="wlv-cell wlv-cell--sub" role="cell" data-label="Sub challenge" data-testid="wlive-sub">{{ r.subName || '—' }}</td>
+              <td class="wlv-cell wlv-cell--when" role="cell" data-label="Completed" data-testid="wlive-completed-at">
+                <!-- date and time each stay whole; a narrow column wraps between them -->
+                <time *ngIf="r.completedIso; else noDate" [attr.datetime]="r.completedIso"><span class="wlv-nw">{{ r.completedDay }},</span>&ngsp;<span class="wlv-nw">{{ r.completedTime }}</span></time>
+                <ng-template #noDate><span class="wlv-nil">{{ r.completedText }}</span></ng-template>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Only with more than one page. Range and page count are of the searched rows; the header count is of all. -->
+      <nav *ngIf="pageCount > 1" class="wlv-pager" data-testid="wlive-pager" aria-label="Pages">
+        <p class="wlv-range" data-testid="wlive-range">{{ rangeText }}</p>
+        <div class="wlv-pg">
+          <button #prevBtn type="button" class="wlv-pg-btn" data-testid="wlive-prev" [disabled]="page <= 1"
+            (click)="goToPage(page - 1, 'prev')">
+            <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false">
+              <path d="M12 4.5L6.5 10l5.5 5.5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>Previous</span>
+          </button>
+          <span class="wlv-pg-label" data-testid="wlive-page">{{ pageText }}</span>
+          <button #nextBtn type="button" class="wlv-pg-btn" data-testid="wlive-next" [disabled]="page >= pageCount"
+            (click)="goToPage(page + 1, 'next')">
+            <span>Next</span>
+            <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false">
+              <path d="M8 4.5l5.5 5.5L8 15.5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+      </nav>
+    </ng-container>
+  </div>
+</div>

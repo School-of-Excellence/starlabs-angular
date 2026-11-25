@@ -1,0 +1,212 @@
+<!-- Sale Achieved — full-screen dialog (plan: specs/plans/2026-11-23-sale-achieved-dialog.md). Hook prefix: wsad-.
+     Shows the buyers the dashboard's card already loaded (no read here); the source is live, so a dialog opened
+     while the lookup runs shows the loading state, then the list — split into New Sales, Funnel Sales and Upgrades.
+     The section hooks repeat inside the three sections (literal, from one template). A buyer with a new_user_data doc
+     (moved to existing or not) gets the "EiFlix New User" chip after the name (wsad-eiflix-new). Every purchase is
+     listed in the row's Products cell — no expand / collapse — and the filters row narrows by product, buyer type,
+     amount and repeat buyers (operator 2026-11-23). -->
+<div class="wsad" data-testid="wsad-dialog">
+  <header class="wsad-head">
+    <div class="wsad-head-t">
+      <h2 class="wsad-title" id="wsad-heading" data-testid="wsad-title">Sale Achieved</h2>
+      <p class="wsad-sub">
+        <span class="wsad-ws" *ngIf="src.workshopTitle">{{ src.workshopTitle }}</span>
+        <span class="wsad-window" data-testid="wsad-window">{{ src.windowLabel }}</span>
+      </p>
+    </div>
+    <dl class="wsad-figs">
+      <div class="wsad-fig wsad-fig--money">
+        <dt>{{ narrowed ? 'Shown' : 'Total' }} <span class="wsad-fig-note">excl. GST</span></dt>
+        <dd data-testid="wsad-total" [class.wsad-is-none]="state === 'nomatch'">{{ totalText }}</dd>
+        <dd class="wsad-fig-of" *ngIf="narrowed">of {{ view.allTotalLabel }}</dd>
+      </div>
+      <div class="wsad-fig">
+        <dt>{{ narrowed ? 'Buyers shown' : 'Buyers' }}</dt>
+        <dd data-testid="wsad-count">{{ countText }}</dd>
+        <dd class="wsad-fig-of" *ngIf="narrowed">of {{ view.allCount }} {{ view.allCount === 1 ? 'buyer' : 'buyers' }}</dd>
+      </div>
+    </dl>
+    <button type="button" class="wsad-x" data-testid="wsad-close" aria-label="Close" cdkFocusInitial (click)="close()">
+      <svg class="wsad-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg>
+    </button>
+  </header>
+
+  <div class="wsad-tools">
+    <!-- Purchase dates, inside the sale window. Only purchases bought in the range count. -->
+    <div class="wsad-range" role="group" aria-label="Purchase dates">
+      <label class="wsad-field">
+        <span>From</span>
+        <input #wsadFrom type="date" data-testid="wsad-from" [(ngModel)]="from" [disabled]="!toolsOn"
+               [attr.min]="src.min || null" [attr.max]="(to || src.max) || null"
+               aria-label="Purchases from" [class.wsad-is-set]="!!from">
+      </label>
+      <label class="wsad-field">
+        <span>To</span>
+        <input type="date" data-testid="wsad-to" [(ngModel)]="to" [disabled]="!toolsOn"
+               [attr.min]="(from || src.min) || null" [attr.max]="src.max || null"
+               aria-label="Purchases to" [class.wsad-is-set]="!!to">
+      </label>
+      <button type="button" class="wsad-iconbtn" data-testid="wsad-range-clear" *ngIf="from || to"
+              (click)="clearRange(wsadFrom)" aria-label="Clear dates" title="Clear dates">
+        <svg class="wsad-ic wsad-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg>
+      </button>
+      <!-- Holds the ✕'s room while no date is set, so picking one does not push the sort and search along. -->
+      <span class="wsad-iconbtn-room" *ngIf="!(from || to)" aria-hidden="true"></span>
+    </div>
+
+    <div class="wsad-seg" role="group" aria-label="Sort buyers">
+      <button type="button" data-testid="wsad-sort-amount" [class.wsad-is-on]="sort === 'amount'"
+              [attr.aria-pressed]="sort === 'amount'" [disabled]="!toolsOn" (click)="setSort('amount')">Highest amount</button>
+      <button type="button" data-testid="wsad-sort-recent" [class.wsad-is-on]="sort === 'recent'"
+              [attr.aria-pressed]="sort === 'recent'" [disabled]="!toolsOn" (click)="setSort('recent')">Most recent</button>
+    </div>
+
+    <div class="wsad-search">
+      <svg class="wsad-ic wsad-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg>
+      <input #wsadSearch type="search" data-testid="wsad-search" [(ngModel)]="query" [disabled]="!toolsOn"
+             placeholder="Search name, email or phone" aria-label="Search buyers by name, email or phone"
+             autocomplete="off" spellcheck="false" (keydown.escape)="onSearchEscape($event, wsadSearch)">
+      <button type="button" class="wsad-search-x" data-testid="wsad-search-clear" *ngIf="query"
+              (click)="clearSearch(wsadSearch)" aria-label="Clear search">
+        <svg class="wsad-ic wsad-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg>
+      </button>
+    </div>
+
+    <button type="button" class="wsad-export" data-testid="wsad-export" *ngIf="src.canExport"
+            [disabled]="!view.count" (click)="exportShown()" title="Downloads the buyers shown, one line per purchase">
+      <svg class="wsad-ic wsad-ic--sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14"/></svg>
+      Export to Excel
+    </button>
+  </div>
+
+  <!-- Filters (operator 2026-11-23): product, buyer type, amount per purchase, repeat buyers. Totals follow. -->
+  <div class="wsad-filters" role="group" aria-label="Filters">
+    <div class="wsad-field wsad-field--product">
+      <span id="wsad-product-l">Product</span>
+      <mat-select data-testid="wsad-product" multiple [(ngModel)]="products" [disabled]="!toolsOn"
+                  placeholder="All products" panelClass="wsad-select-panel" aria-labelledby="wsad-product-l">
+        <mat-option *ngFor="let p of productOptions" [value]="p">{{ p }}</mat-option>
+      </mat-select>
+    </div>
+
+    <div class="wsad-field">
+      <span id="wsad-buyer-l">Buyers</span>
+      <div class="wsad-seg" role="group" aria-labelledby="wsad-buyer-l">
+        <button type="button" data-testid="wsad-buyer-all" [class.wsad-is-on]="buyerType === 'all'" [attr.aria-pressed]="buyerType === 'all'"
+                [disabled]="!toolsOn" (click)="setBuyerType('all')">All</button>
+        <button type="button" data-testid="wsad-buyer-eiflix" [class.wsad-is-on]="buyerType === 'eiflix'" [attr.aria-pressed]="buyerType === 'eiflix'"
+                [disabled]="!toolsOn" (click)="setBuyerType('eiflix')">EiFlix New User</button>
+        <button type="button" data-testid="wsad-buyer-others" [class.wsad-is-on]="buyerType === 'others'" [attr.aria-pressed]="buyerType === 'others'"
+                [disabled]="!toolsOn" (click)="setBuyerType('others')">Others</button>
+      </div>
+    </div>
+
+    <div class="wsad-field">
+      <span id="wsad-amt-l">Amount per purchase (₹)</span>
+      <div class="wsad-amt" role="group" aria-labelledby="wsad-amt-l">
+        <input type="number" min="0" inputmode="numeric" data-testid="wsad-min-amount" placeholder="Min" aria-label="Minimum amount"
+               [ngModel]="minAmount" (ngModelChange)="setAmount('min', $event)" [disabled]="!toolsOn">
+        <span aria-hidden="true">–</span>
+        <input type="number" min="0" inputmode="numeric" data-testid="wsad-max-amount" placeholder="Max" aria-label="Maximum amount"
+               [ngModel]="maxAmount" (ngModelChange)="setAmount('max', $event)" [disabled]="!toolsOn">
+      </div>
+    </div>
+
+    <label class="wsad-check">
+      <input type="checkbox" data-testid="wsad-repeat" [(ngModel)]="repeatOnly" [disabled]="!toolsOn">
+      <span>Repeat buyers only <span class="wsad-check-note">(2+ purchases)</span></span>
+    </label>
+
+    <button type="button" class="wsad-link" data-testid="wsad-filters-clear" *ngIf="filtersSet" (click)="clearFilters(wsadSearch)">Clear filters</button>
+  </div>
+
+  <div class="wsad-body">
+    <div class="wsad-state" data-testid="wsad-loading" *ngIf="state === 'loading'" role="status" aria-live="polite">
+      <span class="wsad-spin" aria-hidden="true"></span>
+      <span>Loading purchases…</span>
+    </div>
+
+    <div class="wsad-state" data-testid="wsad-unavailable" *ngIf="state === 'unavailable'" role="status">
+      <span class="wsad-state-t">Sale data isn't available in this build</span>
+    </div>
+
+    <div class="wsad-state" data-testid="wsad-empty" *ngIf="state === 'empty'" role="status">
+      <span class="wsad-state-t" *ngIf="hasWindow">No purchases in this window</span>
+      <ng-container *ngIf="!hasWindow">
+        <span class="wsad-state-t">There is no sale window yet</span>
+        <span>It runs from the registration start to one month after the workshop ends; set both dates on the workshop.</span>
+      </ng-container>
+    </div>
+
+    <div class="wsad-state" data-testid="wsad-no-match" *ngIf="state === 'nomatch'" role="status">
+      <span class="wsad-state-t">No buyers match</span>
+      <button type="button" class="wsad-link" data-testid="wsad-no-match-clear" (click)="clearAll(wsadSearch)">{{ clearAllLabel }}</button>
+    </div>
+
+    <ng-container *ngIf="state === 'list'">
+      <!-- Each section's figures at a glance (the overall total and the UNIQUE buyer count are the header's). -->
+      <ul class="wsad-summary" data-testid="wsad-summary" aria-label="Sales by type">
+        <li class="wsad-sum" *ngFor="let s of view.sections" [ngClass]="'wsad-tone-' + s.type">
+          <span class="wsad-sum-l">{{ s.title }}</span><span class="wsad-sr">, </span>
+          <span class="wsad-sum-v">{{ s.totalLabel }}</span><span class="wsad-sr">, </span>
+          <span class="wsad-sum-n">{{ s.count }} {{ s.count === 1 ? 'buyer' : 'buyers' }}</span>
+        </li>
+      </ul>
+
+      <section class="wsad-section wsad-tone-new" data-testid="wsad-section-new" aria-labelledby="wsad-sh-new">
+        <ng-container *ngTemplateOutlet="sectionTpl; context: { $implicit: view.new }"></ng-container>
+      </section>
+      <section class="wsad-section wsad-tone-funnel" data-testid="wsad-section-funnel" aria-labelledby="wsad-sh-funnel">
+        <ng-container *ngTemplateOutlet="sectionTpl; context: { $implicit: view.funnel }"></ng-container>
+      </section>
+      <section class="wsad-section wsad-tone-upgrade" data-testid="wsad-section-upgrade" aria-labelledby="wsad-sh-upgrade">
+        <ng-container *ngTemplateOutlet="sectionTpl; context: { $implicit: view.upgrade }"></ng-container>
+      </section>
+    </ng-container>
+
+    <!-- One section: heading, its total and buyers, and the buyer table (or why it is empty). -->
+    <ng-template #sectionTpl let-s>
+      <div class="wsad-sec-head">
+        <div class="wsad-sec-t">
+          <h3 class="wsad-sec-title" [id]="'wsad-sh-' + s.type">{{ s.title }}</h3>
+          <p class="wsad-sec-note">{{ s.note }}</p>
+        </div>
+        <div class="wsad-sec-figs">
+          <span class="wsad-sec-total" data-testid="wsad-section-total">{{ s.totalLabel }}</span><span class="wsad-sr">, </span>
+          <span class="wsad-sec-count" data-testid="wsad-section-count">{{ s.count }} {{ s.count === 1 ? 'buyer' : 'buyers' }}</span>
+        </div>
+      </div>
+
+      <p class="wsad-sec-empty" data-testid="wsad-section-empty" *ngIf="!s.count">{{ s.allCount ? 'No match' : 'None in this window' }}</p>
+
+      <table class="wsad-table" *ngIf="s.count" [attr.aria-labelledby]="'wsad-sh-' + s.type">
+        <thead>
+          <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Email</th>
+            <th scope="col">Phone</th>
+            <th scope="col">Products</th>
+            <th class="wsad-num" scope="col">Total</th>
+          </tr>
+        </thead>
+        <!-- One row per buyer; every purchase of this section is listed in the Products cell, newest first. -->
+        <tbody>
+          <tr class="wsad-tr" data-testid="wsad-row" *ngFor="let row of s.rows; trackBy: trackRow">
+            <td class="wsad-c-name" data-testid="wsad-name">{{ row.name }}<span class="wsad-eiflix" data-testid="wsad-eiflix-new" *ngIf="row.eiflixNew">EiFlix New User</span></td>
+            <td class="wsad-c-email" data-label="Email" data-testid="wsad-email"><ng-container *ngFor="let part of row.emailParts; let first = first"><wbr *ngIf="!first">{{ part }}</ng-container><ng-container *ngIf="!row.email">—</ng-container></td>
+            <td class="wsad-c-phone" data-label="Phone" data-testid="wsad-phone">{{ row.phone || '—' }}</td>
+            <td class="wsad-c-prod" data-label="Products" data-testid="wsad-products">
+              <ul class="wsad-plist" [attr.aria-label]="'Purchases of ' + row.name">
+                <li class="wsad-pl" data-testid="wsad-purchase" *ngFor="let p of row.purchases">
+                  <span class="wsad-pl-p" [class.wsad-is-blank]="!p.product">{{ p.product || 'No product name' }}</span>
+                  <span class="wsad-pl-m">{{ p.dateLabel }} · {{ p.amountLabel }}</span>
+                </li>
+              </ul>
+            </td>
+            <td class="wsad-num wsad-c-amt" data-label="Total" data-testid="wsad-amount">{{ row.totalLabel }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </ng-template>
+  </div>
+</div>

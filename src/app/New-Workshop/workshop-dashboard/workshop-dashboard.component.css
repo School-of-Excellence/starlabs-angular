@@ -6,7 +6,9 @@
    specs/journals/2026-11-17-workshop-dashboard-redesign/workshop-dashboard-states.html,
    minus the page html/body rules and the gallery-only frame/caption/scene
    chrome), 2) region R1, 3) region R2, 4) region R3, 5) assembler glue,
-   6) At a glance additions (wdx-gl-*), 7) side-panel person menu (wdx-pmenu).
+   6) At a glance additions (wdx-gl-*), 7) side-panel person menu (wdx-pmenu) and its
+   Manage tag submenu (wdx-ptags), 8) colour option A (per-card --gl-* tokens, group / section /
+   side-panel header bands).
    The legacy class names that stay in the template (metric-card, metric-value,
    participants-card, cpo-*, pd-*, arc-*, participant-panel, ...) are e2e
    hooks only and are deliberately NOT styled here.
@@ -122,6 +124,9 @@
 .wdx-pill--gold{border-color:var(--accent-line);background:var(--accent-tint);color:var(--accent-ink);font-weight:600;letter-spacing:.04em}
 .wdx-pill--grey{background:#f1f3f6;border-color:var(--border);color:var(--t2)}
 .wdx-new{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:5px;background:var(--new-bg);color:var(--new);font:700 10.5px/1 'DM Sans',sans-serif;letter-spacing:.08em;text-transform:uppercase;flex:none}
+/* New Sign-ups panel (2026-11-21): someone moved to existing, in the New badge's shape and the Existing card's blue
+   (ink #075f92 on #e4f1f9 is 5.9:1). Sentence case: the words are long, and the text reads the same to a test. */
+.wdx-moved{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:5px;background:#e4f1f9;color:#075f92;font:600 11px/1 'DM Sans',sans-serif;letter-spacing:.01em;white-space:nowrap;flex:none}
 .wdx-tag{display:inline-flex;align-items:center;height:24px;padding:0 9px;border:1px solid var(--tag-line);border-radius:999px;background:var(--tag-bg);color:var(--tagc);font-size:12px;font-weight:600;white-space:nowrap;line-height:1}
 .wdx-type{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:6px;font-size:12px;font-weight:600;white-space:nowrap;line-height:1}
 .wdx-type--fac{background:var(--c-fac-bg);color:var(--c-fac)}
@@ -148,6 +153,8 @@ button.wdx-st:hover{border-color:currentColor;box-shadow:0 1px 0 rgba(0,0,0,.04)
 .wdx-meta{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;margin-bottom:12px;color:var(--t2);font-size:13px}
 .wdx-dates{display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
 .wdx-dates .wdx-ic{color:var(--accent-ink)}
+/* Opt-in (registration window) beside the workshop dates: a small label instead of a second calendar icon. */
+.wdx-optin-k{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--accent-ink)}
 .wdx-root .wdx-title{font:600 34px/1.12 'Playfair Display',Georgia,serif;color:var(--primary)}
 .wdx-root.wdx-root .wdx-title{letter-spacing:-.005em}
 .wdx-rule{display:block;width:40px;height:0;border-top:1.5px solid var(--accent);margin:13px 0 11px}
@@ -203,6 +210,15 @@ button.wdx-fig:hover .wdx-go,button.wdx-cell:hover .wdx-go{color:var(--primary);
 .wdx-grp-h{display:flex;align-items:center;gap:8px;height:38px;padding:0 18px;border-bottom:1px solid var(--border-light);background:var(--head)}
 .wdx-grp-h .wdx-eyebrow{font-size:10.5px}
 .wdx-grp-cells{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin:0 -1px -1px 0}
+/* Groups on one row are stretched to the tallest (Participation's Completed card has an extra line). The cards
+   fill that height too, so a shorter group's card borders never show as a second line above the row below
+   (2026-11-19: People sat 4px short, with its card border just above At a glance's top line). */
+.wdx-groups>.wdx-grp{display:flex;flex-direction:column}
+.wdx-groups>.wdx-grp>.wdx-grp-h{flex-shrink:0}
+.wdx-groups>.wdx-grp>.wdx-grp-cells{flex:1 1 auto}
+/* A one-card group (the category-based layout's People, 2026-11-21): alone on a row it would stretch its card
+   across the full width; capped at two cards' width instead. Phones keep the full-width rule below. */
+.wdx-grp.wdx-grp-solo{max-width:336px}
 .wdx-cell{position:relative;display:flex;flex-direction:column;gap:4px;min-width:0;min-height:96px;padding:14px 18px 14px;border-right:1px solid var(--border-light);border-bottom:1px solid var(--border-light);background:var(--surface);text-align:left}
 button.wdx-cell{cursor:pointer;transition:background-color .15s}
 button.wdx-cell:hover{background:var(--hover)}
@@ -554,8 +570,6 @@ button.wdx-cell:disabled .wdx-go{visibility:hidden}
 .wdx-field input{height:36px;width:100%;min-width:0;padding:0 10px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:13px;color:var(--t1)}
 .wdx-field input::placeholder{color:var(--t3);opacity:1}
 .wdx-field input.wdx-is-set{border-color:var(--primary-line);background:var(--primary-tint);font-weight:600;color:var(--primary)}
-.wdx-total{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--success-line);border-radius:9px;background:#f3faf6;color:var(--t2);font-size:13px}
-.wdx-total b{color:var(--money);font:700 18px/1 'DM Sans',sans-serif}
 .wdx-fchips{display:flex;flex-wrap:wrap;gap:6px}
 .wdx-fchip{display:inline-flex;align-items:center;gap:4px;height:28px;padding:0 2px 0 10px;border:1px solid var(--border);border-radius:999px;background:var(--surface);font-size:12.5px;font-weight:500;color:var(--t1)}
 .wdx-fchip button{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;color:var(--t3)}
@@ -568,25 +582,15 @@ a.wdx-pp:hover,div.wdx-pp[role]:hover{background:var(--hover)}
 .wdx-pp-b{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
 .wdx-pp-n{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px}
 .wdx-pp-line{color:var(--t2);font-size:12.5px}
+.wdx-pp-contact{overflow-wrap:anywhere}
 .wdx-pp-tags{display:flex;flex-wrap:wrap;gap:5px}
 .wdx-pp-end{flex:none;display:flex;align-items:center;gap:8px;align-self:center;color:var(--t3)}
-.wdx-amt{color:var(--money);font-weight:700;font-size:14px}
-.wdx-amt-n{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:var(--success-bg);color:var(--success);font:700 11.5px/1 'DM Sans',sans-serif}
 .wdx-nologin{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 9px;border:1px solid var(--warn-line);border-radius:999px;background:var(--warn-bg);color:var(--warn);font-size:12px;font-weight:600;white-space:nowrap}
 .wdx-extbox{display:flex;flex-direction:column;gap:10px;margin:0 20px 12px 64px;padding:12px;border:1px solid var(--accent-line);border-radius:10px;background:var(--accent-tint)}
 .wdx-extbox-a{display:flex;justify-content:flex-end;gap:8px}
 .wdx-pp.wdx-is-picked{background:var(--accent-tint)}
 .wdx-pp-hint{color:var(--accent-ink);font-size:12.5px}
 .wdx-pn-empty{padding:28px 20px;color:var(--t3);font-size:13px;text-align:center}
-.wdx-hcard{width:300px;background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-pop);overflow:hidden}
-.wdx-hcard-h{padding:12px 14px;border-bottom:1px solid var(--border-light)}
-.wdx-hcard-h b{display:block;font-weight:600}
-.wdx-hcard-h span{color:var(--t3);font-size:12px}
-.wdx-hcard-r{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:baseline;padding:9px 14px;border-bottom:1px solid var(--border-light);font-size:12.5px}
-.wdx-hcard-r span:first-child{color:var(--t2);white-space:nowrap}
-.wdx-hcard-r b{font-weight:600;color:var(--t1)}
-.wdx-hcard-f{display:flex;justify-content:space-between;padding:10px 14px;background:var(--head);font-size:13px;color:var(--t2)}
-.wdx-hcard-f b{color:var(--money);font-weight:700}
 
 /* popovers / menus */
 .wdx-pop{width:320px;max-width:100%;background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-pop);overflow:hidden}
@@ -704,6 +708,7 @@ a.wdx-pp:hover,div.wdx-pp[role]:hover{background:var(--hover)}
   .wdx-fig-k{font-size:12.5px}
   .wdx-go span{display:none}
   .wdx-grp{flex-basis:100%}
+  .wdx-grp.wdx-grp-solo{max-width:none}
   .wdx-grp-cells{grid-template-columns:repeat(2,minmax(0,1fr))}
   .wdx-grp-cells > :last-child:nth-child(odd){grid-column:1 / -1}
   .wdx-cell{padding:12px 14px;min-height:88px}
@@ -744,7 +749,6 @@ a.wdx-pp:hover,div.wdx-pp[role]:hover{background:var(--hover)}
   .wdx-pn-count,.wdx-pn-body{padding-left:16px;padding-right:16px}
   .wdx-pp{padding:12px 16px}
   .wdx-extbox{margin-left:16px;margin-right:16px}
-  .wdx-hcard{width:100%}
 }
 /* Headline figures: the "Open list" words give way to the chevron alone when a figure is narrow,
    so they never sit on top of the figure's label (checker fix, 2026-11-17). */
@@ -1087,7 +1091,6 @@ div.wdx-menu.wdx-menu.wdx-menu.mat-mdc-select-panel{border-radius:12px;margin-to
   background:transparent;box-shadow:none;color:inherit;
 }
 .wdx-root .wdx-ppcard.mat-mdc-card:hover{background:var(--hover)}
-.wdx-root .wdx-ppcard.mat-mdc-card.wdx-is-picked{background:var(--accent-tint)}
 .wdx-ppcard > .wdx-pp{flex:1 1 0;min-width:0;border-bottom:0}
 .wdx-root a.wdx-pp{color:inherit;text-decoration:none}
 .wdx-root a.wdx-pp:hover{background:transparent}
@@ -1095,7 +1098,7 @@ div.wdx-menu.wdx-menu.wdx-menu.mat-mdc-select-panel{border-radius:12px;margin-to
 /* The mockup's ".wdx-root.wdx-root p" reset (0,2,1) zeroes these paragraphs' own padding. */
 .wdx-root .wdx-pn-list > .wdx-pn-empty{padding:28px 20px}
 .wdx-menu .wdx-pop-sec > .wdx-pop-empty{padding:4px 10px 8px}
-/* Sale amount / chat action: outside the profile link, laid out as the row's end slot. */
+/* Chat action: outside the profile link, laid out as the row's end slot. */
 .wdx-ppcard-end{flex:none;display:flex;align-items:center;gap:8px;padding:8px 20px 8px 0}
 .wdx-root .wdx-pp-caret.mat-icon{width:18px;height:18px;font-size:18px;line-height:18px;color:var(--t3)}
 .wdx-root .wdx-pp.wdx-is-picked .wdx-pp-caret.mat-icon{color:var(--accent-ink)}
@@ -1109,17 +1112,6 @@ div.wdx-menu.wdx-menu.wdx-menu.mat-mdc-select-panel{border-radius:12px;margin-to
   --mat-datepicker-toggle-icon-color:var(--t2);--mat-datepicker-toggle-active-state-icon-color:var(--primary);
   --mdc-icon-button-state-layer-size:32px;--mdc-icon-button-icon-size:18px;
 }
-
-/* ---------- purchases hover card (outside the panel, fixed above it) ---------- */
-.wdx-root.wdx-hcard--fixed{position:fixed;z-index:1002;max-width:calc(100vw - 24px)}
-/* placed with a max-height on phones (showSaleTip): the head and total stay, the list shrinks and scrolls */
-.wdx-root.wdx-hcard--fixed{display:flex;flex-direction:column}
-.wdx-root.wdx-hcard--fixed > .wdx-hcard-h,.wdx-root.wdx-hcard--fixed > .wdx-hcard-f{flex:none}
-.wdx-root.wdx-hcard--fixed > .wdx-hcard-list{flex:1 1 auto;min-height:0}
-.wdx-hcard-list{max-height:280px;overflow-y:auto}
-.wdx-hcard-list > .wdx-hcard-r:last-child{border-bottom:0}
-.wdx-hcard-r > :last-child{grid-column:3;text-align:right;white-space:nowrap}
-.wdx-hcard-r b{overflow-wrap:anywhere}
 
 /* ---------- filter chips: mat-chip (removed) skinned as .wdx-fchip ---------- */
 .wdx-fchips .wdx-fchip.mat-mdc-chip{
@@ -1249,7 +1241,6 @@ div.wdx-menu.wdx-menu.wdx-menu.mat-mdc-select-panel{border-radius:12px;margin-to
   .wdx-panel--fixed .wdx-pp{padding:12px 16px}
   .wdx-panel--fixed .wdx-ppcard-end{padding-right:16px}
   .wdx-panel--fixed .wdx-extbox{margin-left:16px;margin-right:16px}
-  .wdx-root.wdx-hcard--fixed{width:auto}
 }
 
 /* ==========================================================================
@@ -1377,3 +1368,169 @@ div.wdx-menu.wdx-menu.wdx-menu.mat-mdc-select-panel{border-radius:12px;margin-to
 .wdx-pmenu .mat-mdc-menu-item.wdx-pmenu-item[disabled]{opacity:1}
 .wdx-pmenu .wdx-pmenu-item[disabled] .wdx-pmenu-l,.wdx-pmenu .wdx-pmenu-item[disabled] .wdx-ic{color:var(--t3)}
 .wdx-pmenu .wdx-pmenu-item[disabled] .wdx-pmenu-s{color:var(--warn)}
+
+/* Manage tag (2026-11-19): the person menu's segment-tags submenu (class wdx-ptags beside wdx-pmenu). Compact
+   checkable rows: a ✓ (or the saving spinner) in a fixed slot so the names line up; the list scrolls. */
+.wdx-menu.wdx-pmenu.wdx-ptags.mat-mdc-menu-panel{width:260px;min-width:220px}
+.wdx-ptags .wdx-ptags-h{padding:11px 14px 8px;border-bottom:1px solid var(--border-light)}
+.wdx-ptags .wdx-ptags-note{margin:0;padding:12px 14px 14px;color:var(--t2);font-size:12.5px;line-height:1.4}
+.wdx-ptags .wdx-ptags-note.wdx-is-failed{color:var(--warn)}
+.wdx-ptags .wdx-ptags-list{max-height:min(320px,calc(100vh - 160px));overflow-y:auto;overscroll-behavior:contain;padding:6px}
+.wdx-ptags .mat-mdc-menu-item.wdx-ptag{min-height:36px;padding-top:6px;padding-bottom:6px}
+.wdx-ptags .wdx-ptag .mat-mdc-menu-item-text{display:flex;align-items:center;gap:10px;min-width:0}
+.wdx-ptags .wdx-ptag-mark{flex:none;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;color:var(--primary)}
+.wdx-ptags .wdx-ptag-mark .wdx-ic{stroke-width:2.2}
+.wdx-ptags .wdx-ptag-n{min-width:0;overflow-wrap:anywhere}
+/* saving: keep the row readable (not Material's 38% fade); the spinner says what is happening */
+.wdx-ptags .mat-mdc-menu-item.wdx-ptag[disabled]{opacity:1;cursor:progress}
+.wdx-ptags .mat-mdc-menu-item.wdx-ptag[disabled] .wdx-ptag-n{color:var(--t2)}
+
+/* ===== 8) Colour, option A "Soft tiles" (2026-11-19) =====
+   Port of option "A · Soft tiles" in specs/journals/2026-11-19-workshop-dashboard-colour/workshop-dashboard-colour.html
+   (plan: specs/plans/2026-11-19-workshop-dashboard-colour-d.md; the operator first chose D, then switched to A). The mockup picked cards by data-testid and nth-child;
+   here each At a glance card names its own colour (style="--tone:var(--gl-*)"), each group and section header carries
+   a colour class (wdx-grp--* / wdx-sh--*), and the side panel's header gets --pn-tone from panelTone.
+   Existing tokens keep their values: Journey, the pills, the bars and the panel's own parts still use them.
+   Numbers stay dark (A); zero numbers stay grey; the People cards' loading bar and "—" keep today's look and lose the hover;
+   a finished workshop's timeline fill stays grey; a day with no one joined keeps its grey stub. */
+.wdx-root{
+  /* one colour per At a glance card */
+  --gl-enrolled:#2456a6; --gl-avg:#5b4bd6; --gl-rate:#c97a08; --gl-sale:#0c8a5f;
+  --gl-started:#1f6fd1; --gl-notstarted:#6b7891; --gl-active:#0e8a80; --gl-completed:#2a9457;
+  --gl-existing:#0b78b8; --gl-new:#6d45dc; --gl-notenrolled:#c93d6e; --gl-chat:#d0620f;
+  --gl-stuck:#c27c06; --gl-inactive:#cf3f3f; --gl-joined:#2f6fe0; --gl-tags:#0e8a80;
+  /* New Sign-ups (2026-11-21): a leaf green, the one hue no People sibling or neighbour uses (4:1 on white) */
+  --gl-signups:#4a8a14;
+  /* category-based and evergreen cards (purple = category, teal = Above Diagnostics, orange = Facilitator, as today) */
+  --gl-cat:#8a44c8; --gl-coh:#0a8296; --gl-fac:#d0620f;
+  /* Share Claimed: a warm gold (was the khaki #9a6a1c, which read as a dull beige wash; same icon contrast) */
+  --gl-share:#a8489a; --gl-claim:#a8620a; --gl-purchase:#0c8a5f;
+  /* header bands: the ink (group name; at least 4.5:1 on its band) and the band */
+  --hue-blue:#2456a6; --hue-blue-bg:#e9f1fe; --hue-violet:#6342d4; --hue-violet-bg:#f0ebff;
+  --hue-amber:#a05806; --hue-amber-bg:#fff1dc; --hue-teal:#0b7166; --hue-teal-bg:#e1f5f2;
+  --hue-green:#1b7043; --hue-green-bg:#e5f4ec; --hue-rose:#ad3360; --hue-rose-bg:#fde9f0;
+  --hue-indigo:#4338b8; --hue-indigo-bg:#ecebff; --hue-sky:#0a6aa3; --hue-sky-bg:#e3f2fb;
+}
+.wdx-root :is(.wdx-grp--blue,.wdx-sh--blue){--hue:var(--hue-blue);--hue-bg:var(--hue-blue-bg)}
+.wdx-root :is(.wdx-grp--violet,.wdx-sh--violet){--hue:var(--hue-violet);--hue-bg:var(--hue-violet-bg)}
+.wdx-root :is(.wdx-grp--amber,.wdx-sh--amber){--hue:var(--hue-amber);--hue-bg:var(--hue-amber-bg)}
+.wdx-root :is(.wdx-grp--teal,.wdx-sh--teal){--hue:var(--hue-teal);--hue-bg:var(--hue-teal-bg)}
+.wdx-root :is(.wdx-grp--green,.wdx-sh--green){--hue:var(--hue-green);--hue-bg:var(--hue-green-bg)}
+.wdx-root :is(.wdx-grp--rose,.wdx-sh--rose){--hue:var(--hue-rose);--hue-bg:var(--hue-rose-bg)}
+.wdx-root :is(.wdx-grp--indigo,.wdx-sh--indigo){--hue:var(--hue-indigo);--hue-bg:var(--hue-indigo-bg)}
+.wdx-root :is(.wdx-grp--sky,.wdx-sh--sky){--hue:var(--hue-sky);--hue-bg:var(--hue-sky-bg)}
+
+/* ---------- At a glance: headline figures (11%→4% wash; the 3px top edge replaces the gold lead mark) ---------- */
+.wdx-root .wdx-fig{background:linear-gradient(180deg,color-mix(in srgb,var(--tone) 11%,#fff),color-mix(in srgb,var(--tone) 4%,#fff));box-shadow:inset 0 3px 0 var(--tone)}
+.wdx-root .wdx-fig--lead::before{display:none}
+.wdx-root button.wdx-fig:hover{background:color-mix(in srgb,var(--tone) 13%,#fff)}
+
+/* ---------- At a glance: cells (7% wash, a softer 3px top edge, a little stronger on hover) ---------- */
+.wdx-root .wdx-cell{background:color-mix(in srgb,var(--tone) 7%,#fff);box-shadow:inset 0 3px 0 color-mix(in srgb,var(--tone) 75%,#fff)}
+.wdx-root button.wdx-cell:hover{background:color-mix(in srgb,var(--tone) 12%,#fff)}
+/* disabled People cards (loading, or "—" when the read failed) keep the resting wash: no hover */
+.wdx-root button.wdx-cell:disabled:hover{background:color-mix(in srgb,var(--tone) 7%,#fff)}
+
+/* ---------- At a glance: Joined recently + Top tags (a 6% wash, no edge) ---------- */
+.wdx-root .wdx-gl-mo{background:color-mix(in srgb,var(--tone) 6%,#fff)}
+.wdx-root button.wdx-gl-mo:hover{background:color-mix(in srgb,var(--tone) 11%,#fff)}
+.wdx-root .wdx-gl-mo .wdx-gl-tag-row:hover{background:rgba(255,255,255,.7)}
+
+/* ---------- icon badges: the key icon only (not the .wdx-go arrow, not the Sale info icon) ---------- */
+.wdx-root .wdx-fig-k>.wdx-ic,
+.wdx-root .wdx-cell-k>.wdx-ic,
+.wdx-root .wdx-gl-tl-k>.wdx-ic{width:28px;height:28px;margin:0;padding:6px;border-radius:9px;color:var(--tone,var(--gl-enrolled));background:color-mix(in srgb,var(--tone,var(--gl-enrolled)) 14%,#fff)}
+.wdx-root .wdx-cell-k{align-items:center;gap:9px}
+.wdx-root .wdx-fig-k{gap:10px}
+/* A narrow cell has no room for the badge beside a long word: four across in a content area of about 600-690px
+   (cells 150-163px), or a group with many categories, split "Participants" mid-word. Measured on the real sheet with
+   the 28px badge and 9px gap (A's layout); today's plain icon never split it. So a cell whose content box is 134px or less (a 170px
+   cell with its 18px padding) falls back to today's plain icon (the same idea as the headline figures' wdxfig
+   container above). */
+.wdx-root .wdx-grp-cells>.wdx-cell{container:wdxcell / inline-size}
+@container wdxcell (max-width:134px){
+  .wdx-root .wdx-cell-k{align-items:flex-start;gap:7px}
+  .wdx-root .wdx-cell-k>.wdx-ic{width:15px;height:15px;margin-top:1px;padding:0;border-radius:0;background:none}
+}
+/* New Sign-ups (2026-11-21): its window line ("10 Mar 2020 – 15 Apr 2020 (completed)", about 232px at 12.5px) sits
+   under the number, so each extra line lifts that number further above its siblings' bottom-aligned numbers. In a
+   narrow cell (content 160px or less: four People cards at 1440, two across on a phone, the category layout's lone
+   card) it is a size smaller, which keeps it to two lines ("10 Mar 2020 –" / "15 Apr 2020 (completed)") where 12.5px
+   took three. Measured on the real sheet: the second line is 145px at 12.5px and 133px at 11.5px in a 139px cell. */
+@container wdxcell (max-width:160px){
+  .wdx-root .wdx-cell-s.wdx-signups-win{font-size:11.5px}
+}
+
+/* ---------- group headers: tinted in the group colour, with the group name in that colour ---------- */
+.wdx-root .wdx-grp-h{background:var(--hue-bg,var(--head))}
+.wdx-root .wdx-grp-h .wdx-eyebrow:not(.wdx-grp-note){color:var(--hue,var(--t3))}
+
+/* ---------- timeline: a light blue→violet→green wash; a running workshop fills blue→violet ----------
+   (.wdx-gl-tl--done .wdx-gl-tl-fill outranks the fill rule, so a finished workshop stays grey) */
+.wdx-root .wdx-gl-tl{background:linear-gradient(90deg,#edf3ff,#f3eeff 55%,#ecf8f3)}
+.wdx-root .wdx-gl-tl-fill{background:linear-gradient(90deg,#2f6fe0,#7048e8)}
+.wdx-root .wdx-gl-tl-today{background:#5b4bd6}
+
+/* ---------- Joined recently bars: blue, the last 7 days darker; an empty day keeps its grey stub ---------- */
+.wdx-root .wdx-gl-sp>.wdx-gl-sp-b{background:#cfdcfa}
+.wdx-root .wdx-gl-sp>.wdx-gl-sp-b--wk{background:linear-gradient(180deg,#6b97f2,#2f6fe0)}
+.wdx-root .wdx-gl-sp>.wdx-gl-sp-b--zero{background:var(--border)}
+
+/* ---------- Top tags: each row its own colour (blue, violet, teal, amber, rose, repeating) ---------- */
+.wdx-root .wdx-gl-tags>li:nth-child(5n+1){--tagc:#1f5fbf;--tag-bg:#e8f0fe;--tag-line:#c4d7fa;--bar:#3b78e7}
+.wdx-root .wdx-gl-tags>li:nth-child(5n+2){--tagc:#5b3fc4;--tag-bg:#f0ebff;--tag-line:#d8ccfa;--bar:#7a5af0}
+.wdx-root .wdx-gl-tags>li:nth-child(5n+3){--tagc:#0b7a6e;--tag-bg:#e1f5f2;--tag-line:#b3e2da;--bar:#14a394}
+.wdx-root .wdx-gl-tags>li:nth-child(5n+4){--tagc:#93560a;--tag-bg:#fff3e0;--tag-line:#f3d5a6;--bar:#e59a1c}
+.wdx-root .wdx-gl-tags>li:nth-child(5n+5){--tagc:#ad3360;--tag-bg:#fde9f0;--tag-line:#f5c3d4;--bar:#e05a87}
+.wdx-root .wdx-gl-tags .wdx-gl-tag-bar span{background:var(--bar,var(--accent))}
+
+/* ---------- the sheet does not clip: a washed card in one of its rounded corners follows that corner
+   (11px inside the 1px border). Top: the headline figures when no timeline sits above them. Bottom: the
+   Joined / Top tags row, which wraps at 1120px (Top tags spans the second line) and stacks at 600px. ---------- */
+.wdx-root .wdx-sheet>.wdx-hero:first-child>.wdx-fig:first-child{border-top-left-radius:11px}
+.wdx-root .wdx-sheet>.wdx-hero:first-child>.wdx-fig:last-child{border-top-right-radius:11px}
+.wdx-root .wdx-sheet>.wdx-gl-row:last-child>:first-child{border-bottom-left-radius:11px}
+.wdx-root .wdx-sheet>.wdx-gl-row:last-child>:last-child{border-bottom-right-radius:11px}
+@container wdx (max-width:1120px){
+  .wdx-root .wdx-sheet>.wdx-gl-row:last-child>:first-child{border-bottom-left-radius:0}
+  .wdx-root .wdx-sheet>.wdx-gl-row:last-child>:last-child{border-bottom-left-radius:11px}
+}
+@container wdx (max-width:899px){
+  .wdx-root .wdx-sheet>.wdx-hero:first-child>.wdx-fig:last-child{border-top-right-radius:0}
+  .wdx-root .wdx-sheet>.wdx-hero:first-child>.wdx-fig:nth-child(2){border-top-right-radius:11px}
+  /* figures 2 x 2: with three (no Sale card) the third spans the row, so no white hole sits beside the washes */
+  .wdx-root .wdx-hero>.wdx-fig:last-child:nth-child(odd){grid-column:1 / -1;border-right:0}
+}
+
+/* ---------- small grey text on the tints: --t3 falls under 4.5:1 on the bands and washes; --t2 stays at 4.9:1
+   or more. "Open list" (--t3 at 75%) was already under it on white; at rest it is --t2, on hover it keeps the
+   existing colour. ---------- */
+.wdx-root .wdx-grp-h .wdx-grp-note,
+.wdx-root .wdx-sh .wdx-select-l,
+.wdx-root .wdx-gl-tl .wdx-gl-tl-ends,
+.wdx-root .wdx-gl-mo .wdx-gl-sp-ax{color:var(--t2)}
+.wdx-root :is(.wdx-fig,.wdx-cell):not(:hover) .wdx-go{color:var(--t2);opacity:1}
+
+/* ---------- keyboard focus: the ring sits just under the 3px top edge (at -3px the edge hid its top side) ---------- */
+.wdx-root .wdx-grp .wdx-cell:focus-visible,.wdx-root .wdx-hero .wdx-fig:focus-visible{outline-offset:-5px}
+
+/* ---------- the rest of the dashboard, lighter: each section header tinted in its own colour
+   (the title stays dark). It follows the sheet's 12px top corners. A header without a colour class stays white.
+   Every section but Journey already has a line under its header (the next block's top border); Journey's
+   strip has none, so its header draws one. ---------- */
+.wdx-root .wdx-sh{background:var(--hue-bg,var(--surface))}
+.wdx-root .wdx-sheet>.wdx-sh{border-radius:11px 11px 0 0}
+.wdx-root .wdx-sh:has(+ .wdx-track){box-shadow:inset 0 -1px 0 var(--border-light)}
+/* that line sat only 8px above Journey's day tiles; give the strip the same air the other sections have */
+.wdx-root .wdx-sh + .wdx-track{padding-top:16px}
+/* a disabled tool (e.g. Export Excel with no forms) on a tinted header: a faded white button, not a grey slab */
+.wdx-root .wdx-sh[class*="wdx-sh--"] .wdx-tool:disabled{background:rgba(255,255,255,.55);border-color:var(--border)}
+
+/* ---------- side panel: its header is tinted in the colour of the card that opened it (panelTone), else blue ---------- */
+.wdx-root .wdx-pn-head{background:color-mix(in srgb,var(--pn-tone,var(--gl-enrolled)) 9%,#fff)}
+/* phone sheet: the grab handle floats over the tinted header, so the tint reaches the sheet's rounded top
+   (it used to start under a 12px white strip). Same height: the header's top padding grows by the handle's 12px. */
+@media (max-width:599.98px){
+  .wdx-root.wdx-panel--fixed>.wdx-handle{position:absolute;top:8px;left:50%;z-index:1;margin:0 0 0 -20px;pointer-events:none}
+  .wdx-root.wdx-panel--fixed .wdx-pn-head{padding-top:24px}
+}

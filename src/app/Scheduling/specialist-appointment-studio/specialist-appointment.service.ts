@@ -135,22 +135,25 @@ export class SpecialistAppointmentService {
       .map(x => ({ appt: this.parseAppt(x.id, x.data()), raw: x.data() }));
   }
 
-  /* One page of past appointments, newest first. hostId null = everyone (A&H).
-     Uses the hosts + endtime-desc index appointment-studio already relies on. Pass the returned cursor
-     back in to get the next page; done = nothing older left. */
-  async pastPage(hostId: string | null, cursor: QueryDocumentSnapshot | null, size: number):
-      Promise<{ rows: ApptRow[]; cursor: QueryDocumentSnapshot | null; done: boolean }> {
-    const q: QueryConstraint[] = [];
-    if (hostId) q.push(where('hosts', 'array-contains', this.profileRef(hostId)));
-    q.push(where('endtime', '<=', new Date()), orderBy('endtime', 'desc'));
-    if (cursor) q.push(startAfter(cursor));
-    q.push(limit(size));
-    const s = await getDocs(query(collection(this.firestore, 'appointments'), ...q));
-    return {
-      rows: s.docs.map(x => ({ appt: this.parseAppt(x.id, x.data()), raw: x.data() })),
-      cursor: s.docs.length ? s.docs[s.docs.length - 1] : cursor,
-      done: s.docs.length < size,
-    };
+  /* Every session that ended in [from, to] (from null = no lower bound), newest first, read in pages of 500
+     until done or max rows — Past sessions needs the whole range for its status counts (Muskan's review,
+     2026-11-23). Uses the hosts + endtime index. capped = there were more than max. */
+  async pastBetween(hostId: string | null, from: Date | null, to: Date, max: number): Promise<{ rows: ApptRow[]; capped: boolean }> {
+    const rows: ApptRow[] = [];
+    let cursor: QueryDocumentSnapshot | null = null;
+    for (;;) {
+      const q: QueryConstraint[] = [];
+      if (hostId) q.push(where('hosts', 'array-contains', this.profileRef(hostId)));
+      if (from) q.push(where('endtime', '>=', from));
+      q.push(where('endtime', '<=', to), orderBy('endtime', 'desc'));
+      if (cursor) q.push(startAfter(cursor));
+      q.push(limit(500));
+      const s = await getDocs(query(collection(this.firestore, 'appointments'), ...q));
+      s.docs.forEach(x => rows.push({ appt: this.parseAppt(x.id, x.data()), raw: x.data() }));
+      if (rows.length >= max) return { rows: rows.slice(0, max), capped: rows.length > max || s.docs.length === 500 };
+      if (s.docs.length < 500) return { rows, capped: false };
+      cursor = s.docs[s.docs.length - 1];
+    }
   }
 
   /* The metaData shape AppointmentDetailComponent / MarkAppointmentStatusComponent expect.

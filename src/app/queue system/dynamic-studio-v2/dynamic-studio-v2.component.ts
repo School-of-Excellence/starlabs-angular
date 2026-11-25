@@ -5099,8 +5099,9 @@ export class DynamicStudioV2Component {
 
       loading.close()
 
-      var hostname = window.location.origin
-      window.open(`${hostname}/joinroom/${liveAssignmentID}`, '_blank')
+      // Same tab (2026-11-24): a new tab opened after the awaits above is no longer a click,
+      // so Safari blocked it as a pop-up. Browser Back returns to the studio.
+      this.router.navigate(['/joinroom', liveAssignmentID]);
     }
     catch(err){
       loading.close()

@@ -1,0 +1,77 @@
+<!--
+  New Users · person details (plan 2026-11-18). Read-only, except Delivery on hold.
+  Hooks: nud-* only, literal. Each value hook's text is exactly the shown value.
+  Icons are inline SVG (no sprite <use href>: the app's base href breaks them).
+-->
+<div class="nud-root" data-testid="nud-dialog">
+
+  <header class="nud-head">
+    <span class="nud-mono" aria-hidden="true">{{ view.initials }}</span>
+    <div class="nud-titles">
+      <h2 class="nud-title" id="nud-title" data-testid="nud-name">{{ view.name }}</h2>
+      <p class="nud-sub" data-testid="nud-email">{{ view.email }}</p>
+    </div>
+    <button class="nud-iconbtn" type="button" data-testid="nud-close" aria-label="Close" (click)="close()">
+      <svg class="nud-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg>
+    </button>
+  </header>
+
+  <div class="nud-body">
+    @if (missing) {
+      <p class="nud-missing" role="status" data-testid="nud-missing">This person is no longer in New Users.</p>
+    }
+
+    <dl class="nud-facts">
+      <div class="nud-fact">
+        <dt>Phone</dt>
+        <dd class="nud-val" data-testid="nud-phone">{{ view.phone }}</dd>
+      </div>
+      <div class="nud-fact">
+        <dt>Status</dt>
+        <dd class="nud-val" data-testid="nud-status">{{ view.status }}</dd>
+      </div>
+      <div class="nud-fact">
+        <dt>Account</dt>
+        <dd class="nud-val"><span class="nud-state" [class.nud-state--on]="view.enabled" [class.nud-state--off]="!view.enabled" data-testid="nud-account">{{ view.account }}</span></dd>
+      </div>
+      <div class="nud-fact">
+        <dt>Created</dt>
+        <dd class="nud-val" data-testid="nud-created">{{ view.created }}</dd>
+      </div>
+      <div class="nud-fact">
+        <dt>Last login</dt>
+        <dd class="nud-val" data-testid="nud-last-login">{{ view.lastLogin }}</dd>
+      </div>
+      <div class="nud-fact">
+        <dt>Converted</dt>
+        <dd class="nud-val" data-testid="nud-converted">{{ view.converted }}</dd>
+      </div>
+      <div class="nud-fact">
+        <dt>Moved on</dt>
+        <dd class="nud-val" data-testid="nud-moved-on">{{ view.movedOn }}</dd>
+      </div>
+      <div class="nud-fact">
+        <dt>Tags</dt>
+        <dd class="nud-val">
+          <div class="nud-tags" data-testid="nud-tags">@for (t of view.tags; track $index) {<span class="nud-tag" data-testid="nud-tag">{{ t }}</span>} @empty {<span class="nud-nil">—</span>}</div>
+        </dd>
+      </div>
+    </dl>
+  </div>
+
+  <!-- The one control that changes anything. Pinned under the details, so it is always in reach on a phone. -->
+  <section class="nud-hold" aria-label="Delivery">
+    <mat-slide-toggle class="nud-switch" data-testid="nud-hold-toggle" labelPosition="before" hideIcon disableRipple
+      [checked]="checked" [disabled]="toggleDisabled" (change)="onHoldChange($event)">Delivery on hold</mat-slide-toggle>
+    @if (caption; as c) {
+      <p class="nud-holdby" data-testid="nud-hold-by">{{ c }}</p>
+    }
+    @if (saveFailed) {
+      <p class="nud-error" role="alert" data-testid="nud-hold-error">Couldn't save. Try again.</p>
+    }
+    @if (adminMissing && !missing) {
+      <p class="nud-note">Your profile could not be found, so this can't be changed right now.</p>
+    }
+  </section>
+
+</div>

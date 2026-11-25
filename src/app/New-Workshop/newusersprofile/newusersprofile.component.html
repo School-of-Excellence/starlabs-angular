@@ -444,7 +444,8 @@
                     [class.is-sorted]="sort.active === 'name' && !!sort.direction">Name<svg [nxIcon]="'name' | nxSortIcon : sort.active : sort.direction" class="nx-ic nx-sort-ic"></svg></th>
                   <td mat-cell *matCellDef="let u" class="nx-c-name">
                     @let v = vm(u);
-                    <div class="nx-person"><span class="nx-mono" aria-hidden="true">{{ v.initials }}</span><span class="nx-name">{{ v.name || '—' }}</span></div>
+                    <!-- The name is the keyboard way into the person's details (a click anywhere on the row opens them too). -->
+                    <div class="nx-person"><span class="nx-mono" aria-hidden="true">{{ v.initials }}</span><button class="nx-namebtn" type="button" data-testid="new-open-details" aria-haspopup="dialog" [attr.aria-label]="v.name ? null : 'Open details'" (click)="openDetails(u, $any($event.currentTarget))"><span class="nx-name">{{ v.name || '—' }}</span></button></div>
                   </td>
                 </ng-container>
 
@@ -572,7 +573,8 @@
                 </ng-container>
 
                 <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
-                <tr mat-row *matRowDef="let row; columns: displayedColumns" [class.is-picked]="selection.isSelected(rowId(row))"></tr>
+                <tr mat-row data-testid="new-row" *matRowDef="let row; columns: displayedColumns" [class.is-picked]="selection.isSelected(rowId(row))"
+                  (click)="onRowClick(row, $event)"></tr>
 
                 <!-- Never a mat-row: a workshop read in progress (2.5), or no match with one chip per condition (2.4). -->
                 <tr class="nx-nodata" *matNoDataRow>

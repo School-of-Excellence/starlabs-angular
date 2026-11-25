@@ -60,6 +60,8 @@ import {
   moveButtonText,
   personMenuNoDataNote,
   panelEntryFill,
+  missingProfileIds, newUserDocsById,
+  segmentTagList, personTagIds, tagTogglePlan, applyTagToggle,
   isTransientReadError, retryRead, ReadTimeoutError,
   moveButtonTooltip,
   neverStartedIds,
@@ -975,6 +977,110 @@ describe('workshop-dashboard.engine', () => {
       expect(personMenuNoDataNote({})).toBe('Not started — no data in this workshop yet');
     });
 
+    // Manage tag in the side-panel person menu (operator 2026-11-19): segment tags, added or removed per person.
+    describe('Manage tag', () => {
+      describe('segmentTagList', () => {
+        it('drops blank names, missing or repeated ids, and trims names', () => {
+          expect(segmentTagList([
+            { id: 't1', name: '  Beta ' }, { id: 't2', name: '' }, { id: 't3', name: '   ' }, { id: 't4', name: null },
+            { id: 't5' }, { id: '', name: 'No id' }, { name: 'No id either' }, { id: 't1', name: 'Beta again' },
+            { id: 't6', name: 'Alpha' },
+          ])).toEqual([{ id: 't6', name: 'Alpha' }, { id: 't1', name: 'Beta' }]);
+        });
+
+        it('sorts A→Z ignoring case, keeping the incoming order for names equal once lower-cased', () => {
+          const out = segmentTagList([
+            { id: 'z', name: 'zeta' }, { id: 'b1', name: 'beta' }, { id: 'A', name: 'Alpha' },
+            { id: 'b2', name: 'Beta' }, { id: 'b3', name: 'BETA' }, { id: 'a', name: 'alpha' },
+          ]);
+          expect(out.map(t => t.id)).toEqual(['A', 'a', 'b1', 'b2', 'b3', 'z']);
+        });
+
+        it('treats missing rows as an empty list and never changes its input', () => {
+          expect(segmentTagList(null)).toEqual([]);
+          expect(segmentTagList(undefined)).toEqual([]);
+          expect(segmentTagList([null as any, undefined as any])).toEqual([]);
+          const rows = [{ id: 'b', name: 'B' }, { id: 'a', name: 'A' }];
+          segmentTagList(rows);
+          expect(rows.map(r => r.id)).toEqual(['b', 'a']);
+        });
+      });
+
+      const enrolled = [
+        { profileid: 'p1', id: 'e1', tags: ['t1', 't2'] },
+        { profileid: 'p2', id: 'e2', tags: ['t1'] },
+        { profileid: 'p1', id: 'e1b', tags: ['t3', 't1'] },   // a second enrolment doc, if one ever exists
+        { profileid: 'p3', id: 'e3', tags: 'not-a-list' },
+        { profileid: 'p4', id: 'e4' },
+      ];
+
+      describe('personTagIds', () => {
+        it('is every tag on every enrolled doc of that person, and only theirs', () => {
+          expect([...personTagIds(enrolled, 'p1')].sort()).toEqual(['t1', 't2', 't3']);
+          expect([...personTagIds(enrolled, 'p2')]).toEqual(['t1']);
+        });
+
+        it('is empty for no tags, a malformed tags field, someone not enrolled, or no person', () => {
+          expect(personTagIds(enrolled, 'p3').size).toBe(0);
+          expect(personTagIds(enrolled, 'p4').size).toBe(0);
+          expect(personTagIds(enrolled, 'nobody').size).toBe(0);
+          expect(personTagIds(enrolled, '').size).toBe(0);
+          expect(personTagIds(null, 'p1').size).toBe(0);
+          expect(personTagIds([{ profileid: 'p', tags: ['', null, 5, 'ok'] }], 'p')).toEqual(new Set(['ok']));
+        });
+      });
+
+      describe('tagTogglePlan', () => {
+        it('adds a tag the person does not carry, on each of their enrolled docs', () => {
+          expect(tagTogglePlan(enrolled, 'p1', 't9')).toEqual({ docIds: ['e1', 'e1b'], add: true });
+          expect(tagTogglePlan(enrolled, 'p4', 't1')).toEqual({ docIds: ['e4'], add: true });
+        });
+
+        it('removes a tag the person carries on any of their docs, from all of them', () => {
+          expect(tagTogglePlan(enrolled, 'p1', 't2')).toEqual({ docIds: ['e1', 'e1b'], add: false });
+          expect(tagTogglePlan(enrolled, 'p1', 't3')).toEqual({ docIds: ['e1', 'e1b'], add: false });
+        });
+
+        it('touches nobody else: another person carrying the tag changes nothing', () => {
+          expect(tagTogglePlan(enrolled, 'p2', 't2')).toEqual({ docIds: ['e2'], add: true });
+        });
+
+        it('plans nothing without a person, a tag or an enrolment here', () => {
+          expect(tagTogglePlan(enrolled, 'nobody', 't1')).toBeNull();
+          expect(tagTogglePlan(enrolled, '', 't1')).toBeNull();
+          expect(tagTogglePlan(enrolled, 'p1', '')).toBeNull();
+          expect(tagTogglePlan(null, 'p1', 't1')).toBeNull();
+          expect(tagTogglePlan([{ profileid: 'p1', tags: [] }], 'p1', 't1')).toBeNull();   // no doc id
+        });
+
+        it('lists a doc id once', () => {
+          expect(tagTogglePlan([{ profileid: 'p', id: 'd' }, { profileid: 'p', id: 'd' }], 'p', 't'))
+            .toEqual({ docIds: ['d'], add: true });
+        });
+      });
+
+      describe('applyTagToggle', () => {
+        it('appends a new tag once, keeping the order', () => {
+          expect(applyTagToggle(['a', 'b'], 'c', true)).toEqual(['a', 'b', 'c']);
+          expect(applyTagToggle(['a', 'c', 'b'], 'c', true)).toEqual(['a', 'c', 'b']);
+          expect(applyTagToggle(undefined, 'c', true)).toEqual(['c']);
+        });
+
+        it('removes every copy of the tag', () => {
+          expect(applyTagToggle(['c', 'a', 'c', 'b'], 'c', false)).toEqual(['a', 'b']);
+          expect(applyTagToggle(['a'], 'c', false)).toEqual(['a']);
+          expect(applyTagToggle(null, 'c', false)).toEqual([]);
+        });
+
+        it('returns a new array and leaves the doc as it was', () => {
+          const tags = ['a', 'b'];
+          const out = applyTagToggle(tags, 'a', true);
+          expect(out).not.toBe(tags);
+          expect(tags).toEqual(['a', 'b']);
+        });
+      });
+    });
+
     // new_user_data lands after a side panel was opened (2026-11-18): the open rows are patched in place.
     describe('panelEntryFill', () => {
       const nuDoc = { name: 'NU Alpha', email: 'nu@x.test', phonenumber: '900' };
@@ -1007,6 +1113,59 @@ describe('workshop-dashboard.engine', () => {
         expect(panelEntryFill({ profileid: 'x', name: 'Unknown' }, undefined, undefined)).toBeNull();
         expect(panelEntryFill({ profileid: 'x', name: 'Unknown', metadata: {} }, {}, {})).toBeNull();
         expect(panelEntryFill(null, undefined, undefined)).toBeNull();
+      });
+    });
+
+    // Someone who enrolls while the dashboard is open is in neither profile map (2026-11-19): look them up on their own.
+    describe('missingProfileIds', () => {
+      const meta = { e1: { name: 'Exist One' } };
+      const nu = { n1: { name: 'New One' }, mv: { name: 'Moved', movedtoexist: true } };
+
+      it('returns the enrolled ids in neither map, in enrolment order', () => {
+        expect(missingProfileIds(['late2', 'e1', 'n1', 'late1', 'mv'], meta, nu, new Set())).toEqual(['late2', 'late1']);
+      });
+
+      it('skips ids already asked, found or not, so an orphan enrolment is read once', () => {
+        expect(missingProfileIds(['late1', 'orphan', 'late2'], meta, nu, new Set(['orphan', 'late1']))).toEqual(['late2']);
+      });
+
+      it('trims, drops empty and duplicate ids, and leaves out an id that cannot be a document id', () => {
+        expect(missingProfileIds([' late1 ', 'late1', '', '   ', null, undefined, 'a/b', 42], {}, {}, new Set()))
+          .toEqual(['late1', '42']);
+        expect(missingProfileIds([' e1 ', ' n1'], meta, nu, null)).toEqual([]);   // trimmed before the maps are checked
+      });
+
+      it('reads only own keys of the maps, never inherited ones', () => {
+        expect(missingProfileIds(['constructor', 'toString'], {}, {}, new Set())).toEqual(['constructor', 'toString']);
+      });
+
+      it('treats missing maps and a missing seen set as empty', () => {
+        expect(missingProfileIds(['a', 'b'], null, undefined, undefined)).toEqual(['a', 'b']);
+        expect(missingProfileIds(null, meta, nu, null)).toEqual([]);
+        expect(missingProfileIds(undefined, undefined, undefined, undefined)).toEqual([]);
+      });
+    });
+
+    // The late-enrollee lookup takes only a server answer (2026-11-19 review): offline, a cache answer is empty.
+    describe('newUserDocsById', () => {
+      const snap = (fromCache: boolean, docs: [string, any][]) =>
+        ({ metadata: { fromCache }, docs: docs.map(([id, data]) => ({ id, data: () => data })) });
+
+      it('maps every doc of every batch by id, with its id, without changing the doc', () => {
+        const raw = { name: 'Late One', uid: 'u1' };
+        const out = newUserDocsById([snap(false, [['late1', raw]]), snap(false, [['late2', { name: 'Late Two' }]])]);
+        expect(out).toEqual({ late1: { name: 'Late One', uid: 'u1', id: 'late1' }, late2: { name: 'Late Two', id: 'late2' } });
+        expect(raw).toEqual({ name: 'Late One', uid: 'u1' });
+        expect(newUserDocsById([snap(false, [])])).toEqual({});        // nobody found: orphan enrolments
+        expect(newUserDocsById([snap(false, [['x', undefined]])])).toEqual({ x: { id: 'x' } });
+      });
+
+      it('throws a transient error when any batch was answered from the cache, so nobody is taken for an orphan', () => {
+        let err: any;
+        try { newUserDocsById([snap(false, [['late1', {}]]), snap(true, [])]); } catch (e) { err = e; }
+        expect(err).toBeDefined();
+        expect(err.code).toBe('unavailable');
+        expect(isTransientReadError(err)).toBe(true);
       });
     });
 

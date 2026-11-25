@@ -313,6 +313,7 @@ export class DeliveryDashboardCloneComponent {
         { key: 'implementationSpecialist', label: 'IMPLEMENTATION SPECIALIST', perParticipant: true },
         { key: 'initiatedLabel', label: 'INITIATION DATE', perParticipant: true },
         { key: 'appointmentDate', label: 'APPOINTMENT DATE & TIME', perParticipant: false },
+        { key: 'ongoingDays', label: 'ONGOING DAYS', perParticipant: false },
         { key: 'stage', label: 'STAGE', perParticipant: false },
         { key: 'status', label: 'STATUS', perParticipant: false },
     ];
@@ -403,6 +404,8 @@ export class DeliveryDashboardCloneComponent {
     everyProductRecordRaw: any[] = [];
     /** Latest record per participant+product, as used by the overview (set in applyDateFilter). */
     private latestRecordKeys = new Set<string>();
+    /** Loaded records per participant (set in applyDateFilter) — read by ongoingParallelFor. */
+    private recordsByProfile = new Map<string, any[]>();
     /** Stuck candidates' appointment facts (from getRecentAppointmentDetails), keyed by participantproductid. */
     private stuckFacts = new Map<string, { days: number | null; hasFuture: boolean; basis: string; lastDate: Date | null }>();
 
@@ -1364,6 +1367,31 @@ export class DeliveryDashboardCloneComponent {
         'integration mode',
     ]);
 
+    /**
+     * Ongoing parallel products (operator 2026-11-25) — blocks Eligible and Awaiting Initiation:
+     *  • any other product in the participant's metadata `activeproduct` (covers non-delivery products such as
+     *    Expanding Horizon Consultation), except Winning Heart / Winning Heart - Vantage Point;
+     *  • another cycle of the same product (same card) with status "ongoing".
+     * Returns the names joined, or '' when there is none. Ready to Start keeps its own getParallelProduct.
+     */
+    ongoingParallelFor(profileId: string, productId: string): string {
+        const meta = this.mapMetaData?.[profileId] || {};
+        const card = this.cardLabelForProductId(productId);
+        const names = new Set<string>();
+        for (const id of new Set<string>(meta['activeproduct'] || [])) {
+            if (!id || id === productId) continue;
+            const name = (this.mapProductName?.[id] || this.mapProduct?.[id] || '').toString().trim();
+            if (!name || /^winning heart/i.test(name)) continue;
+            if (this.cardLabelForProductId(id) === card) continue; // same card: judged by its records below
+            names.add(name);
+        }
+        const sameOngoing = (this.recordsByProfile.get(profileId) || []).some(r =>
+            (r?.status || '').toString().toLowerCase().trim() === 'ongoing'
+            && this.cardLabelForProductId(r?.productref?.id) === card);
+        if (sameOngoing) names.add(`${card} (another cycle ongoing)`);
+        return Array.from(names).join(', ');
+    }
+
     /** Cycle number of each record (1 = first) within its participant+product, ordered by its earliest status date. */
     private cycleOrdinalMap(records: any[]): Map<string, number> {
         const byKey = new Map<string, Map<string, any>>();
@@ -1441,6 +1469,15 @@ export class DeliveryDashboardCloneComponent {
                     return latest;
                 };
 
+                // An open cycle (no status / initiated / ongoing) beats a completed one (operator 2026-11-23).
+                // A new cycle that hasn't started has no initiated / ongoing / completed date, so on dates alone
+                // the old completed cycle always won and the participant never reached Ready to Start
+                // (WiSH: Praveena Dorathi, Sherry Sethi). Earlier completed cycles still count in Delivered.
+                const isOpen = (r: any) => (r?.status || '').toString().toLowerCase().trim() !== 'completed';
+                if (isOpen(item) !== isOpen(existing)) {
+                    if (isOpen(item)) latestItemMap.set(key, item);
+                    continue;
+                }
                 if (getLatestProduct(item?.statusdate) > getLatestProduct(existing?.statusdate)) {
                     latestItemMap.set(key, item);
                 }
@@ -1473,45 +1510,6 @@ export class DeliveryDashboardCloneComponent {
                     (groupedStagePool[productId] ||= []).push(item);
                 }
 
-                // Overview "not started" pool (Overall / Eligible / Not Eligible / Purchased / Bonus / Add-on /
-                // This & Next Month): NO status only. Initiated left it (operator 2026-11-19).
-                if (!status) {
-                    (groupedAll[productId] ||= []).push(item);
-
-                    if (isEligible) {
-                        (groupedFiltered[productId] ||= []).push(item);
-
-                        const today = new Date();
-                        const endDate =
-                            item['subscriptionend']?.toDate?.() ||
-                            new Date(item['subscriptionend']);
-
-                        if (endDate < today) {
-                            (groupedNonActive[productId] ||= []).push(item);
-                        }
-
-                        if (tentativestart?.toDate) {
-                            const d = tentativestart.toDate();
-                            if (this.isDateInCurrentMonth(d)) {
-                                (groupedThisMonth[productId] ||= []).push(item);
-                            } else if (this.isDateInNextMonth(d)) {
-                                (groupedNextMonth[productId] ||= []).push(item);
-                            }
-                        }
-
-                        // Eligible = Purchased + Bonus + Add-on (disjoint, by package).
-                        if (packageId && this.bonusPackageLookup[packageId]) {
-                            (groupedBonus[productId] ||= []).push(item);
-                        } else if (packageId && this.addonsPackageLookup[packageId]) {
-                            (groupedAddons[productId] ||= []).push(item);
-                        } else {
-                            (groupedPurchased[productId] ||= []).push(item);
-                        }
-                    } else {
-                        (groupedNotEligible[productId] ||= []).push(item);
-                    }
-                }
-
                 if (!funnelData[productId]) {
                     funnelData[productId] = { awaiting: [], initiated: [], started: [], ongoing: [], completed: [] };
                 }
@@ -1537,6 +1535,76 @@ export class DeliveryDashboardCloneComponent {
                             funnelData[productId].started.push({ ...item, cycle });
                         }
                     }
+                }
+            }
+
+            // Overview "not started" pool (Overall / Eligible / Not Eligible / Purchased / Bonus / Add-on / This & Next
+            // Month), operator 2026-11-25: one per participant per product when ANY cycle has no status — a new cycle
+            // counts even while another cycle of the same product is ongoing (WiSH: Karpagambigai, Sanjeev, Sriram…).
+            // Eligible also needs NO ongoing parallel product (another active product, or another cycle of the same
+            // product ongoing). Everything else in the pool is Not Eligible, so Overall = Eligible + Not Eligible.
+            this.recordsByProfile = new Map();
+            for (const r of this.allMatchedProductsRaw) {
+                if (!r?.profileid) continue;
+                if (!this.recordsByProfile.has(r.profileid)) this.recordsByProfile.set(r.profileid, []);
+                this.recordsByProfile.get(r.profileid)!.push(r);
+            }
+            const notStartedByKey = new Map<string, any>();
+            for (const r of this.allMatchedProductsRaw) {
+                const pid = r?.productref?.id;
+                if (!pid || !r?.profileid) continue;
+                if ((r?.status || '').toString().trim()) continue;
+                const key = `${r.profileid}__${pid}`;
+                // Prefer the record the dashboard already treats as current, else the first no-status one.
+                if (!notStartedByKey.has(key) || this.latestRecordKeys.has(r.id || r.docid)) notStartedByKey.set(key, r);
+            }
+            for (const item of notStartedByKey.values()) {
+                const productId = item.productref.id;
+                if (!this.itemPassesProductFilter(item)) continue;
+                const profileId = item.profileid;
+                const meta = this.mapMetaData?.[profileId] || {};
+                const mode = (meta['participantmode'] || '').toString().toLowerCase().trim();
+                const totalPaid = parseInt(meta['pp_totalpaid'] ?? '0') || 0;
+                const totalBalance = (parseInt(meta['pp_totalpurchasevalue'] ?? '0') || 0) - totalPaid;
+                const minPayment = parseInt(item?.['minimumpayment']) || 0;
+                const isEligible = !this.excludedModes.has(mode) && (totalBalance <= 0 || totalPaid >= minPayment)
+                    && !this.ongoingParallelFor(profileId, productId);
+                const tentativestart = item?.tentativestart || null;
+                const packageId = item?.packageref?.id;
+
+                (groupedAll[productId] ||= []).push(item);
+
+                if (isEligible) {
+                    (groupedFiltered[productId] ||= []).push(item);
+
+                    const today = new Date();
+                    const endDate =
+                        item['subscriptionend']?.toDate?.() ||
+                        new Date(item['subscriptionend']);
+
+                    if (endDate < today) {
+                        (groupedNonActive[productId] ||= []).push(item);
+                    }
+
+                    if (tentativestart?.toDate) {
+                        const d = tentativestart.toDate();
+                        if (this.isDateInCurrentMonth(d)) {
+                            (groupedThisMonth[productId] ||= []).push(item);
+                        } else if (this.isDateInNextMonth(d)) {
+                            (groupedNextMonth[productId] ||= []).push(item);
+                        }
+                    }
+
+                    // Eligible = Purchased + Bonus + Add-on (disjoint, by package).
+                    if (packageId && this.bonusPackageLookup[packageId]) {
+                        (groupedBonus[productId] ||= []).push(item);
+                    } else if (packageId && this.addonsPackageLookup[packageId]) {
+                        (groupedAddons[productId] ||= []).push(item);
+                    } else {
+                        (groupedPurchased[productId] ||= []).push(item);
+                    }
+                } else {
+                    (groupedNotEligible[productId] ||= []).push(item);
                 }
             }
 
@@ -7440,14 +7508,14 @@ export class DeliveryDashboardCloneComponent {
      * disagree. Keep in step with populateActionableCohorts / the card funnel / getRecentAppointmentDetails.
      */
     readonly logicTip = {
-        awaiting: 'Awaiting Initiation — products not initiated yet (no status), for participants whose mode is not installation event / event / integration. One row per participant. Days waiting count from the product onboarding call, else the onboarding of their ongoing journey.',
+        awaiting: "Awaiting Initiation — products not initiated yet (a cycle with no status).\n• Participant mode is not Installation Event / Event / Integration.\n• No ongoing parallel product: no other active product (Winning Heart ignored) and no other cycle of the same product ongoing.\n• One row per participant. Days waiting count from the product onboarding call, else the onboarding of their ongoing journey.",
         ready: 'Ready to Start — products not initiated yet where the participant is Active, finance is Regular or Fully paid, has no parallel product, and has paid at least the product minimum (or owes nothing). One row per participant.',
         inDelivery: 'In delivery — every product with status "ongoing" (delivery has started), across all products including hidden ones. Not limited by the date filter.',
         delivered: "Delivered — every product cycle completed in the selected period, across all products.\n• Any record with status \"completed\" whose completion date falls in the period — earlier cycles count too, even if the participant has since started a new cycle.\n• Discontinued customers' completed products are included.\n• Cancelled or shifted records are never counted.\n• Date filter: USED. No completion date: the latest cycle is always counted; earlier cycles and discontinued customers only under \"All time\".\n• One per cycle — a participant who completed two cycles in the period counts twice.",
         needsAttention: "Needs attention — Stuck (ongoing, more than 7 days since the last booked appointment, nothing booked ahead) and Not consuming (initiated 7+ days, not ongoing). Separate lists, not a slice of In delivery.",
         stuck: "Stuck — in delivery but nothing is happening.\n• Status \"ongoing\" and product mode Priority Mode.\n• More than 7 days since the last BOOKED appointment, attended or not (cancelled ones ignored). No booked appointment yet: since delivery went ongoing.\n• No appointment booked ahead.\n• Date filter: NOT used — counted from today. Longest stuck first.",
         idle: 'Initiated – Not Consuming — status "initiated" for 7 days or more without moving to ongoing.',
-        yetToStart: "Yet to Start — ready to be initiated now.\n• Latest record has no status yet.\n• Participant eligible: mode is not Installation Event / Event / Integration, and the minimum is paid (or nothing is owed).\n• Also: customer status Active, finance Regular or Fully paid, and no other active product.\n• Date filter: NOT used — always today's state.\n• Same people as Ready to Start, counted per product.\n• \"Latest record\" = the most recent cycle of that product for the participant, by its initiated / ongoing / completed date.",
+        yetToStart: "Yet to Start — ready to be initiated now.\n• Latest record has no status yet.\n• Participant eligible: mode is not Installation Event / Event / Integration, and the minimum is paid (or nothing is owed).\n• Also: customer status Active, finance Regular or Fully paid, and no other active product.\n• Date filter: NOT used — always today's state.\n• Same people as Ready to Start, counted per product.\n• \"Latest record\" = the participant's current cycle of that product: an open cycle (no status, initiated or ongoing) wins over a completed one; otherwise the most recent by initiated / ongoing / completed date.",
         init: "Init — initiated but delivery not started.\n• Latest record status is \"initiated\".\n• Participant eligible (mode allowed, minimum paid).\n• Date filter: USED — the initiated date must fall in the selected period. \"All time\" counts every initiated product.\n• A record with no initiated date is always counted, whatever the period.",
         started: "Started — delivery began in the selected period.\n• Latest record status is \"ongoing\".\n• Participant eligible (mode allowed, minimum paid).\n• Date filter: USED — the date it went ongoing must fall in the selected period.\n• A record with no ongoing date is always counted, whatever the period.\n• A part of Ongoing.",
         ongoing: "Ongoing — everything currently in delivery.\n• Latest record status is \"ongoing\", eligible or not.\n• Date filter: NOT used — counted whenever delivery started.",
@@ -7455,9 +7523,9 @@ export class DeliveryDashboardCloneComponent {
         bonus: "Bonus — Eligible products (no status yet) given on a package named \"Bonus\".\n• Eligible = Purchased + Bonus + Add-on.\n• Date filter: NOT used.",
         addons: "Add-on — Eligible products (no status yet) taken on a package named \"Addons\".\n• Eligible = Purchased + Bonus + Add-on.\n• Date filter: NOT used.",
         purchased: "Purchased — Eligible products (no status yet) bought on a regular package (not \"Bonus\" and not \"Addons\").\n• Eligible = Purchased + Bonus + Add-on.\n• Date filter: NOT used.",
-        notEligible: "Not Eligible — products in Overall (no status yet) that cannot be started:\n• participant mode is Installation Event, Event or Integration, OR\n• less than the product minimum is paid while money is still owed.\n• Date filter: NOT used.",
-        total: "Overall — every product not initiated yet, eligible or not.\n• Latest record has NO status (initiated, ongoing and completed are all left out).\n• Overall = Eligible + Not Eligible.\n• Never loaded: cancelled or shifted records, and customers who are not Active / Non active (e.g. discontinued).\n• Date filter: NOT used.\n• \"Latest record\" = the most recent cycle of that product for the participant, by its initiated / ongoing / completed date.",
-        eligible: "Eligible — products not initiated yet that can be started.\n• Latest record has NO status (initiated products are left out).\n• Participant mode is not Installation Event / Event / Integration.\n• Minimum payment is paid, or nothing is owed.\n• Date filter: NOT used — always today's state.\n• Eligible = Purchased + Bonus + Add-on. One per participant per product.",
+        notEligible: "Not Eligible — products in Overall that cannot be started yet:\n• participant mode is Installation Event, Event or Integration, OR\n• less than the product minimum is paid while money is still owed, OR\n• an ongoing parallel product: another active product (Winning Heart ignored), or another cycle of the same product still ongoing.\n• Date filter: NOT used.",
+        total: "Overall — every product with a cycle not initiated yet, eligible or not.\n• Counted when ANY cycle of the product has no status — a new cycle counts even while another cycle of the same product is ongoing.\n• One per participant per product.\n• Overall = Eligible + Not Eligible.\n• Never loaded: cancelled or shifted records, and customers who are not Active / Non active (e.g. discontinued).\n• Date filter: NOT used.",
+        eligible: "Eligible — products not initiated yet that can be started.\n• A cycle of the product has no status.\n• Participant mode is not Installation Event / Event / Integration.\n• Minimum payment is paid, or nothing is owed.\n• No ongoing parallel product: no other active product (Winning Heart ignored) and no other cycle of the same product ongoing.\n• Date filter: NOT used — always today's state.\n• Eligible = Purchased + Bonus + Add-on. One per participant per product.",
     };
 
     /**
@@ -7695,8 +7763,9 @@ export class DeliveryDashboardCloneComponent {
             const daysSinceInitiated = this.daysSinceTs(initiated);
             const daysSinceActivity = this.daysSinceTs(lastActivity);
 
-            // payment not confirmed — not yet initiated
-            if (!status && isEligible) {
+            // payment not confirmed — not yet initiated. Operator 2026-11-25: not while another product is ongoing
+            // (incl. another cycle of the same product) — see ongoingParallelFor.
+            if (!status && isEligible && !this.ongoingParallelFor(profileId, productId)) {
                 awaiting.push({
                     profileid: profileId,
                     journey: journeyName,
@@ -8003,18 +8072,24 @@ export class DeliveryDashboardCloneComponent {
             implementationSpecialist: this.getSpecialistNames(appointments.filter(a => a['cancelled'] !== true), 'implementation'),
             initiatedDate: this.getDateFromFieldPublic(item.statusdate.initiated),
             initiatedLabel: this.formatDate(item.statusdate.initiated),
-            appointments: appointments.map(a => this.buildWeeklyAppointment(a)),
+            appointments: appointments.map(a => this.buildWeeklyAppointment(a, this.getDateFromFieldPublic(item.statusdate.initiated))),
         };
     }
 
-    private buildWeeklyAppointment(appointment: any) {
+    private buildWeeklyAppointment(appointment: any, initiated: Date | null) {
         let statusKey = 'booked';
         if (appointment['cancelled'] === true) statusKey = 'cancelled';
         else if (appointment['attended']) statusKey = 'completed';
 
+        // Ongoing Days (operator 2026-11-23): calendar days from the Initiation Date to the appointment date.
+        const start: Date = appointment['starttime'].toDate();
+        const dayOnly = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+        const ongoingDays = initiated ? Math.round((dayOnly(start) - dayOnly(initiated)) / 86400000) : '-';
+
         return {
-            start: appointment['starttime'].toDate(),
+            start,
             appointmentDate: this.formatDateTime(appointment['starttime']),
+            ongoingDays,
             stage: this.resolveAppointmentType(appointment) || '-',
             statusKey,
             status: this.weeklyStatusLabels[statusKey],
@@ -8059,6 +8134,7 @@ export class DeliveryDashboardCloneComponent {
             'Implementation Specialist': row.implementationSpecialist,
             'Initiation Date': row.initiatedLabel,
             'Appointment Date & Time': row.appointmentDate,
+            'Ongoing Days': row.ongoingDays,
             'Stage': row.stage,
             'Status': row.status,
         }));
@@ -8068,7 +8144,7 @@ export class DeliveryDashboardCloneComponent {
     // helper functions
     private toTableRows(participant: any, appointments: any[], sno: number): any[] {
         if (appointments.length === 0) {
-            return [{ ...participant, sno, isFirst: true, appointmentDate: '-', stage: '-', status: '-' }];
+            return [{ ...participant, sno, isFirst: true, appointmentDate: '-', ongoingDays: '-', stage: '-', status: '-' }];
         }
         return appointments.map((appointment, index) => ({
             ...participant, ...appointment, sno, isFirst: index === 0
@@ -8296,6 +8372,18 @@ export class DeliveryDashboardCloneComponent {
         const notStarted = () => gate || (s ? `Latest record is ${statusTxt}${latestNote} — only products with no status are counted here.` : PASS);
         const eligibility = () => !modeOk ? modeTxt : !payOk ? payTxt : PASS;
 
+        // Overview pool (Overall / Eligible / Not Eligible / Purchased / Bonus / Add-on), operator 2026-11-25: any
+        // cycle with no status counts, even while another cycle is ongoing; Eligible also needs no ongoing parallel.
+        const ns = loaded.find(r => !st(r) && this.latestRecordKeys.has(r?.id || r?.docid)) || loaded.find(r => !st(r)) || null;
+        const parallel = this.ongoingParallelFor(id, pid);
+        const parallelTxt = `Ongoing parallel product: ${parallel} — excluded from Eligible and Awaiting Initiation.`;
+        const ovMinPay = parseInt(ns?.['minimumpayment']) || 0;
+        const ovPayOk = balance <= 0 || paid >= ovMinPay;
+        const ovEligible = modeOk && ovPayOk && !parallel;
+        const ovPayTxt = `Paid ₹${paid.toLocaleString('en-IN')} against a ₹${ovMinPay.toLocaleString('en-IN')} minimum while ₹${balance.toLocaleString('en-IN')} is still owed.`;
+        const ovNotStarted = () => gate || (ns ? PASS : `No cycle of this product is still to start (records: ${statuses}) — only products with a cycle that has no status are counted here.`);
+        const ovEligibility = () => !modeOk ? modeTxt : !ovPayOk ? ovPayTxt : parallel ? parallelTxt : PASS;
+
         const readiness = () => {
             if (gate || s) return notStarted();
             if (!eligible) return eligibility();
@@ -8308,9 +8396,9 @@ export class DeliveryDashboardCloneComponent {
             return fails.length ? `Not ready — ${fails.join('; ')}.` : PASS;
         };
 
-        const pkg = latest?.packageref?.id;
+        const pkg = ns?.packageref?.id;
         const pkgKind = pkg && this.bonusPackageLookup[pkg] ? 'Bonus' : pkg && this.addonsPackageLookup[pkg] ? 'Add-on' : 'Purchased';
-        const pkgReason = (want: string) => (gate || s) ? notStarted() : !eligible ? eligibility()
+        const pkgReason = (want: string) => (gate || !ns) ? ovNotStarted() : !ovEligible ? ovEligibility()
             : pkgKind === want ? PASS
             : `Package is ${pkgKind === 'Purchased' ? 'a regular one' : `"${pkgKind}"`} — counted in ${pkgKind}, not ${want}.`;
 
@@ -8338,9 +8426,9 @@ export class DeliveryDashboardCloneComponent {
 
         const noStatusLoaded = loaded.filter(r => !st(r));
         const awaitingIn = (this.originalData?.['awaitingInitiation']?.data || []).some((r: any) => r?.profileid === id)
-            && noStatusLoaded.length > 0 && modeOk && !filterHidden;
+            && noStatusLoaded.length > 0 && modeOk && !parallel && !filterHidden;
         const awaitingReason = () => gate
-            || (!noStatusLoaded.length ? `No record of this product is without a status (records: ${statuses}).` : !modeOk ? modeTxt : PASS);
+            || (!noStatusLoaded.length ? `No record of this product is without a status (records: ${statuses}).` : !modeOk ? modeTxt : parallel ? parallelTxt : PASS);
 
         const ongoingLoaded = loaded.filter(r => st(r) === 'ongoing');
         const stuckIn = !filterHidden && this.stuckCasesCache.some((r: any) => ongoingLoaded.some(o => o?.docid === r?.participantproductid));
@@ -8373,9 +8461,9 @@ export class DeliveryDashboardCloneComponent {
             && (this.originalData?.['readyForInitiation']?.data || []).some((r: any) => r?.profileid === id);
 
         const rows = ([
-            ['overall', has(this.groupedAll[pid]), notStarted],
-            ['eligible', has(this.groupedFiltered[pid]), () => (gate || s) ? notStarted() : eligibility()],
-            ['notEligible', has(this.groupedNotEligible[pid]), () => (gate || s) ? notStarted() : eligible ? 'Participant is eligible — counted in Eligible.' : PASS],
+            ['overall', has(this.groupedAll[pid]), ovNotStarted],
+            ['eligible', has(this.groupedFiltered[pid]), () => (gate || !ns) ? ovNotStarted() : ovEligibility()],
+            ['notEligible', has(this.groupedNotEligible[pid]), () => (gate || !ns) ? ovNotStarted() : ovEligible ? 'Participant is eligible — counted in Eligible.' : PASS],
             ['purchased', has(this.groupedPurchased[pid]), () => pkgReason('Purchased')],
             ['bonus', has(this.groupedBonus[pid]), () => pkgReason('Bonus')],
             ['addons', has(this.groupedAddons[pid]), () => pkgReason('Add-on')],

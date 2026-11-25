@@ -171,10 +171,11 @@
               <div class="video-date">{{ video.created | date:'medium' }}</div>
             </div>
             <div *ngIf="i === selectedVideoIndex" class="video-player-container">
-              <video #videoPlayer controls class="video-player">
-                <source [src]="video.fileurl" type="video/mp4">
+              <video *ngIf="hlsUrl(video) as videoUrl; else notConverted" #videoPlayer controls class="video-player">
+                <source [src]="videoUrl" type="video/mp4">
                 Your browser does not support the video tag.
               </video>
+              <ng-template #notConverted><p class="video-date">Video not converted yet</p></ng-template>
             </div>
           </div>
         </div>
