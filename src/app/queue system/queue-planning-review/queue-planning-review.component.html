@@ -233,7 +233,93 @@
           (click)="resetEventParticipationFilter()" data-testid="qpr-event-reset">
           <mat-icon>close</mat-icon>
         </button>
+      </div>
+      <!--  filters -->
+      <ng-container *ngIf="selectedQueue != null">
+        <mat-form-field appearance="outline" style="width:250px;">
+          <mat-label>Filter by Specialist</mat-label>
+          <mat-select [(ngModel)]="overallSpecialistFilter" multiple data-testid="qpr-specialist-filter">
+            <mat-option>
+              <ngx-mat-select-search [(ngModel)]="specialistSearch" placeholderLabel="Search specialist..."
+                noEntriesFoundLabel="No specialists found"></ngx-mat-select-search>
+            </mat-option>
+            <mat-option *ngFor="let id of getApptFilterIds('hostref', specialistSearch, overallSpecialistFilter)" [value]="id">{{ getProfileName(id) }}</mat-option>
+          </mat-select>
+        </mat-form-field>
 
+        <mat-form-field appearance="outline" style="width:250px;">
+          <mat-label>Filter by Participant</mat-label>
+          <mat-select [(ngModel)]="overallParticipantFilter" multiple data-testid="qpr-participant-filter">
+            <mat-option>
+              <ngx-mat-select-search [(ngModel)]="participantSearch" placeholderLabel="Search participant..."
+                noEntriesFoundLabel="No participants found"></ngx-mat-select-search>
+            </mat-option>
+            <mat-option *ngFor="let id of getApptFilterIds('bookedby', participantSearch, overallParticipantFilter)" [value]="id">{{ getProfileName(id) }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </ng-container>
+      <div *ngIf="selectedQueue != null" style="width:100%;">
+        <mat-form-field appearance="outline" style="width:250px;">
+          <mat-label>Booking</mat-label>
+          <mat-select [(ngModel)]="overallAvailability" data-testid="qpr-availability-filter">
+            <mat-option value="all">All</mat-option>
+            <mat-option value="booked">Booked</mat-option>
+            <mat-option value="not-booked">Not Booked</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <button mat-button color="warn" style="margin-left:12px; margin-bottom:22px;"
+          *ngIf="overallSegmentFilter.length || overallSpecialistFilter.length || overallParticipantFilter.length || overallAvailability !== 'all' || overallDates.length"
+          (click)="clearOverallFilters()" data-testid="qpr-clear-filters">
+          <mat-icon>filter_alt_off</mat-icon> Clear filters
+        </button>
+      </div>
+      <!-- Slot type pills + past toggle -->
+      <div *ngIf="selectedQueue != null" class="slot-type-bar">
+        <span class="slot-type-label">Slot type</span>
+        <button class="slot-type-pill" [class.active]="overallSlotType === 'all'" (click)="overallSlotType = 'all'" data-testid="qpr-slottype-all">
+          <span class="slot-type-dot" style="background:#9aa0a6;"></span>All slots
+          <span class="slot-type-count">{{ getSlotTypeCount('all') }}</span>
+        </button>
+        <button class="slot-type-pill" [class.active]="overallSlotType === 'queue'" (click)="overallSlotType = 'queue'" data-testid="qpr-slottype-queue">
+          <span class="slot-type-dot" style="background:#3f51b5;"></span>Queue
+          <span class="slot-type-count">{{ getSlotTypeCount('queue') }}</span>
+        </button>
+        <button class="slot-type-pill" [class.active]="overallSlotType === 'appointment'" (click)="overallSlotType = 'appointment'" data-testid="qpr-slottype-appointment">
+          <span class="slot-type-dot" style="background:#2e7d32;"></span>Appointment
+          <span class="slot-type-count">{{ getSlotTypeCount('appointment') }}</span>
+        </button>
+        <div style="display:flex; align-items:center; gap:8px; margin-left:14px;">
+          <span class="toggle-label">Show past slots</span>
+          <label class="toggle-switch">
+            <input type="checkbox" [(ngModel)]="overallShowPast" data-testid="qpr-show-past">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+      <!-- Overall date filter: date cards + date range -->
+      <div *ngIf="selectedQueue != null" class="overall-date-bar">
+        <div class="day-slider-wrapper">
+          <button class="slider-arrow" (click)="mainDays.scrollBy({ left: -250, behavior: 'smooth' })" data-testid="qpr-overall-scroll-left">◀</button>
+          <div class="day-buttons-scroll" #mainDays>
+            <div class="day-buttons-track">
+              <button class="ctrl-btn" [class.active]="overallDates.length === 0"
+                (click)="overallDates = []; overallDateFilter = { startDate: null, endDate: null }" data-testid="qpr-overall-alldays">All Days</button>
+              <button class="ctrl-btn" *ngFor="let date of getOverallSlotDates()"
+                [class.active]="overallDates.includes(date)"
+                (click)="onOverallDate(date)" [attr.data-testid]="'qpr-overall-date-' + date">{{ getDateAndMonthString(date) }}</button>
+            </div>
+          </div>
+          <button class="slider-arrow" (click)="mainDays.scrollBy({ left: 250, behavior: 'smooth' })" data-testid="qpr-overall-scroll-right">▶</button>
+        </div>
+        <mat-form-field appearance="fill">
+          <mat-label>Enter a date range</mat-label>
+          <mat-date-range-input [rangePicker]="overallPicker">
+            <input data-testid="qpr-overall-date-start" matStartDate placeholder="Start date" [(ngModel)]="overallDateFilter.startDate">
+            <input data-testid="qpr-overall-date-end" matEndDate placeholder="End date" [(ngModel)]="overallDateFilter.endDate">
+          </mat-date-range-input>
+          <mat-datepicker-toggle matIconSuffix [for]="overallPicker"></mat-datepicker-toggle>
+          <mat-date-range-picker #overallPicker (closed)="onOverallDate()"></mat-date-range-picker>
+        </mat-form-field>
       </div>
 
     <!-- NEW: Overall Counts Section -->
@@ -393,17 +479,12 @@
 
                   <!-- Appointment slots -->
                   <div *ngFor="let appt of getAppointmentSlotsForStage(stage)" class="slot-card-wrapper">
-                    <div class="slot-card" [attr.data-testid]="'qpr-apptcard-' + stage">
+                    <div class="slot-card" (click)="openApptPanel(appt, stage)" [attr.data-testid]="'qpr-apptcard-' + stage">
                       <div class="slot-datetime-box">
                         <div class="datetime-row slot-title-row">
                           <mat-icon>medical_services</mat-icon>
                           <span class="datetime-label" style="color: black;">Appointment:</span>
                           <span class="slot-title-text">{{ getProfileName(appt.hostref?.id) }}</span>
-                          <button *ngIf="appt.appointmentref" mat-icon-button matTooltip="Revert Appointment"
-                            data-testid="qpr-revert-appointment"
-                            class="revert-btn" style="margin-left: auto;" (click)="revertAppointmentSlot(appt)">
-                            <mat-icon>undo</mat-icon>
-                          </button>
                         </div>
                         <div class="datetime-row">
                           <mat-icon>event</mat-icon>
@@ -418,14 +499,22 @@
                         </div>
                       </div>
 
-                      <div class="slot-counts-section">
+                      <div class="slot-counts-section" style="grid-template-columns: repeat(4, 1fr);">
                         <div class="count-item segments-count">
                           <span class="count-label">Seg:</span>
-                          <span class="count-value">{{ getSegmentName(appt.segmentid) }}</span>
+                          <span class="count-value">{{ appt.segmentids.length }}</span>
+                        </div>
+                        <div class="count-item remainslot-count">
+                          <span class="count-label">R-Slot:</span>
+                          <span class="count-value">{{ appt.bookedby ? 0 : 1 }}</span>
                         </div>
                         <div class="count-item confirmed-count">
-                          <span class="count-label">Booked by:</span>
-                          <span class="count-value">{{ appt.bookedby ? getProfileName(appt.bookedby.id) : 'Open' }}</span>
+                          <span class="count-label">Con:</span>
+                          <span class="count-value">{{ appt.bookedby ? 1 : 0 }}</span>
+                        </div>
+                        <div class="count-item non-confirmed-count">
+                          <span class="count-label">Non-C:</span>
+                          <span class="count-value">{{ getApptNonConfirmed(appt) }}</span>
                         </div>
                       </div>
                     </div>
@@ -499,6 +588,18 @@
             {{ selectedSlot?.startdate | date:'dd MMM yyyy' }} {{ formatTimeTo12Hour(selectedSlot?.starttime) }}
             <span class="separator">—</span>
             {{ selectedSlot?.enddate | date:'dd MMM yyyy' }} {{ formatTimeTo12Hour(selectedSlot?.endtime) }}
+          </span>
+        </h4>
+        <h3 *ngIf="panelViewType === 'appointment'">
+          <mat-icon>medical_services</mat-icon>
+          Appointment Details - {{ selectedStageForPanel }}
+        </h3>
+        <h4 *ngIf="panelViewType === 'appointment'">
+          <span class="info-value">
+            {{ getProfileName(selectedAppt?.hostref?.id) }} —
+            {{ selectedAppt?.startdate?.toDate() | date:'dd MMM yyyy, h:mm a' }}
+            <span class="separator">—</span>
+            {{ selectedAppt?.enddate?.toDate() | date:'dd MMM yyyy, h:mm a' }}
           </span>
         </h4>
       </span>
@@ -654,7 +755,7 @@
       </div>
 
       <!-- Slot View Sections (only shown when panelViewType === 'slot') -->
-      <ng-container *ngIf="panelViewType === 'slot'">
+      <ng-container *ngIf="panelViewType === 'slot' || panelViewType === 'appointment'">
         <!-- Merged Variations List -->
         <span class="merged-variations-section">
           <div class="section-header-clickable" (click)="toggleVariationsExpansion()" data-testid="qpr-toggle-variations">
@@ -675,7 +776,7 @@
                   <div class="sv-counts">
                     <span class="count-badge confirmed">Con: {{ variation.confirmedCount }}</span>
                     <span class="count-badge non-confirmed">Non: {{ variation.nonConfirmedCount }}</span>
-                    <span class="count-badge big">B!G: {{ variation.bigCount }}</span>
+                    <span class="count-badge big" *ngIf="panelViewType === 'slot'">B!G: {{ variation.bigCount }}</span>
                   </div>
                 </div>
               </div>
@@ -684,7 +785,7 @@
         </span>
 
         <!-- Stage Range Information -->
-        <span class="stage-range-info" *ngIf="getStageRangeDetails().hasNonConfirmed">
+        <span class="stage-range-info" *ngIf="panelViewType === 'slot' && getStageRangeDetails().hasNonConfirmed">
           <div class="stage-range-header" (click)="toggleStageRange()" data-testid="qpr-toggle-stagerange">
             <mat-icon>route</mat-icon>
             <span>Stage Range for Non-Confirmed Participants</span>
@@ -724,7 +825,7 @@
         </span>
 
         <!-- Overall Participants Summary -->
-        <span class="summary-grids">
+        <span class="summary-grids" *ngIf="panelViewType === 'slot'">
           <!-- Confirmed Participants Grid -->
           <div class="summary-card confirmed-card" (click)="showAllConfirmedParticipants()" data-testid="qpr-summary-confirmed">
             <div class="summary-content-compact">
@@ -754,7 +855,20 @@
           </div>
         </span>
       </ng-container>
-
+      <span class="summary-grids" *ngIf="panelViewType === 'appointment'" style="grid-template-columns: repeat(2, 1fr);">
+        <div class="summary-card confirmed-card" data-testid="qpr-appt-summary-confirmed" (click)="openApptPanel(selectedAppt, selectedStageForPanel, 'confirmed')">
+          <div class="summary-content-compact">
+            <span class="summary-label">Confirmed</span>
+            <span class="summary-count">{{ selectedAppt?.bookedby ? 1 : 0 }}</span>
+          </div>
+        </div>
+        <div class="summary-card non-confirmed-card" data-testid="qpr-appt-summary-nonconfirmed" (click)="openApptPanel(selectedAppt, selectedStageForPanel, 'non-confirmed')">
+          <div class="summary-content-compact">
+            <span class="summary-label">Non-Confirmed</span>
+            <span class="summary-count">{{ getApptNonConfirmed(selectedAppt) }}</span>
+          </div>
+        </div>
+      </span>
       <!-- Participants List Section -->
       <span class="participants-section" *ngIf="activePanelSection">
         <div class="participants-header">
@@ -987,8 +1101,7 @@
             <div class="participant-actions">
               <!-- Revert button - only for confirmed participants with queue token -->
               <button mat-icon-button
-                *ngIf="activePanelSection === 'confirmed' && !participant.isNonQueueParticipant && selectedStageForPanel"
-                matTooltip="Revert Slot"
+                *ngIf="panelViewType !== 'appointment' && activePanelSection === 'confirmed' && !participant.isNonQueueParticipant && selectedStageForPanel"                matTooltip="Revert Slot"
                 class="revert-btn"
                 (click)="revertSlot(participant, selectedStageForPanel); $event.stopPropagation()" [attr.data-testid]="'qpr-revert-' + (participant.profile_id || participant.profileid)">
                 <mat-icon>undo</mat-icon>
@@ -996,11 +1109,17 @@
 
               <!-- Book button - only participants who have a queue token -->
               <button mat-icon-button
-                *ngIf="activePanelSection === 'non-confirmed' && !participant.isNonQueueParticipant && selectedStageForPanel"
-                matTooltip="Book Slot"
+                *ngIf="panelViewType !== 'appointment' && activePanelSection === 'non-confirmed' && !participant.isNonQueueParticipant && selectedStageForPanel"                matTooltip="Book Slot"
                 class="book-btn"
                 (click)="openBookSlotDialog(participant, selectedStageForPanel); $event.stopPropagation()" [attr.data-testid]="'qpr-book-' + (participant.profile_id || participant.profileid)">
                 <mat-icon>event_available</mat-icon>
+              </button>
+
+              <button data-testid="qpr-panel-revert-appointment" mat-icon-button
+                *ngIf="panelViewType === 'appointment' && activePanelSection === 'confirmed' && selectedAppt?.appointmentref"
+                 matTooltip="Revert Appointment" class="revert-btn"
+                (click)="revertAppointmentSlot(selectedAppt); $event.stopPropagation()">
+                <mat-icon>undo</mat-icon>
               </button>
 
               <mat-checkbox [(ngModel)]="participant.selected" class="participant-checkbox">
@@ -1122,18 +1241,18 @@
         </button>
       </div>
       <button class="export-btn" (click)="exportParticipantsDetailsForStage()" data-testid="qpr-planner-export">📊 Export</button>
-      <button class="expand-toggle" (click)="expandAllRow? expandedAllRows() : collapseAllRows()" data-testid="qpr-planner-expand">{{expandAllRow ?
-        'Expand All':'Collapse All Participants'}}</button>
+      <!-- <button class="expand-toggle" (click)="expandAllRow? expandedAllRows() : collapseAllRows()" data-testid="qpr-planner-expand">{{expandAllRow ?
+        'Expand All':'Collapse All Participants'}}</button> -->
     </div>
     <div class="slot-planner-tabs">
       <button class="tab-btn"
         [class.active-tab]="activeSlotPlannerTab === 'appointment'"
-        (click)="activeSlotPlannerTab = 'appointment'" data-testid="qpr-planner-tab-appointment">
+        (click)="activeSlotPlannerTab = 'appointment'; selectedDates = []" data-testid="qpr-planner-tab-appointment">
         Appointment
       </button>
       <button class="tab-btn"
         [class.active-tab]="activeSlotPlannerTab === 'queue'"
-        (click)="activeSlotPlannerTab = 'queue'; expandedQueueRows = []" data-testid="qpr-planner-tab-queue">
+        (click)="activeSlotPlannerTab = 'queue'; expandedQueueRows = []; selectedDates = []" data-testid="qpr-planner-tab-queue">
         Queue
       </button>
     </div>
@@ -1141,103 +1260,89 @@
       <table class="main-table">
         <thead>
           <tr>
-            <th style="width:40px;"></th>
-            <th>Slot</th>
-            <th>Timing</th>
-            <th style="text-align:center">Max Slot</th>
-            <th>Booked</th>
-            <th>Available</th>
-            <!-- <th style="min-width:160px;">Capacity Fill</th> -->
+            <th>Date</th>
+            <th>Day</th>
+            <th>Time</th>
+            <th>Specialist</th>
+            <th>Participants</th>
+            <th>Status</th>
+            <th>Notes</th>
           </tr>
         </thead>
         <tbody>
-        <ng-container *ngFor="let dayGroup of getSlotsGroupForStage();let i=index">
-  
-          <!-- Day Header -->
-          <tr class="day-row">
-            <td colspan="6">
-              {{ getDayLabel(dayGroup?.date) }}
-              <span class="day-summary">
-                Booked: {{ dayGroup.totalBooked }} &nbsp;|&nbsp;
-                Open: {{ dayGroup.totalOpen }} &nbsp;|&nbsp;
-                Slots: {{ dayGroup.slots.length }}
-              </span>
-            </td>
-          </tr>
-  
-          <!-- Slots for this day -->
-          <ng-container *ngFor="let slot of dayGroup.slots; let i = index">
-  
-            <!-- Slot Row -->
-            <tr [attr.data-testid]="'qplr-act-15-' + i" class="slot-row" (click)="toggleRow(slot)">
-              <td>
-                <span class="expand-arrow" [class.expanded]="slot.expanded" *ngIf="slot.showExpand">▶</span>
-              </td>
-              <td>
-                <div *ngIf="getSlotTitle(slot, selectedStage)"
-                  class="table-slot-title">
-                  <span class="datetime-label" style="color: black;">Title:</span>  
-                  {{ getSlotTitle(slot, selectedStage) }}
-                </div>
-                <strong>{{ getDateAndMonthString(slot?.startdate) }}</strong>
-              </td>
-              <td>{{ getTimeString(slot?.startdate , slot?.enddate) }}</td>
-              <td style="text-align:center">
-                <span class="badge badge-none">{{ getMaxSlotsCount(slot, selectedStage) }}</span>
-              </td>
-              <td style="text-align:center">
-                <span class="badge badge-booked">{{ getConfirmedCountForSlot(slot, selectedStage) }}</span>
-              </td>
-              <td style="text-align:center">
-                <span class="badge badge-open" [class.low-avail]="getRemainingSlotsCount(slot, selectedStage) <= 1">
-                  {{ getRemainingSlotsCount(slot, selectedStage) }}
-                </span>
+        <ng-container *ngIf="getApptView() as view">
+          <ng-container *ngFor="let dayGroup of view.days; trackBy: trackByDay">
+            <tr class="day-row">
+              <td colspan="7">
+                {{ getDayLabel(dayGroup.date) }}
+                
               </td>
             </tr>
-  
-            <!-- Participant Panel -->
-            <tr class="participant-panel" [class.open]="slot.expanded" *ngIf="slot.expanded && slot.showExpand">
-              <td colspan="6">
-                <div class="appt-participant-panel" [@slideDown]="slot.expanded ? 'expanded' : 'collapsed'">
-                  <ng-container *ngFor="let segment of getConfirmedParticipants(slot, selectedStage)">
-                    <div class="appt-segment-block" *ngIf="segment.participants?.length > 0">
-                      <div class="appt-segment-header">
-                        <span class="appt-segment-name">{{ segment?.segmentName ?? '' }}</span>
-                        <span class="appt-segment-count">{{ segment?.participants?.length }}</span>
-                      </div>
-                      <div class="appt-participant-grid">
-                        <div class="appt-participant-item" *ngFor="let participant of segment.participants; let i = index">
-                          <span class="appt-participant-num">{{ i + 1 }}</span>
-                          <div class="appt-participant-info">
-                            <span class="appt-participant-name">{{ getProfileName(participant.profile_id || participant.profileid) }}</span>
-                            <span class="appt-participant-phone"
-                              *ngIf="getParticipantPhoneNumber(participant.profile_id || participant.profileid) as phone">
-                              <mat-icon>phone</mat-icon> {{ phone }}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </ng-container>
-                </div>
-              </td>
-            </tr>
+            <ng-container *ngFor="let appt of dayGroup.slots; trackBy: trackByAppt">
+              <tr class="slot-row" data-testid="qpr-planner-appt-row" [class.appt-booked]="appt.bookedby" [class.appt-open]="!appt.bookedby" [style.cursor]="appt.bookedby || roles['developer'] || roles['tester'] ? 'pointer' : 'default'" (click)="toggleApptRow(appt)">                <td>{{ appt.startdate.toDate() | date:'d MMMM' }}</td>
+                <td>{{ appt.startdate.toDate() | date:'EEEE' }}</td>
+                <td>{{ appt.startdate.toDate() | date:'h:mm a' }} - {{ appt.enddate.toDate() | date:'h:mm a' }}</td>
+                <td>{{ getProfileName(appt.hostref?.id) }}</td>
+                <td>{{ appt.bookedby ? getProfileName(appt.bookedby.id) : '' }}</td>
+                <td><strong [style.color]="appt.bookedby ? '#166534' : '#991b1b'">{{ appt.bookedby ? 'Booked' : 'Not Booked' }}</strong></td>
+                <td>
+                  <div style="display:flex; align-items:center; gap:4px;">
+                    <span [title]="appt.notes || ''" style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#475569;">{{ appt.notes}}</span>
+                    <button mat-icon-button matTooltip="Notes" data-testid="qpr-planner-notes"
+                      style="width:28px; height:28px; line-height:28px; padding:0;"
+                      (click)="openApptNotes(appt); $event.stopPropagation()">
+                      <mat-icon style="font-size:18px; width:18px; height:18px; line-height:18px;">edit_note</mat-icon>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- Book a queue participant into this open slot -->
+              <tr *ngIf="!appt.bookedby && (roles['developer'] || roles['tester']) && expandedQueueRows.includes(appt.id)">
+                <td colspan="7" style="background:#f8fafc; padding:10px 16px;">
+                  <div style="display:flex; align-items:center; gap:16px;">
+                    <mat-form-field appearance="outline" style="width:280px;">
+                      <mat-label>Select participant</mat-label>
+                      <mat-select [(ngModel)]="bookApptProfileId">
+                        <mat-option *ngFor="let t of getApptBookable(appt)" [value]="t.profile_id || t.profileid">
+                          {{ getProfileName(t.profile_id || t.profileid) }}
+                        </mat-option>
+                      </mat-select>
+                    </mat-form-field>
+                    <button mat-raised-button color="primary" data-testid="qpr-planner-book-appointment"
+                      [disabled]="!bookApptProfileId || bookApptLoading"
+                      (click)="bookAppointmentForParticipant(appt)">
+                      <mat-spinner *ngIf="bookApptLoading" diameter="18" style="display:inline-block; margin-right:6px;"></mat-spinner>
+                      Book
+                    </button>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- Booked participant details -->
+              <tr *ngIf="appt.bookedby && expandedQueueRows.includes(appt.appointmentref?.id)">
+                <td colspan="7" style="background:#f8fafc; padding:10px 16px;">
+                  <div style="display:flex; align-items:center; gap:16px;">
+                    <span>📞 {{ getParticipantPhoneNumber(appt.bookedby.id) || 'N/A' }}</span>
+                    <span>✉ {{ getParticipantEmail(appt.bookedby.id) || 'N/A' }}</span>
+                    <span>Segment: {{ getSegmentName(appt.segmentid) }}</span>
+                    <span *ngIf="revertingAppt" style="margin-left:auto; display:flex; align-items:center; gap:8px; color:#991b1b; font-weight:600;">
+                      <mat-spinner diameter="18"></mat-spinner> Cancelling slot...
+                    </span>
+                    <button *ngIf="!revertingAppt" mat-icon-button matTooltip="Revert Appointment" class="revert-btn" style="margin-left:auto;"
+                      data-testid="qpr-planner-revert-appointment"
+                      (click)="revertAppointmentSlot(appt)">
+                      <mat-icon>undo</mat-icon>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </ng-container>
           </ng-container>
-        </ng-container>
-          <!-- Total Row -->
           <tr class="total-row">
-            <td></td>
-            <td colspan="2"><strong>TOTAL</strong></td>
-            <td style="text-align:center">
-              <span class="badge badge-none">{{ getTotalMaxSlotsInTable() }}</span>
-            </td>
-            <td style="text-align:center">
-              <span class="badge badge-booked">{{ getTotalConfirmedParticipantInTable() }}</span>
-            </td>
-            <td style="text-align:center">
-              <span class="badge badge-open">{{ getTotalSlotsOpenInTable() }}</span>
-            </td>
+            <td colspan="7"><strong>TOTAL</strong> &nbsp; Slots: {{ view.max }} &nbsp;|&nbsp; Booked: {{ view.booked }} &nbsp;|&nbsp; Open: {{ view.open }}</td>
           </tr>
+        </ng-container>
       </tbody>
      </table>
     </div>
@@ -1629,6 +1734,10 @@
           <mat-icon>flag</mat-icon>
           <span><b>Stage:</b> {{ entry.stageName }}</span>
         </div>
+         <div class="revert-history-entry-row">
+          <mat-icon>category</mat-icon>
+          <span><b>Slot type:</b> {{ entry.log['slottype'] === 'appointment' ? 'Appointment' : 'Queue' }}</span>
+        </div>
         <div class="revert-history-entry-row" *ngIf="entry.type === 'booked'">
           <mat-icon>label</mat-icon>
           <span><b>Segment:</b> {{ entry.log['segmentName'] }}</span>
@@ -1658,3 +1767,33 @@
     </div>
   </div>
 </div>
+
+<!-- Notes box for an appointment slot -->
+<ng-template #apptNotesDialog>
+  <div style="padding:20px;">
+    <h3 style="margin:0 0 4px;">Notes</h3>
+    <div style="color:#64748b; font-size:13px; margin-bottom:12px;">
+      {{ notesAppt?.startdate?.toDate() | date:'d MMM, h:mm a' }} &middot; {{ getProfileName(notesAppt?.hostref?.id) }}
+    </div>
+
+    <div style="max-height:240px; overflow:auto;">
+      <div *ngIf="!notesAppt?.notesList?.length" style="color:#94a3b8;">No notes yet</div>
+      <div *ngFor="let n of notesAppt?.notesList" style="padding:8px 10px; border-left:3px solid #6366f1; background:#f8fafc; margin-bottom:8px; border-radius:4px;">
+        <div style="white-space:pre-wrap;">{{ n.text }}</div>
+        <div style="font-size:12px; color:#64748b; margin-top:2px;">
+          {{ getProfileName(n.author) }} &middot; {{ n.updatedon?.toDate() | date:'d MMM y, h:mm a' }}
+        </div>
+      </div>
+    </div>
+
+    <mat-form-field appearance="outline" style="width:100%; margin-top:12px;">
+      <mat-label>Add a note</mat-label>
+      <textarea matInput rows="3" [(ngModel)]="newNoteText"></textarea>
+    </mat-form-field>
+    <div style="display:flex; justify-content:flex-end; gap:8px;">
+      <button mat-button mat-dialog-close data-testid="qpr-planner-note-close">Close</button>
+      <button mat-raised-button color="primary" data-testid="qpr-planner-note-save"
+        [disabled]="!newNoteText.trim() || notesSaving" (click)="saveApptNote()">Save</button>
+    </div>
+  </div>
+</ng-template>

@@ -1,0 +1,299 @@
+/* Sale Achieved — full-screen dialog. White / light theme in the dashboard's Heritage Ledger look: DM Sans,
+   navy ink, colour option A (Sale Achieved green, --gl-sale #0c8a5f). Every class is wsad-; no Bootstrap or
+   Material class names. Typography is pinned on :host and on every heading / list, because Bootstrap 5 and the
+   Material prebuilt themes style bare elements globally. */
+
+/* ---------- the dialog panel itself (CDK overlay, outside this component) ---------- */
+::ng-deep .cdk-overlay-pane.wsad-panel { --mdc-dialog-container-shape: 0px; }
+::ng-deep .wsad-panel .mat-mdc-dialog-container,
+::ng-deep .wsad-panel .mat-mdc-dialog-inner-container { padding: 0 !important; }
+::ng-deep .wsad-panel .mat-mdc-dialog-surface {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+  padding: 0;
+  background: #fff;
+}
+/* Phones: 100vh runs under the browser bar; the dynamic viewport height does not. */
+@supports (height: 100dvh) {
+  ::ng-deep .cdk-overlay-pane.wsad-panel { height: 100dvh !important; max-height: 100dvh !important; }
+}
+
+:host {
+  --primary: #1a3c5e; --primary-light: #2a5a8e; --primary-tint: #eef3f9; --primary-line: #b8c7d9;
+  --sale: #0c8a5f; --sale-tint: color-mix(in srgb, #0c8a5f 9%, #fff); --sale-line: #bfe0cb;
+  --bg: #f4f6f9; --surface: #fff; --head: #fafbfc; --hover: #f1f5f9;
+  --border: #dde3ec; --border-light: #edf0f5; --border-strong: #c4cdd9;
+  --t1: #1a2535; --t2: #56647b; --t3: #617086;
+  --ring: 0 0 0 3px rgba(42, 90, 142, .2);
+  display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; height: 100%;
+  font: 400 14px/1.45 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  letter-spacing: normal; color: var(--t1); text-align: left;
+  font-variant-numeric: lining-nums tabular-nums;
+  background: var(--surface);
+}
+:host *, :host *::before, :host *::after { box-sizing: border-box; }
+/* src/styles.css sets label { white-space: pre-wrap } app-wide. */
+.wsad-field, .wsad-search { white-space: normal; }
+:host :focus-visible { outline: 2px solid var(--primary-light); outline-offset: 2px; }
+
+.wsad { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; height: 100%; }
+/* Buttons: each class below sets its own box (no element-level reset, whose specificity would beat them). */
+.wsad-x, .wsad-iconbtn, .wsad-seg button, .wsad-search-x, .wsad-export, .wsad-link {
+  font: inherit; letter-spacing: inherit; text-transform: none; margin: 0; cursor: pointer;
+  -webkit-appearance: none; appearance: none;
+}
+.wsad-x:disabled, .wsad-iconbtn:disabled, .wsad-seg button:disabled, .wsad-search-x:disabled, .wsad-export:disabled { cursor: not-allowed; }
+.wsad-field input, .wsad-search input { font: inherit; letter-spacing: inherit; margin: 0; }
+
+.wsad-ic { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; }
+.wsad-ic--sm { width: 15px; height: 15px; }
+.wsad-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* ---------- header: title, workshop + window, the shown total and buyer count, close ---------- */
+.wsad-head {
+  flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "t figs x";
+  align-items: center; gap: 12px 28px; padding: 18px 20px 16px 28px;
+  background: var(--sale-tint); border-bottom: 1px solid var(--border-light);
+  box-shadow: inset 4px 0 0 var(--sale);
+}
+.wsad-head-t { grid-area: t; min-width: 0; }
+.wsad-title {
+  margin: 0; padding: 0; font: 600 24px/1.2 'Playfair Display', Georgia, serif; letter-spacing: normal; color: var(--primary);
+}
+.wsad-sub {
+  margin: 4px 0 0; padding: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 0;
+  font-size: 13.5px; line-height: 1.45; color: var(--t2);
+  overflow: hidden;   /* clips the '·' of a window line that wrapped (see below) */
+}
+.wsad-ws { margin-right: 22px; font-weight: 600; color: var(--t1); overflow-wrap: anywhere; }
+/* The '·' hangs in the gap LEFT of the window line: beside the workshop title it shows; when the line wraps, it sits
+   left of the box and is clipped — a wrapped line never starts with a dot. */
+.wsad-window::before { content: '·'; display: inline-block; width: 22px; margin-left: -22px; text-align: center; color: var(--t3); }
+.wsad-figs { grid-area: figs; margin: 0; padding: 0; display: flex; gap: 28px; }
+.wsad-fig { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.wsad-fig dt { margin: 0; font: 600 11px/1.2 'DM Sans', sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--t3); white-space: nowrap; }
+.wsad-fig-note { letter-spacing: .04em; text-transform: none; font-weight: 500; }
+.wsad-fig dd { margin: 0; font: 600 28px/1.1 'DM Sans', sans-serif; letter-spacing: -.01em; color: var(--t1); white-space: nowrap; }
+.wsad-fig--money dd { color: var(--sale); }
+.wsad-fig--money dd.wsad-is-none { color: var(--t3); }
+/* "of ₹3,50,997" / "of 4" under a figure while a range or a search narrows it. */
+.wsad-fig dd.wsad-fig-of { font: 500 12px/1.3 'DM Sans', sans-serif; letter-spacing: normal; color: var(--t2); }
+.wsad-x {
+  grid-area: x; align-self: start; display: inline-grid; place-items: center; width: 40px; height: 40px;
+  padding: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--t2);
+  transition: border-color .15s, color .15s;
+}
+.wsad-x:hover { border-color: var(--border-strong); color: var(--t1); }
+
+/* ---------- tools: dates, sort, search, export ---------- */
+.wsad-tools {
+  flex: none; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 16px;
+  padding: 14px 28px; border-bottom: 1px solid var(--border); background: var(--surface);
+}
+.wsad-range { display: flex; align-items: flex-end; gap: 8px; }
+.wsad-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; margin: 0; }
+.wsad-field > span { font-size: 11.5px; font-weight: 600; line-height: 1.2; color: var(--t3); letter-spacing: .04em; }
+.wsad-field input {
+  height: 38px; width: 156px; min-width: 0; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px;
+  background: #fff; font-size: 13.5px; color: var(--t1);
+}
+.wsad-field input.wsad-is-set { border-color: var(--primary-line); background: var(--primary-tint); font-weight: 600; color: var(--primary); }
+.wsad-field input:disabled { background: var(--head); color: var(--t3); cursor: not-allowed; }
+.wsad-iconbtn {
+  display: inline-grid; place-items: center; flex: none; width: 38px; height: 38px;
+  padding: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--t2);
+}
+.wsad-iconbtn:hover { color: var(--t1); border-color: var(--border-strong); }
+.wsad-iconbtn-room { flex: none; width: 38px; height: 38px; }
+
+.wsad-seg { display: inline-grid; grid-auto-flow: column; gap: 3px; padding: 3px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); }
+.wsad-seg button { display: inline-flex; align-items: center; justify-content: center; height: 30px; padding: 0 12px; border: 1px solid transparent; border-radius: 7px; background: none; color: var(--t2); font-size: 13px; font-weight: 500; white-space: nowrap; }
+.wsad-seg button.wsad-is-on { background: #fff; border-color: var(--border); color: var(--primary); font-weight: 600; box-shadow: 0 1px 2px rgba(26, 37, 53, .07); }
+.wsad-seg button:disabled { opacity: .6; }
+
+.wsad-search { position: relative; display: block; flex: 1 1 260px; max-width: 380px; min-width: 200px; margin: 0; }
+.wsad-search > .wsad-ic { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--t3); pointer-events: none; }
+.wsad-search input {
+  display: block; width: 100%; height: 38px; padding: 0 38px; border: 1px solid var(--border); border-radius: 9px;
+  background: var(--surface); font-size: 14px; color: var(--t1); -webkit-appearance: none; appearance: none;
+}
+.wsad-search input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+.wsad-search input::placeholder { color: var(--t3); opacity: 1; }
+.wsad-search input:focus { outline: none; border-color: var(--primary-light); box-shadow: var(--ring); }
+.wsad-search input:disabled { background: var(--head); cursor: not-allowed; }
+.wsad-search-x { position: absolute; right: 2px; top: 2px; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 7px; background: none; color: var(--t2); }
+.wsad-search-x:hover { color: var(--t1); background: var(--hover); }
+
+.wsad-export {
+  display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 16px;
+  border: 1px solid var(--primary); border-radius: 9px; background: var(--primary); color: #fff;
+  font-size: 13.5px; font-weight: 600; white-space: nowrap;
+}
+.wsad-tools > .wsad-export { margin-left: auto; }
+.wsad-export:hover:not(:disabled) { background: #14304b; }
+.wsad-export:disabled { background: var(--head); border-color: var(--border); color: var(--t3); }
+
+/* ---------- body: states and the buyers table ---------- */
+.wsad-body { flex: 1 1 auto; min-height: 0; overflow: auto; background: var(--bg); padding: 16px 28px 28px; }
+
+.wsad-state {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  min-height: 220px; padding: 40px 20px; border: 1px dashed var(--border-strong); border-radius: 12px;
+  background: var(--surface); color: var(--t2); font-size: 14px; text-align: center;
+}
+.wsad-state-t { font-size: 15px; font-weight: 600; color: var(--t1); }
+.wsad-spin { display: inline-block; width: 22px; height: 22px; border: 2px solid #d3dde9; border-top-color: var(--primary); border-radius: 50%; animation: wsad-rot .8s linear infinite; }
+@keyframes wsad-rot { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .wsad-spin { animation: none; } }
+.wsad-link { padding: 4px 2px; border: 0; background: none; color: var(--primary-light); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.wsad-link:hover { color: var(--primary); }
+
+.wsad-table {
+  width: 100%; border-collapse: separate; border-spacing: 0; caption-side: top;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  /* clip, not hidden: hidden would make the table the sticky header's scroll box, and the header would not stick */
+  overflow: hidden; overflow: clip;
+}
+.wsad-table th, .wsad-table td { padding: 0 14px; border: 0; text-align: left; vertical-align: middle; }
+.wsad-table thead th {
+  position: sticky; top: 0; z-index: 1; height: 40px; background: var(--head); border-bottom: 1px solid var(--border);
+  font: 600 11.5px/1.2 'DM Sans', sans-serif; letter-spacing: .06em; text-transform: uppercase; color: var(--t3); white-space: nowrap;
+}
+.wsad-table .wsad-num { text-align: right; }
+.wsad-tr > td { padding-top: 12px; padding-bottom: 12px; border-top: 1px solid var(--border-light); vertical-align: top; }
+.wsad-table tbody .wsad-tr:first-child > td { border-top: 0; }
+.wsad-tr:hover > td { background: var(--hover); }
+.wsad-c-name { width: 22%; font-weight: 600; color: var(--t1); overflow-wrap: anywhere; }
+/* "EiFlix New User" after the name (operator 2026-11-23): the dashboard's small-chip shape (.wdx-moved) in the New
+   badge's violet (.wdx-new) — a colour no section tone uses, so it never reads as a sale type. Never wraps inside. */
+.wsad-eiflix {
+  display: inline-flex; align-items: center; height: 20px; margin-left: 8px; padding: 0 7px; border-radius: 5px;
+  background: #ede7ff; color: #5e35b1; font: 600 11px/1 'DM Sans', sans-serif; letter-spacing: .01em;
+  white-space: nowrap; vertical-align: 1px; overflow-wrap: normal;
+}
+/* break-word, not anywhere: the <wbr> before each '@' / '.' are the break points; a part breaks only if it alone overflows. */
+.wsad-c-email { width: 22%; color: var(--t2); overflow-wrap: break-word; }
+.wsad-c-phone { color: var(--t2); white-space: nowrap; }
+.wsad-c-amt { font-weight: 700; color: var(--sale); white-space: nowrap; }
+
+/* Products: every purchase of the section, newest first, listed in the cell itself (no expand / collapse). */
+.wsad-c-prod { min-width: 240px; }
+.wsad-plist { margin: 0; padding: 0; list-style: none; display: grid; gap: 7px; }
+.wsad-pl { display: grid; gap: 1px; margin: 0; font-size: 13px; line-height: 1.35; }
+.wsad-pl-p { font-weight: 600; color: var(--t1); overflow-wrap: anywhere; }
+.wsad-pl-p.wsad-is-blank { font-weight: 400; font-style: italic; color: var(--t3); }
+.wsad-pl-m { color: var(--t2); font-size: 12.5px; white-space: nowrap; }
+
+/* ---------- filters row (operator 2026-11-23): product, buyer type, amount per purchase, repeat buyers ---------- */
+.wsad-filters {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 18px;
+  padding: 0 28px 16px; background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.wsad-field--product { min-width: 220px; max-width: 360px; flex: 1 1 240px; }
+.wsad-field--product .mat-mdc-select {
+  display: block; height: 38px; padding: 0 10px; border: 1px solid var(--border); border-radius: 9px; background: #fff;
+  font: 500 13.5px/36px 'DM Sans', sans-serif; color: var(--t1);
+}
+.wsad-field--product .mat-mdc-select-disabled { background: var(--head); color: var(--t3); }
+.wsad-amt { display: flex; align-items: center; gap: 6px; color: var(--t3); }
+.wsad-amt input {
+  width: 104px; height: 38px; padding: 0 10px; border: 1px solid var(--border); border-radius: 9px; background: #fff;
+  font: 500 13.5px 'DM Sans', sans-serif; color: var(--t1);
+}
+.wsad-amt input:disabled { background: var(--head); color: var(--t3); }
+.wsad-check { display: inline-flex; align-items: center; gap: 8px; height: 38px; margin: 0; font-size: 13.5px; color: var(--t1); cursor: pointer; }
+.wsad-check input { width: 16px; height: 16px; margin: 0; accent-color: var(--primary); }
+.wsad-check-note { color: var(--t3); }
+.wsad-filters > .wsad-link { height: 38px; }
+
+/* ---------- New Sales / Funnel Sales / Upgrades: the summary strip and the three stacked sections ---------- */
+/* One accent per type (the dashboard's palette: sale green, enrolled blue, claim amber) — a bar, never the text. */
+.wsad-tone-new { --tone: var(--sale); }
+.wsad-tone-funnel { --tone: #2456a6; }
+.wsad-tone-upgrade { --tone: #a8620a; }
+
+.wsad-summary {
+  margin: 0 0 22px; padding: 0; list-style: none;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;
+}
+.wsad-sum {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "l l" "v n";
+  align-items: baseline; gap: 6px 12px; margin: 0; padding: 12px 16px 13px 19px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: inset 3px 0 0 var(--tone);
+}
+.wsad-sum-l { grid-area: l; font: 600 11px/1.2 'DM Sans', sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--t3); }
+.wsad-sum-v { grid-area: v; font: 600 21px/1.15 'DM Sans', sans-serif; letter-spacing: -.01em; color: var(--sale); white-space: nowrap; }
+.wsad-sum-n { grid-area: n; font-size: 13px; color: var(--t2); white-space: nowrap; }
+
+.wsad-section { margin: 0 0 26px; }
+.wsad-section:last-child { margin-bottom: 0; }
+.wsad-sec-head {
+  display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 6px 20px;
+  margin: 0 0 10px; padding: 1px 2px 1px 12px; border-left: 3px solid var(--tone);
+}
+.wsad-sec-t { min-width: 0; }
+.wsad-sec-title { margin: 0; padding: 0; font: 600 17px/1.25 'DM Sans', sans-serif; letter-spacing: normal; color: var(--primary); }
+.wsad-sec-note { margin: 2px 0 0; padding: 0; font-size: 13px; line-height: 1.4; color: var(--t2); }
+.wsad-sec-figs { display: flex; align-items: baseline; gap: 12px; white-space: nowrap; }
+.wsad-sec-total { font: 700 17px/1.2 'DM Sans', sans-serif; color: var(--sale); }
+.wsad-sec-count { font-size: 13px; color: var(--t2); }
+.wsad-sec-empty {
+  margin: 0; padding: 16px; border: 1px dashed var(--border-strong); border-radius: 12px;
+  background: var(--surface); color: var(--t2); font-size: 13.5px; line-height: 1.4; text-align: center;
+}
+
+/* ---------- below ~768px: header stacks, tools wrap, every buyer becomes a card ---------- */
+@media (max-width: 767.98px) {
+  /* The whole dialog scrolls (header and tools included), so the buyers get the screen once you scroll — fixed,
+     the header and tools took ~45% of an 844px-tall phone. */
+  .wsad { overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+  .wsad-body { flex: 1 0 auto; min-height: auto; overflow: visible; }
+  .wsad-head { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "t x" "figs figs"; gap: 12px; padding: 14px 12px 14px 18px; }
+  .wsad-title { font-size: 21px; }
+  .wsad-figs { gap: 24px; }
+  .wsad-fig dd { font-size: 24px; }
+  .wsad-tools { padding: 12px 16px; gap: 10px; }
+  .wsad-range { flex: 1 1 100%; }
+  .wsad-range .wsad-field { flex: 1 1 0; }
+  .wsad-field input { width: 100%; }
+  .wsad-seg { flex: 1 1 100%; grid-auto-columns: minmax(0, 1fr); }
+  .wsad-search { flex: 1 1 100%; max-width: none; min-width: 0; }
+  .wsad-export { flex: 1 1 100%; justify-content: center; }
+  .wsad-tools > .wsad-export { margin-left: 0; }
+  .wsad-body { padding: 12px 12px 20px; }
+
+  .wsad-table { display: block; background: none; border: 0; border-radius: 0; overflow: visible; }
+  .wsad-table thead { display: none; }
+  .wsad-table tbody { display: block; }
+  .wsad-tr {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "name amt" "email email" "phone phone" "prod prod";
+    gap: 8px 12px; margin-bottom: 10px; padding: 12px 14px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  }
+  .wsad-table .wsad-tr > td { display: block; width: auto; min-width: 0; height: auto; padding: 0; border: 0; background: none; text-align: left; }
+  .wsad-tr:hover { background: var(--surface); }
+  .wsad-c-name { grid-area: name; align-self: center; font-size: 15px; }
+  .wsad-c-email { grid-area: email; }
+  .wsad-c-phone { grid-area: phone; }
+  .wsad-c-prod { grid-area: prod; min-width: 0; padding-top: 8px !important; border-top: 1px solid var(--border-light) !important; }
+  .wsad-table .wsad-c-amt { grid-area: amt; align-self: center; text-align: right; }
+  .wsad-tr > td[data-label]:not(.wsad-c-amt)::before {
+    content: attr(data-label); display: block; margin-bottom: 2px;
+    font: 600 10.5px/1.2 'DM Sans', sans-serif; letter-spacing: .06em; text-transform: uppercase; color: var(--t3);
+  }
+  .wsad-filters { padding: 0 16px 12px; gap: 10px; }
+  .wsad-field--product { flex: 1 1 100%; max-width: none; }
+  .wsad-filters .wsad-seg { flex: 1 1 100%; }
+  .wsad-amt input { flex: 1 1 0; width: auto; min-width: 0; }
+  .wsad-filters > .wsad-field:has(.wsad-amt) { flex: 1 1 100%; }
+
+  /* The summary becomes three lines: type, total, buyers. */
+  .wsad-summary { grid-template-columns: minmax(0, 1fr); gap: 8px; margin-bottom: 18px; }
+  .wsad-sum { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "l v n"; gap: 4px 12px; padding: 11px 12px 11px 15px; }
+  .wsad-sum-v { font-size: 17px; }
+  .wsad-section { margin-bottom: 22px; }
+  .wsad-sec-head { padding-left: 10px; }
+}

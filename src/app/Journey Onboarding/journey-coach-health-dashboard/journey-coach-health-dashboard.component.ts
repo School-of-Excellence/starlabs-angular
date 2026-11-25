@@ -9,7 +9,7 @@ import {
 import { Auth, authState } from '@angular/fire/auth';
 import { firstValueFrom } from 'rxjs';
 import { take } from 'rxjs/operators';
-import { environment } from '../../../environments/environment.development';
+import { environment } from '../../../environments/environment';
 import { MatTableModule, MatTableDataSource } from '@angular/material/table';
 import { MatPaginator, MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatSort, MatSortModule } from '@angular/material/sort';
@@ -32,6 +32,8 @@ import { AuthguardService } from '../../authguard.service';
 import { computeHealth, normalizeTier, recencyScore, HealthState, ParticipantSignals } from './health-score.engine';
 import { LogCallDialogComponent, LogCallResult } from './log-call-dialog.component';
 import { SetHealthStateDialogComponent, SetHealthStateResult } from './set-health-state-dialog.component';
+import { exportXlsx, fmtExportDate } from './export-xlsx';
+import { NameSearchPipe } from './name-search.pipe';
 import { ParticipantSlideoverComponent, SlideoverData, SlideoverActivityItem, SlideoverLogPayload, SlideoverFollowUp } from './participant-slideover.component';
 import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 import { JourneycoachDashboardComponent } from '../journeycoach-dashboard/journeycoach-dashboard.component';
@@ -171,7 +173,9 @@ interface LiteIndexRow {
 /** A coach's personal journey group: a chosen name over a set of journey names (one journey per group). */
 interface JourneyGroup { id: string; name: string; journeys: string[]; }
 
-interface AhDrillEntry { profileid: string; name: string; created: number; }
+/** `detail` = an optional second line under the name (e.g. "Ravi → Priya · by Charan" for a coach change);
+ *  `extra` = additional columns for the drill's Export, in insertion order. */
+interface AhDrillEntry { profileid: string; name: string; created: number; detail?: string; extra?: Record<string, string>; }
 
 /** Daily trend (item 6): one healthtracker_activity {type:'daily_snapshot'} doc per scope per day,
  *  id `snap_${scope}_${YYYY-MM-DD}`, no profileid (never in a timeline), no names. */
@@ -213,7 +217,7 @@ interface ScoreboardRow {
   selector: 'app-journey-coach-health-dashboard',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, RouterLink, ProfilePictureComponent,
+    CommonModule, FormsModule, RouterLink, ProfilePictureComponent, NameSearchPipe,
     JourneycoachDashboardComponent, JcEvprepBoardComponent,
     MatTableModule, MatPaginatorModule, MatSortModule,
     MatFormFieldModule, MatInputModule, MatSelectModule,
@@ -612,6 +616,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   private openOvDrill(title: string, entries: AhDrillEntry[], order: 'asc' | 'desc' = 'desc'): void {
     if (!entries.length) return;
     const sorted = entries.slice().sort((a, b) => order === 'asc' ? a.created - b.created : b.created - a.created);
+    this.drillQuery = '';
     this.ahDrill.set({ title, entries: sorted });
   }
   // Dark/light theming (operator-approved): follows prefers-color-scheme by default; the header toggle
@@ -744,7 +749,22 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     { value: 'approved', label: 'Approved' },
     { value: 'requested', label: 'Requested' },
   ];
-  financeOptions: string[] = [];                    // discovered from the loaded base
+  /** Financial-status options, derived from the CURRENT view's base (2026-11-20). It used to be a
+   *  field captured once at load: opening on a coach's own base and then switching to All participants
+   *  reused the cached index without rebuilding it, so the dropdown offered only that first base's
+   *  values (e.g. just "locked" while 20 participants were "defaulted"). De-duped case-insensitively
+   *  — the filter itself matches case-insensitively. */
+  get financeOptions(): string[] {
+    const src: { financialstatus?: string | null }[] = (this.pagedMode && this.fullIndexBuilt) ? this.fullIndex : this.allRows();
+    return this.memo('financeOptions', [src, src.length], () => {
+      const byKey = new Map<string, string>();
+      for (const r of src) {
+        const v = (r.financialstatus ?? '').trim();
+        if (v && !byKey.has(v.toLowerCase())) byKey.set(v.toLowerCase(), v);
+      }
+      return [...byKey.values()].sort((a, b) => a.localeCompare(b));
+    });
+  }
 
   // Set of profileids that pass the lightweight full-base filters (paged mode only). When non-null,
   // it gates which rows render — so search + filters + the ecosystem default cover EVERYONE, not
@@ -861,6 +881,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       if (t === 'dark' || t === 'light') this.theme = t;
     } catch {}
     void this.loadAHSummary();   // Ecosystem A&H analytics (item 3) — base-wide, loads in parallel.
+    void this.loadHqLogs();      // Happiness quotient + logs for the default range (this week)
     try {
       await this.resolveCoach();
       await this.loadPortfolio();
@@ -983,9 +1004,13 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       // lands — it no longer blocks first render. Server counts are cheap (2 parallel counts) so
       // they ride alongside the first page.
       const indexP = this.ensureFullIndex();
+      // Paged mode keys coach-set health by profileid base-wide. The first load only ever read the
+      // CURRENT PAGE's health docs, so the Coach-set health card and the health filter counted almost
+      // everyone as Not assessed until the user switched coach and back. Read the full map alongside.
+      const healthP = this.coachHealthFullLoaded ? Promise.resolve() : this.loadCoachHealthStates();
       await Promise.all([this.loadServerCounts(), this.loadFirstPage()]);
       this.setProgress(60, 'First page ready · finalizing base…');
-      indexP.then(() => this.onFullIndexReady()).catch(() => {});
+      Promise.all([indexP, healthP]).then(() => this.onFullIndexReady()).catch(() => {});
     } else {
       // full mode scopes coach-set health to the coach's base (inside loadFullPortfolio)
       await this.loadFullPortfolio();
@@ -2086,11 +2111,34 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       .slice()
       .sort((a, b) => b.created - a.created)
       .map(d => ({ profileid: d.profileid, name: d.profileid ? this.nameOf(d.profileid) : 'Unknown participant', created: d.created }));
+    this.drillQuery = '';
     this.ahDrill.set({ title, entries });
   }
 
   /** Close the native A&H drill overlay. */
-  closeAhDrill(): void { this.ahDrill.set(null); }
+  closeAhDrill(): void { this.ahDrill.set(null); this.drillQuery = ''; }
+  /** Name search in the drill dialog (2026-11-20). Matches the name and the second line, so a coach
+   *  change can also be found by either coach or by who made it. Export downloads only the matches. */
+  drillQuery = '';
+  readonly drillText = (e: AhDrillEntry): string => `${e.name} ${e.detail ?? ''}`;
+
+  /** Export the open drill list (every Summary / Overall / HQ / A&H drill uses this overlay).
+   *  Participant details come from the lite index (whole base) or the loaded rows. */
+  exportAhDrill(drill: { title: string; entries: AhDrillEntry[] }): void {
+    const lite = new Map<string, { number: string | null; journeyname: string; customerstatus: string | null; financialstatus: string | null }>();
+    for (const l of this.fullIndex) lite.set(l.profileid, l);
+    for (const r of this.allRows()) if (!lite.has(r.profileid)) lite.set(r.profileid, r);
+    // drill-specific columns (e.g. From coach / To coach / Changed by) go right after the name
+    const extraCols: string[] = [];
+    for (const e of drill.entries) for (const k of Object.keys(e.extra ?? {})) if (!extraCols.includes(k)) extraCols.push(k);
+    const rows: unknown[][] = [['Name', ...extraCols, 'Phone', 'Journey', 'Customer status', 'Financial status', 'Date', 'Profile ID']];
+    for (const e of drill.entries) {
+      const l = e.profileid ? lite.get(e.profileid) : undefined;
+      rows.push([e.name, ...extraCols.map(k => e.extra?.[k] ?? ''), l?.number ?? '', l ? this.journeyKey(l.journeyname) : '',
+        l?.customerstatus ?? '', l?.financialstatus ?? '', e.created ? fmtExportDate(new Date(e.created)) : '', e.profileid ?? '']);
+    }
+    exportXlsx(drill.title, [{ name: 'Participants', rows }]);
+  }
 
   /** Row click in the A&H drill: close the overlay and open that participant's slide-over. */
   pickAhDrill(e: AhDrillEntry): void {
@@ -2407,11 +2455,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
     this.matchedCount = rows.length;
     this.allRows.set(rows.sort((a, b) => b.priority - a.priority));
-    if (!this.pagedMode) {
-      this.financeOptions = Array.from(
-        new Set(this.allRows().map(r => r.financialstatus).filter((v): v is string => !!v)),
-      ).sort();
-    }
+    // financeOptions is a getter over the current base now — nothing to rebuild here.
     if (!this.pagedMode) this.computeSummary();
     this.applyFilters();
   }
@@ -2555,7 +2599,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.dialog.open(ParticipantSlideoverComponent, {
       data,
       width: 'min(520px, 100vw)',
-      height: '100vh',
+      height: '100dvh',
       position: { right: '0', top: '0' },
       panelClass: this.isDark ? ['jchd-slideover-panel', 'jchd-overlay-dark'] : 'jchd-slideover-panel',
       // a11y: label the dialog by the participant-name heading and move focus into the panel
@@ -3349,6 +3393,180 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   /** Percentage width for a health-bar segment (0 when nothing loaded). */
   healthPct(count: number, total: number): number {
     return total > 0 ? (count / total) * 100 : 0;
+  }
+
+  /** Participant ids in the CURRENT summary scope (view + journey + lifecycle filter) — the same set
+   *  the Coach-set health card counts. Base-wide from the lite index once it is built (paged view),
+   *  else the loaded rows (a coach's full base). */
+  private summaryScopeIdSet(): Set<string> {
+    if (this.pagedMode && this.fullIndexBuilt) {
+      return new Set(this.fullIndex
+        .filter(l => this.liteInScope(l) && this.matchesSummaryJourneyLite(l) && this.matchesSummaryLifecycleLite(l))
+        .map(l => l.profileid));
+    }
+    return new Set(this.filteredRows().map(r => r.profileid));
+  }
+
+  /** Coach-set health card → the participants behind one legend count (same scope as the card).
+   *  `null` = Not assessed. Reuses the Overall drill overlay; a row opens the slide-over. */
+  healthCardDrill(state: CoachHealthState | null, title: string): void {
+    const people: AhDrillEntry[] = [];
+    const take = (pid: string, h: { state: CoachHealthState; date: Date | null } | null | undefined) => {
+      if ((h?.state ?? null) !== state) return;
+      people.push({ profileid: pid, name: this.nameOf(pid), created: h?.date?.getTime() ?? 0 });
+    };
+    if (this.pagedMode && this.fullIndexBuilt) {
+      for (const l of this.fullIndex) {
+        if (!this.liteInScope(l) || !this.matchesSummaryJourneyLite(l) || !this.matchesSummaryLifecycleLite(l)) continue;
+        take(l.profileid, this.freshHealth(this.coachHealthByProfile[l.profileid]));
+      }
+    } else {
+      for (const r of this.filteredRows()) take(r.profileid, r.coachHealthState);
+    }
+    people.sort((a, b) => a.name.localeCompare(b.name));   // stable base order; the drill re-sorts by date
+    this.openOvDrill(title, people);
+  }
+
+  // ===== Happiness quotient + JC Health logs by type over a date range (operator 2026-11-20) =====
+  // Source: healthtracker_activity — every log this dashboard writes, stamped with a server `timestamp`.
+  // One range query per date change; scoping to the summary filter is client-side so filter changes
+  // cost no reads. HQ = Happy health logs ÷ all health logs in the range (logs, not people — operator
+  // confirmed). The per-type counts are shown; the overall "logs created" total was removed (operator).
+  readonly hqTypeLabels: Record<string, string> = {
+    call: 'Calls', health: 'Health', note: 'Notes', schedule: 'Follow-ups', schedule_done: 'Follow-ups done',
+    flag: 'Flags', coach_change: 'Coach changes', addressed: 'Addressed',
+  };
+  /** Plain-words meaning of each log type, shown as the chip tooltip. */
+  private readonly hqTypeHints: Record<string, string> = {
+    call: 'Calls logged with Log call (reached, no answer, scheduled…)',
+    health: 'Times a coach set a participant\'s health state',
+    note: 'Notes added from the participant panel',
+    schedule: 'Follow-ups scheduled for a later date',
+    schedule_done: 'Follow-ups marked done',
+    flag: 'Participants flagged or un-flagged',
+    coach_change: 'Coach assigned, reassigned or removed — one log per participant, so a bulk assignment of 100 people adds 100',
+    addressed: 'Needs-attention issues marked addressed (or re-opened)',
+  };
+  hqTypeHint(key: string): string { return (this.hqTypeHints[key] ?? key) + '. Click for the list.'; }
+  hqPreset = signal<'week' | 'lastweek' | 'month' | 'custom'>('week');
+  hqRange = signal<{ start: Date; end: Date }>(this.hqWeekRange(0));
+  hqLoading = signal(false);
+  hqError = signal(false);
+  private hqLogs = signal<{ profileid: string; type: string; state: CoachHealthState | null; ms: number; actor: string; from: string | null; to: string | null; action: string }[]>([]);
+  private hqReq = 0;
+  /** Monday 00:00 → Sunday 23:59:59.999 of this week (+offset weeks). */
+  private hqWeekRange(offsetWeeks: number): { start: Date; end: Date } {
+    const now = new Date();
+    const dow = (now.getDay() + 6) % 7;   // Monday = 0
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dow + offsetWeeks * 7);
+    const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6, 23, 59, 59, 999);
+    return { start, end };
+  }
+  hqSetPreset(p: 'week' | 'lastweek' | 'month' | 'custom'): void {
+    this.hqPreset.set(p);
+    if (p === 'custom') return;   // keeps the current dates; the date inputs appear
+    if (p === 'week') this.hqRange.set(this.hqWeekRange(0));
+    else if (p === 'lastweek') this.hqRange.set(this.hqWeekRange(-1));
+    else {
+      const n = new Date();
+      this.hqRange.set({ start: new Date(n.getFullYear(), n.getMonth(), 1), end: new Date(n.getFullYear(), n.getMonth() + 1, 0, 23, 59, 59, 999) });
+    }
+    void this.loadHqLogs();
+  }
+  hqIso(d: Date): string { return this.datepipe.transform(d, 'yyyy-MM-dd') ?? ''; }
+  hqSetDate(which: 'start' | 'end', iso: string): void {
+    if (!iso) return;
+    const [y, m, d] = iso.split('-').map(Number);
+    const cur = this.hqRange();
+    let start = which === 'start' ? new Date(y, m - 1, d) : cur.start;
+    let end = which === 'end' ? new Date(y, m - 1, d, 23, 59, 59, 999) : cur.end;
+    if (start > end) {   // keep the range valid: the edited end drags the other one along
+      if (which === 'start') end = new Date(y, m - 1, d, 23, 59, 59, 999); else start = new Date(y, m - 1, d);
+    }
+    this.hqPreset.set('custom');
+    this.hqRange.set({ start, end });
+    void this.loadHqLogs();
+  }
+  async loadHqLogs(): Promise<void> {
+    const req = ++this.hqReq;   // drop stale responses when the range changes mid-flight
+    const { start, end } = this.hqRange();
+    this.hqLoading.set(true);
+    this.hqError.set(false);
+    try {
+      const snap = await getDocs(query(collection(this.firestore, 'healthtracker_activity'),
+        where('timestamp', '>=', start), where('timestamp', '<=', end)));
+      if (req !== this.hqReq) return;
+      const out: { profileid: string; type: string; state: CoachHealthState | null; ms: number; actor: string; from: string | null; to: string | null; action: string }[] = [];
+      snap.forEach(d => {
+        const data: any = d.data();
+        const pid = data['profileid'];
+        if (!pid) return;   // daily_snapshot docs carry no profileid — not a coach log
+        const type = String(data['type'] ?? '');
+        out.push({
+          profileid: pid, type,
+          state: type === 'health' ? normalizeCoachHealth(data['state']) : null,
+          ms: this.toDate(data['timestamp'])?.getTime() ?? 0,
+          actor: String(data['actorName'] ?? '').trim(),
+          // coach_change only: who it moved from / to ('assign' has no from, 'unassign' no to)
+          from: data['fromCoachName'] ?? null, to: data['toCoachName'] ?? null,
+          action: String(data['action'] ?? ''),
+        });
+      });
+      this.hqLogs.set(out);
+    } catch (e) {
+      if (req !== this.hqReq) return;
+      console.warn('JC health logs (range) failed', e);
+      this.hqError.set(true);
+      this.hqLogs.set([]);
+    } finally {
+      if (req === this.hqReq) this.hqLoading.set(false);
+    }
+  }
+  /** Range logs scoped to the summary filter, with the HQ, per-type and per-state counts. */
+  hq(): {
+    healthTotal: number; happy: number; pct: number | null;
+    types: { key: string; label: string; n: number }[];
+    states: { key: CoachHealthState; label: string; cls: string; n: number }[];
+  } {
+    return this.memo('hq', [this.hqLogs(), this.sumJourneys(), this.sumLifecycle(), this.selectedCoachId,
+      this.allRows(), this.indexReady(), this.fullIndexBuilt], () => {
+      const scope = this.summaryScopeIdSet();
+      const logs = this.hqLogs().filter(l => scope.has(l.profileid));
+      const byType = new Map<string, number>();
+      const byState = new Map<CoachHealthState, number>();
+      for (const l of logs) {
+        byType.set(l.type, (byType.get(l.type) ?? 0) + 1);
+        if (l.type === 'health' && l.state) byState.set(l.state, (byState.get(l.state) ?? 0) + 1);
+      }
+      const healthTotal = [...byState.values()].reduce((a, b) => a + b, 0);
+      const happy = byState.get('HAPPY') ?? 0;
+      return {
+        healthTotal, happy,
+        types: [...byType.entries()].map(([key, n]) => ({ key, label: this.hqTypeLabels[key] ?? key, n }))
+          .sort((a, b) => b.n - a.n),
+        pct: healthTotal ? Math.round((happy / healthTotal) * 100) : null,
+        states: COACH_HEALTH_OPTIONS.map(key => ({ key, label: this.healthLabel(key), cls: this.stateClass(key), n: byState.get(key) ?? 0 })),
+      };
+    });
+  }
+  /** Drill a log count: one row per log (so the list length equals the number clicked). */
+  hqDrill(type: string | null, state: CoachHealthState | null, title: string): void {
+    const scope = this.summaryScopeIdSet();
+    const entries: AhDrillEntry[] = this.hqLogs()
+      .filter(l => scope.has(l.profileid) && (!type || l.type === type) && (!state || l.state === state))
+      .map(l => {
+        const by = l.actor || 'Unknown';
+        if (l.type === 'coach_change') {
+          // From → To + who made the change. 'assign' has no previous coach, 'unassign' no new one.
+          const from = l.from || 'Unassigned', to = l.to || 'Unassigned';
+          return { profileid: l.profileid, name: this.nameOf(l.profileid), created: l.ms,
+            detail: `${from} → ${to} · by ${by}`,
+            extra: { 'From coach': from, 'To coach': to, 'Changed by': by } };
+        }
+        return { profileid: l.profileid, name: this.nameOf(l.profileid), created: l.ms,
+          detail: `by ${by}`, extra: { 'Logged by': by } };
+      });
+    this.openOvDrill(title, entries);
   }
 
   /** Journey-wise split of the current scope's participants (actual journey names, desc by count).
@@ -4402,7 +4620,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     if (this.activeLever === 'inactive' && r.subActive) return false;
     if (this.activeLever === 'tickets' && !(r.openTickets > 0)) return false;
     if (this.journeyFilter && r.journeyname !== this.journeyFilter) return false;
-    if (this.journeyGroupFilter.length && !this.journeyGroupFilter.includes(r.journeyname)) return false;
+    if (this.journeyGroupFilter.length && !this.journeyGroupFilter.includes(this.journeyKey(r.journeyname))) return false;
     if (this.statusFilter && !this.statusMatches(r.customerstatus)) return false;
     if (term && !(`${r.name} ${r.number ?? ''}`.toLowerCase().includes(term))) return false;
     // --- intelligent filter panel ---
@@ -4443,16 +4661,24 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     if (this.activeLever === 'active' && !lite.subActive) return false;
     if (this.activeLever === 'inactive' && lite.subActive) return false;
     if (this.journeyFilter && lite.journeyname !== this.journeyFilter) return false;
-    if (this.journeyGroupFilter.length && !this.journeyGroupFilter.includes(lite.journeyname)) return false;
+    if (this.journeyGroupFilter.length && !this.journeyGroupFilter.includes(this.journeyKey(lite.journeyname))) return false;
     if (this.statusFilter && !this.statusMatches(lite.customerstatus)) return false;
     if (term && !(`${lite.name} ${lite.number ?? ''}`.toLowerCase().includes(term))) return false;
     if (this.productTypeFilters.length && !this.productTypeFilters.includes(lite.productType)) return false;
     if (this.tierFilters.length && !this.tierFilters.includes(lite.atcmodel ?? '')) return false;
-    if (this.financeFilters.length && !this.financeFilters.includes(lite.financialstatus ?? '')) return false;
+    // case-insensitive, same as rowMatches — 'Defaulted' and 'defaulted' both live in the data (restored 2026-11-20)
+    if (this.financeFilters.length && !this.financeFilters.some(f => f.toLowerCase() === (lite.financialstatus ?? '').toLowerCase())) return false;
     // renewal window + open-tickets lever filter the FULL base (computed in the lite index)
     if (this.renewalWindowOnly && !lite.renewalWindow) return false;
     if (this.activeLever === 'tickets' && !(lite.openTickets > 0)) return false;
     if (this.activeLever === 'renewalWindow' && !lite.renewalWindow) return false;
+    // Coach health, base-wide: paged mode holds the FULL coach-health map (coachHealthFullLoaded), so
+    // the filter can scope the matched set instead of only refining the loaded page — which left a
+    // "Happy" filter showing a near-empty page 1 of the whole base.
+    if (this.healthFilters.length && this.coachHealthFullLoaded) {
+      const st = this.freshHealth(this.coachHealthByProfile[lite.profileid])?.state;
+      if (!(st ? this.healthFilters.includes(st) : this.healthFilters.includes('UNASSESSED'))) return false;
+    }
     // lifecycle levers — lapsed / not-started come straight from the lite index.
     if (this.activeLever === 'lapsed' && !lite.lapsed) return false;
     if (this.activeLever === 'notStarted' && !lite.notStarted) return false;
@@ -4489,7 +4715,6 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     if (this.fullIndexBuilt) return;
     const now = Date.now();
     const docs = this.metaMap?.docdata ?? {};
-    const finance = new Set<string>();
     const out: LiteIndexRow[] = [];
 
     for (const profileid of Object.keys(docs)) {
@@ -4497,7 +4722,6 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       const journeyId: string | null =
         (typeof meta['activejourney'] === 'string' && meta['activejourney']) || null;
       const fin = meta['financialstatus'] ?? null;
-      if (fin) finance.add(fin);
 
       const subEnd = this.toDate(meta['subscriptionend']);
       const daysToRenewal = subEnd ? Math.floor((subEnd.getTime() - now) / 86400000) : null;
@@ -4523,7 +4747,6 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     }
 
     this.fullIndex = out;
-    this.financeOptions = Array.from(finance).sort();
     this.rebuildStatusOptions();
     this.fullBaseWithOpenTickets = this.fullIndex.reduce((n, l) => n + (l.openTickets > 0 ? 1 : 0), 0);
     this.fullIndexBuilt = true;
@@ -4584,10 +4807,22 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.journeyFilter = '';   // guard: the panel multi-select wins over the search-bar single-select
     this.applyFilters();
   }
-  /** Search-bar single-select Journey changed → clear the panel multi-select (guard the intersection). */
+  /** Search-bar Journey pill is now a MULTI-select bound straight to journeyGroupFilter (the same
+   *  array the panel chips toggle), so both controls always show one selection. The legacy
+   *  single-value journeyFilter is cleared so it can never intersect the multi-select. */
   onTopJourneyChange(): void {
-    if (this.journeyFilter) this.journeyGroupFilter = [];
+    this.journeyFilter = '';
     this.applyFilters();
+  }
+  /** Pill label for the Journey multi-select: All → the one name → 'N journeys'. */
+  get topJourneyLabel(): string {
+    const n = this.journeyGroupFilter.length;
+    return n === 0 ? 'All' : (n === 1 ? this.journeyGroupFilter[0] : `${n} journeys`);
+  }
+  /** journeyMix lists a blank / '-' journey as 'Unknown'; filter on the same key so picking
+   *  'Unknown' actually matches those participants. */
+  private journeyKey(name: string | undefined | null): string {
+    return (name && name !== '-') ? name : 'Unknown';
   }
 
   /** Clear every filter affordance (panel + journey/status/search + lever) and reset to defaults. */

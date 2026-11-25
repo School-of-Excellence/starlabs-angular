@@ -15,7 +15,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { ConnectedPosition, OverlayModule } from '@angular/cdk/overlay';
 import { A11yModule } from '@angular/cdk/a11y';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
-import { MatDialog } from '@angular/material/dialog';
+import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { SelectionModel } from '@angular/cdk/collections';
 import {
@@ -195,6 +195,8 @@ const EMPTY_FILTER: FilterState = {
 
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** A backdrop click this soon after the details open is the second click of a double-click on the row. */
+const DETAILS_BACKDROP_GRACE_MS = 400;
 
 /**
  * The design's pager, standing in for mat-paginator as MatTableDataSource's paginator: the data source only
@@ -418,7 +420,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   private usersSub: Subscription | null = null;
   private tagsSub: Subscription | null = null;
 
-  // ---- filter state (parsed once per change, read by the predicate and the counts) ----
+  // ---- filter state (parsed once per change, read by the predicate and the count) ----
   private filterState: FilterState = EMPTY_FILTER;
   /** Ids of the rows that pass the current filters; replaced (new identity) after every filter pass. */
   private filteredIdSet = new Set<string>();
@@ -533,6 +535,13 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
 
   /** Guards against a second dialog while the first one's code is still loading. */
   private dialogOpening = false;
+  /** The open person-details dialog, if any (never two at once). */
+  private detailsRef: MatDialogRef<unknown> | null = null;
+  /**
+   * The last click that closed a filter panel or the suggestions. The panels have no backdrop, so that click
+   * goes on to the row underneath; it must only close the panel, not open the details too.
+   */
+  private lastDismissClick: Event | null = null;
 
   // memo slots (identity-keyed, so they recompute only when their inputs change)
   private selMemo: { sel: string[] | null; set: Set<string> | null; matching: number } = { sel: null, set: null, matching: 0 };
@@ -1417,6 +1426,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
       const node = (el as ElementRef<HTMLElement>)?.nativeElement ?? (el as HTMLElement);
       if (node && target && typeof (node as HTMLElement).contains === 'function' && (node as HTMLElement).contains(target)) return;
     }
+    this.lastDismissClick = event;   // the same click then bubbles to the row: it only closes the panel
     this.closePanel();
   }
 
@@ -1469,6 +1479,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
       const node = (el as ElementRef<HTMLElement>)?.nativeElement ?? (el as HTMLElement);
       if (node && target && typeof (node as HTMLElement).contains === 'function' && (node as HTMLElement).contains(target)) return;
     }
+    this.lastDismissClick = event;
     this.closeSuggestions();
   }
 
@@ -2593,6 +2604,81 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   dismissFileResult(): void {
     this.fileResult = null;
     this.showUnmatched = false;
+  }
+
+  // =====================================================================================
+  // Person details (plan 2026-11-18)
+  // =====================================================================================
+
+  /** Clicks on these, inside a row, do their own thing and never open the details. */
+  private static readonly ROW_CLICK_SKIP =
+    'button, a, input, label, select, textarea, mat-checkbox, [role="button"], [role="checkbox"], .nx-c-select';
+
+  /**
+   * A click anywhere on a row (or on a phone card) opens the person's details, except on the row's own
+   * controls (checkbox, tag buttons, "+N", the name button) and except a click that ends a text selection.
+   */
+  onRowClick(user: any, event: MouseEvent): void {
+    if (event && event === this.lastDismissClick) return;   // it closed an open panel (see lastDismissClick)
+    const row = event?.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+    const target = event?.target instanceof Element ? event.target : null;
+    const hit = target?.closest(NewusersprofileComponent.ROW_CLICK_SKIP);
+    if (hit && (!row || row.contains(hit))) return;
+    const picked = typeof window !== 'undefined' ? window.getSelection?.()?.toString() : '';
+    if (picked) return;
+    void this.openDetails(user, row?.querySelector<HTMLElement>('.nx-namebtn') || null);
+  }
+
+  /**
+   * The details dialog (loaded on first use, like the tags dialog). One at a time; Escape and Close return
+   * focus to `opener` (the row's name button), or to whatever had it.
+   */
+  async openDetails(user: any, opener?: HTMLElement | null): Promise<void> {
+    const id = this.rowId(user);
+    if (!id || this.detailsRef || this.dialogOpening || this.dialog.openDialogs?.length) return;
+    this.dialogOpening = true;
+    try {
+      const { NewUserDetailsDialogComponent } = await import('./new-user-details-dialog/new-user-details-dialog.component');
+      if (this.destroyed || this.detailsRef || this.dialog.openDialogs?.length) return;
+      // The dialog hands focus back to whatever had it when it opened: make that the row's name button
+      // (a row click leaves focus on the page body). Programmatic, so no focus ring shows after a mouse click.
+      if (opener?.isConnected && document.activeElement !== opener) opener.focus({ preventScroll: true });
+      const ref = this.dialog.open(NewUserDetailsDialogComponent, {
+        width: '520px',
+        maxWidth: 'calc(100vw - 32px)',
+        maxHeight: '90vh',
+        autoFocus: 'dialog',
+        restoreFocus: true,
+        // Escape and the backdrop are handled below, so the second click of a double-click on a row (it lands
+        // on the backdrop that has just appeared) does not close the dialog it opened.
+        disableClose: true,
+        ariaLabelledBy: 'nud-title',
+        panelClass: 'nud-dialog-panel',
+        data: {
+          id,
+          user,
+          // A getter, not a copy: setTags() swaps in a new map on every tags read, and the dialog follows it.
+          tagMap: () => this.tagMap,
+          profileId: this.accessService.currentProfileId(),
+        },
+      });
+      this.detailsRef = ref;
+      const openedAt = Date.now();
+      ref.backdropClick().subscribe(ev => {
+        if (Date.now() - openedAt < DETAILS_BACKDROP_GRACE_MS || (ev?.detail ?? 0) > 1) return;
+        ref.close();
+      });
+      ref.keydownEvents().subscribe(ev => {
+        if (ev.key !== 'Escape' || ev.altKey || ev.ctrlKey || ev.metaKey || ev.shiftKey) return;
+        ev.preventDefault();
+        ref.close();
+      });
+      ref.afterClosed().subscribe(() => { if (this.detailsRef === ref) this.detailsRef = null; });
+    } catch (err) {
+      console.error('Error opening the person details:', err);
+    } finally {
+      this.dialogOpening = false;
+    }
   }
 
   // =====================================================================================

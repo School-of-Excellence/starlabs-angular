@@ -171,10 +171,9 @@ export class ListOpenviduRoomComponent {
 
       loading.close()
 
-      const url = this.router.serializeUrl(
-        this.router.createUrlTree(['/joinroom', appointment["docid"]])
-      );
-      window.open(url, "_blank");
+      // Same tab (2026-11-24): a new tab opened after the awaits above is no longer a click,
+      // so Safari blocked it as a pop-up. Browser Back returns to the studio.
+      this.router.navigate(['/joinroom', appointment["docid"]]);
     }
     else{
       console.log("Zoom")

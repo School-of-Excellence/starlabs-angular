@@ -11,6 +11,7 @@ import { EmailInputComponent } from '../../Participants Profile Management/parti
 import { MatInputModule } from '@angular/material/input';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { NameSearchPipe, nameSearch } from '../journey-coach-health-dashboard/name-search.pipe';
 import { MatDatepickerModule, MatDateRangePicker } from '@angular/material/datepicker';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import * as XLSX from 'xlsx';
@@ -134,7 +135,7 @@ export interface DialogContext {
 @Component({
   selector: 'app-journeycoach-dashboard',
   imports: [
-    CommonModule,
+    CommonModule, NameSearchPipe,
     MatInputModule,
     ReactiveFormsModule,
     FormsModule,
@@ -5151,6 +5152,7 @@ openOnboardingProduct(p: any, type: 'toOnboard' | 'within7' | 'plus7' | 'notAssu
     this.dialogContext = { dialogType, dialogTitle: title, dialogSubtitle: subtitle, statusClass, profileList, statusType: statusClass };
     this.dialogProfileList = profileList;
     this.selectedProfile = null;
+    this.dlgQuery = '';
     this.isDialogOpen = true;
   }
 
@@ -5354,6 +5356,7 @@ openOnboardingProduct(p: any, type: 'toOnboard' | 'within7' | 'plus7' | 'notAssu
   openTagProfilesDialog(tag: any): void {
     this.selectedTagName = tag['name'] || tag.id;
     this.selectedTagProfiles = this.getProfilesForTag(tag.id);
+    this.dlgQuery = '';
     this.isTagProfilesDialogOpen = true;
   }
 
@@ -5384,6 +5387,7 @@ openOnboardingProduct(p: any, type: 'toOnboard' | 'within7' | 'plus7' | 'notAssu
     this.epDialogSubtitle = `${profiles.length} profiles in this band`;
     this.epDialogBandIdx = bandIdx;
     this.epDialogProfiles = profiles;
+    this.dlgQuery = '';
     this.isEpDialogOpen = true;
   }
 
@@ -5449,6 +5453,7 @@ openOnboardingProduct(p: any, type: 'toOnboard' | 'within7' | 'plus7' | 'notAssu
   openSubDialog(docs: any[], title: string): void {
     this.subDialogTitle = title;
     this.subDialogDocs = docs;
+    this.dlgQuery = '';
     this.isSubDialogOpen = true;
   }
   closeSubDialog(): void { this.isSubDialogOpen = false; this.subDialogDocs = []; }
@@ -5477,6 +5482,7 @@ openOnboardingProduct(p: any, type: 'toOnboard' | 'within7' | 'plus7' | 'notAssu
   openJourneyStatusDialog(profiles: any[], title: string): void {
     this.journeyStatusDialogProfiles = profiles;
     this.journeyStatusDialogTitle = title;
+    this.dlgQuery = '';
     this.isJourneyStatusDialogOpen = true;
   }
 
@@ -5562,6 +5568,7 @@ openOnboardingProduct(p: any, type: 'toOnboard' | 'within7' | 'plus7' | 'notAssu
 
     this.healthDialogTitle = key;
     this.healthDialogProfiles = result;
+    this.dlgQuery = '';
     this.isHealthDialogOpen = true;
   }
 
@@ -5609,6 +5616,7 @@ openOnboardingProduct(p: any, type: 'toOnboard' | 'within7' | 'plus7' | 'notAssu
   openCalendarDialog(): void {
     this.selectedCalendarDate = new Date();
     this.onCalendarDateSelected(this.selectedCalendarDate);
+    this.dlgQuery = '';
     this.isCalendarOpen = true;
     this.cdr.markForCheck();
   }
@@ -5620,6 +5628,7 @@ openOnboardingProduct(p: any, type: 'toOnboard' | 'within7' | 'plus7' | 'notAssu
   // ── CURA ──
   openCURADialog(): void {
     this.curaActiveTab = 0;
+    this.dlgQuery = '';
     this.isCURAOpen = true;
     this.cdr.markForCheck();
   }
@@ -5667,6 +5676,7 @@ openOnboardingProduct(p: any, type: 'toOnboard' | 'within7' | 'plus7' | 'notAssu
     config.table.data.sort((a, b) => (a['name'] ?? '').localeCompare(b['name'] ?? ''));
 
     this.dialogConfig = config;
+    this.dlgQuery = '';
     this.isModalOpen = true;
     this.cdr.markForCheck();
   }
@@ -5698,6 +5708,7 @@ openOnboardingProduct(p: any, type: 'toOnboard' | 'within7' | 'plus7' | 'notAssu
       default: this.askAHDialogProfiles = docs;
     }
 
+    this.dlgQuery = '';
     this.isAskAHDialogOpen = true;
     this.cdr.markForCheck();
   }
@@ -5719,38 +5730,38 @@ openOnboardingProduct(p: any, type: 'toOnboard' | 'within7' | 'plus7' | 'notAssu
 
   exportDialogData(profiles: any[], title: string): void {
     const rows = [['Name', 'Profile ID', 'Date', 'Changed Count']];
-    profiles.forEach(p => rows.push([p.profileName || p.profileId, p.profileId, p.createdDate || '', String(p.changedCount || '')]));
+    nameSearch(profiles, this.dlgQuery, this.dlgNameOfInterim).forEach(p => rows.push([p.profileName || p.profileId, p.profileId, p.createdDate || '', String(p.changedCount || '')]));
     this.exportToXlsx(rows, title.replace(/[^a-zA-Z0-9]/g, '_'));
   }
 
   exportHealthDialogData(): void {
     const keys = this.getHealthDialogKeys();
     const rows = [['Name', 'Profile ID', ...keys, 'Total']];
-    this.healthDialogProfiles.forEach(p => rows.push([p.profileName, p.profileId, ...keys.map(k => String(p.areas[k] || 0)), String(p.total)]));
+    nameSearch(this.healthDialogProfiles, this.dlgQuery, 'profileName').forEach(p => rows.push([p.profileName, p.profileId, ...keys.map(k => String(p.areas[k] || 0)), String(p.total)]));
     this.exportToXlsx(rows, `Health_${this.healthDialogTitle}`);
   }
 
   exportSubDialogData(): void {
     const rows = [['Name', 'Profile ID', 'Journey', 'Status', 'Subscription End']];
-    this.subDialogDocs.forEach(d => rows.push([this.mapprofile[d['profileid']] || d['profileid'], d['profileid'], this.getSubJourneyName(d), d['journeystatus'] || '', this.getSubEndDate(d)]));
+    nameSearch(this.subDialogDocs, this.dlgQuery, this.dlgNameOfDoc).forEach(d => rows.push([this.mapprofile[d['profileid']] || d['profileid'], d['profileid'], this.getSubJourneyName(d), d['journeystatus'] || '', this.getSubEndDate(d)]));
     this.exportToXlsx(rows, `Subscription_${this.subDialogTitle}`);
   }
 
   exportJourneyStatusDialogData(): void {
     const rows = [['Name', 'Profile ID', 'Status']];
-    this.journeyStatusDialogProfiles.forEach(p => rows.push([this.mapprofile[p['profileid']] || p['profileid'], p['profileid'], p['customerstatus'] || 'No status']));
+    nameSearch(this.journeyStatusDialogProfiles, this.dlgQuery, this.dlgNameOfDoc).forEach(p => rows.push([this.mapprofile[p['profileid']] || p['profileid'], p['profileid'], p['customerstatus'] || 'No status']));
     this.exportToXlsx(rows, `JourneyStatus_${this.journeyStatusDialogTitle}`);
   }
 
   exportEpDialogData(): void {
     const rows = [['Name', 'Profile ID', 'Percentage']];
-    this.epDialogProfiles.forEach(p => rows.push([p.profileName, p.profileId, `${p.pct}%`]));
+    nameSearch(this.epDialogProfiles, this.dlgQuery, 'profileName').forEach(p => rows.push([p.profileName, p.profileId, `${p.pct}%`]));
     this.exportToXlsx(rows, `EP_${this.epDialogTitle}`);
   }
 
   exportAskAHDialogData(): void {
     const rows = [['Name', 'Profile ID', 'Source', 'Happy', 'Needs Attention', 'Opportunity', 'Critical']];
-    this.askAHDialogProfiles.forEach(p => rows.push([
+    this.getFilteredAskAHProfiles().forEach(p => rows.push([
       this.mapprofile[p.profileid] || p.profileid, p.profileid,
       p.source === 'ask AH' ? 'Ask AH' : 'Love Letter',
       p.liked ? 'Yes' : '', p.tagged ? 'Yes' : '',
@@ -5761,11 +5772,70 @@ openOnboardingProduct(p: any, type: 'toOnboard' | 'within7' | 'plus7' | 'notAssu
 
   exportTagDialogData(): void {
     const rows = [['Name', 'Profile ID']];
-    this.selectedTagProfiles.forEach(p => rows.push([p.name, p.profileId || '']));
+    nameSearch(this.selectedTagProfiles, this.dlgQuery, 'name').forEach(p => rows.push([p.name, p.profileId || '']));
     this.exportToXlsx(rows, `Tag_${this.selectedTagName}`);
   }
 
+  // ---- Name search in every list dialog (2026-11-20) ----
+  // One query shared by the dialogs (only one is open at a time); cleared whenever a dialog opens.
+  // Lists filter through the nameSearch pipe and each Export downloads only the matching rows.
+  dlgQuery = '';
+  readonly dlgNameOfDoc = (d: any): string => this.mapprofile[d?.profileid] || d?.profileid || '';
+  readonly dlgNameOfInterim = (p: any): string => p?.profileName || p?.profileId || '';
+  readonly dlgNameOfSchedule = (s: any): string => this.mapprofile[s?.bookedby?.id] || '';
+  /** Table modal rows: search every visible cell (the name column varies per table). */
+  readonly dlgRowText = (row: any): string =>
+    ((this.dialogConfig as any)?.table?.columns ?? []).map((c: ColumnConfig) => this.formatCellValue(row, c)).join(' ');
+
+  // ---- Exports added 2026-11-20 (JC Health: "every dialog needs an export") ----
+  /** openDialog table modal (modes, averages, OB/JC calls…): the exact columns + cell text shown. */
+  exportModalTable(): void {
+    const cfg: any = this.dialogConfig;
+    if (!cfg?.table) return;
+    const cols = cfg.table.columns as ColumnConfig[];
+    const rows: any[][] = [['S.No', ...cols.map(c => c.header)]];
+    nameSearch(cfg.table.data as any[], this.dlgQuery, this.dlgRowText).forEach((row, i) => rows.push([i + 1, ...cols.map(c => this.formatCellValue(row, c))]));
+    this.exportToXlsx(rows, String(cfg.title || 'Table').replace(/[^a-zA-Z0-9]/g, '_'));
+  }
+
+  /** CURA: all four tabs, one sheet each. */
+  exportCura(): void {
+    const wb = XLSX.utils.book_new();
+    const tabs: [string, string][] = [['Continuity', 'continuitySales'], ['Upgrades', 'upgradeSales'], ['Referrals', 'referralSales'], ['Add-ons', 'addonSales']];
+    for (const [label, key] of tabs) {
+      const data: any[] = nameSearch(this.originalData[key]?.data ?? [], this.dlgQuery, 'name');
+      const rows: any[][] = [['S.No', 'Name', 'Profile ID']];
+      data.forEach((r, i) => rows.push([i + 1, r?.name ?? '', r?.profileid ?? r?.profileId ?? '']));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), label);
+    }
+    XLSX.writeFile(wb, `CURA_Participants_${new Date().toISOString().split('T')[0]}.xlsx`);
+  }
+
+  /** Booking schedules: the selected day's list as shown (participant, host, appointment, time, status). */
+  exportCalendarDay(): void {
+    const rows: any[][] = [['Participant', 'Host', 'Appointment', 'Start', 'Status']];
+    for (const s of nameSearch(this.selectedDateSchedules, this.dlgQuery, this.dlgNameOfSchedule)) {
+      const start: Date | null = s?.starttime?.toDate ? s.starttime.toDate() : null;
+      rows.push([
+        this.mapprofile[s?.bookedby?.id] ?? '', this.mapprofile[s?.hosts?.[0]?.id] ?? '',
+        this.mapAppointments[s?.appointment?.id] ?? '',
+        start ? start.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '',
+        s?.cancelled ? 'Cancelled' : s?.attended ? 'Completed' : 'Scheduled',
+      ]);
+    }
+    const d = this.selectedCalendarDate ? new Date(this.selectedCalendarDate) : new Date();
+    // exportToXlsx appends today's date, so name the scheduled day in words to keep the two apart.
+    const day = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/\s+/g, '');
+    this.exportToXlsx(rows, `Booking_schedules_for_${day}`);
+  }
+
+  private askAHFilteredMemo: { k: any[]; v: any[] } | null = null;
   getFilteredAskAHProfiles(): any[] {
-    return engine.filterAskAHProfiles(this.askAHDialogProfiles, this.askAHSourceFilter, this.askAHResolvedFilter);
+    // + the dialog's name search (2026-11-20); memoised on its inputs since the template calls this often
+    const k = [this.askAHDialogProfiles, this.askAHSourceFilter, this.askAHResolvedFilter, this.dlgQuery];
+    if (this.askAHFilteredMemo && this.askAHFilteredMemo.k.every((x, i) => x === k[i])) return this.askAHFilteredMemo.v;
+    const v = nameSearch(engine.filterAskAHProfiles(this.askAHDialogProfiles, this.askAHSourceFilter, this.askAHResolvedFilter), this.dlgQuery, this.dlgNameOfDoc);
+    this.askAHFilteredMemo = { k, v };
+    return v;
   }
 }

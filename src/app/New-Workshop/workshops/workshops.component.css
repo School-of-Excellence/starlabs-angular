@@ -308,7 +308,7 @@
 .col-active  { width: 196px; }
 .workshops-table td.col-active,
 .workshops-table th.col-active { padding-left: 8px; padding-right: 8px; }
-.col-actions { width: 130px; }
+.col-actions { width: 176px; }
 .workshops-table th.col-center .mat-sort-header-container,
 .workshops-table th.col-center {
   justify-content: center !important;
@@ -476,6 +476,17 @@
 
 .duplicate-btn { color: var(--text-muted) !important; }
 .duplicate-btn:hover { background: #f0f2f5 !important; color: var(--text-primary) !important; }
+
+.live-btn { color: var(--success) !important; }
+.live-btn:hover { background: var(--success-bg) !important; }
+/* the sensors glyph is drawn with thin arcs: a touch larger so it weighs the same as the solid icons beside it */
+.icon-btn.live-btn mat-icon {
+  font-size: 19px !important;
+  width: 19px !important;
+  height: 19px !important;
+}
+/* the Live button's place on rows that have none, so the icons line up down the column */
+.live-slot { flex: none; width: 34px; height: 34px; }
 
 .empty-state {
   display: flex;

@@ -336,3 +336,7 @@ A review of the change above raised two medium findings. Both held up against th
   - **New WNU-05:** the first attempt is dropped and the retry fills the cards in with the oracle numbers. "Error fetching new_user_data" is never logged.
   - The 60s deadline is pinned by unit tests, not e2e. A one-minute hold is not worth the run time.
 - **Hub pushed through `3d6b1d5`** (2026-11-18 14:13): `4cde14b`, `58f94c4`, `a71e3cf`, `3d6b1d5`. The full workshops suite before the push: 235/1/33. The one failure was WS-40 (EiFlix Home config, a click timeout, unrelated); its file re-run alone was 7/7. Nothing new had landed upstream, so no rebase was needed.
+
+## Answered (2026-11-20)
+
+- **"Should a Top tags click show each person once?"** No change is needed. The operator confirmed: "for a single workshop there is only one enrollment for a user". Top tags counts people and Total Enrolled lists enrolment docs, so with one doc per person they always agree. If a duplicate ever appears, it is bad data to clean up, not a reason to change the panel.
