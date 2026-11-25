@@ -126,7 +126,7 @@
                   <td class="r"><span class="ov-warn" *ngIf="row.error" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span><span class="ov-num ov-ne" *ngIf="!row.error && row.notEligible !== null">{{ row.notEligible | number }}</span><span class="ov-mut" *ngIf="!row.error && row.notEligible === null">…</span></td>
                   <td class="r"><span class="ov-warn" *ngIf="row.error" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span><span class="ov-num" [ngClass]="row.approved ? 'ov-app' : 'ov-zero'" *ngIf="!row.error && row.approved !== null">{{ row.approved | number }}</span><span class="ov-mut" *ngIf="!row.error && row.approved === null">…</span></td>
                   <td class="ev-act">
-                    <button data-testid="epc-row-edit" type="button" class="ev-edit-btn" title="Edit event" (click)="openEventEditor(event['docid']);$event.stopPropagation()">Edit</button>
+                    <button *ngIf="!event?.isQueueEvent" data-testid="epc-row-edit" type="button" class="ev-edit-btn" title="Edit event" (click)="openEventEditor(event['docid']);$event.stopPropagation()">Edit</button>
                   </td>
                   <td class="ov-c-go"><mat-icon class="ov-chev">chevron_right</mat-icon></td>
                 </tr>

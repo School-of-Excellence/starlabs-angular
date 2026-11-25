@@ -518,6 +518,10 @@ export class UpdateEventDetailComponent {
 
     if(this.eventform.valid){
       console.log(value)
+      // surya
+      const heroCheck = this.checkHeroEvent(value?.products ?? []);
+      if (!heroCheck) return 
+
       if(!this.validationFn()){
         var batch = writeBatch(this.firestore)
         const loading = this.loadingref;
@@ -688,8 +692,7 @@ export class UpdateEventDetailComponent {
         alert("No Delivery Events Assigned to the product")
       }
     }else {
-      console.log('Form is Invalid');
-      
+      console.log('Form is Invalid'); 
     }
   }
 
@@ -713,6 +716,21 @@ export class UpdateEventDetailComponent {
       }
     }
     return validated.includes(true)
+  }
+
+  checkHeroEvent(products : any[]){
+    const arenaEvents = products?.filter((p)=> !p['delete'] )
+    if (arenaEvents.length !== 0) {
+      const heroEvent = arenaEvents.filter((product)=> product['heroevent'] );
+      if (heroEvent.length === 0) {
+        alert('hero event is required');
+        return false;
+      } else if (heroEvent.length > 1) {
+        alert('only one product can be marked has hero event')
+        return false
+      } 
+    }
+    return true;
   }
 
   async uploadImage(event: Event) {
