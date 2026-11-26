@@ -420,7 +420,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   private usersSub: Subscription | null = null;
   private tagsSub: Subscription | null = null;
 
-  // ---- filter state (parsed once per change, read by the predicate and the count) ----
+  // ---- filter state (parsed once per change, read by the predicate and the counts) ----
   private filterState: FilterState = EMPTY_FILTER;
   /** Ids of the rows that pass the current filters; replaced (new identity) after every filter pass. */
   private filteredIdSet = new Set<string>();
