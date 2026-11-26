@@ -48,30 +48,64 @@
           <mat-icon>filter_list</mat-icon>
           Filters
         </h3>
-        <button mat-stroked-button class="clear-filters-btn" (click)="clearAllFilters()" *ngIf="hasActiveFilters()" data-testid="qp-clear-filters">
-          <mat-icon>clear_all</mat-icon>
-          Clear All Filters
-        </button>
+        <div class="filters-header-actions">
+          <button mat-stroked-button class="clear-filters-btn" (click)="clearAllFilters()" *ngIf="hasActiveFilters()" data-testid="qp-clear-filters">
+            <mat-icon>clear_all</mat-icon>
+            Clear All Filters
+          </button>
+          <mat-slide-toggle [(ngModel)]="includePastSlots" color="primary" data-testid="qp-include-past">
+            Include past slots
+          </mat-slide-toggle>
+        </div>
       </div>
 
       <div class="filters-content">
         <!-- Date Range Filter -->
         <div class="filter-group">
-          <div class="date-range-inputs">
-            <mat-form-field appearance="outline" class="date-filter">
-              <mat-label>Start Date</mat-label>
-              <input data-testid="qpln-inp-1" matInput [matDatepicker]="filterStartPicker" [(ngModel)]="filterDateStart" placeholder="From">
-              <mat-datepicker-toggle matSuffix [for]="filterStartPicker"></mat-datepicker-toggle>
-              <mat-datepicker #filterStartPicker></mat-datepicker>
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" class="date-filter">
-              <mat-label>End Date</mat-label>
-              <input data-testid="qpln-inp-2" matInput [matDatepicker]="filterEndPicker" [(ngModel)]="filterDateEnd" placeholder="To">
-              <mat-datepicker-toggle matSuffix [for]="filterEndPicker"></mat-datepicker-toggle>
-              <mat-datepicker #filterEndPicker></mat-datepicker>
-            </mat-form-field>
-          </div>
+          <mat-form-field appearance="outline">
+            <mat-label>Start Date</mat-label>
+            <input data-testid="qpln-inp-1" matInput [matDatepicker]="filterStartPicker" [(ngModel)]="filterDateStart" placeholder="From">
+            <mat-datepicker-toggle matSuffix [for]="filterStartPicker"></mat-datepicker-toggle>
+            <mat-datepicker #filterStartPicker></mat-datepicker>
+          </mat-form-field>
+        </div>
+        <div class="filter-group">
+          <mat-form-field appearance="outline">
+            <mat-label>End Date</mat-label>
+            <input data-testid="qpln-inp-2" matInput [matDatepicker]="filterEndPicker" [(ngModel)]="filterDateEnd" placeholder="To">
+            <mat-datepicker-toggle matSuffix [for]="filterEndPicker"></mat-datepicker-toggle>
+            <mat-datepicker #filterEndPicker></mat-datepicker>
+          </mat-form-field>
+        </div>
+        <div class="filter-group">
+          <mat-form-field appearance="outline" class="slottype-filter">
+            <mat-label>Slot type</mat-label>
+            <mat-select [(ngModel)]="filterSlotType" data-testid="qp-filter-slottype">
+              <mat-option [value]="null">All</mat-option>
+              <mat-option value="queue">Queue</mat-option>
+              <mat-option value="appointment">Appointment</mat-option>
+            </mat-select>
+            <mat-icon matPrefix>category</mat-icon>
+          </mat-form-field>
+        </div>
+        <div class="filter-group">
+          <mat-form-field appearance="outline" class="specialist-filter">
+            <mat-label>Specialist</mat-label>
+            <mat-select [(ngModel)]="filterSpecialists" multiple data-testid="qp-filter-specialist"
+                        (openedChange)="$event ? refreshSpecialistOptions() : (specialistSearch = '')">
+              <mat-option>
+                <ngx-mat-select-search [(ngModel)]="specialistSearch"
+                                       placeholderLabel="Search specialist..."
+                                       noEntriesFoundLabel="No specialists found"
+                                       data-testid="qp-filter-specialist-search">
+                </ngx-mat-select-search>
+              </mat-option>
+              <mat-option *ngFor="let s of getFilteredSpecialistOptions()" [value]="s.id">
+                {{ s.name }}
+              </mat-option>
+            </mat-select>
+            <mat-icon matPrefix>person</mat-icon>
+          </mat-form-field>
         </div>
 
         <!-- Segment Search Filter -->
@@ -90,10 +124,18 @@
         <div class="filter-group">
           <mat-form-field appearance="outline" class="tags-filter">
             <mat-label>Filter by Tags</mat-label>
-            <mat-select data-testid="qpln-sel-4" [(ngModel)]="filterSelectedTags" multiple placeholder="Select tags">
-              <mat-option *ngFor="let tag of participantTagsList" [value]="tag.id">
-                {{ tag.name }}
+            <mat-select data-testid="qpln-sel-4" [(ngModel)]="filterSelectedTags" multiple placeholder="Select tags"
+              (openedChange)="$event ? null : (tagSearch = '')">
+              <mat-option>
+                <ngx-mat-select-search [(ngModel)]="tagSearch" placeholderLabel="Search tag..."
+                  noEntriesFoundLabel="No tags found" data-testid="qp-filter-tag-search">
+                </ngx-mat-select-search>
               </mat-option>
+              <ng-container *ngFor="let tag of participantTagsList">
+                <mat-option *ngIf="!tagSearch || tag.name?.toLowerCase().includes(tagSearch.toLowerCase())" [value]="tag.id">
+                  {{ tag.name }}
+                </mat-option>
+              </ng-container>
             </mat-select>
             <mat-icon matPrefix>label</mat-icon>
           </mat-form-field>
@@ -103,10 +145,19 @@
         <div class="filter-group">
           <mat-form-field appearance="outline" class="lists-filter">
             <mat-label>Filter by Participant Lists</mat-label>
-            <mat-select data-testid="qpln-sel-5" [(ngModel)]="filterSelectedLists" multiple placeholder="Select lists">
-              <mat-option *ngFor="let list of participantListsList" [value]="list.id">
-                {{ list.listname }}
+            <mat-select data-testid="qpln-sel-5" [(ngModel)]="filterSelectedLists" multiple placeholder="Select lists"
+              (openedChange)="$event ? null : (listSearch = '')">
+              <mat-option>
+                <ngx-mat-select-search [(ngModel)]="listSearch" placeholderLabel="Search list..."
+                  noEntriesFoundLabel="No lists found" data-testid="qp-filter-list-search">
+                </ngx-mat-select-search>
               </mat-option>
+              <ng-container *ngFor="let list of participantListsList">
+                <mat-option *ngIf="!listSearch || list.listname?.toLowerCase().includes(listSearch.toLowerCase())"
+                  [value]="list.id">
+                  {{ list.listname }}
+                </mat-option>
+              </ng-container>
             </mat-select>
             <mat-icon matPrefix>list</mat-icon>
           </mat-form-field>
@@ -128,6 +179,18 @@
             <mat-icon matChipAvatar>date_range</mat-icon>
             {{ filterDateStart ? (filterDateStart | date:'MMM d, y') : 'Any' }} - {{ filterDateEnd ? (filterDateEnd |
             date:'MMM d, y') : 'Any' }}
+            <mat-icon matChipRemove>cancel</mat-icon>
+          </mat-chip>
+
+          <mat-chip *ngIf="filterSlotType" (removed)="filterSlotType = null" [removable]="true">
+            <mat-icon matChipAvatar>category</mat-icon>
+            {{ filterSlotType === 'appointment' ? 'Appointment' : 'Queue' }} slots
+            <mat-icon matChipRemove>cancel</mat-icon>
+          </mat-chip>
+
+          <mat-chip *ngFor="let id of filterSpecialists" (removed)="removeSpecialistFilter(id)" [removable]="true">
+            <mat-icon matChipAvatar>person</mat-icon>
+            {{ getProfileName(id) }}
             <mat-icon matChipRemove>cancel</mat-icon>
           </mat-chip>
 
@@ -153,12 +216,13 @@
         Showing {{ getFilteredPlanningRows().length }} of {{ planningRows.length }} rows
       </div>
 
-      <div class="table-wrapper">
+      <div class="table-wrapper" (scroll)="summaryPopover = null">
         <table class="planning-table">
           <thead>
             <tr>
               <th class="segment-col sticky-col"><b>Segment</b></th>
               <th class="variation-col sticky-col-2"><b>Variation</b></th>
+              <th class="summary-col"><b>Slot Summary</b></th>
               <th *ngFor="let stage of queueStages" class="stage-col">
                 <div class="th-content">
                   <b>{{ stage }}</b>
@@ -174,6 +238,7 @@
             <tr *ngFor="let row of getFilteredPlanningRows()" class="planning-row">
               <!-- Segment Column -->
               <td class="segment-cell sticky-col">
+                <div class="cell-sticky">
                 <div class="segment-info">
                   <div class="segment-name" *ngIf="row.selectedSegment">
                     <mat-icon class="info-icon">label</mat-icon>
@@ -229,26 +294,80 @@
                     <mat-icon>how_to_reg</mat-icon>
                     Confirmed Participants
                   </button> -->
+                 </div>
                 </div>
               </td>
 
               <!-- Variation Column - STICKY -->
               <td class="variation-cell sticky-col-2">
-                <div class="variation-info">
-                  <div class="variation-name" *ngIf="row.selectedVariation">
-                    <mat-icon class="info-icon">category</mat-icon>
-                    <span>{{ getVariationName(row.selectedVariation) }}</span>
+                <div class="cell-sticky">
+                  <div class="variation-info">
+                    <div class="variation-name" *ngIf="row.selectedVariation">
+                      <mat-icon class="info-icon">category</mat-icon>
+                      <span>{{ getVariationName(row.selectedVariation) }}</span>
+                    </div>
+                    <div class="variation-placeholder" *ngIf="!row.selectedVariation">
+                      <span>No variation selected</span>
+                    </div>
                   </div>
-                  <div class="variation-placeholder" *ngIf="!row.selectedVariation">
-                    <span>No variation selected</span>
-                  </div>
-                </div>
 
-                <div class="variation-actions">
-                  <button mat-stroked-button class="btn-edit-row" (click)="editVariation(row)" [attr.data-testid]="'qp-editvariation-' + row.id">
-                    <mat-icon>edit</mat-icon> Edit Variation
-                  </button>
+                  <div class="variation-actions">
+                    <button mat-stroked-button class="btn-edit-row" (click)="editVariation(row)" [attr.data-testid]="'qp-editvariation-' + row.id">
+                      <mat-icon>edit</mat-icon> Edit Variation
+                    </button>
+                  </div>
                 </div>
+              </td>
+
+              <!-- Slot Summary Column -->
+              <td class="summary-cell">
+                <ng-container *ngIf="row.selectedVariation && getRowSummary(row) as s; else noSummary">
+                  <div class="slot-summary" (mouseenter)="showSummary(row, $event)" (mouseleave)="hideSummary()"
+                    [attr.data-testid]="'qp-slotsummary-' + row.id">
+                    <div class="slot-summary__head">
+                      <div class="slot-summary__title"><b>{{ s.total }}</b> slot{{ s.total === 1 ? '' : 's' }} released</div>
+                      <div class="slot-summary__sub">in {{ s.stagesWithSlots.length }} of {{ s.stageCount }} stages</div>
+                    </div>
+              
+                    <div class="slot-summary__row">
+                      <span class="slot-summary__label">Types</span>
+                      <span class="slot-summary__chips">
+                        <span class="ss-chip ss-chip--queue" *ngIf="s.queues.length">{{ s.queues.length }} Queue</span>
+                        <span class="ss-chip ss-chip--appt" *ngIf="s.appointments.length">{{ s.appointments.length }}
+                          Appointment</span>
+                        <span *ngIf="!s.total">—</span>
+                      </span>
+                    </div>
+              
+                    <div class="slot-summary__row">
+                      <span class="slot-summary__label">Dates</span>
+                      <span class="slot-summary__value">
+                        {{ s.first ? (s.first | date:'d MMM') + ' – ' + (s.last | date:'d MMM') : '—' }}
+                      </span>
+                    </div>
+              
+                    <div class="slot-summary__row slot-summary__row--seats">
+                      <span class="slot-summary__label">Seats</span>
+                      <div class="slot-summary__value">
+                        {{ s.seatsBooked }} / {{ s.seatsTotal }} booked
+                        <div class="ss-bar">
+                          <div class="ss-bar__fill" [style.width.%]="s.seatsTotal ? (s.seatsBooked / s.seatsTotal) * 100 : 0"></div>
+                        </div>
+                      </div>
+                    </div>
+              
+                    <div class="slot-summary__row">
+                      <span class="slot-summary__label">Empty</span>
+                      <span class="slot-summary__value">{{ s.emptyStages.length }} stage{{ s.emptyStages.length === 1 ? '' : 's'
+                        }}</span>
+                    </div>
+              
+                    <div class="slot-summary__hint">Hover for stage details</div>
+                  </div>
+                </ng-container>
+                <ng-template #noSummary>
+                  <div class="no-data">—</div>
+                </ng-template>
               </td>
 
               <!-- Stage Columns -->
@@ -308,70 +427,112 @@
                     </div> -->
                   <!-- </div> -->
 
-                  <!-- Show slots if they exist -->
-                  <div *ngIf="row.stageData[stage]?.dates && row.stageData[stage].dates.length > 0">
-                    <div *ngFor="let dateEntry of row.stageData[stage].dates; let i = index" class="date-entry"
-                      [class.date-not-set]="!dateEntry.startdate || !dateEntry.enddate">
-                      <div class="slot-header">
-                        <div>
-                          <b>Slot : {{i+1}}</b>
-                          <span class="slot-type-tag" data-testid="qp-slot-typetag" [class.appointment]="dateEntry.slottype === 'appointment'">
+                  <!-- Slot cards -->
+                  <div *ngIf="row.stageData[stage]?.dates?.length > 0" class="slot-list">
+                    <ng-container *ngFor="let dateEntry of row.stageData[stage].dates; let i = index">
+                      <div *ngIf="slotMatchesFilters(dateEntry)" class="slot-card"
+                        [class.slot-card--appointment]="dateEntry.slottype === 'appointment'"
+                        [class.slot-card--invalid]="!dateEntry.startdate || !dateEntry.enddate"
+                        [attr.data-testid]="'qp-slotcard-' + row.id + '-' + stage + '-' + i">
+                        <!-- Header -->
+                        <div class="slot-card__header">
+                          <span class="slot-card__type" data-testid="qp-slot-typetag">
                             {{ dateEntry.slottype === 'appointment' ? 'Appointment' : 'Queue' }}
                           </span>
-                        </div>
-                        <mat-icon class="btn-delete"
-                          [matTooltip]="(dateEntry.appointmentref || dateEntry.bookedby || dateEntry.usedslot > 0 || dateEntry.participants?.length > 0) ? 'Booked - cancel the booking first' : 'Remove slot'"
-                          (click)="removeDateFromStage(row, stage, i)"
-                          [attr.data-testid]="'qp-slotdel-' + row.id + '-' + stage + '-' + i">delete</mat-icon>
-                      </div>
-                      <div style="display: flex;flex-direction: row;justify-content: space-between;">
-                        <div class="date-row">
-                          <div class="date-label" [class.error-text]="!dateEntry.startdate || !dateEntry.enddate">
-                            <b>Start</b> : {{ (dateEntry.startdate | date:'dd MMM yyyy') || 'Not Set' }}
-                            <span *ngIf="dateEntry && dateEntry.startdate && dateEntry.starttime"> - {{
-                              formatTimeTo12Hour(dateEntry.starttime) }}</span>
-                          </div>
-                          <div class="date-label" [class.error-text]="!dateEntry.enddate">
-                            <b>End</b>&nbsp;&nbsp; : {{ (dateEntry.enddate | date:'dd MMM yyyy') || 'Not Set' }}
-                            <span *ngIf="dateEntry.endtime && dateEntry.enddate"> - {{
-                              formatTimeTo12Hour(dateEntry.endtime) }}</span>
+                          <div class="slot-card__actions">
+                            <mat-icon class="slot-card__icon" matTooltip="Edit slot" (click)="editDateEntry(row, stage, i)"
+                              [attr.data-testid]="'qp-slotedit-' + row.id + '-' + stage + '-' + i">edit_note</mat-icon>
+                            <mat-icon class="slot-card__icon slot-card__icon--delete" [class.is-disabled]="isSlotBooked(dateEntry)"
+                              [matTooltip]="isSlotBooked(dateEntry) ? 'Booked - cancel the booking first' : 'Remove slot'"
+                              (click)="removeDateFromStage(row, stage, i)"
+                              [attr.data-testid]="'qp-slotdel-' + row.id + '-' + stage + '-' + i">delete_outline</mat-icon>
                           </div>
                         </div>
-                        <div class="edit-slot-btn">
-                          <mat-icon class="btn-edit" (click)="editDateEntry(row, stage, i)"
-                            matTooltip="Edit slot" [attr.data-testid]="'qp-slotedit-' + row.id + '-' + stage + '-' + i">edit_note</mat-icon>
+                        <!-- Body -->
+                        <div class="slot-card__body">
+                          <div class="slot-card__row" *ngIf="dateEntry.slottype !== 'appointment' && dateEntry.title">
+                            <span class="slot-card__label">Title</span>
+                            <span class="slot-card__value">{{ dateEntry.title }}</span>
+                          </div>
+                  
+                          <div class="slot-card__row" *ngIf="dateEntry.slottype === 'appointment'">
+                            <span class="slot-card__label">Specialist</span>
+                            <span class="slot-card__value">{{ getProfileName(dateEntry.hostref?.id) || 'Specialist' }}</span>
+                          </div>
+                  
+                          <div class="slot-card__row">
+                            <span class="slot-card__label">Date</span>
+                            <span class="slot-card__value" *ngIf="dateEntry.startdate">
+                              {{ dateEntry.startdate | date:'d MMM y' }}
+                              <ng-container
+                                *ngIf="dateEntry.enddate && (dateEntry.startdate | date:'yMMdd') !== (dateEntry.enddate | date:'yMMdd')">
+                                – {{ dateEntry.enddate | date:'d MMM y' }}
+                              </ng-container>
+                            </span>
+                            <span class="slot-card__value slot-card__value--error" *ngIf="!dateEntry.startdate">Not set</span>
+                          </div>
+                  
+                          <div class="slot-card__row" *ngIf="dateEntry.startdate && dateEntry.enddate">
+                            <span class="slot-card__label">Time</span>
+                            <span class="slot-card__value">
+                              {{ formatTimeTo12Hour(dateEntry.starttime) }} – {{ formatTimeTo12Hour(dateEntry.endtime) }}
+                            </span>
+                          </div>
+                  
+                          <div class="slot-card__row"
+                            *ngIf="dateEntry.slottype === 'appointment' && (dateEntry.appointmentref || dateEntry.bookedby)">
+                            <span class="slot-card__label">Booked by</span>
+                            <span class="slot-card__value slot-card__value--booked">
+                              {{ getProfileName(dateEntry.bookedby?.id ?? dateEntry.bookedby) }}
+                            </span>
+                          </div>
+                        </div>
+                  
+                        <!-- Footer -->
+                        <div class="slot-card__footer">
+                          <div class="slot-card__stat">
+                            <span class="slot-card__label">Max</span>
+                            <span class="slot-card__stat-value">
+                              {{ dateEntry.slottype === 'appointment' ? 1 : (dateEntry.maxslot || 0) }}
+                            </span>
+                          </div>
+                          <div class="slot-card__stat">
+                            <span class="slot-card__label">Used</span>
+                            <span class="slot-card__stat-value">
+                              {{ dateEntry.slottype === 'appointment' ? (isSlotBooked(dateEntry) ? 1 : 0) : (dateEntry.usedslot || 0) }}
+                            </span>
+                            <!-- <div class="slots-row">
+                              <span class="slot-info clickable"
+                                (click)="showBigParticipants(dateEntry.bigparticipants, {stage: stage, row: row, index: i})"
+                                [class.has-data]="dateEntry.bigparticipants?.length > 0"
+                                matTooltip="Click to view B!G participants">
+                                B!G Participants : {{ dateEntry.bigparticipants?.length || 0 }}
+                              </span>
+                              <span *ngIf="dateEntry.startdate && dateEntry.enddate">
+                                <span class="slot-info">Total: {{ dateEntry.maxslot }}</span>
+                              </span>
+                              <span *ngIf="dateEntry.startdate && dateEntry.enddate">
+                                <span class="slot-info clickable"
+                                  (click)="showParticipants(dateEntry.participants, {stage: stage, row: row, index: i})"
+                                  [class.has-data]="dateEntry.participants?.length > 0"
+                                  matTooltip="Click to view participants">
+                                  Confirmed: {{ dateEntry.participants?.length || 0 }}
+                                </span>
+                              </span>
+                              <span *ngIf="dateEntry.startdate && dateEntry.enddate && row.selectedVariation">
+                                <span class="slot-info clickable non-confirmed"
+                                  (click)="showNonConfirmedParticipants(row.selectedVariation, row.selectedSegment, stage, dateEntry.startdate, dateEntry.enddate, {stage: stage, row: row, index: i})"
+                                  [class.has-data]="getNonConfirmedCount(row.selectedVariation, row.selectedSegment, stage, dateEntry.startdate, dateEntry.enddate) > 0"
+                                  matTooltip="Click to view non-confirmed participants">
+                                  Non-Confirmed: {{ getNonConfirmedCount(row.selectedVariation, row.selectedSegment, stage,
+                                  dateEntry.startdate, dateEntry.enddate) }}
+                                </span>
+                              </span>
+                            </div> -->
+                          </div>
                         </div>
                       </div>
-
-                      <!-- <div class="slots-row">
-                        <span class="slot-info clickable"
-                          (click)="showBigParticipants(dateEntry.bigparticipants, {stage: stage, row: row, index: i})"
-                          [class.has-data]="dateEntry.bigparticipants?.length > 0"
-                          matTooltip="Click to view B!G participants">
-                          B!G Participants : {{ dateEntry.bigparticipants?.length || 0 }}
-                        </span>
-                        <span *ngIf="dateEntry.startdate && dateEntry.enddate">
-                          <span class="slot-info">Total: {{ dateEntry.maxslot }}</span>
-                        </span>
-                        <span *ngIf="dateEntry.startdate && dateEntry.enddate">
-                          <span class="slot-info clickable"
-                            (click)="showParticipants(dateEntry.participants, {stage: stage, row: row, index: i})"
-                            [class.has-data]="dateEntry.participants?.length > 0"
-                            matTooltip="Click to view participants">
-                            Confirmed: {{ dateEntry.participants?.length || 0 }}
-                          </span>
-                        </span>
-                        <span *ngIf="dateEntry.startdate && dateEntry.enddate && row.selectedVariation">
-                          <span class="slot-info clickable non-confirmed"
-                            (click)="showNonConfirmedParticipants(row.selectedVariation, row.selectedSegment, stage, dateEntry.startdate, dateEntry.enddate, {stage: stage, row: row, index: i})"
-                            [class.has-data]="getNonConfirmedCount(row.selectedVariation, row.selectedSegment, stage, dateEntry.startdate, dateEntry.enddate) > 0"
-                            matTooltip="Click to view non-confirmed participants">
-                            Non-Confirmed: {{ getNonConfirmedCount(row.selectedVariation, row.selectedSegment, stage,
-                            dateEntry.startdate, dateEntry.enddate) }}
-                          </span>
-                        </span>
-                      </div> -->
-                    </div>
+                    </ng-container>
                   </div>
 
                   <!-- Always show Add New button -->
@@ -387,7 +548,7 @@
 
             <!-- No Results Message -->
             <tr *ngIf="getFilteredPlanningRows().length === 0" class="no-results-row">
-              <td [attr.colspan]="queueStages.length + 2" class="no-results-cell">
+              <td [attr.colspan]="queueStages.length + 3" class="no-results-cell">
                 <div class="no-results-message">
                   <mat-icon>search_off</mat-icon>
                   <p>No rows match the current filters</p>
@@ -400,6 +561,69 @@
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- Slot Summary hover panel -->
+      <div class="summary-popover" *ngIf="summaryPopover as p"
+           [style.top.px]="p.top" [style.left.px]="p.left" [style.max-height.px]="p.maxHeight"
+           (mouseenter)="summaryHovered = true" (mouseleave)="summaryHovered = false; hideSummary()"
+           data-testid="qp-summary-popover">
+
+        <div class="sp-title">Stages with slots <span class="sp-count">{{ p.summary.stagesWithSlots.length }}</span></div>
+        <div class="sp-chips">
+          <span class="sp-stage-chip" *ngFor="let st of p.summary.stagesWithSlots">
+            {{ st.name }} <span class="sp-count">{{ st.count }}</span>
+          </span>
+        </div>
+
+        <!-- Appointments -->
+        <ng-container *ngIf="p.summary.appointments.length">
+          <div class="sp-title">
+            <span class="sp-tag sp-tag--appt">Appt</span> Appointments
+            <span class="sp-count">{{ p.summary.appointments.length }}</span>
+          </div>
+          <div class="sp-item sp-item--appt" *ngFor="let a of p.summary.appointments">
+            <div class="sp-avatar">{{ a.initials }}</div>
+            <div class="sp-item__main">
+              <div class="sp-item__title">{{ a.name }}</div>
+              <div class="sp-item__time">
+                {{ a.entry.startdate | date:'d MMM' }} · {{ formatTimeTo12Hour(a.entry.starttime) }} – {{ formatTimeTo12Hour(a.entry.endtime) }}
+              </div>
+              <div class="sp-item__stage">{{ a.stage }}</div>
+            </div>
+            <span class="sp-seats">{{ a.used }}/{{ a.max }}</span>
+          </div>
+        </ng-container>
+
+        <!-- Queue slots -->
+        <ng-container *ngIf="p.summary.queues.length">
+          <div class="sp-title">
+            <span class="sp-tag sp-tag--queue">Queue</span> Queue slots
+            <span class="sp-count">{{ p.summary.queues.length }}</span>
+          </div>
+          <div class="sp-item sp-item--queue" *ngFor="let q of p.summary.queues">
+            <div class="sp-date">{{ q.entry.startdate | date:'d MMM' }}</div>
+            <div class="sp-item__main">
+              <div class="sp-item__title">{{ q.entry.title || 'Queue slot' }}</div>
+              <div class="sp-item__time">
+                {{ q.entry.startdate | date:'d MMM' }} {{ formatTimeTo12Hour(q.entry.starttime) }}
+                → {{ q.entry.enddate | date:'d MMM' }} {{ formatTimeTo12Hour(q.entry.endtime) }}
+              </div>
+              <div class="sp-item__stage">{{ q.stage }}</div>
+            </div>
+            <span class="sp-seats">{{ q.used }}/{{ q.max }}</span>
+          </div>
+        </ng-container>
+
+        <div class="sp-empty-msg" *ngIf="!p.summary.total">No slots yet for this segment.</div>
+
+        <!-- Stages with no slots (collapsible) -->
+        <details class="sp-empty" *ngIf="p.summary.emptyStages.length">
+          <summary>Stages with no slots <span class="sp-count">{{ p.summary.emptyStages.length }}</span></summary>
+          <div class="sp-chips">
+            <span class="sp-stage-chip sp-stage-chip--empty" *ngFor="let st of p.summary.emptyStages">{{ st }}</span>
+          </div>
+        </details>
       </div>
 
       <!-- Footer Actions -->
@@ -668,10 +892,18 @@
       <div class="row-edit-form">
         <mat-form-field appearance="outline">
           <mat-label>Variation</mat-label>
-          <mat-select data-testid="qpln-sel-7" [(ngModel)]="editingVariationData.selectedVariation" placeholder="Select Variation">
-            <mat-option *ngFor="let variation of queueVariationList" [value]="variation.id">
-              {{ variation.variationname }}
+          <mat-select data-testid="qpln-sel-7" [(ngModel)]="editingVariationData.selectedVariation" placeholder="Select Variation"
+                      (openedChange)="$event ? null : (variationSearch = '')">
+            <mat-option>
+              <ngx-mat-select-search [(ngModel)]="variationSearch" placeholderLabel="Search variation..."
+                                     noEntriesFoundLabel="No variations found" data-testid="qp-vardlg-search">
+              </ngx-mat-select-search>
             </mat-option>
+            <ng-container *ngFor="let variation of queueVariationList">
+              <mat-option *ngIf="!variationSearch || variation.variationname?.toLowerCase().includes(variationSearch.toLowerCase())" [value]="variation.id">
+                {{ variation.variationname }}
+              </mat-option>
+            </ng-container>
           </mat-select>
           <mat-hint>Changing variation may clear segment if it conflicts</mat-hint>
         </mat-form-field>
@@ -692,11 +924,19 @@
       <div class="row-edit-form">
         <mat-form-field appearance="outline">
           <mat-label>Segment</mat-label>
-          <mat-select data-testid="qpln-sel-8" [(ngModel)]="editingSegmentData.selectedSegment" placeholder="Select Segment">
-            <mat-option *ngFor="let segment of segmentList" [value]="segment.id"
-              [disabled]="isSegmentDisabled(segment.id, editingRowForSegment?.id)">
-              {{ segment.segmentname }}
+          <mat-select data-testid="qpln-sel-8" [(ngModel)]="editingSegmentData.selectedSegment" placeholder="Select Segment"
+                      (openedChange)="$event ? null : (segmentSearch = '')">
+            <mat-option>
+              <ngx-mat-select-search [(ngModel)]="segmentSearch" placeholderLabel="Search segment..."
+                                     noEntriesFoundLabel="No segments found" data-testid="qp-segdlg-search">
+              </ngx-mat-select-search>
             </mat-option>
+            <ng-container *ngFor="let segment of segmentList">
+              <mat-option *ngIf="!segmentSearch || segment.segmentname?.toLowerCase().includes(segmentSearch.toLowerCase())" [value]="segment.id"
+                [disabled]="isSegmentDisabled(segment.id, editingRowForSegment?.id)">
+                {{ segment.segmentname }}
+              </mat-option>
+            </ng-container>
           </mat-select>
           <mat-hint>Disabled options are already used with the selected variation</mat-hint>
         </mat-form-field>
@@ -857,18 +1097,10 @@
     <!-- Appointment slot picker -->
     <div *ngIf="editingSlotType === 'appointment' && (editingDateIndex === null || !(editingDateEntry.appointmentref || editingDateEntry.bookedby))">
       <h4 style="margin: 0 0 4px;">Select Specialist Slots</h4>
-      <div style="font-size: 13px; color: #666; margin-bottom: 12px;">Pick the specialist slots to reserve for this entry.</div>
+      <div style="font-size: 13px; color: #666; margin-bottom: 12px;">Pick the Time Period to reserve specialist slots for this entry.</div>
 
       <!-- Filters -->
       <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
-        <mat-form-field appearance="outline" style="width: 220px;">
-          <mat-label>Specialist</mat-label>
-          <mat-select [(ngModel)]="appointmentSpecialistFilter" data-testid="qp-appt-specialist">
-            <mat-option [value]="null">All specialists</mat-option>
-            <mat-option *ngFor="let g of appointmentGroups" [value]="g.hostId" data-testid="qp-appt-specialist-option">{{ g.name }}</mat-option>
-          </mat-select>
-        </mat-form-field>
-
         <mat-form-field appearance="outline" style="width: 280px;">
           <mat-label>Time period</mat-label>
           <mat-date-range-input [rangePicker]="apptRangePicker">
@@ -879,6 +1111,28 @@
           <mat-datepicker-toggle matSuffix [for]="apptRangePicker"></mat-datepicker-toggle>
           <mat-date-range-picker #apptRangePicker></mat-date-range-picker>
         </mat-form-field>
+
+        <mat-form-field appearance="outline" style="width: 220px;">
+          <mat-label>Specialist</mat-label>
+          <mat-select [(ngModel)]="appointmentSpecialistFilter" data-testid="qp-appt-specialist">
+            <mat-option [value]="null">All specialists</mat-option>
+            <mat-option *ngFor="let g of appointmentGroups" [value]="g.hostId" data-testid="qp-appt-specialist-option">{{ g.name }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" style="width: 160px;">
+          <mat-label>Days</mat-label>
+          <mat-select [(ngModel)]="appointmentDayFilter" (selectionChange)="applyAppointmentFilters()" data-testid="qp-appt-days">
+            <mat-option value="all">All days</mat-option>
+            <mat-option value="weekdays">Weekdays</mat-option>
+            <mat-option value="weekends">Weekends</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-checkbox [(ngModel)]="appointmentFreeOnly" (change)="applyAppointmentFilters()" data-testid="qp-appt-freeonly">
+          Free slots only
+        </mat-checkbox>
+
 
         <button mat-button *ngIf="appointmentDateStart" data-testid="qp-appt-cleardates"
                 (click)="appointmentDateStart = null; appointmentDateEnd = null; appointmentSlotOptions = []; appointmentGroups = []; selectedAppointmentSlots = []">
@@ -917,6 +1171,7 @@
                     {{ g.name?.charAt(0) }}
                   </div>
                   <b data-testid="qp-appt-groupname">{{ g.name }}</b>
+                  <span class="appt-group-count" data-testid="qp-appt-groupcount">{{ g.free }} free of {{ g.total }}</span>
                 </div>
 
                 <div style="display: flex; overflow-x: auto;">
@@ -926,13 +1181,16 @@
                     </div>
                     <div *ngFor="let slot of day.slots"
                          data-testid="qp-appt-slot"
-                         style="display: flex; align-items: center; gap: 8px; padding: 4px 8px; cursor: pointer;"
-                         [style.background]="slot.selected ? '#e8eaf6' : (slot.blocked ? '#eeeeee' : '')"
-                         (click)="!slot.blocked && toggleAppointmentSlotSelection(slot)">
-                      <mat-checkbox [checked]="slot.selected" [disabled]="slot.blocked" data-testid="qp-appt-slotcheck"
-                                    (click)="$event.stopPropagation(); !slot.blocked && toggleAppointmentSlotSelection(slot)">
+                         class="appt-slot"
+                         [class.appt-slot--taken]="slot.taken"
+                         [class.appt-slot--blocked]="slot.blocked && !slot.taken"
+                         [class.appt-slot--selected]="slot.selected"
+                         [matTooltip]="slot.taken === 'booked' ? 'Booked by a participant' : (slot.taken === 'reserved' ? 'Already reserved in a queue' : '')"
+                         (click)="!slot.blocked && !slot.taken && toggleAppointmentSlotSelection(slot)">
+                      <mat-checkbox [checked]="slot.selected" [disabled]="slot.blocked || !!slot.taken" data-testid="qp-appt-slotcheck"
+                                    (click)="$event.stopPropagation(); !slot.blocked && !slot.taken && toggleAppointmentSlotSelection(slot)">
                       </mat-checkbox>
-                      <span style="font-size: 13px;" [style.color]="slot.blocked ? '#9e9e9e' : ''">
+                      <span class="appt-slot__time">
                         {{ slot.slotstart.toDate() | date:'h:mm a' }} – {{ slot.slotend.toDate() | date:'h:mm a' }}
                       </span>
                     </div>
@@ -987,5 +1245,55 @@
         {{ editingDateIndex !== null ? 'Update Slot' : 'Reserve ' + selectedAppointmentSlots.length + ' Slot(s)' }}
       </button>
     </mat-dialog-actions>
+  </div>
+</ng-template>
+<!-- Reserve Success Dialog -->
+<ng-template #reserveSuccessDialog>
+  <div class="reserve-success" data-testid="qp-reserve-success">
+    <div class="reserve-success__head">
+      <div class="reserve-success__icon">
+        <mat-icon>check</mat-icon>
+      </div>
+      <h2 class="reserve-success__title">Slots have been released successfully</h2>
+      <p class="reserve-success__sub">
+        {{ reservationSummary?.count }} slot{{ reservationSummary?.count === 1 ? '' : 's' }}
+        {{ reservationSummary?.count === 1 ? 'is' : 'are' }} now reserved
+        <ng-container *ngIf="reservationSummary?.segments > 1; else singleEntry">
+          for {{ reservationSummary?.segments }} segments.
+        </ng-container>
+        <ng-template #singleEntry>for this entry.</ng-template>
+      </p>
+    </div>
+
+    <div class="reserve-success__body">
+      <div class="reserve-success__row">
+        <span class="reserve-success__label">Date range</span>
+        <span class="reserve-success__value" data-testid="qp-reserve-success-range">{{ reservationSummary?.dateRange }}</span>
+      </div>
+      <div class="reserve-success__row">
+        <span class="reserve-success__label">Slots released</span>
+        <span class="reserve-success__value" data-testid="qp-reserve-success-count">{{ reservationSummary?.count }}</span>
+      </div>
+      <div class="reserve-success__row" *ngIf="reservationSummary?.segments > 1">
+        <span class="reserve-success__label">Segments</span>
+        <span class="reserve-success__value" data-testid="qp-reserve-success-segments">{{ reservationSummary?.segments }}</span>
+      </div>
+      <div class="reserve-success__row">
+        <span class="reserve-success__label">Days</span>
+        <span class="reserve-success__value">{{ reservationSummary?.days }}</span>
+      </div>
+      <div class="reserve-success__row">
+        <span class="reserve-success__label">Specialists</span>
+        <span class="reserve-success__value">{{ reservationSummary?.specialists }}</span>
+      </div>
+      <div class="reserve-success__row" *ngIf="reservationSummary?.skipped > 0">
+        <span class="reserve-success__label">Skipped</span>
+        <span class="reserve-success__value">{{ reservationSummary?.skipped }} duplicate(s)</span>
+      </div>
+    </div>
+
+    <div class="reserve-success__actions">
+      <button mat-raised-button color="primary" mat-dialog-close data-testid="qp-reserve-success-done">Done</button>
+    </div>
   </div>
 </ng-template>

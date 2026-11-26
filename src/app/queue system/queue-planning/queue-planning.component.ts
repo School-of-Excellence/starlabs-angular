@@ -15,6 +15,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatOptionModule } from '@angular/material/core';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { Subject, Subscription, takeUntil } from 'rxjs';
 import { MatProgressSpinner } from "@angular/material/progress-spinner";
 import { MatTableModule } from '@angular/material/table';
@@ -95,6 +96,7 @@ interface NonSelectedParticipant {
     MatCheckboxModule,
     MatBadgeModule,
     MatHint,
+    MatSlideToggleModule,
 
   ],
   templateUrl: './queue-planning.component.html',
@@ -106,6 +108,7 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
   @ViewChild('dateEditDialog') dateEditDialog: TemplateRef<any>;
   @ViewChild('segmentEditDialog') segmentEditDialog: TemplateRef<any>;
   @ViewChild('variationEditDialog') variationEditDialog: TemplateRef<any>;
+  @ViewChild('reserveSuccessDialog') reserveSuccessDialog: TemplateRef<any>;
 
   searchQueue: string;
   profileid: string;
@@ -145,6 +148,20 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
   filterDateEnd: Date | null = null;
   filterSelectedTags: string[] = [];
   filterSelectedLists: string[] = [];
+  //filters
+  filterSlotType: 'queue' | 'appointment' | null = null;
+  filterSpecialists: string[] = [];
+  specialistOptions: Array<{ id: string, name: string }> = [];
+  specialistSearch: string = '';
+  tagSearch: string = '';
+  listSearch: string = '';
+  variationSearch: string = '';
+  segmentSearch: string = '';
+  includePastSlots: boolean = false;
+  reservationSummary: any = null;
+  summaryPopover: { summary: any, top: number, left: number, maxHeight: number } | null = null;
+  summaryHovered: boolean = false;
+  private summaryHideTimer: any;
 
   // For editing segment
   editingRowForSegment: PlanningRow = null;
@@ -223,6 +240,8 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
   appointmentDateEnd: Date | null = null;
   appointmentGroups: any[] = [];                      
   appointmentSpecialistFilter: string | null = null;
+  appointmentDayFilter: 'all' | 'weekdays' | 'weekends' = 'all';
+  appointmentFreeOnly: boolean = false;
 
   private storage = inject(Storage);
   private destroy$ = new Subject<void>();
@@ -338,36 +357,57 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
         }
       }
 
-      if (this.filterDateStart || this.filterDateEnd) {
-        let hasMatchingDate = false;
-
-        for (const stageName of this.queueStages) {
-          if (row.stageData[stageName] && row.stageData[stageName].dates) {
-            for (const dateEntry of row.stageData[stageName].dates) {
-              if (dateEntry.startdate && dateEntry.enddate) {
-                const slotStart = new Date(dateEntry.startdate);
-                const slotEnd = new Date(dateEntry.enddate);
-
-                const matchesStart = !this.filterDateStart || slotEnd >= this.filterDateStart;
-                const matchesEnd = !this.filterDateEnd || slotStart <= this.filterDateEnd;
-
-                if (matchesStart && matchesEnd) {
-                  hasMatchingDate = true;
-                  break;
-                }
-              }
-            }
-            if (hasMatchingDate) break;
-          }
-        }
-
-        if (!hasMatchingDate) {
+      if (this.filterDateStart || this.filterDateEnd || this.filterSlotType || this.filterSpecialists.length > 0) {
+        const hasMatchingSlot = this.queueStages.some(stageName =>
+          (row.stageData[stageName]?.dates || []).some(dateEntry => this.slotMatchesFilters(dateEntry))
+        );
+        if (!hasMatchingSlot) {
           return false;
         }
       }
-
       return true;
     });
+  }
+  slotMatchesFilters(dateEntry: any): boolean {
+    if (!dateEntry) return false;
+    if (!this.includePastSlots && dateEntry.enddate &&
+        this.combineDateAndTime(dateEntry.enddate, dateEntry.endtime || '23:59') < new Date()) {
+      return false;
+    }
+    if (this.filterSlotType && (dateEntry.slottype || 'queue') !== this.filterSlotType) return false;
+    if (this.filterSpecialists.length > 0 && !this.filterSpecialists.includes(dateEntry.hostref?.id)) return false;
+    if (this.filterDateStart || this.filterDateEnd) {
+      if (!dateEntry.startdate || !dateEntry.enddate) return false;
+      const slotStart = this.combineDateAndTime(dateEntry.startdate, dateEntry.starttime || '00:00');
+      const slotEnd = this.combineDateAndTime(dateEntry.enddate, dateEntry.endtime || '23:59');
+      const from = this.filterDateStart ? new Date(this.filterDateStart) : null;
+      from?.setHours(0, 0, 0, 0);
+      const to = this.filterDateEnd ? new Date(this.filterDateEnd) : null;
+      to?.setHours(23, 59, 59, 999);
+      if (from && slotEnd < from) return false;
+      if (to && slotStart > to) return false;
+    }
+    return true;
+  }
+
+  refreshSpecialistOptions() {
+    const map = new Map<string, string>();
+    this.planningRows.forEach(row =>
+      Object.values(row.stageData).forEach(stage =>
+        (stage.dates || []).forEach(d => {
+          if (d.slottype === 'appointment' && d.hostref?.id) {
+            map.set(d.hostref.id, this.getProfileName(d.hostref.id));
+          }
+        })
+      )
+    );
+    this.specialistOptions = [...map].map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  getFilteredSpecialistOptions() {
+    const term = this.specialistSearch?.toLowerCase().trim();
+    return term ? this.specialistOptions.filter(s => s.name.toLowerCase().includes(term)) : this.specialistOptions;
   }
 
   clearAllFilters() {
@@ -376,6 +416,9 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
     this.filterDateEnd = null;
     this.filterSelectedTags = [];
     this.filterSelectedLists = [];
+    this.filterSlotType = null;
+    this.filterSpecialists = [];
+    this.specialistSearch = '';
   }
 
   hasActiveFilters(): boolean {
@@ -384,7 +427,9 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
       this.filterDateStart ||
       this.filterDateEnd ||
       this.filterSelectedTags.length > 0 ||
-      this.filterSelectedLists.length > 0
+      this.filterSelectedLists.length > 0 ||
+      this.filterSlotType ||
+      this.filterSpecialists.length > 0
     );
   }
 
@@ -404,6 +449,10 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
 
   removeListFilter(listId: string) {
     this.filterSelectedLists = this.filterSelectedLists.filter(id => id !== listId);
+  }
+
+  removeSpecialistFilter(id: string) {
+    this.filterSpecialists = this.filterSpecialists.filter(x => x !== id);
   }
 
   async getNonSelectedParticipantsCount(segmentId: string): Promise<number> {
@@ -1229,6 +1278,8 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
     if (this.planningRows.length === 0) {
       this.addRow();
     }
+
+    this.refreshSpecialistOptions();
   }
 
   private updatePlanningRowsWithTokenData() {
@@ -1508,9 +1559,7 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
     const dateRanges = row.stageData[stageName].dates;
     const entry = dateRanges[dateIndex];
 
-    const booked = !!(entry['appointmentref'] || entry['bookedby']) || (entry['usedslot'] || 0) > 0 || (entry.participants?.length || 0) > 0;
-
-    if (booked) {
+    if (this.isSlotBooked(entry)) {
       alert('This slot is booked. Please cancel the booking first, then delete the slot.');
       return;
     }
@@ -1530,6 +1579,77 @@ export class QueuePlanningComponent implements OnInit, OnDestroy {
       console.log(err);
       alert('Error removing slot');
     }
+  }
+
+  isSlotBooked(e: any): boolean {
+    return !!(e?.appointmentref || e?.bookedby)
+      || (e?.usedslot || 0) > 0
+      || (e?.participants?.length || 0) > 0;
+  }
+
+  getRowSummary(row: PlanningRow) {
+    const variation = this.queueVariationList.find(v => v.id === row.selectedVariation);
+    const stages = this.queueStages.filter(s => variation?.stages?.includes(s));
+
+    const stagesWithSlots: Array<{ name: string, count: number }> = [];
+    const emptyStages: string[] = [];
+    const appointments: any[] = [];
+    const queues: any[] = [];
+    let seatsTotal = 0, seatsBooked = 0;
+    let first: Date = null, last: Date = null;
+
+    for (const stage of stages) {
+      const dates = (row.stageData[stage]?.dates || []).filter(d => this.slotMatchesFilters(d));
+      if (dates.length === 0) { emptyStages.push(stage); continue; }
+      stagesWithSlots.push({ name: stage, count: dates.length });
+
+      for (const d of dates) {
+        const isAppt = d.slottype === 'appointment';
+        const max = isAppt ? 1 : (d.maxslot || 0);
+        const used = isAppt ? (this.isSlotBooked(d) ? 1 : 0) : (d.usedslot || 0);
+        seatsTotal += max;
+        seatsBooked += used;
+
+        if (d.startdate && (!first || d.startdate < first)) first = d.startdate;
+        const end = d.enddate || d.startdate;
+        if (end && (!last || end > last)) last = end;
+
+        const sortKey = this.combineDateAndTime(d.startdate, d.starttime || '00:00')?.getTime() || 0;
+        if (isAppt) {
+          const name = this.getProfileName(d.hostref?.id) || 'Specialist';
+          const initials = name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+          appointments.push({ entry: d, stage, max, used, name, initials, sortKey });
+        } else {
+          queues.push({ entry: d, stage, max, used, sortKey });
+        }
+      }
+    }
+
+    appointments.sort((a, b) => a.sortKey - b.sortKey);
+    queues.sort((a, b) => a.sortKey - b.sortKey);
+
+    return {
+      total: appointments.length + queues.length,
+      stageCount: stages.length,
+      stagesWithSlots, emptyStages, appointments, queues,
+      seatsTotal, seatsBooked, first, last
+    };
+  }
+
+  showSummary(row: PlanningRow, event: MouseEvent) {
+    clearTimeout(this.summaryHideTimer);
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const width = 440;
+    const left = rect.right + 8 + width > window.innerWidth ? Math.max(8, rect.left - width - 8) : rect.right + 8;
+    const top = Math.max(16, Math.min(rect.top, window.innerHeight - 400));
+    this.summaryPopover = { summary: this.getRowSummary(row), top, left, maxHeight: window.innerHeight - top - 16 };
+  }
+
+  hideSummary() {
+    clearTimeout(this.summaryHideTimer);
+    this.summaryHideTimer = setTimeout(() => {
+      if (!this.summaryHovered) this.summaryPopover = null;
+    }, 150);
   }
 
   isStageAvailableForVariation(row: PlanningRow, stageName: string): boolean {
@@ -2875,13 +2995,14 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
       slotsForType.forEach(s => {
         const slotStartDate = s.slotstart?.toDate ? s.slotstart.toDate() : new Date(s.slotstart);
 
-        if (s.available === true && s.booked !== true && slotStartDate >= now && slotStartDate >= from && slotStartDate <= to) {
+        if (s.available === true && slotStartDate >= now && slotStartDate >= from && slotStartDate <= to) {
           openSlots.push({
             availabilityid: availDoc.id,
             hostref: data['profileref'],
             specialistName: this.mapProfile[data['profileref'].id] || data['profileref'].id,
             slotstart: s.slotstart,
             slotend: s.slotend,
+            booked: s.booked === true,
             selected: false
           });
         }
@@ -2900,28 +3021,45 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
     const editingDocId = this.editingDateIndex !== null ? this.editingDateEntry.docid : null;
     const reserved = reservedDocs.docs.filter(d => d.id !== editingDocId).map(d => d.data());
 
-    this.appointmentSlotOptions = openSlots.filter(open =>
-      !reserved.some(r =>
+    this.appointmentSlotOptions = openSlots.map(open => {
+      const reservedInQueue = reserved.some(r =>
         r['hostref']?.id === open.hostref?.id &&
         r['startdate'].toMillis() < open.slotend.toMillis() &&
         r['enddate'].toMillis() > open.slotstart.toMillis()
-      )
-    );
+      );
+      return { ...open, taken: open.booked ? 'booked' : (reservedInQueue ? 'reserved' : null) };
+    });
+
+    this.appointmentSpecialistFilter = null;
+    this.applyAppointmentFilters();
+    this.loadingAppointmentSlots = false;
+  }
+
+  applyAppointmentFilters() {
     const bySpecialist = new Map<string, any>();
+
     for (const slot of this.appointmentSlotOptions) {
+      if (this.appointmentFreeOnly && slot.taken) continue;
+
+      const start = slot.slotstart.toDate();
+      const weekday = start.getDay(); 
+      if (this.appointmentDayFilter === 'weekdays' && (weekday === 0 || weekday === 6)) continue;
+      if (this.appointmentDayFilter === 'weekends' && weekday !== 0 && weekday !== 6) continue;
+
       const hostId = slot.hostref.id;
       if (!bySpecialist.has(hostId)) {
-        bySpecialist.set(hostId, { hostId, name: slot.specialistName, days: new Map() });
+        bySpecialist.set(hostId, { hostId, name: slot.specialistName, days: new Map(), free: 0, total: 0 });
       }
-      const days = bySpecialist.get(hostId).days;
-      const start = slot.slotstart.toDate();
+      const group = bySpecialist.get(hostId);
+      group.total++;
+      if (!slot.taken) group.free++;
+
       const dayKey = start.toDateString();
-      if (!days.has(dayKey)) days.set(dayKey, { date: start, slots: [] });
-      days.get(dayKey).slots.push(slot);
+      if (!group.days.has(dayKey)) group.days.set(dayKey, { date: start, slots: [] });
+      group.days.get(dayKey).slots.push(slot);
     }
+
     this.appointmentGroups = [...bySpecialist.values()].map(g => ({ ...g, days: [...g.days.values()] }));
-    this.appointmentSpecialistFilter = null;
-    this.loadingAppointmentSlots = false;
   }
 
   async saveAppointmentSlots() {
@@ -3032,9 +3170,43 @@ getAvailableSegmentsForMultiSlot(): Array<{rowId: string, segmentId: string, var
         else p.row.stageData[stageName].dates.push(p.entry);
       });
       this.dialog.closeAll();
-      let msg = isEdit ? 'Appointment slot updated' : `${pending.length} appointment slot(s) reserved`;
-      if (skipped > 0) msg += ` (${skipped} duplicate(s) skipped)`;
-      this.guard.openSnackBar(msg, 'OK', 600);
+      if (isEdit) {
+        this.guard.openSnackBar('Appointment slot updated', 'OK', 600);
+        return;
+      }
+      const label = (d: Date) => {
+        const n = d.getDate();
+        const suffix = (n % 10 === 1 && n !== 11) ? 'st' : (n % 10 === 2 && n !== 12) ? 'nd' : (n % 10 === 3 && n !== 13) ? 'rd' : 'th';
+        return `${n}${suffix} ${d.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })} ${d.toLocaleDateString('en-GB', { weekday: 'short' })}`;
+      };
+
+      const uniqueSlots = new Map<string, any>();
+      pending.forEach(p => {
+        const key = p.entry.availabilityid + '_' + p.entry.startdate.getTime();
+        if (!uniqueSlots.has(key)) uniqueSlots.set(key, p.entry);
+      });
+      const slots = [...uniqueSlots.values()];
+
+      const startTimes = slots.map(s => s.startdate.getTime());
+      const first = new Date(Math.min(...startTimes));
+      const last = new Date(Math.max(...startTimes));
+
+      const specialistCounts = new Map<string, number>();
+      slots.forEach(s => {
+        const name = s.specialistName || 'Specialist';
+        specialistCounts.set(name, (specialistCounts.get(name) || 0) + 1);
+      });
+
+      this.reservationSummary = {
+        count: slots.length,
+        segments: new Set(pending.map(p => p.row.id)).size,
+        skipped: skipped,
+        dateRange: first.toDateString() === last.toDateString() ? label(first) : `${label(first)} – ${label(last)}`,
+        days: new Set(slots.map(s => s.startdate.toDateString())).size,
+        specialists: [...specialistCounts].map(([name, c]) => `${name} (${c})`).join(', ')
+      };
+
+      this.dialog.open(this.reserveSuccessDialog, { width: '600px', maxWidth: '95vw' });
     } catch (err) {
       console.log(err);
       alert('Error saving appointment slots. Please try again.');
