@@ -28,3 +28,14 @@
 - Hub commit `d82b723` (CN-47/48) is local until the operator says push. It must be on hub `main` before the
   operator pushes `nanda-development`, or the gate blocks the branch.
 - The operator commits/pushes `nanda-development` (43+ commits ahead, including the two pulls and this journal).
+
+## 2026-11-26 — CI console: "approval superseded"
+- The rollout approval covered `25a28df`. The 08:30 push `2699f6d9` (a one-line comment change) reached GitHub, and
+  its suites ran and passed, but the console kept `25a28df` as the head. Its push webhook evidently never landed.
+  Approval sha ≠ the passing run's sha → "The approval is no longer backed by a passing run."
+- Fix used: push a new commit (this journal), so the push webhook moves the head, resets the approval and re-runs
+  the suites; then the tester approves again. The faster alternative needs a GitHub admin: redeliver the missed
+  push webhook.
+- Separate: the dev preview channel fails with HTTP 429, the Hosting storage quota on `starlabs-test`
+  (site `breakthroughs-test`). Someone with access must lower the releases kept per channel or upgrade the plan.
+  It does not block the approval.
