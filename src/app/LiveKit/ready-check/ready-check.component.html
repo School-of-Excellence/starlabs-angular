@@ -1,6 +1,6 @@
 <!-- Join "Ready check" — plan 2026-11-27-join-ready-check. Hook prefix: rck.
-     Layout: media column (preview + mic level + device pickers) | checks column (3 required steps,
-     then compact system tiles). Two columns from 900px, one column below. -->
+     Layout: media column (preview + mic level) | checks column (3 required steps, each with its own
+     device picker under it, then compact system tiles). Two columns from 900px, one column below. -->
 <div class="rck" data-testid="rck-panel">
 
   <!-- ── Media column ─────────────────────────────────────────────────────── -->
@@ -15,28 +15,6 @@
         <span class="material-icons rck-overlay-mic">mic</span>
         <div class="rck-meter" data-testid="rck-mic-meter"><div class="rck-meter-fill" [style.width.%]="micLevel * 100"></div></div>
       </div>
-    </div>
-
-    <div class="rck-devices" *ngIf="hasStream && (cameras.length > 1 || mics.length > 1 || (canPickSpeaker && speakers.length > 1))">
-      <label class="rck-device" *ngIf="cameras.length > 1">
-        <span class="material-icons">videocam</span>
-        <select [value]="selectedCameraId" (change)="pickCamera($any($event.target).value)" data-testid="rck-camera-select" aria-label="Camera">
-          <option *ngFor="let c of cameras" [value]="c.deviceId">{{ c.label || 'Camera' }}</option>
-        </select>
-      </label>
-      <label class="rck-device" *ngIf="mics.length > 1">
-        <span class="material-icons">mic</span>
-        <select [value]="selectedMicId" (change)="pickMic($any($event.target).value)" data-testid="rck-mic-select" aria-label="Microphone">
-          <option *ngFor="let m of mics" [value]="m.deviceId">{{ m.label || 'Microphone' }}</option>
-        </select>
-      </label>
-      <label class="rck-device" *ngIf="canPickSpeaker && speakers.length > 1">
-        <span class="material-icons">volume_up</span>
-        <select [value]="selectedSpeakerId" (change)="pickSpeaker($any($event.target).value)" data-testid="rck-speaker-select" aria-label="Speaker">
-          <option value="">System default</option>
-          <option *ngFor="let s of speakers" [value]="s.deviceId">{{ s.label || 'Speaker' }}</option>
-        </select>
-      </label>
     </div>
   </section>
 
@@ -59,6 +37,12 @@
       <div class="rck-body">
         <div class="rck-label">Camera</div>
         <div class="rck-msg">{{ checks.camera.message }}</div>
+        <label class="rck-device" *ngIf="hasStream && cameras.length > 1">
+          <span class="material-icons">videocam</span>
+          <select [value]="selectedCameraId" (change)="pickCamera($any($event.target).value)" data-testid="rck-camera-select" aria-label="Camera">
+            <option *ngFor="let c of cameras" [value]="c.deviceId">{{ c.label || 'Camera' }}</option>
+          </select>
+        </label>
         <div class="rck-help" *ngIf="help.camera">{{ help.camera }}</div>
         <div class="rck-actions" *ngIf="checks.camera.state === 'fail'">
           <button class="rck-btn" *ngIf="osSettingsFor('camera')" (click)="openOsSettings('camera')" data-testid="rck-os-camera-btn">
@@ -75,6 +59,12 @@
       <div class="rck-body">
         <div class="rck-label">Microphone</div>
         <div class="rck-msg">{{ checks.mic.message }}</div>
+        <label class="rck-device" *ngIf="hasStream && mics.length > 1">
+          <span class="material-icons">mic</span>
+          <select [value]="selectedMicId" (change)="pickMic($any($event.target).value)" data-testid="rck-mic-select" aria-label="Microphone">
+            <option *ngFor="let m of mics" [value]="m.deviceId">{{ m.label || 'Microphone' }}</option>
+          </select>
+        </label>
         <div class="rck-help" *ngIf="help.mic">{{ help.mic }}</div>
         <div class="rck-actions" *ngIf="(hasStream && meterNeedsClick) || checks.mic.state === 'fail'">
           <button class="rck-btn rck-primary" *ngIf="hasStream && meterNeedsClick" (click)="startMeterByClick()" data-testid="rck-meter-start-btn">Test microphone</button>
@@ -92,6 +82,13 @@
       <div class="rck-body">
         <div class="rck-label">Speaker</div>
         <div class="rck-msg">{{ speakerTest === 'asked' ? 'Did you hear the sound?' : checks.speaker.message }}</div>
+        <label class="rck-device" *ngIf="canPickSpeaker && speakers.length > 1">
+          <span class="material-icons">volume_up</span>
+          <select [value]="selectedSpeakerId" (change)="pickSpeaker($any($event.target).value)" data-testid="rck-speaker-select" aria-label="Speaker">
+            <option value="">System default</option>
+            <option *ngFor="let s of speakers" [value]="s.deviceId">{{ s.label || 'Speaker' }}</option>
+          </select>
+        </label>
         <div class="rck-help" *ngIf="help.speaker">{{ help.speaker }}</div>
         <div class="rck-actions">
           <button class="rck-btn" [class.rck-primary]="checks.speaker.state !== 'ok'" *ngIf="speakerTest === 'idle'" (click)="playTestSound()" data-testid="rck-test-sound-btn">
@@ -130,11 +127,12 @@
         </div>
       </div>
 
-      <div class="rck-tile" [ngClass]="'rck-' + checks.computer.state" [class.rck-tile-wide]="checks.computer.state === 'warn'" data-testid="rck-row-computer" [attr.data-state]="checks.computer.state">
+      <div class="rck-tile" [ngClass]="'rck-' + checks.computer.state" [class.rck-tile-wide]="!!help.computer" data-testid="rck-row-computer" [attr.data-state]="checks.computer.state">
         <span class="material-icons rck-icon">{{ icon(checks.computer.state) }}</span>
         <div class="rck-body">
           <div class="rck-label">Computer</div>
           <div class="rck-msg">{{ checks.computer.message }}</div>
+          <div class="rck-help" *ngIf="help.computer" data-testid="rck-computer-help">{{ help.computer }}</div>
         </div>
       </div>
     </div>

@@ -35,7 +35,7 @@ export class ReadyCheckComponent implements AfterViewInit, OnDestroy {
     network:  { key: 'network',  state: 'pending', code: '', message: 'Checking…' },
     computer: { key: 'computer', state: 'pending', code: '', message: 'Checking…' },
   };
-  help: Partial<Record<'camera' | 'mic' | 'speaker' | 'browser' | 'network', string>> = {};
+  help: Partial<Record<'camera' | 'mic' | 'speaker' | 'browser' | 'network' | 'computer', string>> = {};
   cameraProblem: DeviceProblem | null = null;
   micProblem: DeviceProblem | null = null;
 
@@ -151,12 +151,19 @@ export class ReadyCheckComponent implements AfterViewInit, OnDestroy {
 
   private checkComputer(): void {
     const cores = navigator.hardwareConcurrency || 0;
-    const mem = (navigator as any).deviceMemory || 0;   // Chrome / Edge only
-    if ((cores && cores < 4) || (mem && mem < 4)) {
+    const mem = (navigator as any).deviceMemory || 0;   // Chrome / Edge only; rounded, capped at 8
+    // Say exactly what was found, so the person knows WHY it isn't a tick (operator 2026-11-27).
+    const reasons: string[] = [];
+    if (cores && cores < 4) reasons.push(`it has ${cores} processor core${cores === 1 ? '' : 's'} (video calls run best with 4 or more)`);
+    if (mem && mem < 4) reasons.push(`it has about ${mem} GB of memory (4 GB or more is recommended)`);
+    if (reasons.length) {
+      this.set('computer', 'warn', cores && cores < 4 ? 'low-cpu' : 'low-memory', 'May be slow for video calls');
       // Background blur and Deep Filter Noise are already off by default — keep it that way.
-      this.set('computer', 'warn', 'weak', 'Older computer — background blur and extra noise filtering are kept off for a smoother call');
+      this.help.computer = `This computer may struggle because ${reasons.join(' and ')}. ` +
+        'Close other apps and browser tabs before joining. Background blur and extra noise filtering stay off to keep the call smooth.';
     } else {
       this.set('computer', 'ok', 'ok', 'Good');
+      this.help.computer = undefined;
     }
   }
 

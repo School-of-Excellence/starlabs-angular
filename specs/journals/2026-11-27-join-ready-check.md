@@ -60,3 +60,12 @@ Revert: `updateReady()` in `ready-check.component.ts` back to camera ok + mic no
 | Required checks as 3 rows + "N of 3 ready to join" bar; browser / network / computer as small tiles that widen only to explain a problem | Puts what blocks Join first; healthy system checks take one line |
 Checked with a static harness of the real CSS at 1440×900, 1280×620, 768×1024 and 375×812 (ready + waiting footers): footer visible in all.
 Revert: `git checkout 7665319a -- src/app/LiveKit/ready-check/ready-check.component.{html,css} src/app/LiveKit/join-livekit-call/join-livekit-call.component.{html,css}` (+ drop `requiredDone()`).
+
+## Same day — pickers under their checks; computer check says why (operator)
+- Camera / microphone / speaker pickers moved from under the preview to inside their own check row,
+  all full width and the same height (operator: the mic and speaker dropdowns were different sizes).
+  Measured in the harness: 397×40 each at 1440 px, 283×40 each at 375 px.
+- Computer check: when it isn't a tick it now says what it found and what to do, e.g. "it has 2
+  processor cores (video calls run best with 4 or more) and it has about 2 GB of memory (4 GB or more
+  is recommended). Close other apps and browser tabs before joining…" (`rck-computer-help`).
+  Note `navigator.deviceMemory` is Chrome/Edge only, rounded and capped at 8 GB.

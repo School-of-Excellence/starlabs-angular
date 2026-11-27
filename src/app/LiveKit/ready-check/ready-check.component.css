@@ -38,15 +38,16 @@
 .rck-meter { flex: 1; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.25); overflow: hidden; }
 .rck-meter-fill { height: 100%; background: #4ade80; border-radius: 3px; transition: width 120ms linear; }
 
-.rck-devices { display: grid; grid-template-columns: 1fr; gap: 8px; }
+/* Device picker — sits under its own check (camera / mic / speaker); every picker is the same
+   full width and height (operator 2026-11-27: the pickers were different sizes). */
 .rck-device {
-  display: flex; align-items: center; gap: 8px; margin: 0;
-  padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff;
+  display: flex; align-items: center; gap: 8px; width: 100%; box-sizing: border-box;
+  margin: 10px 0 0; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff;
 }
-.rck-device .material-icons { font-size: 18px; color: var(--muted); }
+.rck-device .material-icons { font-size: 18px; color: var(--muted); flex: none; }
 .rck-device select {
-  flex: 1; min-width: 0; height: 38px; border: 0; background: transparent;
-  font-size: 13px; color: var(--ink); outline: none; text-overflow: ellipsis;
+  flex: 1; min-width: 0; width: 100%; height: 38px; border: 0; background: transparent;
+  font-size: 13px; color: var(--ink); outline: none; text-overflow: ellipsis; cursor: pointer;
 }
 
 /* ── Checks column ── */
@@ -107,7 +108,6 @@
 @media (max-width: 899px) {
   .rck { grid-template-columns: minmax(0, 1fr); gap: 14px; }
   .rck-preview { aspect-ratio: auto; height: clamp(150px, 30vh, 280px); }
-  .rck-devices { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
 }
 @media (max-width: 420px) {
   .rck-row { padding: 10px 12px; }
