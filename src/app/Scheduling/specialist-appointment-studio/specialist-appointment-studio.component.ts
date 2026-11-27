@@ -20,7 +20,7 @@ import {
 } from '../book-appointment/appointment-booking.service';
 import {
   SpecialistAppointmentService, ApptRow, Specialist, Team, TypeOption, ProductBreakdown, TypeBreakdown,
-  FilterProduct, FilterType,
+  FilterProduct, FilterType, QueueHold,
 } from './specialist-appointment.service';
 import {
   ViewRole, VIEW_LABEL, ownsProduct, AvailWindow, AvailStatus, Hours, Interval, Period, PeriodMode, ApptStatus,
@@ -319,6 +319,9 @@ export class HomeTab {
   private pastRun = 0;
   private loadRun = 0;
   private raw: { wins: AvailWindow[]; appts: ApptRow[]; up: ApptRow[] } = { wins: [], appts: [], up: [] };
+  /* Queue planner reservations not booked yet, by availability window id (operator, 2026-11-27). The planner
+     never marks the availability slot, so without these a reserved window looked free and could be deleted. */
+  private holds = new Map<string, QueueHold[]>();
   /* Joint delivery types: who could take a slot with whom. Partners' windows are read too, but never shown. */
   joint = new JointIndex(new Map(), [], new Date());
   private jointTypes = new Map<string, JointType>();
@@ -374,11 +377,12 @@ export class HomeTab {
     const calTo = p.mode === 'month' ? new Date(calFrom.getTime() + 42 * 86400000) : p.to;
     try {
       this.loadPast();
-      const [wins, appts, up, joint] = await Promise.all([
+      const [wins, appts, up, joint, holds] = await Promise.all([
         this.svc.windows(ids, calFrom, calTo),
         this.svc.appointments(ids, calFrom, calTo),
         this.svc.appointments(ids, upFrom, upTo, ids ? 0 : 300),
         this.svc.jointTypes(),
+        this.svc.queueHolds(calFrom, calTo),
       ]);
       // A specialist's joint types need their partners' free slots to say whether a slot is bookable.
       let partnerWins: AvailWindow[] = [];
@@ -389,6 +393,8 @@ export class HomeTab {
       }
       if (run !== this.loadRun) return;
       this.raw = { wins, appts, up };
+      this.holds = new Map();
+      holds.filter(x => !x.booked && x.end > this.now).forEach(x => this.holds.set(x.availabilityid, [...(this.holds.get(x.availabilityid) ?? []), x]));
       this.jointTypes = joint;
       this.partnerWins = partnerWins;
       this.apply();
@@ -726,14 +732,22 @@ export class HomeTab {
     const full = this.raw.wins.find(x => x.id === w.id) ?? w;
     const sessions = this.raw.appts.filter(r => r.appt.hostIds.includes(full.profileId)
       && r.appt.start >= full.start && r.appt.start < full.end).sort(byStart);
-    this.h.openWindow(full, sessions).then(res => {
+    this.h.openWindow(full, sessions, this.heldBy(full)).then(res => {
       if (res === 'delete') this.deleteWindow(full);
       else if (res) this.openDetail(res);
     });
   }
 
   /* ---------- Bulk delete (operator, 2026-10-01): future windows with nothing booked ---------- */
-  canDelete(w: AvailWindow) { return w.start > this.now && !w.slots.some(s => s.booked); }
+  canDelete(w: AvailWindow) { return w.start > this.now && !w.slots.some(s => s.booked) && !this.heldBy(w).length; }
+  /* Unbooked queue planner reservations on this window, earliest first. */
+  heldBy(w: AvailWindow): QueueHold[] { return (this.holds.get(w.id) ?? []).slice().sort((a, b) => a.start.getTime() - b.start.getTime()); }
+  holdNote(w: AvailWindow): string | null {
+    const l = this.heldBy(w);
+    if (!l.length) return null;
+    const queues = [...new Set(l.map(x => x.queueName))];
+    return `Reserved for queue: ${queues.join(', ')} · ${l.length} slot${l.length === 1 ? '' : 's'}`;
+  }
   get selectable() { return this.availList.filter(w => this.canDelete(w)); }
   get allSelected() { return this.selectable.length > 0 && this.selectable.every(w => this.selected.has(w.id)); }
   toggleAll() { this.selected = this.allSelected ? new Set() : new Set(this.selectable.map(w => w.id)); }
@@ -773,6 +787,12 @@ export class HomeTab {
   async deleteWindow(w: AvailWindow, ev?: Event) {
     ev?.stopPropagation();
     if (w.slots.some(s => s.booked)) { alert('Booking were already made. Please ask client to cancel it'); return; }
+    const held = this.heldBy(w);
+    if (held.length) {
+      const list = held.map(x => `• ${x.queueName} · ${x.stage} · ${this.h.datepipe.transform(x.start, 'EEE d MMM, H:mm')}`).join('\n');
+      alert(`This time is reserved in the Queue Planner, so it can't be deleted:\n${list}\n\nRemove the reservation in the Queue Planner first.`);
+      return;
+    }
     if (!confirm('Delete this day Slot?')) return;
     try {
       await deleteDoc(doc(this.h.firestore, 'availability/' + w.id));
@@ -1409,7 +1429,7 @@ export class WindowDialog {
   readonly status: string;
   readonly canDelete: boolean;
 
-  constructor(h: SpecialistAppointmentStudioComponent, public w: AvailWindow, public sessions: ApptRow[]) {
+  constructor(h: SpecialistAppointmentStudioComponent, public w: AvailWindow, public sessions: ApptRow[], public holds: QueueHold[] = []) {
     this.types = w.typeIds.map(id => {
       const slots = w.slots.filter(s => s.typeId === id), meta = h.svc.mapAppointmentData[id] ?? {};
       return {
@@ -1419,7 +1439,7 @@ export class WindowDialog {
       };
     });
     this.status = windowStatus(w, sessions.map(r => r.appt), this.now);
-    this.canDelete = w.start > this.now && !w.slots.some(s => s.booked);
+    this.canDelete = w.start > this.now && !w.slots.some(s => s.booked) && !holds.length;
   }
 
   statusOf(r: ApptRow) { const s = apptStatus(r.appt, this.now); return s === 'Pending' ? 'Completion pending' : s; }
@@ -1608,8 +1628,8 @@ export class SpecialistAppointmentStudioComponent implements OnInit, OnDestroy {
     return firstValueFrom(ref.afterClosed()).then(v => { this.add = null; return !!v; });
   }
 
-  openWindow(w: AvailWindow, sessions: ApptRow[]): Promise<'delete' | ApptRow | undefined> {
-    this.win = new WindowDialog(this, w, sessions);
+  openWindow(w: AvailWindow, sessions: ApptRow[], holds: QueueHold[] = []): Promise<'delete' | ApptRow | undefined> {
+    this.win = new WindowDialog(this, w, sessions, holds);
     const ref = this.dialog.open<unknown, unknown, 'delete' | ApptRow>(this.windowTpl, this.dialogBox);
     this.win.ref = ref;
     return firstValueFrom(ref.afterClosed()).then(v => { this.win = null; return v; });
