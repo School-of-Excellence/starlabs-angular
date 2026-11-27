@@ -1,8 +1,9 @@
 // import { PicoKoalaService } from './../../Service/PicoVoice Koala/pico-koala.service';
 import { HttpClient } from '@angular/common/http';
-import { AfterViewInit, Component, computed, ElementRef, HostListener, OnDestroy, signal, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, computed, ElementRef, HostListener, inject, NgZone, OnDestroy, signal, ViewChild } from '@angular/core';
+import { Auth } from '@angular/fire/auth';
 import { firstValueFrom, lastValueFrom, Subject, takeUntil } from 'rxjs';
-import { ConnectionQuality, createLocalScreenTracks, LocalAudioTrack, LocalVideoTrack, Participant, RemoteParticipant, RemoteTrack, RemoteTrackPublication, Room, RoomEvent, Track, TrackEvent, LocalTrackPublication, VideoQuality, ScreenSharePresets, VideoPreset } from 'livekit-client';
+import { ConnectionQuality, DisconnectReason, createLocalScreenTracks, LocalAudioTrack, LocalVideoTrack, Participant, RemoteParticipant, RemoteTrack, RemoteTrackPublication, Room, RoomEvent, Track, TrackEvent, LocalTrackPublication, VideoQuality, ScreenSharePresets, VideoPreset } from 'livekit-client';
 import { CdkDrag, CdkDragEnd } from '@angular/cdk/drag-drop';
 import { doc, docData, getDoc, setDoc, updateDoc, deleteField, serverTimestamp, Firestore } from '@angular/fire/firestore';
 import { ReadyCheckComponent } from '../ready-check/ready-check.component';
@@ -87,7 +88,8 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
 
   // UI States
   loading = true;
-  meetingRoomStatus: null | "servercheck" | "serverstarting" | "serverfailed" | "connecting" | "connected" | "left" | "ended" = "servercheck"
+  meetingRoomStatus: null | "servercheck" | "serverstarting" | "serverfailed" | "connecting" | "connected" | "left" | "ended"
+    | "waiting" | "denied" | "reconnecting" | "disconnected" = "servercheck"
 
   // ── Waiting for a video server (2026-11-14 plan items 2.1, 2.1b, 3.1) ──────────────────────
   // A stopped server is woken by the 5-minute job (≤5 min) and boots in ~10 min, so the tab keeps
@@ -117,6 +119,35 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   hostActionBusy: Record<string, 'muting' | 'removing'> = {};
   hostActionNote: string | null = null;
   joinError: string | null = null; // shown on the "left" screen when joining failed
+
+  // ── Plan 2026-11-27-openvidu-call-resilience ────────────────────────────────────────────
+  private afAuth = inject(Auth);
+  private zone = inject(NgZone);
+  // Phase 1: gateway / network errors on the token call are retried (2→4→8→15→30 s, ≤ 3 min).
+  private static readonly TRANSIENT_LIMIT_MS = 3 * 60 * 1000;
+  private static readonly TRANSIENT_BACKOFF_S = [2, 4, 8, 15, 30];
+  // Phase 2: "your connection is weak" banner — on after 5 s of Poor/Lost, off after 10 s of good.
+  poorNet = false;
+  poorNetDismissed = false;
+  private poorTimer: any = null;
+  private goodTimer: any = null;
+  // Phase 3: rejoin after an unintended drop, for up to 2 min; LiveKit's own silent retry first.
+  private static readonly REJOIN_LIMIT_MS = 2 * 60 * 1000;
+  private static readonly LOST_CONTACT_MS = 3 * 60 * 1000;   // 3 missed 60-s heartbeats
+  reconnectingOverlay = false;
+  rejoinStartedAt = 0;
+  private rejoinCamOn = true;
+  private rejoinMicOn = true;
+  // Phase 4: waiting room.
+  private lastRoomData: any = null;
+  private admissionWake: { resolve: () => void; reject: (e: any) => void } | null = null;
+  waitingSince = 0;
+  waitingList: { id: string; name: string; since: number }[] = [];
+  deniedList: { id: string; name: string }[] = [];
+  waitingPanelOpen = true;
+  private alertedWaiting = new Set<string>();
+  private alertCtx: AudioContext | null = null;
+  private lastPrecheck: Record<string, any> = {};
 
   // Browser blocked sound until the user taps (Safari / iPhone autoplay rule) — plan item 2.2.
   audioBlocked = false;
@@ -319,6 +350,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
             }
 
             this.readNotJoined(data["precheck"])
+            this.lastRoomData = data
 
             this.roomDetail = {
               roomId: id,
@@ -328,6 +360,8 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
               roomstatus: data["roomstatus"],
               recordingstatus: data["recordingstatus"]
             }
+            // After roomDetail: isHost() reads its hosts (phase 4 waiting room).
+            this.readWaitingRoom(data)
           }
           else{
             // Meeting ended / not active: no "not joined yet" record should remain.
@@ -362,6 +396,9 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.stopHostWarmup();
+    if (this.meetingRoomStatus === 'waiting') this.removeMyWaitingEntry();
+    this.clearPoorNet();
+    try { void this.alertCtx?.close(); } catch (_) {}
     // Left the page before joining → the specialist sees "left the page at …".
     this.precheck?.markLeft();
     this.precheck = null;
@@ -525,8 +562,9 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   /** Participants still on the Ready check — read from the room doc's `precheck` map, which the
    *  page already listens to (no extra listener). Shown only to the specialist, in the call. */
   private readNotJoined(precheck: Record<string, any> | undefined): void {
+    this.lastPrecheck = precheck || {};
     this.notJoined = Object.entries(precheck || {})
-      .filter(([pid, r]) => pid !== this.loggedinProfileid && r && typeof r === 'object')
+      .filter(([pid, r]) => pid !== this.loggedinProfileid && r && typeof r === 'object' && r.state !== 'waiting')
       .map(([, r]: [string, any]) => ({
         name: r.name || 'Participant',
         message: r.message || '',
@@ -549,26 +587,57 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
 
   /** "2 min ago" / "left the page at 11:12" for the Not-joined panel. */
   notJoinedWhen(r: { at: number; leftAt: number }): string {
+    if (!r.leftAt && this.isLostContact(r.at)) return `last seen ${this.clock(r.at)}`;
     if (r.leftAt) return `left the page at ${new Date(r.leftAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
     const min = Math.max(0, Math.round((this.notJoinedNow - r.at) / 60000));
     return min < 1 ? 'just now' : `${min} min ago`;
   }
 
-  async joinCall() {
-    // Camera + mic were checked by the Ready check panel. Re-check only if they aren't ready.
-    if (!this.devicesReady) {
-      const allowed = await this.prepareParticipant();
-      if (!allowed) return;   // the panel shows what's wrong and how to fix it
-    }
+  /** `rejoin` = automatic rejoin after a drop (plan 2026-11-27-openvidu-call-resilience, phase 3):
+   *  skips the Ready check hand-over and throws on failure instead of leaving. */
+  /** Lost contact (phase 3): a live page re-saves its entry every 60 s; 3 min of silence means the
+   *  tab was closed, the browser crashed or the internet is gone — whatever `state` still says. */
+  isLostContact(updatedAtMs: number): boolean {
+    return !!updatedAtMs && this.notJoinedNow - updatedAtMs > JoinLivekitCallComponent.LOST_CONTACT_MS;
+  }
 
-    // Remember devices picked on the Ready check, then free them before LiveKit opens them
-    // (avoids double capture).
-    this.prejoinMicId = this.readyCheck?.micPicked ? this.readyCheck.selectedMicId : '';
-    this.prejoinSpeakerId = this.readyCheck?.selectedSpeakerId || '';
-    this.readyCheck?.release();
+  private clock(ms: number): string {
+    return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  /** Plain message for a Not-joined row. */
+  notJoinedText(r: { state: string; message: string; at: number; leftAt: number }): string {
+    if (r.state === 'left') return 'Left the page';
+    if (this.isLostContact(r.at)) return 'Lost contact';
+    if (r.state === 'reconnecting') return 'Connection dropped — reconnecting';
+    if (r.state === 'disconnected') return 'Disconnected — could not reconnect';
+    return r.message;
+  }
+
+  async joinCall(rejoin = false) {
+    if (!rejoin) {
+      // Waiting-room alerts (phase 4): ask for notification permission and unlock sound while we
+      // still have the click (browsers only allow both from a user gesture).
+      if (this.isHost()) this.prepareHostAlerts();
+
+      // Camera + mic were checked by the Ready check panel. Re-check only if they aren't ready.
+      if (!this.devicesReady) {
+        const allowed = await this.prepareParticipant();
+        if (!allowed) return;   // the panel shows what's wrong and how to fix it
+      }
+
+      // Remember devices picked on the Ready check, then free them before LiveKit opens them
+      // (avoids double capture).
+      if (this.readyCheck) {
+        this.prejoinMicId = this.readyCheck.micPicked ? this.readyCheck.selectedMicId : '';
+        this.prejoinSpeakerId = this.readyCheck.selectedSpeakerId || '';
+        this.readyCheck.release();
+      }
+      this.joinError = null;
+    }
     this.localParticipant.set(undefined);
 
-    this.meetingRoomStatus = "connecting"
+    this.meetingRoomStatus = rejoin ? "reconnecting" : "connecting"
 
     // Detect device capabilities and pick the best starting quality tier
     const initialTier = this.adaptiveQuality.detectInitialQuality();
@@ -664,6 +733,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
         if (participant.identity === room.localParticipant.identity) {
           this.localNetworkQuality.set(quality);
           console.log("📶 Local network quality:", ConnectionQuality[quality]);
+          this.onLocalQuality(quality);
         }
 
         this.remoteParticipantsQuality.update((prev) => {
@@ -735,11 +805,13 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       this.resolvePipSource(); // pick a new target
     });
 
-    // Handle unexpected server disconnection (network drop, server kick)
-    room.on(RoomEvent.Disconnected, () => {
-      console.log('Room disconnected unexpectedly');
-      this.leaveRoom(false);
-    });
+    // Network drop / server gone → rejoin by ourselves; Leave, End all, Remove, same account in
+    // another tab → end as before (plan 2026-11-27-openvidu-call-resilience, phase 3).
+    room.on(RoomEvent.Disconnected, (reason?: DisconnectReason) => this.onRoomDisconnected(reason));
+    // LiveKit's own silent retry (~15 s) — show it instead of a frozen call.
+    room.on(RoomEvent.Reconnecting, () => this.onLivekitReconnecting());
+    room.on(RoomEvent.SignalReconnecting, () => this.onLivekitReconnecting());
+    room.on(RoomEvent.Reconnected, () => this.onLivekitReconnected());
 
     // Browser autoplay rule (Safari / iPhone): LiveKit reports when it cannot play sound until a
     // tap — show the "Tap to enable sound" button instead of silently playing nothing (plan 2.2).
@@ -751,8 +823,8 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     room.on(RoomEvent.MediaDevicesChanged, () => void this.onDevicesChanged());
 
     try {
-      // Request a new token
-      const response = await this.getTokenWithRetry();
+      // Request a new token (waits in the waiting room when the server says so — phase 4)
+      const response = await this.getTokenAfterWaiting(rejoin);
       console.log('Token received:', response);
 
       // ── KOALA: Init BEFORE room.connect() so This captures mic, runs the noise suppression pipeline, and produces a clean MediaStreamTrack — all before the room handshake begins.
@@ -763,6 +835,9 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       // await ensures we wait until initial signaling is done
       await room.connect(response.url, response.token);
       this.meetingRoomStatus = "connected"
+      this.reconnectingOverlay = false;
+      this.rejoinStartedAt = 0;
+      this.waitingSince = 0;
       // Joined: the "not joined yet" record is no longer needed (plan 2026-11-27, Phase 4).
       void this.precheck?.clear();
       this.precheck = null;
@@ -853,7 +928,14 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       this.setupAutoPip();
       this.resolvePipSource();
 
+      // Rejoin: put camera / mic / blur back the way they were before the drop.
+      if (rejoin) await this.restoreAfterRejoin();
+      // Specialist: alert for anyone already in the waiting room.
+      if (this.isHost()) this.readWaitingRoom(this.lastRoomData);
+
     } catch (error: any) {
+      if (rejoin) throw error;        // the rejoin loop decides (retry / give up)
+      if (error?.code === 'DENIED') { await this.showDenied(); return; }
       // Handle connection errors gracefully
       console.log(error)
       console.log('There was an error connecting to the room:', error?.error?.errorMessage || error?.message || error);
@@ -868,24 +950,55 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  private async getTokenWithRetry(): Promise<any> {
+  /** Token request; a `403 WAITING` answer parks the participant in the waiting room until a
+   *  specialist admits them, then asks again (plan 2026-11-27-openvidu-call-resilience, phase 4). */
+  private async getTokenAfterWaiting(rejoin: boolean): Promise<any> {
+    const deadline = rejoin && this.rejoinStartedAt ? this.rejoinStartedAt + JoinLivekitCallComponent.REJOIN_LIMIT_MS : 0;
+    while (true) {
+      try {
+        return await this.getTokenWithRetry(deadline);
+      } catch (e: any) {
+        if (e?.code !== 'WAITING') throw e;
+        await this.waitForAdmission();          // throws DENIED / LEFT
+        this.meetingRoomStatus = rejoin ? 'reconnecting' : 'connecting';
+      }
+    }
+  }
+
+  private tokenAttemptAlive(): boolean {
+    return this.meetingRoomStatus === 'connecting' || this.meetingRoomStatus === 'reconnecting';
+  }
+
+  /** Gateway / network trouble worth another try (phase 1). 4xx is never retried. */
+  private isTransientTokenError(error: any): boolean {
+    const st = error?.status;
+    return st === 0 || st === 502 || st === 504 || (st === 503 && error?.error?.code !== 'SCALING_IN_PROGRESS');
+  }
+
+  private async getTokenWithRetry(deadline = 0): Promise<any> {
     const roomName = this.roomDetail.roomId;
     const participantId = this.loggedinProfileid || `user-${Date.now()}`;
     const participantName = this.loggedinProfileRole["name"] || 'Guest';
+    let transientSince = 0;
+    let transientTries = 0;
 
     // "Media node not ready" = a media server is still booting, or every server already holds a
     // call and one more was just ordered (~5–8 min). Keep trying for up to TOKEN_WAIT_LIMIT_MS
     // with an on-screen message + elapsed time (was 3 tries over ~3 min) — plan item 2.1b.
     const startedAt = Date.now();
     while (true) {
+      if (deadline && Date.now() >= deadline) throw new Error('Could not reconnect in time');
       try {
+        // Sign-in proof (phase 4): the function checks this belongs to participantId.
+        let idToken = '';
+        try { idToken = (await this.afAuth.currentUser?.getIdToken()) || ''; } catch (_) {}
         const response = await firstValueFrom(
           this.httpClient.post<any>(`https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/createOpenViduToken`, {
             roomName,
             participantName,
             participantId,
             provider: this.provider
-          })
+          }, idToken ? { headers: { Authorization: `Bearer ${idToken}` } } : {})
         );
         this.tokenWaitStartedAt = 0;
         this.stopWaitTicker();
@@ -905,9 +1018,25 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
           // ONE timer, not 1 s steps: Chrome slows timers in a background tab to about once a
           // minute, so 30 × 1 s became ~30 min (test 2026-11-15: a Room 2 tab behind a Room 1
           // call stopped retrying). Bringing the tab to the front or leaving ends the wait early.
-          if (this.meetingRoomStatus !== 'connecting') throw new Error('Left while waiting for a video server');
+          if (!this.tokenAttemptAlive()) throw new Error('Left while waiting for a video server');
           await this.waitForRetry(wait * 1000);
-          if (this.meetingRoomStatus !== 'connecting') throw new Error('Left while waiting for a video server');
+          if (!this.tokenAttemptAlive()) throw new Error('Left while waiting for a video server');
+        } else if (error.status === 403 && (error.error?.code === 'WAITING' || error.error?.code === 'DENIED')) {
+          throw Object.assign(new Error(error.error?.message || error.error.code), { code: error.error.code });
+        } else if (this.isTransientTokenError(error)) {
+          // Phase 1: a gateway hiccup (e.g. Google's "service not available yet" 503 / 504) or a
+          // network blip — try again quietly instead of failing the join.
+          if (!transientSince) transientSince = Date.now();
+          if (Date.now() - transientSince >= JoinLivekitCallComponent.TRANSIENT_LIMIT_MS) {
+            throw new Error("We couldn't reach the video service for 3 minutes. Please check your internet and try again.");
+          }
+          if (!this.tokenWaitStartedAt) { this.tokenWaitStartedAt = startedAt; this.startWaitTicker(); }
+          const steps = JoinLivekitCallComponent.TRANSIENT_BACKOFF_S;
+          const wait = steps[Math.min(transientTries++, steps.length - 1)];
+          console.log(`Token ${error.status || 'network error'} — retry in ${wait}s`);
+          if (!this.tokenAttemptAlive()) throw new Error('Left while connecting');
+          await this.waitForRetry(wait * 1000);
+          if (!this.tokenAttemptAlive()) throw new Error('Left while connecting');
         } else {
           throw error;
         }
@@ -923,13 +1052,319 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       const done = () => {
         clearTimeout(timer);
         document.removeEventListener('visibilitychange', onVisible);
+        window.removeEventListener('online', done);
         if (this.retryWake === done) this.retryWake = null;
         resolve();
       };
       timer = setTimeout(done, ms);
       document.addEventListener('visibilitychange', onVisible);
+      window.addEventListener('online', done);   // internet back → try at once
       this.retryWake = done;
     });
+  }
+
+  // ── Phase 2: "your connection is weak" banner ────────────────────────────────────────────
+  private onLocalQuality(q: ConnectionQuality): void {
+    const bad = q === ConnectionQuality.Poor || q === ConnectionQuality.Lost;
+    if (bad) {
+      if (this.goodTimer) { clearTimeout(this.goodTimer); this.goodTimer = null; }
+      if (!this.poorNet && !this.poorTimer) this.poorTimer = setTimeout(() => { this.poorTimer = null; this.poorNet = true; }, 5000);
+    } else if (q !== ConnectionQuality.Unknown) {
+      if (this.poorTimer) { clearTimeout(this.poorTimer); this.poorTimer = null; }
+      if (this.poorNet && !this.goodTimer) {
+        this.goodTimer = setTimeout(() => { this.goodTimer = null; this.poorNet = false; this.poorNetDismissed = false; }, 10000);
+      }
+    }
+  }
+
+  private clearPoorNet(): void {
+    if (this.poorTimer) { clearTimeout(this.poorTimer); this.poorTimer = null; }
+    if (this.goodTimer) { clearTimeout(this.goodTimer); this.goodTimer = null; }
+    this.poorNet = false;
+    this.poorNetDismissed = false;
+  }
+
+  /** Banner button: drop my video so my voice keeps going. */
+  async turnOffMyVideo(): Promise<void> {
+    if (!this.isVideoHidden()) await this.toggleCamera();
+    this.poorNetDismissed = true;
+  }
+
+  /** "Connection weak" chip on another person's tile. */
+  isRemoteWeak(identity: string): boolean {
+    return this.isRemoteConnectionLost(identity);
+  }
+
+  // ── Phase 3: reconnect instead of "You left" ─────────────────────────────────────────────
+  private onRoomDisconnected(reason?: DisconnectReason): void {
+    console.log('Room disconnected:', reason !== undefined ? DisconnectReason[reason] : 'unknown');
+    if (this.meetingRoomStatus === 'reconnecting') return;   // a rejoin attempt failed — the loop handles it
+    const intended = reason === DisconnectReason.CLIENT_INITIATED
+      || reason === DisconnectReason.DUPLICATE_IDENTITY
+      || reason === DisconnectReason.PARTICIPANT_REMOVED
+      || reason === DisconnectReason.ROOM_DELETED
+      || reason === DisconnectReason.ROOM_CLOSED;
+    if (this.meetingRoomStatus !== 'connected' || intended || !this.roomDetail?.roomId) {
+      this.leaveRoom(false);
+      return;
+    }
+    void this.rejoin();
+  }
+
+  private onLivekitReconnecting(): void {
+    if (this.meetingRoomStatus !== 'connected') return;
+    this.reconnectingOverlay = true;
+    this.markReconnectingForHost();
+  }
+
+  private onLivekitReconnected(): void {
+    this.reconnectingOverlay = false;
+    if (this.precheck && this.meetingRoomStatus === 'connected') { void this.precheck.clear(); this.precheck = null; }
+  }
+
+  /** Participants only: the specialist's panel shows "reconnecting" while we try. */
+  private markReconnectingForHost(): void {
+    if (this.isHost() || !this.loggedinProfileid || !this.roomDetail?.roomId) return;
+    if (!this.precheck) {
+      this.precheck = new PrecheckRecorder(this.firestore, this.roomDetail.roomId, this.loggedinProfileid, this.loggedinProfileRole["name"] || 'Participant');
+    }
+    this.precheck.setPhase('reconnecting', 'Connection dropped — reconnecting');
+  }
+
+  /** Rebuild the call after an unintended drop: new token, same camera / mic / blur, ≤ 2 min. */
+  private async rejoin(): Promise<void> {
+    if (this.meetingRoomStatus === 'reconnecting') return;
+    const lp = this.room()?.localParticipant;
+    if (lp) {
+      this.rejoinCamOn = lp.isCameraEnabled && !this.isVideoHidden();
+      this.rejoinMicOn = !this.isAudioMuted();
+    }
+    if (this.selectedMicId) this.prejoinMicId = this.selectedMicId;
+    if (this.selectedSpeakerId) this.prejoinSpeakerId = this.selectedSpeakerId;
+    this.meetingRoomStatus = 'reconnecting';
+    this.rejoinStartedAt = Date.now();
+    this.markReconnectingForHost();
+    await this.teardownRoom(true);
+    this.startWaitTicker();
+
+    const limit = JoinLivekitCallComponent.REJOIN_LIMIT_MS;
+    while (this.meetingRoomStatus === 'reconnecting') {
+      const left = this.rejoinStartedAt + limit - Date.now();
+      if (left <= 0) break;
+      if (!navigator.onLine) { await this.waitForRetry(Math.min(left, 15000)); continue; }   // wakes on 'online'
+      try {
+        await this.joinCall(true);
+        if ((this.meetingRoomStatus as string) === 'connected') return;   // status changes inside joinCall
+      } catch (e: any) {
+        console.log('[rejoin] attempt failed:', e?.message || e);
+        if (e?.code === 'DENIED') { await this.showDenied(); return; }
+        if (this.meetingRoomStatus !== 'reconnecting') return;   // left / ended meanwhile
+        await this.teardownRoom(true);
+        this.startWaitTicker();
+        await this.waitForRetry(Math.min(3000, Math.max(0, this.rejoinStartedAt + limit - Date.now())));
+      }
+    }
+    if (this.meetingRoomStatus === 'reconnecting') {
+      this.stopWaitTicker();
+      this.meetingRoomStatus = 'disconnected';
+      this.precheck?.setPhase('disconnected', 'Disconnected — could not reconnect');
+    }
+  }
+
+  /** "You were disconnected" → Rejoin button. */
+  rejoinNow(): void {
+    void this.rejoin();
+  }
+
+  private async restoreAfterRejoin(): Promise<void> {
+    const room = this.room();
+    if (!room) return;
+    try {
+      if (!this.rejoinCamOn) await room.localParticipant.setCameraEnabled(false);
+      else if (this.blurLevel !== 'none') {
+        const level = this.blurLevel;
+        this.blurLevel = 'none';          // applyBlur ignores "same level" — the new track has no blur yet
+        await this.applyBlur(level);
+      }
+      if (!this.rejoinMicOn) await this.getLocalTrackPublication(Track.Source.Microphone)?.mute();
+    } catch (e: any) {
+      console.warn('[rejoin] restore failed:', e?.message || e);
+    }
+  }
+
+  /** "m:ss" since `fromMs`, ticking with the wait ticker. */
+  elapsedSince(fromMs: number): string {
+    if (!fromMs) return '0:00';
+    const total = Math.max(0, Math.floor((this.waitNow - fromMs) / 1000));
+    return `${Math.floor(total / 60)}:${(total % 60).toString().padStart(2, '0')}`;
+  }
+
+  // ── Phase 4: waiting room ────────────────────────────────────────────────────────────────
+  private roomRef() {
+    return doc(this.firestore, 'openviduroom', this.roomDetail.roomId);
+  }
+
+  /** Participant: put my name on the waiting list, then wait for Admit / Deny. */
+  private waitForAdmission(): Promise<void> {
+    const me = this.loggedinProfileid;
+    this.meetingRoomStatus = 'waiting';
+    this.tokenWaitStartedAt = 0;
+    if (!this.waitingSince) this.waitingSince = Date.now();
+    this.startWaitTicker();
+    this.precheck?.setPhase('waiting', 'In the waiting room — waiting for the host');
+    void updateDoc(this.roomRef(), {
+      [`waiting.${me}`]: { name: this.loggedinProfileRole["name"] || 'Participant', since: serverTimestamp() },
+    }).catch(e => console.log('[waiting] write failed:', e));
+    return new Promise<void>((resolve, reject) => {
+      this.admissionWake = { resolve, reject };
+      this.readWaitingRoom(this.lastRoomData);   // already admitted (e.g. Let in before Join)
+    });
+  }
+
+  private removeMyWaitingEntry(): void {
+    const me = this.loggedinProfileid;
+    if (!me || !this.roomDetail?.roomId) return;
+    void updateDoc(this.roomRef(), { [`waiting.${me}`]: deleteField() })
+      .catch(e => console.log('[waiting] cleanup failed:', e));
+  }
+
+  private async showDenied(): Promise<void> {
+    this.tokenWaitStartedAt = 0;
+    this.waitingSince = 0;
+    this.stopWaitTicker();
+    void this.precheck?.clear();
+    this.precheck = null;
+    await this.teardownRoom(false);
+    this.meetingRoomStatus = 'denied';
+  }
+
+  /** Runs on every room snapshot: participant → admitted / denied; specialist → waiting lists + alerts. */
+  private readWaitingRoom(data: any): void {
+    if (!data) return;
+    const me = this.loggedinProfileid;
+    const admitted = data['admitted'] || {};
+    const denied = data['denied'] || {};
+
+    if (me && this.admissionWake) {
+      if (admitted[me]) {
+        const w = this.admissionWake; this.admissionWake = null; w.resolve();
+      } else if (denied[me]) {
+        const w = this.admissionWake; this.admissionWake = null;
+        w.reject(Object.assign(new Error('The host could not let you in'), { code: 'DENIED' }));
+      }
+    }
+    // Denied by mistake → specialist pressed "Let in" while this page is still open.
+    if (me && this.meetingRoomStatus === 'denied' && admitted[me]) { void this.joinCall(false); }
+
+    if (!this.isHost()) return;
+    const ms = (t: any) => (t?.toMillis ? t.toMillis() : Date.now());
+    this.waitingList = Object.entries(data['waiting'] || {})
+      .filter(([id, w]) => !!w && !admitted[id] && !denied[id] && id !== me)
+      .map(([id, w]: [string, any]) => ({ id, name: w.name || 'Participant', since: ms(w.since) }))
+      .sort((a, b) => a.since - b.since);
+    this.deniedList = Object.entries(denied)
+      .filter(([id, d]) => !!d && !admitted[id])
+      .map(([id, d]: [string, any]) => ({ id, name: d.name || 'Participant' }));
+
+    const ids = new Set(this.waitingList.map(w => w.id));
+    this.alertedWaiting.forEach(id => { if (!ids.has(id)) this.alertedWaiting.delete(id); });
+    if (this.meetingRoomStatus !== 'connected') return;   // alerts only once the specialist is in the call
+    const fresh = this.waitingList.filter(w => !this.alertedWaiting.has(w.id));
+    if (!fresh.length) return;
+    fresh.forEach(w => this.alertedWaiting.add(w.id));
+    this.alertWaiting(fresh);
+  }
+
+  /** Inside the Join click: notification permission + an unlocked sound context. */
+  private prepareHostAlerts(): void {
+    try {
+      if ('Notification' in window && Notification.permission === 'default') void Notification.requestPermission();
+    } catch (_) {}
+    try {
+      if (!this.alertCtx) this.alertCtx = new AudioContext();
+      void this.alertCtx.resume();
+    } catch (_) {}
+  }
+
+  /** Sound + browser notification — also when the call tab is in the background. */
+  private alertWaiting(list: { id: string; name: string }[]): void {
+    this.waitingPanelOpen = true;
+    this.playChime();
+    const title = list.length === 1 ? `${list[0].name} is waiting to join` : `${list.length} people are waiting to join`;
+    try {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        const n = new Notification(title, {
+          body: `${this.roomDetail?.title || 'Your call'} — click to let them in`,
+          tag: `lkj-wr-${this.roomDetail?.roomId}`,
+          renotify: true,
+        } as any);
+        n.onclick = () => this.zone.run(() => {
+          try { window.focus(); } catch (_) {}
+          this.waitingPanelOpen = true;
+          n.close();
+        });
+      }
+    } catch (e) {
+      console.log('[waiting] notification failed:', e);
+    }
+  }
+
+  private playChime(): void {
+    const ctx = this.alertCtx;
+    if (!ctx) return;
+    try {
+      void ctx.resume();
+      const t0 = ctx.currentTime;
+      [880, 1320].forEach((freq, i) => {
+        const at = t0 + i * 0.18;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.0001, at);
+        gain.gain.exponentialRampToValueAtTime(0.25, at + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.16);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(at);
+        osc.stop(at + 0.17);
+      });
+    } catch (_) {}
+  }
+
+  async admit(id: string): Promise<void> {
+    await updateDoc(this.roomRef(), {
+      [`admitted.${id}`]: { by: this.loggedinProfileid, at: serverTimestamp() },
+      [`waiting.${id}`]: deleteField(),
+      [`denied.${id}`]: deleteField(),
+    }).catch(e => console.log('[waiting] admit failed:', e));
+  }
+
+  async admitAll(): Promise<void> {
+    const fields: Record<string, any> = {};
+    this.waitingList.forEach(w => {
+      fields[`admitted.${w.id}`] = { by: this.loggedinProfileid, at: serverTimestamp() };
+      fields[`waiting.${w.id}`] = deleteField();
+    });
+    if (!Object.keys(fields).length) return;
+    await updateDoc(this.roomRef(), fields).catch(e => console.log('[waiting] admit all failed:', e));
+  }
+
+  async deny(w: { id: string; name: string }): Promise<void> {
+    await updateDoc(this.roomRef(), {
+      [`denied.${w.id}`]: { by: this.loggedinProfileid, at: serverTimestamp(), name: w.name },
+      [`waiting.${w.id}`]: deleteField(),
+    }).catch(e => console.log('[waiting] deny failed:', e));
+  }
+
+  /** Waiting-panel row: lost contact if their page stopped its heartbeat. */
+  waitingLost(id: string): boolean {
+    const at = this.lastPrecheck[id]?.updatedAt?.toMillis?.();
+    return at ? this.isLostContact(at) : false;
+  }
+
+  waitedFor(since: number): string {
+    const min = Math.max(0, Math.round((this.notJoinedNow - since) / 60000));
+    return min < 1 ? 'just now' : `${min} min`;
   }
 
   // Leave/Disconnect from the Room
@@ -942,8 +1377,22 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     // Guard: if already left/leaving, do nothing to prevent re-entrant calls
     // (RoomEvent.Disconnected also calls leaveRoom — without this guard it loops)
     if (this.meetingRoomStatus === 'left' || this.meetingRoomStatus === 'ended') return;
+    const wasWaiting = this.meetingRoomStatus === 'waiting';
     this.meetingRoomStatus = 'left'; // set immediately so re-entrant Disconnected event is ignored
     this.retryWake?.();              // end a token-retry wait now (it re-checks the status and stops)
+    // Left the waiting room (phase 4): take my name off the specialist's list.
+    if (this.admissionWake) { const w = this.admissionWake; this.admissionWake = null; w.reject(Object.assign(new Error('Left the waiting room'), { code: 'LEFT' })); }
+    if (wasWaiting) {
+      this.precheck?.markLeft();
+      this.precheck = null;
+      this.removeMyWaitingEntry();
+    }
+    await this.teardownRoom(false);
+    this.meetingRoomStatus = "left"
+  }
+
+  /** Everything leaving a call releases. `rejoin` keeps the blur choice for the automatic rejoin. */
+  private async teardownRoom(rejoin: boolean): Promise<void> {
     this.stopHostWarmup();
     this.stopNotJoined();
     if (this.autoSpeakerTimer) { clearTimeout(this.autoSpeakerTimer); this.autoSpeakerTimer = null; }
@@ -993,8 +1442,10 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     // which runs no video blur. Background blur (per-frame segmentation) competes for CPU with
     // the single-threaded DeepFilterNet3 AudioWorklet; auto-forcing 'high' here silently starved
     // the DFN worklet on rejoin → choppy audio. Blur stays a manual, opt-in choice (blur menu).
-    this.blurLevel = 'none';
-    this.meetingRoomStatus = "left"
+    if (!rejoin) this.blurLevel = 'none';
+    this.adaptiveQuality.stopMonitoring();   // joinCall starts it again (no duplicate intervals)
+    this.clearPoorNet();
+    this.reconnectingOverlay = false;
   }
 
   // Close the Room and disconnect everyone
@@ -1015,7 +1466,9 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       }
       // Meeting over: drop every "not joined yet" entry of this room (plan 2026-11-27, Phase 4).
       try {
-        await updateDoc(doc(this.firestore, "openviduroom", this.roomDetail["roomId"]), { precheck: deleteField() });
+        await updateDoc(doc(this.firestore, "openviduroom", this.roomDetail["roomId"]), {
+          precheck: deleteField(), waiting: deleteField(), admitted: deleteField(), denied: deleteField(),
+        });
       } catch (e) { console.log('[precheck] cleanup failed:', e); }
       this.leaveRoom(false);
       progress.close()

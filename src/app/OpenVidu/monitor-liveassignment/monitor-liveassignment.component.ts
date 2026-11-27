@@ -1,5 +1,6 @@
 import { HttpClient } from '@angular/common/http';
-import { Component, OnDestroy, signal } from '@angular/core';
+import { Component, inject, OnDestroy, signal } from '@angular/core';
+import { Auth } from '@angular/fire/auth';
 import { firstValueFrom, lastValueFrom, Subject, takeUntil } from 'rxjs';
 import { ConnectionQuality, Participant, RemoteParticipant, RemoteTrack, RemoteTrackPublication, Room, RoomEvent, Track } from 'livekit-client';
 import { collection, collectionData, Firestore, limit, query, where } from '@angular/fire/firestore';
@@ -72,6 +73,9 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
   infraError: string | null = null;
   infraSuccess: string | null = null;
   private destroy$ = new Subject<void>();
+
+  // Sign-in proof for createOpenViduToken (plan 2026-11-27-openvidu-call-resilience, phase 4).
+  private afAuth = inject(Auth);
 
   constructor(
     public http: HttpClient,
@@ -341,13 +345,15 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
 
     while (retryCount <= 3) {
       try {
+        let idToken = '';
+        try { idToken = (await this.afAuth.currentUser?.getIdToken()) || ''; } catch (_) {}
         return await firstValueFrom(
           this.http.post<any>(`https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/createOpenViduToken`, {
             roomName,
             participantName,
             participantId,
             provider: mediaProvider
-          })
+          }, idToken ? { headers: { Authorization: `Bearer ${idToken}` } } : {})
         );
       } catch (error: any) {
         if (error.status === 503 && error.error?.code === 'SCALING_IN_PROGRESS') {

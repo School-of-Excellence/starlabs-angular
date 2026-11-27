@@ -15,6 +15,9 @@ export type CheckKey = 'browser' | 'camera' | 'mic' | 'speaker' | 'network' | 'c
 export type CheckState = 'pending' | 'ok' | 'warn' | 'fail';
 export type ServerState = 'checking' | 'starting' | 'ready' | 'failed';
 
+/** States written after the Ready check (plan 2026-11-27-openvidu-call-resilience). */
+export type PrecheckPhase = 'waiting' | 'reconnecting' | 'disconnected';
+
 export interface CheckItem {
   key: CheckKey;
   state: CheckState;
@@ -51,6 +54,9 @@ export class PrecheckRecorder {
   private writeTimer: any = null;
   private heartbeat: any = null;
   private done = false;
+  /** Set once the participant has moved past the Ready check (waiting room / reconnecting):
+   *  later check changes no longer overwrite that state. */
+  private phase: PrecheckPhase | null = null;
   private readonly onPageHide = () => this.markLeft();
 
   constructor(private firestore: Firestore, roomId: string, private profileId: string, private name: string) {
@@ -69,7 +75,7 @@ export class PrecheckRecorder {
 
   /** Record the latest state (coalesced; unchanged states are not re-written). */
   update(snap: PrecheckSnapshot): void {
-    if (this.done) return;
+    if (this.done || this.phase) return;
     this.pending = snap;
     if (!this.writeTimer) this.writeTimer = setTimeout(() => this.flush(), PrecheckRecorder.WRITE_DELAY_MS);
   }
@@ -86,6 +92,22 @@ export class PrecheckRecorder {
       [`${this.key}.message`]: `Couldn't connect to the call: ${reason}`,
       [`${this.key}.updatedAt`]: serverTimestamp(),
     });
+  }
+
+  /** Past the Ready check (plan 2026-11-27-openvidu-call-resilience): in the waiting room,
+   *  reconnecting after a drop, or disconnected (rejoin gave up). Replaces the whole entry. */
+  setPhase(state: PrecheckPhase, message: string): void {
+    if (this.done) return;
+    if (this.writeTimer) { clearTimeout(this.writeTimer); this.writeTimer = null; }
+    this.pending = null;
+    if (this.phase === state) return;
+    this.phase = state;
+    this.lastWritten = `phase:${state}`;
+    const extra = state === 'reconnecting' ? { reconnectingSince: serverTimestamp() } : {};
+    void this.write({ [this.key]: {
+      profileId: this.profileId, name: this.name, state, step: state, message,
+      leftAt: null, ...extra, updatedAt: serverTimestamp(),
+    } });
   }
 
   /** Participant connected (or the meeting ended): remove this participant's entry. */

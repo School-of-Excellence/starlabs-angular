@@ -15,7 +15,7 @@ import { PreassignStudioComponent } from '../preassign-studio/preassign-studio.c
 import { HoldAlertDialogComponent } from '../hold-alert-dialog/hold-alert-dialog.component';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { collection, collectionData, doc, Firestore, getDoc, getDocs, orderBy, query, updateDoc , arrayUnion, deleteDoc, setDoc, serverTimestamp, arrayRemove, addDoc, writeBatch, collectionSnapshots, documentId, limit, where, DocumentReference, getFirestore } from '@angular/fire/firestore';
+import { collection, collectionData, doc, Firestore, getDoc, getDocs, orderBy, query, updateDoc , arrayUnion, deleteDoc, setDoc, serverTimestamp, arrayRemove, addDoc, writeBatch, collectionSnapshots, documentId, limit, where, DocumentReference, getFirestore, deleteField } from '@angular/fire/firestore';
 import { environment } from '../../../environments/environment';
 import { CommonModule } from '@angular/common';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -2624,7 +2624,7 @@ export class DynamicStudioComponent {
         }
         else{
           if(!doc.data()["active"]){
-            await updateDoc(roomDoc, {active: true})
+            await updateDoc(roomDoc, {active: true, waiting: deleteField(), admitted: deleteField(), denied: deleteField()}) // reopened: fresh waiting room (plan 2026-11-27-openvidu-call-resilience)
           }
         }
       })

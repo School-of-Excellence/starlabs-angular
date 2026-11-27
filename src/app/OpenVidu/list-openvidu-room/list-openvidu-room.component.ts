@@ -1,7 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { CallTabService } from '../../LiveKit/ready-check/call-tab.service';
 import { AuthguardService } from '../../authguard.service';
-import { collection, collectionData, doc, Firestore, getDocs, query, where, getDoc, serverTimestamp, setDoc, updateDoc } from '@angular/fire/firestore';
+import { collection, collectionData, doc, Firestore, getDocs, query, where, getDoc, serverTimestamp, setDoc, updateDoc, deleteField } from '@angular/fire/firestore';
 import { interval, Subject, Subscription, takeUntil } from 'rxjs';
 import { MatButtonModule } from "@angular/material/button";
 import { CommonModule } from '@angular/common';
@@ -167,7 +167,7 @@ export class ListOpenviduRoomComponent {
         }
         else{
           if(!doc.data()["active"]){
-            await updateDoc(roomDoc, {active: true})
+            await updateDoc(roomDoc, {active: true, waiting: deleteField(), admitted: deleteField(), denied: deleteField()}) // reopened: fresh waiting room (plan 2026-11-27-openvidu-call-resilience)
           }
         }
       })

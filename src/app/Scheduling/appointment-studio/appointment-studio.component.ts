@@ -1,7 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { CallTabService } from '../../LiveKit/ready-check/call-tab.service';
 import { MatTableDataSource } from '@angular/material/table';
-import { Firestore, collection, query, orderBy, where, collectionSnapshots, Query, doc, limit, getDocs, getDoc, serverTimestamp, setDoc, updateDoc } from '@angular/fire/firestore';
+import { Firestore, collection, query, orderBy, where, collectionSnapshots, Query, doc, limit, getDocs, getDoc, serverTimestamp, setDoc, updateDoc, deleteField } from '@angular/fire/firestore';
 import { MatDialog } from '@angular/material/dialog';
 import { AuthguardService } from '../../authguard.service';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -694,7 +694,7 @@ export class AppointmentStudioComponent {
         }
         else{
           if(!doc.data()["active"]){
-            await updateDoc(roomDoc, {active: true})
+            await updateDoc(roomDoc, {active: true, waiting: deleteField(), admitted: deleteField(), denied: deleteField()}) // reopened: fresh waiting room (plan 2026-11-27-openvidu-call-resilience)
           }
         }
       })
@@ -760,7 +760,7 @@ export class AppointmentStudioComponent {
           }
           else{
             if(!doc.data()["active"]){
-              await updateDoc(roomDoc, {active: true})
+              await updateDoc(roomDoc, {active: true, waiting: deleteField(), admitted: deleteField(), denied: deleteField()}) // reopened: fresh waiting room (plan 2026-11-27-openvidu-call-resilience)
             }
           }
         })

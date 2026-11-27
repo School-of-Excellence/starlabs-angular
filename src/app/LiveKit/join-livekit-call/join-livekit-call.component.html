@@ -80,6 +80,36 @@
   </ng-template>
 </div>
 
+<!-- Plan 2026-11-27-openvidu-call-resilience, phase 4: participant in the waiting room. -->
+<div *ngIf="!loading && meetingRoomStatus == 'waiting'" class="lkj-state" data-testid="lkj-waiting">
+  <div class="server-wait-spinner" aria-hidden="true"></div>
+  <div class="lkj-state-title">Waiting for the coach to let you in</div>
+  <div class="server-wait-note">Your camera and microphone are ready. Keep this tab open — you'll join automatically.</div>
+  <div class="server-wait-elapsed" data-testid="lkj-waiting-elapsed">Waiting {{ elapsedSince(waitingSince) }}</div>
+  <button class="lkj-state-btn lkj-state-btn-ghost" (click)="leaveRoom(false)" data-testid="lkj-waiting-leave-btn">Leave</button>
+</div>
+
+<div *ngIf="!loading && meetingRoomStatus == 'denied'" class="lkj-state" data-testid="lkj-denied">
+  <mat-icon class="lkj-state-icon">block</mat-icon>
+  <div class="lkj-state-title">The coach couldn't let you in to this call</div>
+  <div class="server-wait-note">If this was a mistake, keep this tab open — you'll join automatically if the coach lets you in.</div>
+</div>
+
+<!-- Phase 3: rebuilding the call after a network drop. -->
+<div *ngIf="!loading && meetingRoomStatus == 'reconnecting'" class="lkj-state" data-testid="lkj-rejoining">
+  <div class="server-wait-spinner" aria-hidden="true"></div>
+  <div class="lkj-state-title">Reconnecting…</div>
+  <div class="server-wait-note">Your connection dropped. We're getting you back into the call.</div>
+  <div class="server-wait-elapsed" data-testid="lkj-rejoining-elapsed">{{ elapsedSince(rejoinStartedAt) }}</div>
+</div>
+
+<div *ngIf="!loading && meetingRoomStatus == 'disconnected'" class="lkj-state" data-testid="lkj-disconnected">
+  <mat-icon class="lkj-state-icon">wifi_off</mat-icon>
+  <div class="lkj-state-title">You were disconnected</div>
+  <div class="server-wait-note">We couldn't reconnect for 2 minutes. Check your internet, then rejoin.</div>
+  <button class="lkj-state-btn" (click)="rejoinNow()" data-testid="lkj-rejoin-btn">Rejoin</button>
+</div>
+
 <!-- Connected to the Meeting -->
 <div #meetingContainer *ngIf="room() && meetingRoomStatus == 'connected'" class="zoom-container" data-testid="joinroom-connected">
 
@@ -87,6 +117,47 @@
   <button *ngIf="audioBlocked" class="sound-blocked-btn" (click)="enableSound()" data-testid="lkj-enablesound">
     <mat-icon>volume_up</mat-icon> Tap to enable sound
   </button>
+  <!-- Phase 3: LiveKit's own silent retry after a short drop. -->
+  <div *ngIf="reconnectingOverlay" class="lkj-reconnecting" role="status" data-testid="lkj-reconnecting">
+    <div class="server-wait-spinner" aria-hidden="true"></div>
+    <div>Reconnecting…</div>
+  </div>
+
+  <!-- Phase 2: my connection is weak. -->
+  <div *ngIf="poorNet && !poorNetDismissed" class="lkj-poor-net" role="status" data-testid="lkj-poor-net">
+    <mat-icon>signal_cellular_connected_no_internet_4_bar</mat-icon>
+    <span>Your connection is weak — video lowered to keep the call going.</span>
+    <button *ngIf="!isVideoHidden()" (click)="turnOffMyVideo()" data-testid="lkj-poor-net-video-off-btn">Turn off my video</button>
+    <button class="lkj-poor-net-x" (click)="poorNetDismissed = true" aria-label="Dismiss" data-testid="lkj-poor-net-close-btn">✕</button>
+  </div>
+
+  <!-- Phase 4: specialist's waiting room. -->
+  <div *ngIf="isHost() && (waitingList.length || deniedList.length)" class="wr-panel" data-testid="lkj-wr-panel">
+    <button class="wr-head" (click)="waitingPanelOpen = !waitingPanelOpen" data-testid="lkj-wr-toggle-btn">
+      <mat-icon>hourglass_top</mat-icon>
+      <span>Waiting room ({{ waitingList.length }})</span>
+      <mat-icon class="wr-caret">{{ waitingPanelOpen ? 'expand_less' : 'expand_more' }}</mat-icon>
+    </button>
+    <div *ngIf="waitingPanelOpen" class="wr-body">
+      <div *ngFor="let w of waitingList" class="wr-row" [class.wr-lost]="waitingLost(w.id)" data-testid="lkj-wr-row">
+        <div class="wr-who">
+          <div class="wr-name">{{ w.name }}</div>
+          <div class="wr-when">{{ waitingLost(w.id) ? 'Lost contact' : 'waiting ' + waitedFor(w.since) }}</div>
+        </div>
+        <button class="wr-btn wr-admit" (click)="admit(w.id)" data-testid="lkj-wr-admit-btn">Admit</button>
+        <button class="wr-btn" (click)="deny(w)" data-testid="lkj-wr-deny-btn">Deny</button>
+      </div>
+      <button *ngIf="waitingList.length > 1" class="wr-btn wr-admit wr-all" (click)="admitAll()" data-testid="lkj-wr-admit-all-btn">Admit all</button>
+      <ng-container *ngIf="deniedList.length">
+        <div class="wr-sub">Denied</div>
+        <div *ngFor="let d of deniedList" class="wr-row wr-denied" data-testid="lkj-wr-denied-row">
+          <div class="wr-who"><div class="wr-name">{{ d.name }}</div></div>
+          <button class="wr-btn" (click)="admit(d.id)" data-testid="lkj-wr-letin-btn">Let in</button>
+        </div>
+      </ng-container>
+    </div>
+  </div>
+
   <!-- 2026-11-15 test: mute / remove cold-start for a few seconds — show that it is working. -->
   <div *ngIf="hostActionNote" class="host-action-note" role="status">{{ hostActionNote }}</div>
 
@@ -94,9 +165,9 @@
        why (records exist only until they join; hosts are never recorded). -->
   <div *ngIf="isHost() && notJoined.length" class="nj-panel" data-testid="lkj-notjoined">
     <div class="nj-title">Not joined yet</div>
-    <div *ngFor="let r of notJoined" class="nj-row" [class.nj-stuck]="r.state === 'stuck'" [class.nj-left]="r.state === 'left'" data-testid="lkj-notjoined-row">
+    <div *ngFor="let r of notJoined" class="nj-row" [class.nj-stuck]="r.state === 'stuck'" [class.nj-left]="r.state === 'left' || isLostContact(r.at)" data-testid="lkj-notjoined-row">
       <div class="nj-name">{{ r.name }}</div>
-      <div class="nj-msg">{{ r.state === 'left' ? 'Left the page' : r.message }}</div>
+      <div class="nj-msg">{{ notJoinedText(r) }}</div>
       <div class="nj-when">{{ notJoinedWhen(r) }}</div>
     </div>
   </div>
@@ -161,6 +232,7 @@
               <mat-icon class="badge-icon">graphic_eq</mat-icon>
               <span class="nr-atten" *ngIf="info.dfn">{{ info.atten }}</span>
             </span>
+            <span class="weak-chip" *ngIf="isRemoteWeak(remote.participantIdentity)" data-testid="lkj-weak-chip">Connection weak</span>
             <span class="network-bars">
               <span class="bar" [class.active]="getNetworkBars(remote.participantIdentity).bars >= 1"
                 [style.background]="getNetworkBars(remote.participantIdentity).color"></span>
@@ -324,6 +396,7 @@
                 <mat-icon class="badge-icon">graphic_eq</mat-icon>
                 <span class="nr-atten" *ngIf="info.dfn">{{ info.atten }}</span>
               </span>
+              <span class="weak-chip" *ngIf="isRemoteWeak(remote.participantIdentity)" data-testid="lkj-weak-chip">Connection weak</span>
               <span class="network-bars">
                 <span class="bar" [class.active]="getNetworkBars(remote.participantIdentity).bars >= 1"
                   [style.background]="getNetworkBars(remote.participantIdentity).color"></span>
@@ -405,6 +478,7 @@
             <mat-icon class="badge-icon">graphic_eq</mat-icon>
             <span class="nr-atten" *ngIf="info.dfn">{{ info.atten }}</span>
           </span>
+          <span class="weak-chip" *ngIf="isRemoteWeak(remote.participantIdentity)" data-testid="lkj-weak-chip">Connection weak</span>
           <span class="network-bars" [title]="'Network: ' + getNetworkBars(remote.participantIdentity).bars + ' bars'">
             <span class="bar" [class.active]="getNetworkBars(remote.participantIdentity).bars >= 1"
               [style.background]="getNetworkBars(remote.participantIdentity).color"></span>
