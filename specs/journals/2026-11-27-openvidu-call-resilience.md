@@ -49,3 +49,19 @@ Plan: `specs/plans/2026-11-27-openvidu-call-resilience.md` (approved "build it")
 - `tsc -p tsconfig.app.json --noEmit` clean; `ng build --configuration development` OK.
 - Functions: `node --check` OK; deployed `createOpenViduToken`, `openViduCloseRoom`, `kickParticipant` to **starlabs-test** (2026-11-27, from the uncommitted `feature/waiting-room` branch). Switch doc `openvidu server/waitingroom` created there with `enabled:false`, `verifySignIn:false`. Production untouched.
 - **Not yet run in a browser.** To test on starlabs-test: see the plan's Verification list.
+
+## Same day — specialist sees a drop even when the participant is fully offline (operator)
+Gap found while writing the test steps: with the participant's Wi-Fi completely off, their page
+can't write `precheck.<id>` ("reconnecting"), so the specialist saw nothing but a vanished tile.
+Fix — on the **specialist's own screen**, no participant write needed:
+- LiveKit `ParticipantDisconnected` for a participant (not a Ghost, not already back) → row in the
+  Not-joined panel: "Connection dropped — reconnecting · since hh:mm"; after 2.5 min (their page
+  gives up at 2) → "Dropped and not back yet"; ✕ dismisses. Back in the call → row gone.
+- **Leave on purpose is not a drop:** the leaving page sends a `{type:'bye'}` data message
+  (≤ 0.4 s) before disconnecting; Remove is marked by the specialist's own click.
+- If the participant's own entry exists (partial outage → "reconnecting" written), the dropped row
+  is hidden to avoid two rows.
+- LiveKit notices a fully offline participant after its timeout (~15–30 s), so the row appears then.
+Hooks: `lkj-dropped-row`, `lkj-dropped-dismiss-btn`.
+Revert: remove `noteDropped` / `clearDropped` / DataReceived listener / `sendBye()` call and the
+`lkj-dropped-row` block.

@@ -1502,3 +1502,11 @@
 .wr-all { width: 100%; margin-top: 8px; }
 .wr-sub { margin-top: 10px; font-size: 11.5px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; }
 .wr-denied .wr-name { color: #6b7280; }
+
+/* Specialist: participant dropped (seen from the call itself). */
+.nj-row.nj-dropped { position: relative; padding-right: 26px; }
+.nj-x {
+  position: absolute; top: 6px; right: 4px; border: 0; background: transparent; color: inherit;
+  opacity: 0.6; cursor: pointer; font-size: 12px; line-height: 1;
+}
+.nj-x:hover { opacity: 1; }

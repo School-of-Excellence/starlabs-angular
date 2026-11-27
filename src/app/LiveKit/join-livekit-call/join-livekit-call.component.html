@@ -163,12 +163,19 @@
 
   <!-- 2026-11-27 Ready check, Phase 4: specialist only — participants still on the check page and
        why (records exist only until they join; hosts are never recorded). -->
-  <div *ngIf="isHost() && notJoined.length" class="nj-panel" data-testid="lkj-notjoined">
+  <div *ngIf="isHost() && (notJoined.length || droppedRows().length)" class="nj-panel" data-testid="lkj-notjoined">
     <div class="nj-title">Not joined yet</div>
     <div *ngFor="let r of notJoined" class="nj-row" [class.nj-stuck]="r.state === 'stuck'" [class.nj-left]="r.state === 'left' || isLostContact(r.at)" data-testid="lkj-notjoined-row">
       <div class="nj-name">{{ r.name }}</div>
       <div class="nj-msg">{{ notJoinedText(r) }}</div>
       <div class="nj-when">{{ notJoinedWhen(r) }}</div>
+    </div>
+    <!-- Seen by the specialist's own screen: works even when the participant is fully offline. -->
+    <div *ngFor="let d of droppedRows()" class="nj-row nj-dropped" data-testid="lkj-dropped-row">
+      <div class="nj-name">{{ d.name }}</div>
+      <div class="nj-msg">{{ droppedText(d) }}</div>
+      <div class="nj-when">{{ droppedWhen(d) }}</div>
+      <button class="nj-x" (click)="dismissDropped(d.id)" aria-label="Dismiss" data-testid="lkj-dropped-dismiss-btn">✕</button>
     </div>
   </div>
   

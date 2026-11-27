@@ -148,6 +148,12 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   private alertedWaiting = new Set<string>();
   private alertCtx: AudioContext | null = null;
   private lastPrecheck: Record<string, any> = {};
+  // Phase 3 follow-up: the specialist's own screen notices a participant vanish from the call
+  // without saying goodbye — works even when the participant's internet is completely off
+  // (their page can't write anything then).
+  dropped: { id: string; name: string; at: number }[] = [];
+  private leftOnPurpose = new Set<string>();
+  private static readonly GHOST_SUFFIX = ' - Ghost';
 
   // Browser blocked sound until the user taps (Safari / iPhone autoplay rule) — plan item 2.2.
   audioBlocked = false;
@@ -187,7 +193,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   private prejoinMicId = '';
   private prejoinSpeakerId = '';
   // Specialist's "Not joined yet" panel (call screen only).
-  notJoined: { name: string; message: string; state: string; at: number; leftAt: number }[] = [];
+  notJoined: { id: string; name: string; message: string; state: string; at: number; leftAt: number }[] = [];
   notJoinedNow = Date.now();
   private notJoinedTicker: any = null;
 
@@ -565,7 +571,8 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     this.lastPrecheck = precheck || {};
     this.notJoined = Object.entries(precheck || {})
       .filter(([pid, r]) => pid !== this.loggedinProfileid && r && typeof r === 'object' && r.state !== 'waiting')
-      .map(([, r]: [string, any]) => ({
+      .map(([pid, r]: [string, any]) => ({
+        id: pid,
         name: r.name || 'Participant',
         message: r.message || '',
         state: r.state || 'checking',
@@ -790,6 +797,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     // Clean up state maps when a participant disconnects — prevents memory leak
     room.on(RoomEvent.ParticipantDisconnected, (participant: RemoteParticipant) => {
       const identity = participant.identity;
+      this.noteDropped(participant);
       this.remoteParticipantsQuality.update(prev => { const next = new Map(prev); next.delete(identity); return next; });
       this.remoteParticipantsMute.update(prev => { const next = new Map(prev); next.delete(identity); return next; });
       this.remoteVideoTracks.delete(identity);
@@ -803,6 +811,17 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       if (this.lastActiveSpeaker === identity) this.lastActiveSpeaker = null;
       console.log('Participant disconnected, state cleaned:', identity);
       this.resolvePipSource(); // pick a new target
+    });
+
+    // Dropped participant came back (specialist's "dropped" rows).
+    room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => this.clearDropped(participant.identity));
+    // "Leaving on purpose" note sent by a participant's Leave (so it isn't shown as a drop).
+    room.on(RoomEvent.DataReceived, (payload: Uint8Array, participant?: RemoteParticipant) => {
+      if (!participant) return;
+      try {
+        const msg = JSON.parse(new TextDecoder().decode(payload));
+        if (msg?.type === 'bye') this.leftOnPurpose.add(participant.identity);
+      } catch (_) {}
     });
 
     // Network drop / server gone → rejoin by ourselves; Leave, End all, Remove, same account in
@@ -1199,6 +1218,55 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     return `${Math.floor(total / 60)}:${(total % 60).toString().padStart(2, '0')}`;
   }
 
+  // ── Phase 3 follow-up: specialist sees a participant drop ────────────────────────────────
+  private noteDropped(p: RemoteParticipant): void {
+    const id = p.identity;
+    if (!id || !this.isHost() || id.endsWith(JoinLivekitCallComponent.GHOST_SUFFIX)) return;
+    if (this.leftOnPurpose.delete(id)) return;               // Leave / Remove — not a drop
+    if (this.meetingRoomStatus !== 'connected') return;      // we are the ones leaving
+    // Rejoined under the same identity already (the old connection's goodbye arrives late).
+    if (this.room()?.remoteParticipants.has(id)) return;
+    this.dropped = [...this.dropped.filter(d => d.id !== id), { id, name: p.name || id, at: Date.now() }];
+  }
+
+  private clearDropped(id: string): void {
+    this.leftOnPurpose.delete(id);
+    if (this.dropped.some(d => d.id === id)) this.dropped = this.dropped.filter(d => d.id !== id);
+  }
+
+  dismissDropped(id: string): void {
+    this.dropped = this.dropped.filter(d => d.id !== id);
+  }
+
+  /** Dropped rows not already explained by the participant's own entry (e.g. "reconnecting"). */
+  droppedRows(): { id: string; name: string; at: number }[] {
+    if (!this.dropped.length) return this.dropped;
+    const explained = new Set(this.notJoined.map(r => r.id));
+    return this.dropped.filter(d => !explained.has(d.id));
+  }
+
+  /** Their page keeps trying for 2 min (REJOIN_LIMIT_MS); after that they're probably not coming back by themselves. */
+  droppedText(d: { at: number }): string {
+    return this.notJoinedNow - d.at < JoinLivekitCallComponent.REJOIN_LIMIT_MS + 30_000
+      ? 'Connection dropped — reconnecting'
+      : 'Dropped and not back yet';
+  }
+
+  droppedWhen(d: { at: number }): string {
+    return `since ${this.clock(d.at)}`;
+  }
+
+  private async sendBye(): Promise<void> {
+    const room = this.room();
+    if (!room || room.state !== 'connected') return;
+    try {
+      await Promise.race([
+        room.localParticipant.publishData(new TextEncoder().encode(JSON.stringify({ type: 'bye' })), { reliable: true }),
+        new Promise(r => setTimeout(r, 400)),
+      ]);
+    } catch (_) {}
+  }
+
   // ── Phase 4: waiting room ────────────────────────────────────────────────────────────────
   private roomRef() {
     return doc(this.firestore, 'openviduroom', this.roomDetail.roomId);
@@ -1378,6 +1446,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     // (RoomEvent.Disconnected also calls leaveRoom — without this guard it loops)
     if (this.meetingRoomStatus === 'left' || this.meetingRoomStatus === 'ended') return;
     const wasWaiting = this.meetingRoomStatus === 'waiting';
+    const wasConnected = this.meetingRoomStatus === 'connected';
     this.meetingRoomStatus = 'left'; // set immediately so re-entrant Disconnected event is ignored
     this.retryWake?.();              // end a token-retry wait now (it re-checks the status and stops)
     // Left the waiting room (phase 4): take my name off the specialist's list.
@@ -1387,6 +1456,8 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       this.precheck = null;
       this.removeMyWaitingEntry();
     }
+    // Tell the others this is a real Leave, not a drop (≤ 0.4 s; ignored if the room is gone).
+    if (wasConnected) await this.sendBye();
     await this.teardownRoom(false);
     this.meetingRoomStatus = "left"
   }
@@ -1446,6 +1517,8 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     this.adaptiveQuality.stopMonitoring();   // joinCall starts it again (no duplicate intervals)
     this.clearPoorNet();
     this.reconnectingOverlay = false;
+    this.dropped = [];
+    this.leftOnPurpose.clear();
   }
 
   // Close the Room and disconnect everyone
@@ -2692,6 +2765,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     if (!confirmed) return;
 
     this.startHostAction(participantIdentity, 'removing', `Removing ${participantName}…`);
+    this.leftOnPurpose.add(participantIdentity);   // removed ≠ dropped
     try {
       const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/kickParticipant`;
 
