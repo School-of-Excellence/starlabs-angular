@@ -322,3 +322,10 @@
   margin:-8px -8px 0; padding:8px 8px 4px; border-radius:var(--bt-r-sm) var(--bt-r-sm) 0 0; }
 /* Join in Upcoming sessions is a real button, not a text link. */
 .sas-btn.sas-join { min-height:32px; padding:0 12px; font-size:13px; }
+
+/* Queue Planner reservations (operator, 2026-11-27): the planner never marks the slot, so the studio shows them. */
+.sas-slot small.sas-queue, .sas-tbl small.sas-queue { display:flex; align-items:center; gap:4px; white-space:normal; color:var(--bt-warning-deep); font-weight:700; }
+.sas-slot small.sas-queue mat-icon, .sas-tbl small.sas-queue mat-icon { width:13px; height:13px; font-size:13px; flex-shrink:0; }
+.sas-queue-box { display:grid; gap:3px; margin:12px 0; padding:10px 12px; border-radius:var(--bt-r-sm); background:var(--bt-warning-tint); color:var(--bt-warning-deep); font-size:12.5px; }
+.sas-queue-box b { display:flex; align-items:center; gap:6px; }
+.sas-queue-box mat-icon { width:16px; height:16px; font-size:16px; }

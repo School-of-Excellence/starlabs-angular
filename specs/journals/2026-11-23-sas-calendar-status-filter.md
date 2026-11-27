@@ -16,6 +16,8 @@
 
 | 6 | uncommitted (2026-11-24) | Summary cards: Total = Booked + Not booked + Delivered + Cancelled, then Utilisation | `…/sas-logic.ts` (`summaryHours`), `…/specialist-appointment-studio.component.ts` (`HomeTab.summary` replaces `hours`), `.html` (six cards), `.css` (`.is-bad`, `.sas-stat-warn`), `sas-logic.spec.ts`, `.component.spec.ts` | Studio folder as #1 |
 
+| 7 | uncommitted (2026-11-27) | Queue Planner reservations block delete and are shown | `…/specialist-appointment.service.ts` (`queueHolds`, `QueueHold`), `…/specialist-appointment-studio.component.ts` (`HomeTab.holds`, `heldBy`, `holdNote`, `canDelete`, `deleteWindow` guard, `WindowDialog.holds`), `.html` (window card, Availability row, window dialog), `.css` (`.sas-queue*`), `.component.spec.ts` | Studio folder as #1 |
+
 The files change together; reverting one alone breaks the build (the template calls `setCalF`,
 `cardStatus`, `dayHasCards`, `calCounts`, which live in the component and use `sas-logic` helpers).
 
@@ -208,6 +210,60 @@ Verified: specs 127/127 (Booked / Not booked set the right statuses and narrow t
 the Past filter). Read-only on 4200, 23–29 Nov, all specialists: Booked 43 → 43 sessions; Cancelled 13 → 13;
 Delivered 17 → 17 Past rows; needs update 2 → 2 rows; Not booked → 110 open/unused windows; Total → Availability
 (172 windows) scrolled into view.
+
+## 2026-11-27 — Queue Planner reservations (option A)
+
+Operator: availability that the Queue Planner has taken can still be deleted here, and the planner keeps a
+reference to the deleted doc.
+
+The flow, traced:
+1. Studio / Add availability → `availability/{id}`; `computeSlot` cuts slots (`available: true, booked: false`).
+2. Queue Planner `saveAppointmentSlots` reserves a slot by writing a **`queue availability`** doc
+   (`slottype: 'appointment'`, `availabilityid`, `hostref`, `startdate` / `enddate`, `appointmentref: null`,
+   `bookedby: null`). **It never touches the availability doc**, so the slot still reads free.
+3. The participant books it in Flutter (`Delivery Queue/queueAppointment.dart`): one transaction marks the slot
+   `booked`, closes overlapping slots, creates the appointment (`queueref`, `slotdata`) and fills `bookedby` /
+   `appointmentref` on the queue doc.
+
+The studio's delete rule only looked at the availability doc (future + no slot booked), so between steps 2 and 3
+a reserved window could be deleted, one by one or in bulk. Then the queue doc points at a missing doc; Flutter's
+`filterBookableSlots` drops the slot silently (the participant just stops seeing it) and booking throws
+"No Availability"; the planner still lists the reservation. The appointment type carries no queue flag in code —
+the planner takes the type from the queue stage's `actionresource`; the only `queue_appointment` flag in code is a
+participant flag (Participants Analytics).
+
+Fix A (studio only, reads only): `queueHolds(from, to)` reads `queue availability` with the planner's own query
+(`slottype == 'appointment'`, `startdate` in the calendar range) and names the queue from
+`queue generation.queuename`. Unbooked, not-ended reservations are keyed by `availabilityid`. `canDelete` (row
+checkbox, Select all, the dialog's Delete) also requires no reservation; `deleteWindow` alerts with the queue,
+stage and time and stops before the confirm. The window card, the Availability row and the window dialog say
+"Reserved for queue: <name> · N slot(s)". A booked reservation does not block (the slot itself is booked then).
+Not done here (option B): regular booking still sees a reserved slot as free.
+
+Verified: tsc clean; specs 128/128 (new: a reserved window can't be deleted or bulk-selected and the alert names
+the queue; a booked reservation and a free window stay deletable). Live check pending: the signed-in browser tab
+was gone and the new one is at the login page.
+
+## 2026-11-27 — report D: reservations pointing at deleted availability (production, read-only)
+
+Run with the operator's gcloud login, Firestore REST `:runQuery` / `:batchGet` only (script in the session
+scratchpad, not the repo). `queue availability` with `slottype == 'appointment'`: **472 reservations** over 82
+availability docs, **5 docs missing → 22 broken reservations**, all in "A&H Evolution Preparation Event -
+November 2026", stage Scope Enhancement:
+
+| When (IST) | Specialist | Reservations | Availability doc (deleted) |
+|---|---|---|---|
+| Tue 1 Dec 14:30–16:30 | Nalluri Geethika | 5 (one per segment) | RUghSU5JTBLyTt8U376Y |
+| Wed 2 Dec 14:30–16:30 | Nalluri Geethika | 5 | HMJiNQ76IdQUuor63xqp |
+| Thu 3 Dec 14:30–16:30 | Nalluri Geethika | 5 | nWTkZRnmFxXUb4HvAsb9 |
+| Mon 16 Nov 14:30–16:30 (past) | Afshan Banu | 6 | otoTvO8BMutHqV38ZF3N |
+| Tue 17 Nov 14:30–16:30 (past) | Afshan Banu | 1 | RAZYRs7KMd7QM3kJCAod |
+
+All 22 are unbooked. The 15 future ones are live: participants of that queue cannot see or book Scope
+Enhancement on 1–3 Dec (Flutter drops a slot whose availability doc is missing), while the planner still lists
+them. Re-adding availability does not repair them — a new window gets a new doc id; the planner has to remove and
+re-reserve those slots against the new window. Other counts: future reserved & ok 76, future booked 9, past
+booked 40, past reserved-never-booked 325.
 
 ## Pending
 
