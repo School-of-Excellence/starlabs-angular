@@ -16,6 +16,8 @@
 
 | WiSH scenarios: ongoing parallel product blocks Eligible + Awaiting; Overall counts any not-started cycle | uncommitted | `/delivery-dashboard` → Products Overview (Overall / Eligible / Not Eligible / Purchased / Bonus / Add-on / This & Next Month), Awaiting Initiation, "Why not here?" | `delivery-dashboard-clone.component.ts` | `git checkout -- "src/app/Journey Onboarding/delivery-dashboard-clone/delivery-dashboard-clone.component.ts"` while uncommitted; afterwards `git revert <hash>` |
 
+| CTD Pre / Post Video Ask stages | uncommitted | `/delivery-dashboard` → Stages → CTD D&I (Appointment), both cycles | `delivery-dashboard-clone.component.ts` | `git checkout -- "src/app/Journey Onboarding/delivery-dashboard-clone/delivery-dashboard-clone.component.ts"` while uncommitted; afterwards `git revert <hash>` |
+
 Self-contained: no other screen depends on it. The `ctdStageType()` alias fold sits in shared stage helpers, but it only rewrites two CTD type names, so other products are unaffected and reverting it alone is safe.
 
 ## What changed
@@ -124,9 +126,23 @@ Team list of 16 WiSH participants, three groups: (A) another product ongoing —
 - **`ongoingParallelFor(profile, product)`**: other ids in metadata `activeproduct` (catches non-delivery products — Preethi's Expanding Horizon Consultation is only there), **ignoring names starting "Winning Heart"** (operator: a programme, not a delivery — many participants carry it), plus another cycle on the same card with status "ongoing". Ready to Start keeps its own `getParallelProduct` (unchanged, still counts Winning Heart) and the Stages pool is unchanged — both by decision.
 - Verified live: all 16 land as asked (A: Total + Not Eligible, out of Eligible / Awaiting; B, C: Total + Not Eligible, out of Awaiting). Identities hold on every card. Totals now: Overall 741, Eligible 435, Not Eligible 306, Awaiting 475 (23 Nov: 728 / 458 / — / 503).
 
+## CTD Pre / Post Video Ask stages (operator, 2026-11-27)
+
+- **What changed upstream:** the CTD D&I (Appointment) `productToDeliverySequence` (prod, updated 25 Nov) gained `arenavideoask` steps in both cycles — 3 before CTD Diagnostics (titles "CTD Pre video ask – 01…03") and 4 after CTD Review ("CTD Post video ask – 01…04"). The 1st Cycle labels the first three "CTD Post Video Ask" — a config label slip; same ids as the Next Cycle's "Pre". A "Test" option also exists (videoasks + a form, no appointments).
+- **Columns:** Pre Video Ask after Impact Valuation Activity, Post Video Ask after Review (12 columns). Furthest step order: forms → Pre Video Ask → Diagnostics → Implementation 1 / 2 → Review → Post Video Ask. A VideoAsk step is reached once ANY of its VideoAsks is answered.
+- **Why read the ids from the sequence:** Pre = arenavideoask steps before the first `appointmenttype` step, Post = after the last; the "Test" option has no appointments and is skipped. Swapping a VideoAsk in the config needs no code change. The field is `deliveryoptions[].deliverysequence[].activity` (first build read `.sequence` and found nothing; an empty read is no longer cached).
+- **Answers:** `participantvideoask` where `videoaskid in [...]` (7 ids, one query), keyed by `participantproductid`; answers without one fall back to the participant (`p:<profileid>`).
+- **Bug found while checking:** an ongoing enrolment with no form or appointment went straight to Total Eligible before the furthest-step check, so a VideoAsk-only answer was ignored. CTD now runs the step check there too.
+- **Diagnostics Waiting** draws from `readyForDiagnostics` = Impact Valuation + Pre Video Ask, because enrolments from before 25 Nov never reach Pre Video Ask.
+- **Verified live (27 Nov):** 1st Cycle — Pre Video Ask 2 (Sameena Shaikh, Prakash Reddy), Post 0; Next Cycle — Pre 1 (Ragavendhiran S (Test), on the "Test" option, which the cycle toggle counts as Next Cycle), Post 1 (Nandakumar M). Matches a read-only count from production. Diagnostics Waiting 6 (4 + 2).
+
 ## Pending
 
 - UI check while signed in (the code compiles on the dev server; the page is auth-gated).
 - e2e: register `ddc-btn-ctd-appt`, `ddc-ctd-cycle-first`, `ddc-ctd-cycle-next`, `ddc-chip-addon` and `ddc-btn-addon` in the delivery-dashboard suite before pushing.
 - e2e: also register the "Why not here?" hooks listed above.
 - Team decision: 206 latest completed records have no completion date and count in every period.
+- **Guard added before push (e2e found it):** `loadCtdVideoAsk` returns early when the CTD product id is missing
+  or a merged `group:` id. The journey seed has no CTD product card, so `productId` was `undefined` and
+  `doc('products', undefined)` threw ("CTD VideoAsk load failed … reading 'indexOf'") — DDC-CTD-01/02 failed on
+  the console guard. Production has the card, so it was unaffected. Hub DDC-CTD-01 now expects the 12 columns.
