@@ -1,12 +1,14 @@
-import { Firestore, doc, setDoc, deleteDoc, serverTimestamp } from '@angular/fire/firestore';
+import { Firestore, doc, updateDoc, deleteField, serverTimestamp } from '@angular/fire/firestore';
 
 // Plan 2026-11-27-join-ready-check, Phase 4 — "why hasn't the participant joined yet?".
 //
 // Rules (operator, 2026-11-27):
 //   • participants only — hosts/specialists run the same checks but are NEVER written;
-//   • only BEFORE the call — the doc is deleted the moment the participant connects;
-//   • one doc per participant: openviduroom/<roomId>/precheck/<profileId>;
-//   • closing the tab marks the doc "left" (with the time) instead of deleting it, so the
+//   • only BEFORE the call — the entry is removed the moment the participant connects;
+//   • stored ON THE ROOM DOC itself (operator 2026-11-27: "put in the main collection only"):
+//     openviduroom/<roomId>.precheck.<profileId>. A sub-collection was denied by the deployed
+//     Firestore rules (they only cover openviduroom/{doc}); the room doc is already writable;
+//   • closing the tab marks the entry "left" (with the time) instead of removing it, so the
 //     specialist can tell "gave up" from "stuck".
 
 export type CheckKey = 'browser' | 'camera' | 'mic' | 'speaker' | 'network' | 'computer';
@@ -42,6 +44,8 @@ export class PrecheckRecorder {
   private static readonly WRITE_DELAY_MS = 1500;   // coalesce bursts of check changes
   private static readonly HEARTBEAT_MS = 60 * 1000; // "last seen" for the specialist
   private readonly ref;
+  /** Field path of this participant's entry on the room doc. */
+  private readonly key: string;
   private pending: PrecheckSnapshot | null = null;
   private lastWritten = '';
   private writeTimer: any = null;
@@ -50,11 +54,17 @@ export class PrecheckRecorder {
   private readonly onPageHide = () => this.markLeft();
 
   constructor(private firestore: Firestore, roomId: string, private profileId: string, private name: string) {
-    this.ref = doc(this.firestore, 'openviduroom', roomId, 'precheck', profileId);
+    this.ref = doc(this.firestore, 'openviduroom', roomId);
+    this.key = `precheck.${profileId}`;
     this.heartbeat = setInterval(() => {
-      if (!this.done) setDoc(this.ref, { updatedAt: serverTimestamp() }, { merge: true }).catch(() => {});
+      if (!this.done && this.lastWritten) this.write({ [`${this.key}.updatedAt`]: serverTimestamp() });
     }, PrecheckRecorder.HEARTBEAT_MS);
     window.addEventListener('pagehide', this.onPageHide);
+  }
+
+  /** Field-path update on the room doc (only touches this participant's entry). */
+  private write(fields: Record<string, any>): Promise<void> {
+    return updateDoc(this.ref, fields).catch(e => console.log('[precheck] write failed:', e));
   }
 
   /** Record the latest state (coalesced; unchanged states are not re-written). */
@@ -69,24 +79,33 @@ export class PrecheckRecorder {
     if (this.done) return;
     if (this.writeTimer) { clearTimeout(this.writeTimer); this.writeTimer = null; }
     this.pending = null;
-    this.lastWritten = '';
-    setDoc(this.ref, { state: 'stuck', step: 'connect', message: `Couldn't connect to the call: ${reason}`, updatedAt: serverTimestamp() }, { merge: true })
-      .catch(e => console.log('[precheck] write failed:', e));
+    this.lastWritten = 'connect-failed';
+    void this.write({
+      [`${this.key}.state`]: 'stuck',
+      [`${this.key}.step`]: 'connect',
+      [`${this.key}.message`]: `Couldn't connect to the call: ${reason}`,
+      [`${this.key}.updatedAt`]: serverTimestamp(),
+    });
   }
 
-  /** Participant connected (or the meeting ended): delete the record. */
+  /** Participant connected (or the meeting ended): remove this participant's entry. */
   async clear(): Promise<void> {
     this.stopTimers();
     this.done = true;
-    try { await deleteDoc(this.ref); } catch (e) { console.log('[precheck] delete failed:', e); }
+    await this.write({ [this.key]: deleteField() });
   }
 
-  /** Page closed / component destroyed before joining: keep the record, marked "left". */
+  /** Page closed / component destroyed before joining: keep the entry, marked "left". */
   markLeft(): void {
     if (this.done) return;
     this.stopTimers();
     this.done = true;
-    setDoc(this.ref, { state: 'left', leftAt: serverTimestamp(), updatedAt: serverTimestamp() }, { merge: true }).catch(() => {});
+    if (!this.lastWritten) return;   // nothing recorded yet → nothing to mark
+    void this.write({
+      [`${this.key}.state`]: 'left',
+      [`${this.key}.leftAt`]: serverTimestamp(),
+      [`${this.key}.updatedAt`]: serverTimestamp(),
+    });
   }
 
   private flush(): void {
@@ -95,13 +114,16 @@ export class PrecheckRecorder {
     this.pending = null;
     if (!snap || this.done) return;
 
+    // Join needs camera + mic + speaker ticked (operator 2026-11-27), so any of them not "ok" is
+    // what the participant is still on.
     const blocking = snap.checks.find(c => c.state === 'fail');
-    const devicesPending = snap.checks.some(c => c.state === 'pending' && (c.key === 'camera' || c.key === 'mic'));
-    const warning = snap.checks.find(c => c.state === 'warn' && c.key !== 'speaker');
+    const notTicked = snap.checks.find(c => (c.key === 'camera' || c.key === 'mic' || c.key === 'speaker') && c.state !== 'ok');
+    const warning = snap.checks.find(c => c.state === 'warn');
     const state = blocking || snap.server === 'failed' ? 'stuck'
-      : snap.server === 'ready' && !devicesPending ? 'ready'
+      : snap.server === 'ready' && !notTicked ? 'ready'
       : 'checking';
     const message = blocking ? `${CHECK_LABEL[blocking.key]}: ${blocking.message}`
+      : notTicked ? `${CHECK_LABEL[notTicked.key]}: ${notTicked.message}`
       : snap.server !== 'ready' ? SERVER_MESSAGE[snap.server]
       : warning ? `${CHECK_LABEL[warning.key]}: ${warning.message}`
       : SERVER_MESSAGE.ready;
@@ -113,7 +135,8 @@ export class PrecheckRecorder {
     const json = JSON.stringify(body);
     if (json === this.lastWritten) return;
     this.lastWritten = json;
-    setDoc(this.ref, { ...body, leftAt: null, updatedAt: serverTimestamp() }).catch(e => console.log('[precheck] write failed:', e));
+    // Replaces this participant's whole entry; other participants' entries are untouched.
+    void this.write({ [this.key]: { ...body, leftAt: null, updatedAt: serverTimestamp() } });
   }
 
   private stopTimers(): void {

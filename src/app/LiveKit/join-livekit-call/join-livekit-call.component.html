@@ -46,9 +46,7 @@
         Join Call
       </button>
     </div>
-    <p class="hint" *ngIf="!devicesReady">
-      Fix the camera / microphone item marked above to join — both are needed for this call.
-    </p>
+    <p class="hint" *ngIf="!devicesReady" data-testid="lkj-join-hint">{{ joinHint() }}</p>
   </div>
 
 </div>

@@ -31,7 +31,7 @@ export class ReadyCheckComponent implements AfterViewInit, OnDestroy {
     browser:  { key: 'browser',  state: 'pending', code: '', message: 'Checking…' },
     camera:   { key: 'camera',   state: 'pending', code: '', message: 'Checking…' },
     mic:      { key: 'mic',      state: 'pending', code: '', message: 'Checking…' },
-    speaker:  { key: 'speaker',  state: 'pending', code: 'untested', message: 'Not tested yet' },
+    speaker:  { key: 'speaker',  state: 'pending', code: 'untested', message: 'Play the test sound to check' },
     network:  { key: 'network',  state: 'pending', code: '', message: 'Checking…' },
     computer: { key: 'computer', state: 'pending', code: '', message: 'Checking…' },
   };
@@ -415,6 +415,7 @@ export class ReadyCheckComponent implements AfterViewInit, OnDestroy {
         ? 'Turn up the volume (and check the mute key), or pick your earphones / speaker below and play the sound again.'
         : 'Turn up the volume and check the mute key. If you use earphones, check they are connected and selected in your computer\'s sound settings, then play the sound again.';
     }
+    this.updateReady();
     this.emit();
   }
 
@@ -464,7 +465,15 @@ export class ReadyCheckComponent implements AfterViewInit, OnDestroy {
   micPicked = false;
   pickMic(id: string): void { this.selectedMicId = id; this.micPicked = true; void this.requestDevices(); }
   pickCamera(id: string): void { this.selectedCameraId = id; void this.requestDevices(); }
-  pickSpeaker(id: string): void { this.selectedSpeakerId = id; this.speakerTest = 'idle'; }
+  /** A different speaker must be tested again before Join. */
+  pickSpeaker(id: string): void {
+    this.selectedSpeakerId = id;
+    this.speakerTest = 'idle';
+    this.set('speaker', 'pending', 'untested', 'Play the test sound on this speaker');
+    this.help.speaker = undefined;
+    this.updateReady();
+    this.emit();
+  }
 
   async copyLink(): Promise<void> {
     try { await navigator.clipboard.writeText(window.location.href); this.linkCopied = true; }
@@ -477,9 +486,13 @@ export class ReadyCheckComponent implements AfterViewInit, OnDestroy {
     this.checks[key] = { key, state, code, message };
   }
 
+  /** Join needs ALL of: camera working, microphone heard the person, speaker test answered "Yes"
+   *  (operator 2026-11-27: Join must stay off until the mic and speaker are ticked). */
   private updateReady(): void {
     const ok = this.hasStream && this.checks.browser.state !== 'fail'
-      && this.checks.camera.state === 'ok' && this.checks.mic.state !== 'fail';
+      && this.checks.camera.state === 'ok'
+      && this.checks.mic.state === 'ok'
+      && this.checks.speaker.state === 'ok';
     if (ok !== this.ready) { this.ready = ok; this.readyChange.emit(ok); }
   }
 

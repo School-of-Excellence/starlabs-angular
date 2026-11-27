@@ -64,7 +64,7 @@ Recording rules (operator, 2026-11-27):
 | When stored | **Only before the call** — written/updated as each check changes, from page open until they connect |
 | When deleted | **The moment they connect** to the call (also when the host ends the meeting). Rejoin after a drop → written again until connected |
 | What is stored | Current step + each check's state, e.g. "camera: busy (Zoom?) — retried 2×", "server: starting", last-updated time |
-| Where | One doc per participant: `openviduroom/<roomId>/precheck/<profileId>` (Firestore rules: participant writes own doc, hosts read) |
+| Where | On the room doc: `openviduroom/<roomId>` field `precheck.<profileId>` (operator 2026-11-27: main collection only — a sub-collection is denied by the deployed rules) |
 | Who sees it | The specialist, **on their own call screen only** (operator 2026-11-27) — "Not joined yet" panel: "Prithi — stuck at camera: in use by another app (2 min ago)". Not in appointment studio |
 | Closed tab | Doc stays with "left the page at 11:12" so the specialist knows they gave up, not stuck |
 

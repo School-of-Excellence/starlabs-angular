@@ -4,7 +4,7 @@ import { AfterViewInit, Component, computed, ElementRef, HostListener, OnDestroy
 import { firstValueFrom, lastValueFrom, Subject, takeUntil } from 'rxjs';
 import { ConnectionQuality, createLocalScreenTracks, LocalAudioTrack, LocalVideoTrack, Participant, RemoteParticipant, RemoteTrack, RemoteTrackPublication, Room, RoomEvent, Track, TrackEvent, LocalTrackPublication, VideoQuality, ScreenSharePresets, VideoPreset } from 'livekit-client';
 import { CdkDrag, CdkDragEnd } from '@angular/cdk/drag-drop';
-import { doc, docData, getDoc, setDoc, serverTimestamp, Firestore, collection, collectionData, getDocs, deleteDoc } from '@angular/fire/firestore';
+import { doc, docData, getDoc, setDoc, updateDoc, deleteField, serverTimestamp, Firestore } from '@angular/fire/firestore';
 import { ReadyCheckComponent } from '../ready-check/ready-check.component';
 import { CheckItem, PrecheckRecorder, ServerState } from '../ready-check/precheck-recorder';
 import { environment } from '../../../environments/environment';
@@ -158,7 +158,6 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   // Specialist's "Not joined yet" panel (call screen only).
   notJoined: { name: string; message: string; state: string; at: number; leftAt: number }[] = [];
   notJoinedNow = Date.now();
-  private notJoinedSub = new Subject<void>();
   private notJoinedTicker: any = null;
 
   blurLevel: 'none' | 'mid' | 'high' = 'none';
@@ -318,6 +317,8 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
               else this.checkServer()
               this.startPrecheckRecord(id, data["hosts"] || [])
             }
+
+            this.readNotJoined(data["precheck"])
 
             this.roomDetail = {
               roomId: id,
@@ -497,6 +498,16 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     this.pushPrecheck();
   }
 
+  /** Under the disabled Join button: exactly which ticks are still missing. */
+  joinHint(): string {
+    const missing: string[] = [];
+    const st = (k: string) => this.lastChecks.checks.find(c => c.key === k)?.state;
+    if (st('camera') !== 'ok') missing.push('fix the camera');
+    if (st('mic') !== 'ok') missing.push('say something so we can hear you');
+    if (st('speaker') !== 'ok') missing.push('play the test sound and answer "Yes"');
+    return missing.length ? `To join: ${missing.join(', ')}.` : 'Getting ready…';
+  }
+
   /** Participants only (hosts never recorded) — operator 2026-11-27. */
   private startPrecheckRecord(roomId: string, hosts: string[]): void {
     if (this.precheck || !this.loggedinProfileid || hosts.includes(this.loggedinProfileid)) return;
@@ -511,31 +522,29 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     this.precheck.update({ server, checks: this.lastChecks.checks, retries: this.lastChecks.retries });
   }
 
-  /** Specialist's call screen: live list of participants still on the Ready check. */
+  /** Participants still on the Ready check — read from the room doc's `precheck` map, which the
+   *  page already listens to (no extra listener). Shown only to the specialist, in the call. */
+  private readNotJoined(precheck: Record<string, any> | undefined): void {
+    this.notJoined = Object.entries(precheck || {})
+      .filter(([pid, r]) => pid !== this.loggedinProfileid && r && typeof r === 'object')
+      .map(([, r]: [string, any]) => ({
+        name: r.name || 'Participant',
+        message: r.message || '',
+        state: r.state || 'checking',
+        at: r.updatedAt?.toMillis ? r.updatedAt.toMillis() : Date.now(),
+        leftAt: r.leftAt?.toMillis ? r.leftAt.toMillis() : 0,
+      }))
+      .sort((a, b) => b.at - a.at);
+  }
+
+  /** Keeps the "x min ago" labels fresh while the specialist is in the call. */
   private watchNotJoined(): void {
-    const roomId = this.roomDetail?.roomId;
-    if (!roomId || !this.isHost()) return;
-    collectionData(collection(this.firestore, "openviduroom", roomId, "precheck")).pipe(
-      takeUntil(this.notJoinedSub)
-    ).subscribe((rows: any[]) => {
-      this.notJoined = rows
-        .filter(r => r.profileId !== this.loggedinProfileid)
-        .map(r => ({
-          name: r.name || 'Participant',
-          message: r.message || '',
-          state: r.state || 'checking',
-          at: r.updatedAt?.toMillis ? r.updatedAt.toMillis() : Date.now(),
-          leftAt: r.leftAt?.toMillis ? r.leftAt.toMillis() : 0,
-        }))
-        .sort((a, b) => b.at - a.at);
-    });
+    if (!this.isHost()) return;
     if (!this.notJoinedTicker) this.notJoinedTicker = setInterval(() => this.notJoinedNow = Date.now(), 30_000);
   }
 
   private stopNotJoined(): void {
-    this.notJoinedSub.next();
     if (this.notJoinedTicker) { clearInterval(this.notJoinedTicker); this.notJoinedTicker = null; }
-    this.notJoined = [];
   }
 
   /** "2 min ago" / "left the page at 11:12" for the Not-joined panel. */
@@ -1004,10 +1013,9 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       } catch (error) {
         console.log(error)
       }
-      // Meeting over: drop every "not joined yet" record of this room (plan 2026-11-27, Phase 4).
+      // Meeting over: drop every "not joined yet" entry of this room (plan 2026-11-27, Phase 4).
       try {
-        const rows = await getDocs(collection(this.firestore, "openviduroom", this.roomDetail["roomId"], "precheck"));
-        await Promise.all(rows.docs.map(d => deleteDoc(d.ref)));
+        await updateDoc(doc(this.firestore, "openviduroom", this.roomDetail["roomId"]), { precheck: deleteField() });
       } catch (e) { console.log('[precheck] cleanup failed:', e); }
       this.leaveRoom(false);
       progress.close()
