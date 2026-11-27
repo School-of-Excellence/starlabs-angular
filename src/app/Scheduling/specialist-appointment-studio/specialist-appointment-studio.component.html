@@ -185,6 +185,7 @@
                   <b>{{ t(x.w.start) }} – {{ t(x.w.end) }}</b>
                   <small>{{ x.label }}{{ x.state === 'open' ? ' · ' + fmtHours(x.open) + ' open' : '' }}</small>
                   <small>{{ x.w.typeIds.length }} delivery type{{ x.w.typeIds.length === 1 ? '' : 's' }}</small>
+                  @if (h.holdNote(x.w); as qn) { <small class="sas-queue" data-testid="sas-home-window-queue"><mat-icon>lock</mat-icon>{{ qn }}</small> }
                   @if (x.joint) { <small class="sas-joint" data-testid="sas-home-window-joint"><mat-icon>group</mat-icon>{{ x.joint }}</small> }
                   @if (x.w.start > h.now) {
                     <button class="sas-icon-btn sas-del" data-testid="sas-home-window-delete" (click)="h.deleteWindow(x.w, $event)" (keydown.enter)="$event.stopPropagation()" aria-label="Delete availability"><mat-icon>delete_outline</mat-icon></button>
@@ -266,7 +267,7 @@
             <mat-icon>delete_outline</mat-icon>{{ h.deleting ? 'Deleting…' : 'Delete selected (' + h.selected.size + ')' }}
           </button>
         </div>
-        <div class="sas-chs">Availability in this {{ h.period.mode }}. Only future windows with nothing booked can be selected.</div>
+        <div class="sas-chs">Availability in this {{ h.period.mode }}. Only future windows with nothing booked and no Queue Planner reservation can be selected.</div>
       </div>
       @if (h.loading) { <ng-container *ngTemplateOutlet="loaderTpl; context: { msg: 'Loading availability…' }" /> }
       @else if (!h.availList.length) { <div class="sas-empty" data-testid="sas-home-avail-empty"><b>No availability in this {{ h.period.mode }}</b></div> }
@@ -281,7 +282,8 @@
                 <td><b class="nw">{{ w.start | date: 'EEE, d MMM y' }}</b><small>{{ t(w.start) }} – {{ t(w.end) }}</small></td>
                 @if (h.allMode) { <td>{{ svc.name(w.profileId) }}</td> }
                 <td>{{ typeNames(w) }}</td>
-                <td><span class="sas-pill">{{ h.windowLabelOf(w) }}</span></td>
+                <td><span class="sas-pill">{{ h.windowLabelOf(w) }}</span>
+                  @if (h.holdNote(w); as qn) { <small class="sas-queue" data-testid="sas-home-avail-queue"><mat-icon>lock</mat-icon>{{ qn }}</small> }</td>
               </tr>
             }
           </tbody>
@@ -1109,6 +1111,13 @@
       </table></div>
 
       <span class="sas-lbl">Bookings</span>
+      @if (wd.holds.length) {
+        <div class="sas-queue-box" data-testid="sas-window-queue">
+          <b><mat-icon>lock</mat-icon>Reserved in the Queue Planner</b>
+          @for (q of wd.holds; track q.docid) { <small>{{ q.queueName }} · {{ q.stage }} · {{ q.start | date: 'EEE d MMM, H:mm' }} – {{ q.end | date: 'H:mm' }}</small> }
+          <small>This window can't be deleted until these reservations are removed in the Queue Planner.</small>
+        </div>
+      }
       @if (!wd.sessions.length) { <p class="sas-muted" data-testid="sas-window-no-bookings">Nothing booked in this window.</p> }
       @for (r of wd.sessions; track r.appt.id) {
         <button class="sas-slot is-sess" data-testid="sas-window-booking" (click)="wd.ref?.close(r)">

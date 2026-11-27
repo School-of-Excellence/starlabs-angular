@@ -10,6 +10,9 @@ export interface ApptRow { appt: Appt; raw: any; }
 export interface Specialist { profileId: string; name: string; role: 'mentor' | 'cw'; productowner: string[]; }
 export interface TypeOption { path: string; id: string; name: string; duration: number; }
 export interface Team { productIds: string[]; memberIds: string[]; }
+/* A queue planner reservation on an availability slot (queue availability, slottype 'appointment'). booked =
+   a participant has already booked it (appointmentref set); then the availability slot itself is booked too. */
+export interface QueueHold { docid: string; availabilityid: string; queueid: string; queueName: string; stage: string; start: Date; end: Date; booked: boolean; }
 export interface RoleEis { id: string; name: string; kind: 'required' | 'additional'; eisIds: string[]; }
 export interface TypeBreakdown { id: string; name: string; duration: number; roles: RoleEis[]; }
 export interface ProductBreakdown { id: string; name: string; atcmodel: string; types: TypeBreakdown[]; }
@@ -133,6 +136,30 @@ export class SpecialistAppointmentService {
     const seen = new Set<string>();
     return snaps.flatMap(s => s.docs).filter(x => !seen.has(x.id) && !!seen.add(x.id))
       .map(x => ({ appt: this.parseAppt(x.id, x.data()), raw: x.data() }));
+  }
+
+  /* Queue planner reservations starting in [from, to] (operator, 2026-11-27). The planner reserves a slot by
+     writing a queue availability doc that points at the availability doc (availabilityid) — it never marks the
+     slot itself — so the studio must read these to know a window is taken. Same slottype + startdate query the
+     planner runs. Queue names come from queue generation.queuename (cached). */
+  private queueNames = new Map<string, string>();
+  async queueHolds(from: Date, to: Date): Promise<QueueHold[]> {
+    const s = await getDocs(query(collection(this.firestore, 'queue availability'),
+      where('slottype', '==', 'appointment'), where('startdate', '>=', from), where('startdate', '<', to)));
+    const holds = s.docs.map(x => {
+      const d = x.data();
+      return {
+        docid: x.id, availabilityid: d['availabilityid'] ?? '', queueid: d['queueid'] ?? '', queueName: '',
+        stage: d['stagename'] ?? '', start: toDate(d['startdate'])!, end: toDate(d['enddate'])!, booked: !!d['appointmentref'],
+      };
+    }).filter(h => h.availabilityid && h.start && h.end);
+    const missing = [...new Set(holds.map(h => h.queueid))].filter(q => q && !this.queueNames.has(q));
+    await Promise.all(missing.map(async q => {
+      const g = await getDoc(doc(this.firestore, 'queue generation/' + q)).catch(() => null);
+      this.queueNames.set(q, (g?.exists() && g.data()['queuename']) || 'a queue');
+    }));
+    holds.forEach(h => h.queueName = this.queueNames.get(h.queueid) ?? 'a queue');
+    return holds;
   }
 
   /* Every session that ended in [from, to] (from null = no lower bound), newest first, read in pages of 500

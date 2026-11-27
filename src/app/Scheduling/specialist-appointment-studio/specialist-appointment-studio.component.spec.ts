@@ -23,6 +23,7 @@ function fakeSvc(over: Record<string, any> = {}): any {
     specialists: () => Promise.resolve([]), mentors: () => Promise.resolve([]), atcModels: () => Promise.resolve([]),
     windows: () => Promise.resolve([]), appointments: () => Promise.resolve([]),
     pastBetween: () => Promise.resolve({ rows: [], capped: false }),
+    queueHolds: () => Promise.resolve([]),
     productsFor: () => Promise.resolve([]), teamForAtcModels: () => Promise.resolve({ productIds: [], memberIds: [] }),
     typesFor: () => Promise.resolve([]), futureIntervals: () => Promise.resolve([]), unmarkedLastAppointment: () => Promise.resolve(null),
     jointTypes: () => Promise.resolve(new Map()), mapRoles: {},
@@ -230,6 +231,40 @@ describe('HomeTab · past sessions and Join', () => {
     c.join(later);
     c.join(ended);
     expect(nav).not.toHaveBeenCalled();
+  });
+});
+
+/* ================================================================ Queue Planner reservations */
+describe('Queue Planner reservations (operator, 2026-11-27)', () => {
+  it('a window with an unbooked queue reservation cannot be deleted and says why; booked or past ones do not block', async () => {
+    const monday = new Date(); monday.setHours(0, 0, 0, 0); monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7) + 7);
+    const at = (hr: number) => new Date(monday.getFullYear(), monday.getMonth(), monday.getDate(), hr);
+    const win = (id: string): any => ({ id, profileId: 'me', start: at(9), end: at(12), typeIds: ['t'],
+      slots: [{ typeId: 't', start: at(10), end: at(11), booked: false, available: true }] });
+    const hold = (id: string, availabilityid: string, extra: any = {}) => ({ docid: id, availabilityid, queueid: 'q1', queueName: 'BIG Nov',
+      stage: 'Diagnostics', start: at(10), end: at(11), booked: false, ...extra });
+    const svc = fakeSvc({
+      roles: { eis: true },
+      windows: () => Promise.resolve([win('held'), win('free'), win('bookedHold')]),
+      queueHolds: () => Promise.resolve([hold('h1', 'held'), hold('h2', 'bookedHold', { booked: true })]),
+    });
+    const { fixture, c } = await make(svc);
+    const h = c.home!;
+    h.bar.emit({ mode: 'week', from: monday, to: new Date(monday.getTime() + 7 * 86400000) });
+    await settle(fixture);
+    const w = (id: string) => h.availList.find(x => x.id === id)!;
+    expect(h.canDelete(w('held'))).toBeFalse();
+    expect(h.canDelete(w('free'))).toBeTrue();
+    expect(h.canDelete(w('bookedHold'))).toBeTrue();      // booked: the slot itself is booked once a participant books
+    expect(h.holdNote(w('held'))).toBe('Reserved for queue: BIG Nov · 1 slot');
+    expect(h.selectable.map(x => x.id).sort()).toEqual(['bookedHold', 'free']);
+    const alert = spyOn(window, 'alert'), confirm = spyOn(window, 'confirm');
+    await h.deleteWindow(w('held'));
+    expect(alert.calls.mostRecent().args[0]).toContain('reserved in the Queue Planner');
+    expect(alert.calls.mostRecent().args[0]).toContain('BIG Nov · Diagnostics');
+    expect(confirm).not.toHaveBeenCalled();                // never reaches the delete
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelectorAll('[data-testid="sas-home-avail-queue"]').length).toBe(1);
   });
 });
 
