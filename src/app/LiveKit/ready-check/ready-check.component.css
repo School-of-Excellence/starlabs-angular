@@ -1,0 +1,36 @@
+.rck { display: flex; flex-direction: column; gap: 10px; }
+
+.rck-preview { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #111; border-radius: 10px; overflow: hidden; }
+.rck-video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.rck-hidden { display: none; }
+.rck-video-off { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #666; }
+.rck-video-off .material-icons { font-size: 48px; }
+
+.rck-heading { font-weight: 600; font-size: 15px; color: #374151; margin-top: 6px; }
+
+.rck-row { display: flex; gap: 10px; padding: 10px 12px; border-radius: 8px; background: #f9fafb; align-items: flex-start; }
+.rck-icon { font-size: 20px; margin-top: 1px; color: #9ca3af; }
+.rck-ok .rck-icon { color: #16a34a; }
+.rck-warn .rck-icon { color: #d97706; }
+.rck-fail { background: #fef2f2; }
+.rck-fail .rck-icon { color: #dc2626; }
+.rck-warn { background: #fffbeb; }
+
+.rck-body { flex: 1; min-width: 0; }
+.rck-line { display: flex; gap: 8px; flex-wrap: wrap; align-items: baseline; }
+.rck-label { font-weight: 600; font-size: 14px; color: #111827; min-width: 86px; }
+.rck-msg { font-size: 14px; color: #374151; }
+.rck-help { margin-top: 6px; font-size: 13px; color: #4b5563; line-height: 1.4; }
+
+.rck-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+.rck-actions:empty { display: none; }
+.rck-btn { padding: 6px 12px; border-radius: 6px; border: 1px solid #d1d5db; background: #fff; font-size: 13px; cursor: pointer; }
+.rck-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.rck-primary { background: #4f46e5; border-color: #4f46e5; color: #fff; }
+.rck-ask { font-size: 13px; color: #374151; }
+
+.rck-select { margin-top: 8px; width: 100%; max-width: 100%; padding: 5px 8px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 13px; background: #fff; }
+
+.rck-meter { margin-top: 8px; height: 6px; border-radius: 3px; background: #e5e7eb; overflow: hidden; }
+.rck-meter-fill { height: 100%; background: #16a34a; transition: width 120ms linear; }
+.rck-row .rck-btn[data-testid="rck-meter-start-btn"] { margin-top: 8px; }

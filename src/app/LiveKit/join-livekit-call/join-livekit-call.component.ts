@@ -4,7 +4,9 @@ import { AfterViewInit, Component, computed, ElementRef, HostListener, OnDestroy
 import { firstValueFrom, lastValueFrom, Subject, takeUntil } from 'rxjs';
 import { ConnectionQuality, createLocalScreenTracks, LocalAudioTrack, LocalVideoTrack, Participant, RemoteParticipant, RemoteTrack, RemoteTrackPublication, Room, RoomEvent, Track, TrackEvent, LocalTrackPublication, VideoQuality, ScreenSharePresets, VideoPreset } from 'livekit-client';
 import { CdkDrag, CdkDragEnd } from '@angular/cdk/drag-drop';
-import { doc, docData, getDoc, setDoc, serverTimestamp, Firestore } from '@angular/fire/firestore';
+import { doc, docData, getDoc, setDoc, serverTimestamp, Firestore, collection, collectionData, getDocs, deleteDoc } from '@angular/fire/firestore';
+import { ReadyCheckComponent } from '../ready-check/ready-check.component';
+import { CheckItem, PrecheckRecorder, ServerState } from '../ready-check/precheck-recorder';
 import { environment } from '../../../environments/environment';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthguardService } from '../../authguard.service';
@@ -51,7 +53,8 @@ type RoomInfo = {
     MatIconModule,
     MatMenuModule,
     MatDividerModule,
-    CdkDrag
+    CdkDrag,
+    ReadyCheckComponent
   ],
   templateUrl: './join-livekit-call.component.html',
   styleUrl: './join-livekit-call.component.css'
@@ -136,10 +139,27 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   // appointments (twin of the appointment-studio button; opens /journeysupport/<client>).
   journeyPlanProfileId: string | null = null;
 
-  // Permission
+  // Permission — set from the Ready check panel (plan 2026-11-27-join-ready-check).
   cameraStatus: 'granted' | 'denied' | 'prompt' = 'prompt';
   micStatus: 'granted' | 'denied' | 'prompt' = 'prompt';
   isRequesting = false;
+
+  // ── Ready check (plan 2026-11-27-join-ready-check) ─────────────────────────────────────────
+  // The panel runs camera / mic / speaker / browser / network checks from page open (also during
+  // the server wait). Participants' results are recorded until they connect so the specialist
+  // sees why they haven't joined; hosts run the same checks but are never recorded.
+  @ViewChild(ReadyCheckComponent) readyCheck?: ReadyCheckComponent;
+  devicesReady = false;
+  private precheck: PrecheckRecorder | null = null;
+  private lastChecks: { checks: CheckItem[]; retries: number } = { checks: [], retries: 0 };
+  // Devices picked on the Ready check, applied once the call connects.
+  private prejoinMicId = '';
+  private prejoinSpeakerId = '';
+  // Specialist's "Not joined yet" panel (call screen only).
+  notJoined: { name: string; message: string; state: string; at: number; leftAt: number }[] = [];
+  notJoinedNow = Date.now();
+  private notJoinedSub = new Subject<void>();
+  private notJoinedTicker: any = null;
 
   blurLevel: 'none' | 'mid' | 'high' = 'none';
   localParticipantIdentity = '';
@@ -294,8 +314,9 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
             if(!this.roomCreatedAt) this.roomCreatedAt = this.recentCreationMs(data["createddate"])
 
             if(this.roomDetail.title == ""){
-              if(this.provider === "do") this.prepareParticipant()
+              if(this.provider === "do") this.onServerReady()
               else this.checkServer()
+              this.startPrecheckRecord(id, data["hosts"] || [])
             }
 
             this.roomDetail = {
@@ -308,6 +329,9 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
             }
           }
           else{
+            // Meeting ended / not active: no "not joined yet" record should remain.
+            void this.precheck?.clear();
+            this.precheck = null;
             this.leaveRoom(false).then(() =>{
               this.meetingRoomStatus = "ended"
             })
@@ -337,6 +361,10 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.stopHostWarmup();
+    // Left the page before joining → the specialist sees "left the page at …".
+    this.precheck?.markLeft();
+    this.precheck = null;
+    this.stopNotJoined();
     // 3. Stop adaptive quality monitoring (synchronous)
     this.adaptiveQuality.stopMonitoring();
 
@@ -377,7 +405,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
           if(masterStatus == "running" && readyNodes > 0){
             this.serverWaitStartedAt = 0
             this.stopWaitTicker()
-            this.prepareParticipant()
+            this.onServerReady()
             this.serverSubscription?.next()
             this.serverSubscription?.complete()
             return
@@ -388,6 +416,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
             this.touchRoomForWake()
           }
           this.meetingRoomStatus = this.serverWaitExpired() ? "serverfailed" : "serverstarting"
+          this.pushPrecheck()
         }
       },
       error: (err) => {
@@ -425,6 +454,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       // The status doc may not change for a while — flip to the error once the limit passes.
       if (this.meetingRoomStatus === "serverstarting" && this.serverWaitExpired()) {
         this.meetingRoomStatus = "serverfailed";
+        this.pushPrecheck();
       }
     }, 1000);
   }
@@ -441,62 +471,92 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       .catch(err => console.log("Wake touch failed (server still wakes for rooms opened in the last 30 min):", err));
   }
 
-  async prepareParticipant() {
-    this.isRequesting = true;
+  /** The video server is ready (or not needed, DO): show the Join controls. Devices were already
+   *  being checked by the Ready check panel during the wait. */
+  private onServerReady(): void {
     this.meetingRoomStatus = null;
+    this.pushPrecheck();
+  }
 
-    try {
-      // C3: audio:true removed — mic is exclusively managed by PicoKoalaService via WebVoiceProcessor
-      // Opening mic here would conflict with Koala's WebVoiceProcessor pipeline (double capture, AEC failure)
-      // const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+  /** "Enable Access" / "Check again": re-run the camera + mic check (Ready check panel). */
+  async prepareParticipant(): Promise<boolean> {
+    if (!this.readyCheck) return false;
+    this.isRequesting = true;
+    try { return await this.readyCheck.retry(); }
+    finally { this.isRequesting = false; }
+  }
 
-      // Store the full stream so joinCall() can stop the audio track later
-      this.previewStream = stream;
+  onDevicesReady(ok: boolean): void {
+    this.devicesReady = ok;
+    this.cameraStatus = ok ? 'granted' : 'prompt';
+    this.micStatus = ok ? 'granted' : 'prompt';
+  }
 
-      // Only use video for the preview tile — audio is not played back
-      const videoTrack = new LocalVideoTrack(stream.getVideoTracks()[0]);
-      this.localParticipant.set(videoTrack);
+  onChecksChange(c: { checks: CheckItem[]; retries: number }): void {
+    this.lastChecks = c;
+    this.pushPrecheck();
+  }
 
-      this.cameraStatus = 'granted';
-      this.micStatus = 'granted';
-      this.isRequesting = false;
-      return true;
-    } catch (err: any) {
-      console.error('Permission error:', err);
+  /** Participants only (hosts never recorded) — operator 2026-11-27. */
+  private startPrecheckRecord(roomId: string, hosts: string[]): void {
+    if (this.precheck || !this.loggedinProfileid || hosts.includes(this.loggedinProfileid)) return;
+    this.precheck = new PrecheckRecorder(this.firestore, roomId, this.loggedinProfileid, this.loggedinProfileRole["name"] || 'Participant');
+    this.pushPrecheck();
+  }
 
-      const isHardBlock = err.name === 'NotAllowedError' && err.message?.includes('Permission dismissed') === false;
+  private pushPrecheck(): void {
+    if (!this.precheck) return;
+    const s = this.meetingRoomStatus;
+    const server: ServerState = s === 'serverstarting' ? 'starting' : s === 'serverfailed' ? 'failed' : s === 'servercheck' ? 'checking' : 'ready';
+    this.precheck.update({ server, checks: this.lastChecks.checks, retries: this.lastChecks.retries });
+  }
 
-      if (isHardBlock) {
-        this.cameraStatus = 'denied';
-        this.micStatus = 'denied';
-      } else {
-        this.cameraStatus = 'prompt';
-        this.micStatus = 'prompt';
-      }
+  /** Specialist's call screen: live list of participants still on the Ready check. */
+  private watchNotJoined(): void {
+    const roomId = this.roomDetail?.roomId;
+    if (!roomId || !this.isHost()) return;
+    collectionData(collection(this.firestore, "openviduroom", roomId, "precheck")).pipe(
+      takeUntil(this.notJoinedSub)
+    ).subscribe((rows: any[]) => {
+      this.notJoined = rows
+        .filter(r => r.profileId !== this.loggedinProfileid)
+        .map(r => ({
+          name: r.name || 'Participant',
+          message: r.message || '',
+          state: r.state || 'checking',
+          at: r.updatedAt?.toMillis ? r.updatedAt.toMillis() : Date.now(),
+          leftAt: r.leftAt?.toMillis ? r.leftAt.toMillis() : 0,
+        }))
+        .sort((a, b) => b.at - a.at);
+    });
+    if (!this.notJoinedTicker) this.notJoinedTicker = setInterval(() => this.notJoinedNow = Date.now(), 30_000);
+  }
 
-      this.isRequesting = false;
-      return false;
-    }
+  private stopNotJoined(): void {
+    this.notJoinedSub.next();
+    if (this.notJoinedTicker) { clearInterval(this.notJoinedTicker); this.notJoinedTicker = null; }
+    this.notJoined = [];
+  }
+
+  /** "2 min ago" / "left the page at 11:12" for the Not-joined panel. */
+  notJoinedWhen(r: { at: number; leftAt: number }): string {
+    if (r.leftAt) return `left the page at ${new Date(r.leftAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    const min = Math.max(0, Math.round((this.notJoinedNow - r.at) / 60000));
+    return min < 1 ? 'just now' : `${min} min ago`;
   }
 
   async joinCall() {
-    // Permissions were already obtained in prepareParticipant() during the pre-join screen.
-    // Calling it again would open a second getUserMedia() on the same device, causing echo
-    // and camera conflicts. Instead, release the preview stream here so LiveKit can open it.
-    if (this.cameraStatus !== 'granted' || this.micStatus !== 'granted') {
+    // Camera + mic were checked by the Ready check panel. Re-check only if they aren't ready.
+    if (!this.devicesReady) {
       const allowed = await this.prepareParticipant();
-      if (!allowed) {
-        alert("Please allow Camera & Microphone to join the call.");
-        return;
-      }
+      if (!allowed) return;   // the panel shows what's wrong and how to fix it
     }
 
-    // Stop preview tracks before LiveKit opens the device to avoid double capture
-    if (this.previewStream) {
-      this.previewStream.getTracks().forEach(t => t.stop());
-      this.previewStream = null;
-    }
+    // Remember devices picked on the Ready check, then free them before LiveKit opens them
+    // (avoids double capture).
+    this.prejoinMicId = this.readyCheck?.micPicked ? this.readyCheck.selectedMicId : '';
+    this.prejoinSpeakerId = this.readyCheck?.selectedSpeakerId || '';
+    this.readyCheck?.release();
     this.localParticipant.set(undefined);
 
     this.meetingRoomStatus = "connecting"
@@ -694,6 +754,10 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       // await ensures we wait until initial signaling is done
       await room.connect(response.url, response.token);
       this.meetingRoomStatus = "connected"
+      // Joined: the "not joined yet" record is no longer needed (plan 2026-11-27, Phase 4).
+      void this.precheck?.clear();
+      this.precheck = null;
+      this.watchNotJoined();
       this.audioBlocked = !room.canPlaybackAudio;
       this.localParticipantIdentity = room.localParticipant.identity;
       console.log('Room connected:', this.loggedinProfileid);
@@ -765,9 +829,15 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       // Bluetooth headset in HFP mode → low-quality/choppy). Only switch if it isn't already.
       // Label patterns: macOS "MacBook Pro Microphone (Built-in)"; Windows laptops expose
       // the internal mic as "Microphone Array (…)".
+      // A mic / speaker picked on the Ready check wins over these defaults.
       const builtInMic = this.mics.find(m => /built[\s-]?in|internal|macbook|microphone array/i.test(m.label));
-      if (builtInMic && builtInMic.deviceId !== this.selectedMicId) {
+      if (this.prejoinMicId && this.mics.some(m => m.deviceId === this.prejoinMicId)) {
+        if (this.prejoinMicId !== this.selectedMicId) await this.selectMic(this.prejoinMicId, true);
+      } else if (builtInMic && builtInMic.deviceId !== this.selectedMicId) {
         await this.selectMic(builtInMic.deviceId, false);
+      }
+      if (this.prejoinSpeakerId && this.speakers.some(s => s.deviceId === this.prejoinSpeakerId)) {
+        await this.selectSpeaker(this.prejoinSpeakerId, true);
       }
 
       // Prime the PiP source and arm auto-PiP.
@@ -781,6 +851,8 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       if (!this.joinError && this.meetingRoomStatus === 'connecting') {
         this.joinError = error?.message || 'Could not connect to the call.';
       }
+      // Still not in the call → tell the specialist why (only set while not yet connected).
+      this.precheck?.connectFailed(error?.message || 'unknown error');
       this.tokenWaitStartedAt = 0;
       this.stopWaitTicker();
       this.leaveRoom(false);
@@ -864,6 +936,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     this.meetingRoomStatus = 'left'; // set immediately so re-entrant Disconnected event is ignored
     this.retryWake?.();              // end a token-retry wait now (it re-checks the status and stops)
     this.stopHostWarmup();
+    this.stopNotJoined();
     if (this.autoSpeakerTimer) { clearTimeout(this.autoSpeakerTimer); this.autoSpeakerTimer = null; }
     this.clearPip();
 
@@ -931,6 +1004,11 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       } catch (error) {
         console.log(error)
       }
+      // Meeting over: drop every "not joined yet" record of this room (plan 2026-11-27, Phase 4).
+      try {
+        const rows = await getDocs(collection(this.firestore, "openviduroom", this.roomDetail["roomId"], "precheck"));
+        await Promise.all(rows.docs.map(d => deleteDoc(d.ref)));
+      } catch (e) { console.log('[precheck] cleanup failed:', e); }
       this.leaveRoom(false);
       progress.close()
     }

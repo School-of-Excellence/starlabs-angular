@@ -1,4 +1,5 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
+import { CallTabService } from '../../LiveKit/ready-check/call-tab.service';
 import { AuthguardService } from '../../authguard.service';
 import { collection, collectionData, doc, Firestore, getDocs, query, where, getDoc, serverTimestamp, setDoc, updateDoc } from '@angular/fire/firestore';
 import { interval, Subject, Subscription, takeUntil } from 'rxjs';
@@ -16,6 +17,8 @@ import { MatDialog } from '@angular/material/dialog';
   styleUrl: './list-openvidu-room.component.css'
 })
 export class ListOpenviduRoomComponent {
+  // Join opens the call in a new tab Safari won't block (plan 2026-11-27-join-ready-check, Phase 1).
+  private callTab = inject(CallTabService);
 
   Array = Array
 
@@ -120,10 +123,13 @@ export class ListOpenviduRoomComponent {
     console.log(appointment)
 
     if(appointment["platform"] == "openvidu"){
+      // Open the new tab NOW, inside the click (before any await) — see CallTabService.
+      const callWin = this.callTab.open()
       var loading = this.dialog.open(LoadingProgressComponent, {
         data: {msg: "Setting uP!..."},
         disableClose: true
       })
+      try{
 
       // Check Room Creation
       var roomDoc = doc(this.firestore, "openviduroom", appointment["docid"])
@@ -171,9 +177,15 @@ export class ListOpenviduRoomComponent {
 
       loading.close()
 
-      // Same tab (2026-11-24): a new tab opened after the awaits above is no longer a click,
-      // so Safari blocked it as a pop-up. Browser Back returns to the studio.
-      this.router.navigate(['/joinroom', appointment["docid"]]);
+      // New tab again (2026-11-27, replaces the 2026-11-24 same-tab change): the tab was opened
+      // inside the click above, so Safari allows it; this only points it at the call.
+      this.callTab.go(callWin, appointment["docid"])
+      } catch(err){
+        loading.close()
+        this.callTab.abort(callWin)
+        console.log(err)
+        alert("Could not set up the meeting room. Please try again.")
+      }
     }
     else{
       console.log("Zoom")

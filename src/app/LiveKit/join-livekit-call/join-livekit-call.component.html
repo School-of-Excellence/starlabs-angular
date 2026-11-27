@@ -7,87 +7,49 @@
   Connecting...
 </div>
 
-<!-- Server Check -->
-<div *ngIf="!room() && meetingRoomStatus == 'servercheck'" class="text-center mt-3" data-testid="lkj-server-check">
-  Checking the video server...
-</div>
+<!-- Ready check (plan 2026-11-27-join-ready-check): ONE block from page open until Join, so the
+     camera / mic / speaker checks run — and keep their state — while the video server starts.
+     The server lines keep their 2026-11-14 hooks; joinroom-prejoin still appears only once the
+     server is ready (LKJ-01/02 assert that). -->
+<div *ngIf="!room() && !loading && (meetingRoomStatus == 'servercheck' || meetingRoomStatus == 'serverstarting' || meetingRoomStatus == 'serverfailed' || meetingRoomStatus == null)" class="ready-wrap" data-testid="lkj-ready-wrap">
 
-<!-- 2026-11-14 plan item 2.1: the server is off or still booting. The 5-minute job starts it for
-     this room; this tab moves on to the pre-join screen by itself once a media server is ready. -->
-<div *ngIf="!room() && meetingRoomStatus == 'serverstarting'" class="server-wait" data-testid="lkj-server-starting">
-  <div class="server-wait-spinner" aria-hidden="true"></div>
-  <div class="server-wait-title">Starting the video server, about 10 minutes…</div>
-  <div class="server-wait-note">Keep this tab open, the call opens by itself when the server is ready.</div>
-  <div class="server-wait-elapsed" data-testid="lkj-server-wait-elapsed">Waiting {{ waitElapsed(serverWaitStartedAt) }}</div>
-</div>
+  <div class="ready-title">{{ roomDetail?.title }}</div>
 
-<div *ngIf="!room() && meetingRoomStatus == 'serverfailed'" class="server-wait" data-testid="lkj-server-failed">
-  <div class="server-wait-title">The video server didn't start in time.</div>
-  <div class="server-wait-note">Please refresh this page to try again, or contact support if it keeps happening.</div>
-</div>
-
-<!-- Preview - Not Joined the meeting -->
-<div *ngIf="!room() && !loading && meetingRoomStatus == null" class="prejoin-container" data-testid="joinroom-prejoin">
-  
-  <div class="title">{{roomDetail.title}}</div>
-  
-  <!-- Video Preview -->
-  <div class="video-preview">
-    <app-openvidu-video-element
-      *ngIf="localParticipant()"
-      [track]="localParticipant()"
-      [participantIdentity]="'You'">
-    </app-openvidu-video-element>
-
-    <!-- Placeholder if video not yet allowed -->
-    <div class="video-placeholder" *ngIf="!localParticipant()">
-      <span class="material-icons">videocam_off</span>
-    </div>
+  <!-- Server Check -->
+  <div *ngIf="meetingRoomStatus == 'servercheck'" class="ready-server" data-testid="lkj-server-check">
+    Checking the video server...
   </div>
 
-  <!-- Status Row -->
-  <div class="status-row">
-    <!-- Camera Status -->
-    <div class="status-item">
-      <span class="material-icons" [ngClass]="'status-' + cameraStatus">
-        {{ cameraStatus === 'granted' ? 'videocam' : 'videocam_off' }}
-      </span>
-      <div>
-        <div class="status-label">Camera</div>
-        <div class="status-value" [ngClass]="'status-' + cameraStatus">
-          {{ cameraStatus === 'granted' ? 'Ready' : cameraStatus === 'denied' ? 'Blocked' : 'Not enabled' }}
-        </div>
-      </div>
-    </div>
-    
-    <!-- Microphone Status -->
-    <div class="status-item">
-      <span class="material-icons" [ngClass]="'status-' + micStatus">
-        {{ micStatus === 'granted' ? 'mic' : 'mic_off' }}
-      </span>
-      <div>
-        <div class="status-label">Microphone</div>
-        <div class="status-value" [ngClass]="'status-' + micStatus">
-          {{ micStatus === 'granted' ? 'Ready' : micStatus === 'denied' ? 'Blocked' : 'Not enabled' }}
-        </div>
-      </div>
-    </div>
+  <!-- 2026-11-14 plan item 2.1: the server is off or still booting. The 5-minute job starts it for
+       this room; the Join button appears by itself once a media server is ready. -->
+  <div *ngIf="meetingRoomStatus == 'serverstarting'" class="server-wait ready-server" data-testid="lkj-server-starting">
+    <div class="server-wait-spinner" aria-hidden="true"></div>
+    <div class="server-wait-title">Starting the video server, about 10 minutes…</div>
+    <div class="server-wait-note">Keep this tab open. Meanwhile, let's check your camera, microphone and speaker below.</div>
+    <div class="server-wait-elapsed" data-testid="lkj-server-wait-elapsed">Waiting {{ waitElapsed(serverWaitStartedAt) }}</div>
   </div>
 
-  <!-- Buttons -->
-  <div class="buttons">
-    <button class="btn-enable" (click)="prepareParticipant()" data-testid="joinroom-enable-btn" [disabled]="isRequesting">
-      Enable Access
-    </button>
-    <button class="btn-join" (click)="joinCall()" data-testid="joinroom-join-btn" [disabled]="cameraStatus !== 'granted' || micStatus !== 'granted'">
-      Join Call
-    </button>
+  <div *ngIf="meetingRoomStatus == 'serverfailed'" class="server-wait ready-server" data-testid="lkj-server-failed">
+    <div class="server-wait-title">The video server didn't start in time.</div>
+    <div class="server-wait-note">Please refresh this page to try again, or contact support if it keeps happening.</div>
   </div>
 
-  <!-- Warning hint for denied permissions -->
-  <p class="hint" *ngIf="cameraStatus === 'denied' || micStatus === 'denied'">
-    ⚠️ Permissions blocked. Please allow camera & microphone in browser settings.
-  </p>
+  <app-ready-check (readyChange)="onDevicesReady($event)" (checksChange)="onChecksChange($event)"></app-ready-check>
+
+  <!-- Server ready: Join controls -->
+  <div *ngIf="meetingRoomStatus == null" class="prejoin-actions" data-testid="joinroom-prejoin">
+    <div class="buttons">
+      <button class="btn-enable" (click)="prepareParticipant()" data-testid="joinroom-enable-btn" [disabled]="isRequesting">
+        {{ devicesReady ? 'Check again' : 'Enable Access' }}
+      </button>
+      <button class="btn-join" (click)="joinCall()" data-testid="joinroom-join-btn" [disabled]="!devicesReady">
+        Join Call
+      </button>
+    </div>
+    <p class="hint" *ngIf="!devicesReady">
+      Fix the camera / microphone item marked above to join — both are needed for this call.
+    </p>
+  </div>
 
 </div>
 
@@ -112,6 +74,17 @@
   </button>
   <!-- 2026-11-15 test: mute / remove cold-start for a few seconds — show that it is working. -->
   <div *ngIf="hostActionNote" class="host-action-note" role="status">{{ hostActionNote }}</div>
+
+  <!-- 2026-11-27 Ready check, Phase 4: specialist only — participants still on the check page and
+       why (records exist only until they join; hosts are never recorded). -->
+  <div *ngIf="isHost() && notJoined.length" class="nj-panel" data-testid="lkj-notjoined">
+    <div class="nj-title">Not joined yet</div>
+    <div *ngFor="let r of notJoined" class="nj-row" [class.nj-stuck]="r.state === 'stuck'" [class.nj-left]="r.state === 'left'" data-testid="lkj-notjoined-row">
+      <div class="nj-name">{{ r.name }}</div>
+      <div class="nj-msg">{{ r.state === 'left' ? 'Left the page' : r.message }}</div>
+      <div class="nj-when">{{ notJoinedWhen(r) }}</div>
+    </div>
+  </div>
   
 
   <!-- Zoom-style Header -->
@@ -612,7 +585,7 @@
 
 <div *ngIf="!loading && meetingRoomStatus == 'ended'" class="text-center w-100 p-5 fw-700 fs-4">
   <div *ngIf="roomDetail.hosts.includes(loggedinProfileid); else nonHostTest">
-    The Meeting is Ended. Go back and Join Meeting to start again.
+    The Meeting is Ended. Close and Join Meeting to start again.
   </div>
   <ng-template #nonHostTest>
     The Meeting is Closed or not Started yet. Only Host can Start the Meeting.

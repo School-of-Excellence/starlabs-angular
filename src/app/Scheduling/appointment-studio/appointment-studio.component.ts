@@ -1,4 +1,5 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
+import { CallTabService } from '../../LiveKit/ready-check/call-tab.service';
 import { MatTableDataSource } from '@angular/material/table';
 import { Firestore, collection, query, orderBy, where, collectionSnapshots, Query, doc, limit, getDocs, getDoc, serverTimestamp, setDoc, updateDoc } from '@angular/fire/firestore';
 import { MatDialog } from '@angular/material/dialog';
@@ -28,6 +29,8 @@ import { MatSlideToggleModule } from "@angular/material/slide-toggle";
   styleUrl: './appointment-studio.component.css'
 })
 export class AppointmentStudioComponent {
+  // Join opens the call in a new tab Safari won't block (plan 2026-11-27-join-ready-check, Phase 1).
+  private callTab = inject(CallTabService);
 
   Array = Array
 
@@ -647,10 +650,13 @@ export class AppointmentStudioComponent {
     var appointment = selectedAppointment["meta"]
 
     if(appointment["platform"] == "openvidu"){
+      // Open the new tab NOW, inside the click (before any await) — see CallTabService.
+      const callWin = this.callTab.open()
       var loading = this.dialog.open(LoadingProgressComponent, {
         data: {msg: "Setting uP!..."},
         disableClose: true
       })
+      try{
 
       // Check Room Creation
       var roomDoc = doc(this.firestore, "openviduroom", appointment["docid"])
@@ -698,9 +704,15 @@ export class AppointmentStudioComponent {
 
       loading.close()
 
-      // Same tab (2026-11-24): a new tab opened after the awaits above is no longer a click,
-      // so Safari blocked it as a pop-up. Browser Back returns to the studio.
-      this.router.navigate(['/joinroom', appointment["docid"]]);
+      // New tab again (2026-11-27, replaces the 2026-11-24 same-tab change): the tab was opened
+      // inside the click above, so Safari allows it; this only points it at the call.
+      this.callTab.go(callWin, appointment["docid"])
+      } catch(err){
+        loading.close()
+        this.callTab.abort(callWin)
+        console.log(err)
+        alert("Could not set up the meeting room. Please try again.")
+      }
 
     }
     else{

@@ -1,0 +1,97 @@
+<!-- Join "Ready check" — plan 2026-11-27-join-ready-check. Hook prefix: rck. -->
+<div class="rck" data-testid="rck-panel">
+
+  <div class="rck-preview">
+    <video #preview class="rck-video" [class.rck-hidden]="!hasStream" playsinline muted autoplay data-testid="rck-preview"></video>
+    <div class="rck-video-off" *ngIf="!hasStream">
+      <span class="material-icons">videocam_off</span>
+    </div>
+  </div>
+
+  <div class="rck-heading">Getting you ready</div>
+
+  <!-- Browser -->
+  <div class="rck-row" [ngClass]="'rck-' + checks.browser.state" data-testid="rck-row-browser" [attr.data-state]="checks.browser.state">
+    <span class="material-icons rck-icon">{{ icon(checks.browser.state) }}</span>
+    <div class="rck-body">
+      <div class="rck-line"><span class="rck-label">Browser</span><span class="rck-msg">{{ checks.browser.message }}</span></div>
+      <div class="rck-help" *ngIf="help.browser">{{ help.browser }}</div>
+      <div class="rck-actions" *ngIf="checks.browser.code === 'in-app' || checks.browser.code === 'mobile'">
+        <button class="rck-btn" (click)="copyLink()" data-testid="rck-copy-link-btn">{{ linkCopied ? 'Link copied' : 'Copy link' }}</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Camera -->
+  <div class="rck-row" [ngClass]="'rck-' + checks.camera.state" data-testid="rck-row-camera" [attr.data-state]="checks.camera.state">
+    <span class="material-icons rck-icon">{{ icon(checks.camera.state) }}</span>
+    <div class="rck-body">
+      <div class="rck-line"><span class="rck-label">Camera</span><span class="rck-msg">{{ checks.camera.message }}</span></div>
+      <div class="rck-help" *ngIf="help.camera">{{ help.camera }}</div>
+      <div class="rck-actions" *ngIf="checks.camera.state === 'fail'">
+        <button class="rck-btn" *ngIf="osSettingsFor('camera')" (click)="openOsSettings('camera')" data-testid="rck-os-camera-btn">Open camera settings</button>
+        <button class="rck-btn rck-primary" (click)="retry()" [disabled]="requesting" data-testid="rck-retry-camera-btn">Try again</button>
+      </div>
+      <select class="rck-select" *ngIf="hasStream && cameras.length > 1" [value]="selectedCameraId" (change)="pickCamera($any($event.target).value)" data-testid="rck-camera-select">
+        <option *ngFor="let c of cameras" [value]="c.deviceId">{{ c.label || 'Camera' }}</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Microphone -->
+  <div class="rck-row" [ngClass]="'rck-' + checks.mic.state" data-testid="rck-row-mic" [attr.data-state]="checks.mic.state">
+    <span class="material-icons rck-icon">{{ icon(checks.mic.state) }}</span>
+    <div class="rck-body">
+      <div class="rck-line"><span class="rck-label">Microphone</span><span class="rck-msg">{{ checks.mic.message }}</span></div>
+      <div class="rck-meter" *ngIf="hasStream" data-testid="rck-mic-meter"><div class="rck-meter-fill" [style.width.%]="micLevel * 100"></div></div>
+      <button class="rck-btn" *ngIf="hasStream && meterNeedsClick" (click)="startMeterByClick()" data-testid="rck-meter-start-btn">Test microphone</button>
+      <div class="rck-help" *ngIf="help.mic">{{ help.mic }}</div>
+      <div class="rck-actions" *ngIf="checks.mic.state === 'fail'">
+        <button class="rck-btn" *ngIf="osSettingsFor('mic')" (click)="openOsSettings('mic')" data-testid="rck-os-mic-btn">Open microphone settings</button>
+        <button class="rck-btn rck-primary" (click)="retry()" [disabled]="requesting" data-testid="rck-retry-mic-btn">Try again</button>
+      </div>
+      <select class="rck-select" *ngIf="hasStream && mics.length > 1" [value]="selectedMicId" (change)="pickMic($any($event.target).value)" data-testid="rck-mic-select">
+        <option *ngFor="let m of mics" [value]="m.deviceId">{{ m.label || 'Microphone' }}</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Speaker -->
+  <div class="rck-row" [ngClass]="'rck-' + checks.speaker.state" data-testid="rck-row-speaker" [attr.data-state]="checks.speaker.state">
+    <span class="material-icons rck-icon">{{ checks.speaker.state === 'pending' ? 'volume_up' : icon(checks.speaker.state) }}</span>
+    <div class="rck-body">
+      <div class="rck-line"><span class="rck-label">Speaker</span><span class="rck-msg">{{ checks.speaker.message }}</span></div>
+      <div class="rck-help" *ngIf="help.speaker">{{ help.speaker }}</div>
+      <div class="rck-actions">
+        <button class="rck-btn" *ngIf="speakerTest === 'idle'" (click)="playTestSound()" data-testid="rck-test-sound-btn">Play test sound</button>
+        <ng-container *ngIf="speakerTest === 'asked'">
+          <span class="rck-ask">Did you hear it?</span>
+          <button class="rck-btn rck-primary" (click)="heard(true)" data-testid="rck-heard-yes-btn">Yes</button>
+          <button class="rck-btn" (click)="heard(false)" data-testid="rck-heard-no-btn">No</button>
+        </ng-container>
+      </div>
+      <select class="rck-select" *ngIf="canPickSpeaker && speakers.length > 1" [value]="selectedSpeakerId" (change)="pickSpeaker($any($event.target).value)" data-testid="rck-speaker-select">
+        <option value="">System default</option>
+        <option *ngFor="let s of speakers" [value]="s.deviceId">{{ s.label || 'Speaker' }}</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Network -->
+  <div class="rck-row" [ngClass]="'rck-' + checks.network.state" data-testid="rck-row-network" [attr.data-state]="checks.network.state">
+    <span class="material-icons rck-icon">{{ icon(checks.network.state) }}</span>
+    <div class="rck-body">
+      <div class="rck-line"><span class="rck-label">Network</span><span class="rck-msg">{{ checks.network.message }}</span></div>
+      <div class="rck-help" *ngIf="help.network">{{ help.network }}</div>
+    </div>
+  </div>
+
+  <!-- Computer -->
+  <div class="rck-row" [ngClass]="'rck-' + checks.computer.state" data-testid="rck-row-computer" [attr.data-state]="checks.computer.state">
+    <span class="material-icons rck-icon">{{ icon(checks.computer.state) }}</span>
+    <div class="rck-body">
+      <div class="rck-line"><span class="rck-label">Computer</span><span class="rck-msg">{{ checks.computer.message }}</span></div>
+    </div>
+  </div>
+
+</div>
