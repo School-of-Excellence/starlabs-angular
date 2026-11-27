@@ -2463,6 +2463,8 @@ export class DeliveryDashboardCloneComponent {
     private ctdVideoAnswers = new Map<string, { pre: Set<string>; post: Set<string> }>();
 
     private async loadCtdVideoAsk(productId: string): Promise<void> {
+        // No CTD product card (or a merged 'group:' id) → no single products doc to read the sequence from.
+        if (!productId || productId.startsWith('group:')) return;
         try {
             if (!this.ctdVideoAskIds) {
                 const pre = new Set<string>();

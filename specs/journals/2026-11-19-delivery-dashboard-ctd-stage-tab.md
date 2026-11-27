@@ -142,3 +142,7 @@ Team list of 16 WiSH participants, three groups: (A) another product ongoing —
 - e2e: register `ddc-btn-ctd-appt`, `ddc-ctd-cycle-first`, `ddc-ctd-cycle-next`, `ddc-chip-addon` and `ddc-btn-addon` in the delivery-dashboard suite before pushing.
 - e2e: also register the "Why not here?" hooks listed above.
 - Team decision: 206 latest completed records have no completion date and count in every period.
+- **Guard added before push (e2e found it):** `loadCtdVideoAsk` returns early when the CTD product id is missing
+  or a merged `group:` id. The journey seed has no CTD product card, so `productId` was `undefined` and
+  `doc('products', undefined)` threw ("CTD VideoAsk load failed … reading 'indexOf'") — DDC-CTD-01/02 failed on
+  the console guard. Production has the card, so it was unaffected. Hub DDC-CTD-01 now expects the 12 columns.
