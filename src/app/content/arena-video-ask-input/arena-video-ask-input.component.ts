@@ -1,5 +1,5 @@
-import { Component, ViewChild } from '@angular/core';
-import { MatDialog } from '@angular/material/dialog';
+import { Component, TemplateRef, ViewChild } from '@angular/core';
+import { MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
 import { MatSort } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
@@ -30,6 +30,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
     MatIconModule,
     MatPaginatorModule,
     MatSlideToggleModule,
+    MatDialogModule
   ],
   templateUrl: './arena-video-ask-input.component.html',
   styleUrl: './arena-video-ask-input.component.css'
@@ -48,11 +49,19 @@ videoAskForm = {
   }
   eventlist=[]
   // table
-  displayedColumns: string[] = ['title','description','eventref', 'questiontype', 'questionurl', 'active'];
+  displayedColumns: string[] = ['title','description','eventref', 'questiontype', 'questionurl', 'active','edit'];
   dataSource: MatTableDataSource<any> = new MatTableDataSource();
+  editForm = {
+    docid:null,
+    title:null,
+    description:null
+  }
+  editDialogRef: MatDialogRef<any>
 
   @ViewChild(MatPaginator) paginator: MatPaginator;
   @ViewChild(MatSort) sort: MatSort
+  @ViewChild('editDialog') editDialog: TemplateRef<any>
+
 
   mapVideoaskByEvent = {}
   mapEvent = {}
@@ -177,6 +186,26 @@ videoAskForm = {
     }else{
       alert("please select image (or) video")
     }
+  }
+  
+  onEdit(row:any){
+    this.editForm = {
+      docid:row['docid'],
+      title:row['title'] ?? null,
+      description:row['description'] ?? null
+    }
+    this.editDialogRef = this.dialog.open(this.editDialog,{
+      width:'500px'
+    })
+  }
+
+  async onUpdate(){
+    const arenavideoaskRef = doc(this.firestore, 'arenavideoask', this.editForm.docid);
+    await updateDoc(arenavideoaskRef,{
+      title:this.editForm.title,
+      description:this.editForm.description
+    })
+    this.editDialogRef.close()
   }
 
   async upload(){
