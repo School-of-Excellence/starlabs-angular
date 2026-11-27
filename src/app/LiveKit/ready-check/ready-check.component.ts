@@ -500,6 +500,11 @@ export class ReadyCheckComponent implements AfterViewInit, OnDestroy {
     this.checksChange.emit({ checks: Object.values(this.checks).map(c => ({ ...c })), retries: this.retries });
   }
 
+  /** How many of the three Join-required checks (camera, mic, speaker) are ticked. */
+  requiredDone(): number {
+    return (['camera', 'mic', 'speaker'] as CheckKey[]).filter(k => this.checks[k].state === 'ok').length;
+  }
+
   icon(state: CheckState): string {
     return state === 'ok' ? 'check_circle' : state === 'warn' ? 'error' : state === 'fail' ? 'cancel' : 'hourglass_empty';
   }

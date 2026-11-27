@@ -50,3 +50,13 @@ what is missing. The specialist's record now names the first un-ticked item.
 now stays disabled until the speaker test is answered, so LKJ-03 must click `rck-test-sound-btn` and
 `rck-heard-yes-btn` first (and rely on Chrome's fake mic beep for the mic tick). Not updated yet.
 Revert: `updateReady()` in `ready-check.component.ts` back to camera ok + mic not fail.
+
+## Same day — Ready check redesign (operator: buttons went below the viewport)
+| Change | Why |
+|---|---|
+| One card, `max-height: 100dvh − 32px` (full-bleed `100dvh` under 900 px): header · scrolling body · footer | The footer (server status while waiting, then Check again / Join Call) can never leave the screen; only the checks scroll |
+| Server status moved into the footer (same `lkj-server-*` hooks) | Join appears in the same place the wait message was — no jump |
+| Two columns ≥ 900 px: preview (mic level bar over the video, device pickers under it) · checks | Fits a laptop screen without scrolling; one column with a 30 vh preview below 900 px |
+| Required checks as 3 rows + "N of 3 ready to join" bar; browser / network / computer as small tiles that widen only to explain a problem | Puts what blocks Join first; healthy system checks take one line |
+Checked with a static harness of the real CSS at 1440×900, 1280×620, 768×1024 and 375×812 (ready + waiting footers): footer visible in all.
+Revert: `git checkout 7665319a -- src/app/LiveKit/ready-check/ready-check.component.{html,css} src/app/LiveKit/join-livekit-call/join-livekit-call.component.{html,css}` (+ drop `requiredDone()`).

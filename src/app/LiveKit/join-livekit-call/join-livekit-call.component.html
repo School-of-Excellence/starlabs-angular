@@ -7,48 +7,65 @@
   Connecting...
 </div>
 
-<!-- Ready check (plan 2026-11-27-join-ready-check): ONE block from page open until Join, so the
+<!-- Ready check (plan 2026-11-27-join-ready-check): ONE card from page open until Join, so the
      camera / mic / speaker checks run — and keep their state — while the video server starts.
-     The server lines keep their 2026-11-14 hooks; joinroom-prejoin still appears only once the
-     server is ready (LKJ-01/02 assert that). -->
-<div *ngIf="!room() && !loading && (meetingRoomStatus == 'servercheck' || meetingRoomStatus == 'serverstarting' || meetingRoomStatus == 'serverfailed' || meetingRoomStatus == null)" class="ready-wrap" data-testid="lkj-ready-wrap">
+     The card is exactly the viewport's height at most: its body scrolls, its footer (server status,
+     then Check again / Join Call) never leaves the screen. The server lines keep their 2026-11-14
+     hooks; joinroom-prejoin still appears only once the server is ready (LKJ-01/02 assert that). -->
+<div *ngIf="!room() && !loading && (meetingRoomStatus == 'servercheck' || meetingRoomStatus == 'serverstarting' || meetingRoomStatus == 'serverfailed' || meetingRoomStatus == null)" class="rw" data-testid="lkj-ready-wrap">
+  <div class="rw-card">
 
-  <div class="ready-title">{{ roomDetail?.title }}</div>
+    <header class="rw-head">
+      <div class="rw-eyebrow"><span class="material-icons">verified_user</span> Ready check</div>
+      <div class="rw-title">{{ roomDetail?.title }}</div>
+    </header>
 
-  <!-- Server Check -->
-  <div *ngIf="meetingRoomStatus == 'servercheck'" class="ready-server" data-testid="lkj-server-check">
-    Checking the video server...
-  </div>
-
-  <!-- 2026-11-14 plan item 2.1: the server is off or still booting. The 5-minute job starts it for
-       this room; the Join button appears by itself once a media server is ready. -->
-  <div *ngIf="meetingRoomStatus == 'serverstarting'" class="server-wait ready-server" data-testid="lkj-server-starting">
-    <div class="server-wait-spinner" aria-hidden="true"></div>
-    <div class="server-wait-title">Starting the video server, about 10 minutes…</div>
-    <div class="server-wait-note">Keep this tab open. Meanwhile, let's check your camera, microphone and speaker below.</div>
-    <div class="server-wait-elapsed" data-testid="lkj-server-wait-elapsed">Waiting {{ waitElapsed(serverWaitStartedAt) }}</div>
-  </div>
-
-  <div *ngIf="meetingRoomStatus == 'serverfailed'" class="server-wait ready-server" data-testid="lkj-server-failed">
-    <div class="server-wait-title">The video server didn't start in time.</div>
-    <div class="server-wait-note">Please refresh this page to try again, or contact support if it keeps happening.</div>
-  </div>
-
-  <app-ready-check (readyChange)="onDevicesReady($event)" (checksChange)="onChecksChange($event)"></app-ready-check>
-
-  <!-- Server ready: Join controls -->
-  <div *ngIf="meetingRoomStatus == null" class="prejoin-actions" data-testid="joinroom-prejoin">
-    <div class="buttons">
-      <button class="btn-enable" (click)="prepareParticipant()" data-testid="joinroom-enable-btn" [disabled]="isRequesting">
-        {{ devicesReady ? 'Check again' : 'Enable Access' }}
-      </button>
-      <button class="btn-join" (click)="joinCall()" data-testid="joinroom-join-btn" [disabled]="!devicesReady">
-        Join Call
-      </button>
+    <div class="rw-body">
+      <app-ready-check (readyChange)="onDevicesReady($event)" (checksChange)="onChecksChange($event)"></app-ready-check>
     </div>
-    <p class="hint" *ngIf="!devicesReady" data-testid="lkj-join-hint">{{ joinHint() }}</p>
-  </div>
 
+    <footer class="rw-foot">
+      <!-- Server Check -->
+      <div *ngIf="meetingRoomStatus == 'servercheck'" class="rw-status" data-testid="lkj-server-check">
+        <div class="server-wait-spinner" aria-hidden="true"></div>
+        <div class="rw-status-text"><div class="rw-status-title">Checking the video server...</div></div>
+      </div>
+
+      <!-- 2026-11-14 plan item 2.1: the server is off or still booting. The 5-minute job starts it for
+           this room; Join appears here by itself once a media server is ready. -->
+      <div *ngIf="meetingRoomStatus == 'serverstarting'" class="rw-status" data-testid="lkj-server-starting">
+        <div class="server-wait-spinner" aria-hidden="true"></div>
+        <div class="rw-status-text">
+          <div class="rw-status-title">Starting the video server, about 10 minutes…</div>
+          <div class="rw-status-note">Keep this tab open — Join appears here when it's ready. Finish the checks meanwhile.</div>
+        </div>
+        <div class="rw-elapsed" data-testid="lkj-server-wait-elapsed">Waiting {{ waitElapsed(serverWaitStartedAt) }}</div>
+      </div>
+
+      <div *ngIf="meetingRoomStatus == 'serverfailed'" class="rw-status rw-status-fail" data-testid="lkj-server-failed">
+        <span class="material-icons">error</span>
+        <div class="rw-status-text">
+          <div class="rw-status-title">The video server didn't start in time.</div>
+          <div class="rw-status-note">Please refresh this page to try again, or contact support if it keeps happening.</div>
+        </div>
+      </div>
+
+      <!-- Server ready: Join controls -->
+      <div *ngIf="meetingRoomStatus == null" class="rw-actions" data-testid="joinroom-prejoin">
+        <p class="rw-hint" *ngIf="!devicesReady" data-testid="lkj-join-hint">{{ joinHint() }}</p>
+        <p class="rw-hint rw-hint-ok" *ngIf="devicesReady"><span class="material-icons">check_circle</span> You're all set</p>
+        <div class="rw-buttons">
+          <button class="rw-btn rw-btn-secondary" (click)="prepareParticipant()" data-testid="joinroom-enable-btn" [disabled]="isRequesting">
+            <span class="material-icons">refresh</span>{{ devicesReady ? 'Check again' : 'Enable Access' }}
+          </button>
+          <button class="rw-btn rw-btn-primary" (click)="joinCall()" data-testid="joinroom-join-btn" [disabled]="!devicesReady">
+            <span class="material-icons">videocam</span>Join Call
+          </button>
+        </div>
+      </div>
+    </footer>
+
+  </div>
 </div>
 
 <!-- Connecting to the Meeting -->

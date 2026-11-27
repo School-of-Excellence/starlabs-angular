@@ -1317,24 +1317,100 @@
   pointer-events: none;
 }
 
-/* ── 2026-11-27 Ready check (plan 2026-11-27-join-ready-check) ── */
-.ready-wrap {
-  background: white;
-  padding: 28px;
-  border-radius: 12px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  max-width: 600px;
-  margin: 32px auto;
+/* ── 2026-11-27 Ready check (plan 2026-11-27-join-ready-check) ──
+   One card, never taller than the viewport: header, scrolling body, footer that always stays on
+   screen (server status while waiting, then Check again / Join Call). */
+.rw {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: linear-gradient(180deg, #eef2ff 0%, #f8fafc 60%);
+  box-sizing: border-box;
+}
+.rw-card {
+  width: min(1040px, 100%);
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 10px 40px rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.06);
+  overflow: hidden;
 }
-.ready-title { text-align: center; color: #333; font-size: 20px; font-weight: 600; }
-.ready-wrap .server-wait { margin: 0 auto; }
-.ready-server { text-align: center; }
-.prejoin-actions .hint { color: #b45309; }
-@media (max-width: 768px) {
-  .ready-wrap { padding: 16px; margin: 16px; }
+.rw-head { padding: 18px 24px 14px; border-bottom: 1px solid #eef0f4; flex: none; }
+.rw-eyebrow {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #4f46e5;
+}
+.rw-eyebrow .material-icons { font-size: 16px; }
+.rw-title {
+  margin-top: 4px; font-size: 19px; font-weight: 700; color: #111827; line-height: 1.3;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rw-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 20px 24px; overscroll-behavior: contain; }
+.rw-foot {
+  flex: none; padding: 14px 24px;
+  padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid #eef0f4; background: #fcfcfe;
+}
+
+/* Server status in the footer */
+.rw-status { display: flex; align-items: center; gap: 12px; }
+.rw-status .server-wait-spinner { width: 22px; height: 22px; margin: 0; flex: none; border-width: 3px; }
+.rw-status-text { flex: 1; min-width: 0; }
+.rw-status-title { font-size: 14px; font-weight: 600; color: #111827; }
+.rw-status-note { font-size: 12.5px; color: #6b7280; margin-top: 2px; }
+.rw-elapsed {
+  flex: none; font-size: 13px; color: #4b5563; font-variant-numeric: tabular-nums;
+  padding: 4px 10px; border-radius: 999px; background: #eef2ff;
+}
+.rw-status-fail .material-icons { color: #dc2626; }
+
+/* Join controls in the footer */
+.rw-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.rw-hint { margin: 0; font-size: 13px; color: #b45309; line-height: 1.4; min-width: 0; }
+.rw-hint-ok { color: #15803d; display: inline-flex; align-items: center; gap: 6px; font-weight: 500; }
+.rw-hint-ok .material-icons { font-size: 18px; }
+.rw-buttons { display: flex; gap: 10px; flex: none; }
+.rw-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 44px; padding: 0 20px; border-radius: 10px; font-size: 15px; font-weight: 600;
+  cursor: pointer; transition: background 150ms, opacity 150ms; white-space: nowrap; border: 1px solid transparent;
+}
+.rw-btn .material-icons { font-size: 20px; }
+.rw-btn:disabled { cursor: not-allowed; }
+.rw-btn-secondary { background: #fff; border-color: #d1d5db; color: #374151; }
+.rw-btn-secondary:hover:not(:disabled) { background: #f9fafb; }
+.rw-btn-secondary:disabled { opacity: 0.55; }
+.rw-btn-primary { background: #4f46e5; color: #fff; min-width: 150px; }
+.rw-btn-primary:hover:not(:disabled) { background: #4338ca; }
+.rw-btn-primary:disabled { background: #c7cbd6; color: #fff; }
+
+/* Tablets / phones: full-bleed card, stacked footer, full-width buttons */
+@media (max-width: 899px) {
+  .rw { padding: 0; align-items: stretch; }
+  .rw-card { max-height: none; height: 100vh; height: 100dvh; width: 100%; border-radius: 0; box-shadow: none; }
+  .rw-head { padding: 14px 16px 12px; }
+  .rw-title { font-size: 17px; white-space: normal; }
+  .rw-body { padding: 14px 16px; }
+  .rw-foot { padding: 12px 16px; padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+  .rw-actions { flex-direction: column; align-items: stretch; gap: 10px; }
+  .rw-buttons { width: 100%; }
+  .rw-btn { flex: 1; padding: 0 12px; }
+  .rw-btn-primary { min-width: 0; }
+  .rw-elapsed { font-size: 12px; }
+  .rw-status-note { display: none; }
+}
+/* Short landscape screens (small laptops at 125 % zoom, phones sideways) */
+@media (max-height: 560px) and (min-width: 900px) {
+  .rw { padding: 8px; }
+  .rw-card { max-height: calc(100vh - 16px); max-height: calc(100dvh - 16px); }
+  .rw-head { padding: 10px 20px; }
+  .rw-body { padding: 12px 20px; }
 }
 
 /* Specialist's "Not joined yet" panel on the call screen */
