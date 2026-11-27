@@ -147,6 +147,17 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   waitingPanelOpen = true;
   private alertedWaiting = new Set<string>();
   private alertCtx: AudioContext | null = null;
+  // Waiting-room alerts (operator 2026-11-28: one beep was missed, no notification seen).
+  // Ringtone repeats every RING_EVERY_MS while someone waits, until the specialist acts on the
+  // panel or RING_FOR_MS passes. Notifications need the site permission — shown on the call
+  // screen with a one-click "Turn on" when it isn't granted.
+  private static readonly RING_EVERY_MS = 8000;
+  private static readonly RING_FOR_MS = 60 * 1000;
+  private ringTimer: any = null;
+  private ringStartedAt = 0;
+  alertPermission: 'granted' | 'denied' | 'default' | 'unsupported' = 'default';
+  alertChipDismissed = false;
+  alertTestSent = false;
   private lastPrecheck: Record<string, any> = {};
   // Phase 3 follow-up: the specialist's own screen notices a participant vanish from the call
   // without saying goodbye — works even when the participant's internet is completely off
@@ -404,6 +415,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     this.stopHostWarmup();
     if (this.meetingRoomStatus === 'waiting') this.removeMyWaitingEntry();
     this.clearPoorNet();
+    this.stopRinging();
     try { void this.alertCtx?.close(); } catch (_) {}
     // Left the page before joining → the specialist sees "left the page at …".
     this.precheck?.markLeft();
@@ -950,7 +962,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       // Rejoin: put camera / mic / blur back the way they were before the drop.
       if (rejoin) await this.restoreAfterRejoin();
       // Specialist: alert for anyone already in the waiting room.
-      if (this.isHost()) this.readWaitingRoom(this.lastRoomData);
+      if (this.isHost()) { this.readAlertPermission(); this.readWaitingRoom(this.lastRoomData); }
 
     } catch (error: any) {
       if (rejoin) throw error;        // the rejoin loop decides (retry / give up)
@@ -1336,6 +1348,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
 
     const ids = new Set(this.waitingList.map(w => w.id));
     this.alertedWaiting.forEach(id => { if (!ids.has(id)) this.alertedWaiting.delete(id); });
+    if (!this.waitingList.length) this.stopRinging();
     if (this.meetingRoomStatus !== 'connected') return;   // alerts only once the specialist is in the call
     const fresh = this.waitingList.filter(w => !this.alertedWaiting.has(w.id));
     if (!fresh.length) return;
@@ -1345,61 +1358,126 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
 
   /** Inside the Join click: notification permission + an unlocked sound context. */
   private prepareHostAlerts(): void {
+    this.readAlertPermission();
     try {
-      if ('Notification' in window && Notification.permission === 'default') void Notification.requestPermission();
+      if (this.alertPermission === 'default') {
+        void Notification.requestPermission().then(() => this.zone.run(() => this.readAlertPermission()));
+      }
     } catch (_) {}
+    this.unlockAlertSound();
+  }
+
+  private unlockAlertSound(): void {
     try {
       if (!this.alertCtx) this.alertCtx = new AudioContext();
       void this.alertCtx.resume();
     } catch (_) {}
   }
 
+  private readAlertPermission(): void {
+    this.alertPermission = 'Notification' in window ? Notification.permission : 'unsupported';
+  }
+
+  /** Call-screen chip: "Turn on waiting-room alerts" (needs a click — browsers ignore it otherwise). */
+  async enableAlerts(): Promise<void> {
+    this.unlockAlertSound();
+    try {
+      if ('Notification' in window && Notification.permission === 'default') await Notification.requestPermission();
+    } catch (_) {}
+    this.readAlertPermission();
+    if (this.alertPermission === 'granted') this.testAlert();
+  }
+
+  /** Plays the ringtone once and shows a sample notification, so the specialist can confirm both. */
+  testAlert(): void {
+    this.unlockAlertSound();
+    this.playRingtone();
+    this.alertTestSent = this.showNotification('Waiting-room alerts are on', 'You will see this when someone is waiting to join.');
+  }
+
   /** Sound + browser notification — also when the call tab is in the background. */
   private alertWaiting(list: { id: string; name: string }[]): void {
     this.waitingPanelOpen = true;
-    this.playChime();
+    this.startRinging();
     const title = list.length === 1 ? `${list[0].name} is waiting to join` : `${list.length} people are waiting to join`;
+    this.showNotification(title, `${this.roomDetail?.title || 'Your call'} — click to let them in`);
+  }
+
+  /** Returns false when the browser / permission doesn't allow it. */
+  private showNotification(title: string, body: string): boolean {
+    this.readAlertPermission();
+    if (this.alertPermission !== 'granted') {
+      console.log(`[waiting] notification not shown — permission: ${this.alertPermission}`);
+      return false;
+    }
     try {
-      if ('Notification' in window && Notification.permission === 'granted') {
-        const n = new Notification(title, {
-          body: `${this.roomDetail?.title || 'Your call'} — click to let them in`,
-          tag: `lkj-wr-${this.roomDetail?.roomId}`,
-          renotify: true,
-        } as any);
-        n.onclick = () => this.zone.run(() => {
-          try { window.focus(); } catch (_) {}
-          this.waitingPanelOpen = true;
-          n.close();
-        });
-      }
+      const n = new Notification(title, {
+        body,
+        tag: `lkj-wr-${this.roomDetail?.roomId}`,
+        renotify: true,
+        requireInteraction: true,     // stays on screen until clicked (desktop Chrome / Edge)
+        icon: 'assets/ah-black-logo-only.png',
+      } as any);
+      n.onclick = () => this.zone.run(() => {
+        try { window.focus(); } catch (_) {}
+        this.waitingPanelOpen = true;
+        this.stopRinging();
+        n.close();
+      });
+      return true;
     } catch (e) {
       console.log('[waiting] notification failed:', e);
+      return false;
     }
   }
 
-  private playChime(): void {
+  private startRinging(): void {
+    this.ringStartedAt = Date.now();
+    this.playRingtone();
+    if (this.ringTimer) return;
+    this.ringTimer = setInterval(() => {
+      if (!this.waitingList.length || Date.now() - this.ringStartedAt >= JoinLivekitCallComponent.RING_FOR_MS) {
+        this.stopRinging();
+        return;
+      }
+      this.playRingtone();
+    }, JoinLivekitCallComponent.RING_EVERY_MS);
+  }
+
+  /** Any action on the waiting panel (or the notification) silences the ringtone. */
+  stopRinging(): void {
+    if (this.ringTimer) { clearInterval(this.ringTimer); this.ringTimer = null; }
+  }
+
+  /** "Ding-dong-ding" doorbell, played twice (~2 s) — clearly not a call sound effect. */
+  private playRingtone(): void {
     const ctx = this.alertCtx;
     if (!ctx) return;
     try {
       void ctx.resume();
-      const t0 = ctx.currentTime;
-      [880, 1320].forEach((freq, i) => {
-        const at = t0 + i * 0.18;
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.value = freq;
-        gain.gain.setValueAtTime(0.0001, at);
-        gain.gain.exponentialRampToValueAtTime(0.25, at + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.16);
-        osc.connect(gain).connect(ctx.destination);
-        osc.start(at);
-        osc.stop(at + 0.17);
-      });
+      const t0 = ctx.currentTime + 0.05;
+      const notes = [659.25, 830.61, 987.77];          // E5 · G#5 · B5 (E major)
+      [0, 1.0].forEach(rep => notes.forEach((freq, i) => {
+        const at = t0 + rep + i * 0.24;
+        [1, 2].forEach(h => {                            // fundamental + soft overtone = bell-like
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = h === 1 ? 'triangle' : 'sine';
+          osc.frequency.value = freq * h;
+          const peak = h === 1 ? 0.45 : 0.12;
+          gain.gain.setValueAtTime(0.0001, at);
+          gain.gain.exponentialRampToValueAtTime(peak, at + 0.015);
+          gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.55);
+          osc.connect(gain).connect(ctx.destination);
+          osc.start(at);
+          osc.stop(at + 0.6);
+        });
+      }));
     } catch (_) {}
   }
 
   async admit(id: string): Promise<void> {
+    this.stopRinging();
     await updateDoc(this.roomRef(), {
       [`admitted.${id}`]: { by: this.loggedinProfileid, at: serverTimestamp() },
       [`waiting.${id}`]: deleteField(),
@@ -1408,6 +1486,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   }
 
   async admitAll(): Promise<void> {
+    this.stopRinging();
     const fields: Record<string, any> = {};
     this.waitingList.forEach(w => {
       fields[`admitted.${w.id}`] = { by: this.loggedinProfileid, at: serverTimestamp() };
@@ -1418,6 +1497,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   }
 
   async deny(w: { id: string; name: string }): Promise<void> {
+    this.stopRinging();
     await updateDoc(this.roomRef(), {
       [`denied.${w.id}`]: { by: this.loggedinProfileid, at: serverTimestamp(), name: w.name },
       [`waiting.${w.id}`]: deleteField(),
@@ -1519,6 +1599,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     this.reconnectingOverlay = false;
     this.dropped = [];
     this.leftOnPurpose.clear();
+    this.stopRinging();
   }
 
   // Close the Room and disconnect everyone

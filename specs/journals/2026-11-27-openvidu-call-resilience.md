@@ -65,3 +65,16 @@ Fix — on the **specialist's own screen**, no participant write needed:
 Hooks: `lkj-dropped-row`, `lkj-dropped-dismiss-btn`.
 Revert: remove `noteDropped` / `clearDropped` / DataReceived listener / `sendBye()` call and the
 `lkj-dropped-row` block.
+
+## 2026-11-28 — waiting-room alerts: no pop-up seen, one beep too easy to miss (operator test)
+- **Pop-up:** the permission was only asked inside the Join click; if that prompt was missed,
+  dismissed or auto-quieted by Chrome, nothing told the specialist. Now the call screen shows a
+  chip while permission isn't granted: **Turn on** (asks + fires a sample pop-up), or — if
+  blocked — how to allow it in the address bar. Notifications now `requireInteraction` (stay until
+  clicked). The waiting panel has **Test sound & pop-up**, with a hint about the computer's own
+  notification settings / Focus mode (a page can't detect an OS-level block).
+- **Sound:** the 2-note beep (0.35 s) is replaced by a doorbell ringtone (E5-G#5-B5 played twice,
+  ~2 s), repeated every 8 s while someone waits, for up to 1 min; any click on the panel, Admit,
+  Deny or clicking the pop-up silences it.
+Hooks: `lkj-wr-alerts-chip`, `lkj-wr-alerts-on-btn`, `lkj-wr-alerts-close-btn`, `lkj-wr-test-alert-btn`.
+Revert: restore `prepareHostAlerts` / `alertWaiting` / `playChime` from 3e085042 and drop the chip.

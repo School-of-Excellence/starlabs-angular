@@ -131,8 +131,24 @@
     <button class="lkj-poor-net-x" (click)="poorNetDismissed = true" aria-label="Dismiss" data-testid="lkj-poor-net-close-btn">✕</button>
   </div>
 
+  <!-- Phase 4: waiting-room alerts need the browser's notification permission (one click). -->
+  <div *ngIf="isHost() && alertPermission !== 'granted' && !alertChipDismissed" class="wr-alert-chip" data-testid="lkj-wr-alerts-chip">
+    <mat-icon>notifications_off</mat-icon>
+    <ng-container *ngIf="alertPermission === 'default'">
+      <span>Get a pop-up when someone is waiting</span>
+      <button (click)="enableAlerts()" data-testid="lkj-wr-alerts-on-btn">Turn on</button>
+    </ng-container>
+    <ng-container *ngIf="alertPermission === 'denied'">
+      <span>Pop-ups are blocked for this site. Click the icon left of the address bar → Notifications → Allow, then reload.</span>
+    </ng-container>
+    <ng-container *ngIf="alertPermission === 'unsupported'">
+      <span>This browser can't show pop-ups — you'll hear a sound instead.</span>
+    </ng-container>
+    <button class="wr-alert-x" (click)="alertChipDismissed = true" aria-label="Dismiss" data-testid="lkj-wr-alerts-close-btn">✕</button>
+  </div>
+
   <!-- Phase 4: specialist's waiting room. -->
-  <div *ngIf="isHost() && (waitingList.length || deniedList.length)" class="wr-panel" data-testid="lkj-wr-panel">
+  <div *ngIf="isHost() && (waitingList.length || deniedList.length)" class="wr-panel" (click)="stopRinging()" data-testid="lkj-wr-panel">
     <button class="wr-head" (click)="waitingPanelOpen = !waitingPanelOpen" data-testid="lkj-wr-toggle-btn">
       <mat-icon>hourglass_top</mat-icon>
       <span>Waiting room ({{ waitingList.length }})</span>
@@ -147,6 +163,8 @@
         <button class="wr-btn wr-admit" (click)="admit(w.id)" data-testid="lkj-wr-admit-btn">Admit</button>
         <button class="wr-btn" (click)="deny(w)" data-testid="lkj-wr-deny-btn">Deny</button>
       </div>
+      <button class="wr-test" (click)="testAlert()" data-testid="lkj-wr-test-alert-btn">Test sound &amp; pop-up</button>
+      <div *ngIf="alertTestSent" class="wr-hint">Didn't see a pop-up? Your computer may be blocking it — allow your browser in System Settings → Notifications (Mac) or Settings → System → Notifications (Windows), and turn off Focus / Do not disturb.</div>
       <button *ngIf="waitingList.length > 1" class="wr-btn wr-admit wr-all" (click)="admitAll()" data-testid="lkj-wr-admit-all-btn">Admit all</button>
       <ng-container *ngIf="deniedList.length">
         <div class="wr-sub">Denied</div>
