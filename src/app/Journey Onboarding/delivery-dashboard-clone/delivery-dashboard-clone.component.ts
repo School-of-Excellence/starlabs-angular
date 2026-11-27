@@ -503,10 +503,12 @@ export class DeliveryDashboardCloneComponent {
             "ATC Understanding Validation",
             "My Evolution Wishlist",
             "Impact Valuation Activity",
+            "Pre Video Ask",
             "Diagnostics",
             "Implementation 1",
             "Implementation 2",
             "Review",
+            "Post Video Ask",
             "Completion"
         ],
 
@@ -726,7 +728,9 @@ export class DeliveryDashboardCloneComponent {
             review: 'implementation'
         },
         ctdAppointment: {
-            diagnostics: 'impactValuation',
+            // Impact Valuation OR Pre Video Ask: enrolments from before the VideoAsks were added (25 Nov) never
+            // reach Pre Video Ask, so Diagnostics' Waiting list keeps them too.
+            diagnostics: 'readyForDiagnostics',
             'implementation 1': 'diagnostics',
             'implementation 2': 'implementation1',
             review: 'implementation2'
@@ -765,7 +769,7 @@ export class DeliveryDashboardCloneComponent {
             implementation: [], review: [], postForm: [], completion: []
         },
         ctdAppointment: {
-            totalEligible: [], aspiration: [], atcValidation: [], thirdForm: [], impactValuation: [], diagnostics: [], implementation1: [], implementation2: [], review: [], completion: []
+            totalEligible: [], aspiration: [], atcValidation: [], thirdForm: [], impactValuation: [], preVideoAsk: [], readyForDiagnostics: [], diagnostics: [], implementation1: [], implementation2: [], review: [], postVideoAsk: [], completion: []
         }
     };
 
@@ -1667,7 +1671,7 @@ export class DeliveryDashboardCloneComponent {
             eiStarterPack: { totalEligible: [], pastMonth: [], thisMonth: [], nextMonth: [], onBoarding: [], preprocess: [], diagnostics: [], implementation: [], reports: [], celebrationCall: [] },
             eiCustomSolutions: { totalEligible: [], thisMonth: [], nextMonth: [], onBoarding: [], diagnostics: [], implementation: [], review: [], celebrationCall: [] },
             criticalSupport: { totalEligible: [], request: [], preprocess: [], diagnostics: [], implementation: [], review: [], postForm: [], completion: [] },
-            ctdAppointment: { totalEligible: [], aspiration: [], atcValidation: [], thirdForm: [], impactValuation: [], diagnostics: [], implementation1: [], implementation2: [], review: [], completion: [] }
+            ctdAppointment: { totalEligible: [], aspiration: [], atcValidation: [], thirdForm: [], impactValuation: [], preVideoAsk: [], readyForDiagnostics: [], diagnostics: [], implementation1: [], implementation2: [], review: [], postVideoAsk: [], completion: [] }
         };
         const productId = this.getCardIdForProduct(product);
         this.selectedProductLabel = product;
@@ -1693,6 +1697,7 @@ export class DeliveryDashboardCloneComponent {
             await this.filterStageData('criticalSupport');
         } else if (product === 'CTD D&I (Appointment)') {
             this.selectedColumns = this.ctdColumns();
+            await this.loadCtdVideoAsk(productId);
             await this.filterProductData('ctdAppointment', product, productId);
             await this.filterStageData('ctdAppointment');
         }
@@ -1828,7 +1833,7 @@ export class DeliveryDashboardCloneComponent {
                 preprocess: [], diagnostics: [], implementation: [], review: [], postForm: [], completion: []
             },
             ctdAppointment: {
-                totalEligible: [], aspiration: [], atcValidation: [], thirdForm: [], impactValuation: [], diagnostics: [], implementation1: [], implementation2: [], review: [], completion: []
+                totalEligible: [], aspiration: [], atcValidation: [], thirdForm: [], impactValuation: [], preVideoAsk: [], readyForDiagnostics: [], diagnostics: [], implementation1: [], implementation2: [], review: [], postVideoAsk: [], completion: []
             }
         };
 
@@ -1900,7 +1905,9 @@ export class DeliveryDashboardCloneComponent {
                     } else if (this.selectedProductType === 'eiCustomSolutions') {
                         productData.eiCustomSolutions.totalEligible.push(mergedData);
                     } else if (this.selectedProductType === 'ctdAppointment') {
-                        productData.ctdAppointment.totalEligible.push(mergedData);
+                        // No form / appointment yet, but a VideoAsk may already be answered.
+                        const step = this.ctdFurthestStep([], this.ctdVideoAnswersFor(data));
+                        (step ? productData.ctdAppointment[step.key] : productData.ctdAppointment.totalEligible).push(mergedData);
                     }
                 }
                 else if (attendedAppointments.length > 0) {
@@ -2028,7 +2035,7 @@ export class DeliveryDashboardCloneComponent {
                     // Furthest done step wins, in the cycle's delivery order: 4 forms (submitted), then
                     // Diagnostics, Implementation ×2, Review (attended). Alias types fold in via ctdStageType.
                     else if (this.selectedProductType === 'ctdAppointment') {
-                        const step = this.ctdFurthestStep(attendedAppointments);
+                        const step = this.ctdFurthestStep(attendedAppointments, this.ctdVideoAnswersFor(data));
                         const target = step ? productData.ctdAppointment[step.key] : productData.ctdAppointment.totalEligible;
                         target.push(step?.app ? { ...mergedData, ...step.app } : mergedData);
                     }
@@ -2055,6 +2062,10 @@ export class DeliveryDashboardCloneComponent {
                 } else if (productType === 'ctdAppointment') {
                     if (this.inCtdCycle(data)) productData.ctdAppointment.completion.push(data);
                 }
+            }
+            if (productType === 'ctdAppointment') {
+                productData.ctdAppointment.readyForDiagnostics = [
+                    ...productData.ctdAppointment.impactValuation, ...productData.ctdAppointment.preVideoAsk];
             }
             Object.assign(this.productData, productData);
             this.updateFilteredCards();
@@ -2425,7 +2436,8 @@ export class DeliveryDashboardCloneComponent {
 
     ctdColumns(): string[] {
         return ['Total Eligible', 'Aspiration Form', 'ATC Understanding Validation', this.ctdThirdFormName(),
-            'Impact Valuation Activity', 'Diagnostics', 'Implementation 1', 'Implementation 2', 'Review', 'Completion'];
+            'Impact Valuation Activity', 'Pre Video Ask', 'Diagnostics', 'Implementation 1', 'Implementation 2', 'Review',
+            'Post Video Ask', 'Completion'];
     }
 
     /** Form names compared without case, spacing or dash style ("CTD – Impact…" = "CTD - Impact…"). */
@@ -2442,8 +2454,81 @@ export class DeliveryDashboardCloneComponent {
         ];
     }
 
-    /** Furthest step an enrolment has done (submitted form / attended appointment), or null for none. */
-    private ctdFurthestStep(done: any[]): { key: string; app: any } | null {
+    // ===== CTD VideoAsk steps (operator 2026-11-27) =====
+    // The CTD D&I (Appointment) delivery sequence (productToDeliverySequence) gained arenavideoask steps on 25 Nov:
+    // 3 before the first appointment ("CTD Pre video ask 01–03") and 4 after the last ("CTD Post video ask 01–04").
+    // Which VideoAsk is Pre / Post is read from the sequence, so swapping a VideoAsk needs no code change.
+    // Answers live in participantvideoask (videoaskid + participantproductid; older answers only carry profileid).
+    private ctdVideoAskIds: { pre: Set<string>; post: Set<string> } | null = null;
+    private ctdVideoAnswers = new Map<string, { pre: Set<string>; post: Set<string> }>();
+
+    private async loadCtdVideoAsk(productId: string): Promise<void> {
+        try {
+            if (!this.ctdVideoAskIds) {
+                const pre = new Set<string>();
+                const post = new Set<string>();
+                const snap = await runInInjectionContext(this.injector, () => getDocs(query(
+                    collection(this.firestore, 'productToDeliverySequence'),
+                    where('product', '==', doc(this.firestore, 'products', productId)))));
+                for (const d of snap.docs) {
+                    for (const opt of (d.data()['deliveryoptions'] || [])) {
+                        const paths: string[] = (opt?.deliverysequence || []).map((x: any) => (x?.activity?.path || '').toString());
+                        const isAppt = (p: string) => p.startsWith('appointmenttype/');
+                        const first = paths.findIndex(isAppt);
+                        if (first < 0) continue; // e.g. the "Test" option — no appointments, no Pre / Post split
+                        let last = first;
+                        paths.forEach((p, i) => { if (isAppt(p)) last = i; });
+                        paths.forEach((p, i) => {
+                            if (!p.startsWith('arenavideoask/')) return;
+                            const id = p.split('/')[1];
+                            if (i < first) pre.add(id); else if (i > last) post.add(id);
+                        });
+                    }
+                }
+                // Cache only a real result, so a failed or empty read is retried next time.
+                if (pre.size || post.size) this.ctdVideoAskIds = { pre, post };
+                else return;
+            }
+            if (!this.ctdVideoAskIds) return;
+            const { pre, post } = this.ctdVideoAskIds;
+            const ids = [...pre, ...post];
+            const answers = new Map<string, { pre: Set<string>; post: Set<string> }>();
+            for (let i = 0; i < ids.length; i += 30) {
+                const snap = await runInInjectionContext(this.injector, () => getDocs(query(
+                    collection(this.firestore, 'participantvideoask'),
+                    where('videoaskid', 'in', ids.slice(i, i + 30)))));
+                for (const d of snap.docs) {
+                    const a: any = d.data();
+                    // By enrolment; an answer without participantproductid falls back to the participant.
+                    const key = a['participantproductid'] || (a['profileid'] ? 'p:' + a['profileid'] : '');
+                    if (!key) continue;
+                    if (!answers.has(key)) answers.set(key, { pre: new Set(), post: new Set() });
+                    answers.get(key)![pre.has(a['videoaskid']) ? 'pre' : 'post'].add(a['videoaskid']);
+                }
+            }
+            this.ctdVideoAnswers = answers;
+        } catch (err) {
+            console.error('CTD VideoAsk load failed:', err);
+        }
+    }
+
+    /** VideoAsks this enrolment has answered (its own, plus the participant's answers that carry no enrolment). */
+    private ctdVideoAnswersFor(item: any): { pre: Set<string>; post: Set<string> } {
+        const own = this.ctdVideoAnswers.get(item?.docid);
+        const loose = this.ctdVideoAnswers.get('p:' + item?.profileid);
+        return {
+            pre: new Set([...(own?.pre || []), ...(loose?.pre || [])]),
+            post: new Set([...(own?.post || []), ...(loose?.post || [])]),
+        };
+    }
+
+    /**
+     * Furthest step an enrolment has done (submitted form / attended appointment / answered VideoAsk), or null.
+     * Order (operator 2026-11-27): forms → Pre Video Ask → Diagnostics → Implementation ×2 → Review → Post Video Ask.
+     * A VideoAsk step counts as reached once ANY of its VideoAsks is answered.
+     */
+    private ctdFurthestStep(done: any[], va?: { pre: Set<string>; post: Set<string> }): { key: string; app: any } | null {
+        if (va?.post.size) return { key: 'postVideoAsk', app: null };
         const ofType = (type: string) => done.filter(a => this.ctdStageType(a?.appointmentTypeName) === type);
         const review = ofType('CTD Review');
         if (review.length) return { key: 'review', app: review[0] };
@@ -2452,6 +2537,7 @@ export class DeliveryDashboardCloneComponent {
         if (impl.length === 1) return { key: 'implementation1', app: impl[0] };
         const diag = ofType('CTD Diagnostics');
         if (diag.length) return { key: 'diagnostics', app: diag[0] };
+        if (va?.pre.size) return { key: 'preVideoAsk', app: null };
         const steps = this.ctdFormSteps();
         for (let i = steps.length - 1; i >= 0; i--) {
             const want = this.normFormName(steps[i].form);
@@ -2637,11 +2723,13 @@ export class DeliveryDashboardCloneComponent {
                 2: this.productData.ctdAppointment.atcValidation || [],
                 3: this.productData.ctdAppointment.thirdForm || [],
                 4: this.productData.ctdAppointment.impactValuation || [],
-                5: this.productData.ctdAppointment.diagnostics || [],
-                6: this.productData.ctdAppointment.implementation1 || [],
-                7: this.productData.ctdAppointment.implementation2 || [],
-                8: this.productData.ctdAppointment.review || [],
-                9: this.productData.ctdAppointment.completion || []
+                5: this.productData.ctdAppointment.preVideoAsk || [],
+                6: this.productData.ctdAppointment.diagnostics || [],
+                7: this.productData.ctdAppointment.implementation1 || [],
+                8: this.productData.ctdAppointment.implementation2 || [],
+                9: this.productData.ctdAppointment.review || [],
+                10: this.productData.ctdAppointment.postVideoAsk || [],
+                11: this.productData.ctdAppointment.completion || []
             };
         }
 
@@ -7545,16 +7633,18 @@ export class DeliveryDashboardCloneComponent {
             'next month': 'Next Month — EI Solution products not started yet (no status, or "initiated"; eligible) whose tentative start set in journey planning falls in next calendar month. They stay in Total Eligible too. One per product.',
         },
         ctdAppointment: {
-            "total eligible": "Total Eligible — CTD D&I (Appointment) products on the selected cycle with no status or status \"initiated\" (participant mode not installation event / event / integration; minimum paid or nothing owed), plus \"ongoing\" products with no submitted CTD form and no attended CTD appointment this calendar month. One per product.",
+            "total eligible": "Total Eligible — CTD D&I (Appointment) products on the selected cycle with no status or status \"initiated\" (participant mode not installation event / event / integration; minimum paid or nothing owed), plus \"ongoing\" products with no submitted CTD form, no answered CTD VideoAsk and no attended CTD appointment this calendar month. One per product.",
             "aspiration form": "Aspiration Form — \"ongoing\" products on the selected cycle whose furthest step is a submitted CTD Aspiration Form. One per product.",
             "atc understanding validation": "ATC Understanding Validation — \"ongoing\" products on the selected cycle whose furthest step is a submitted ATC Understanding Validation form. One per product.",
             "my evolution wishlist": "My Evolution Wishlist (1st Cycle) — \"ongoing\" 1st Cycle products whose furthest step is a submitted My Evolution Wishlist form. One per product.",
             "my pocket atc": "My Pocket ATC (Next Cycle) — \"ongoing\" Next Cycle products whose furthest step is a submitted My Pocket ATC form. One per product.",
             "impact valuation activity": "Impact Valuation Activity — \"ongoing\" products on the selected cycle whose furthest step is a submitted CTD – Impact Valuation Activity form. One per product.",
+            "pre video ask": "Pre Video Ask — \"ongoing\" products on the selected cycle that have answered at least one of the CTD Pre VideoAsks (the VideoAsks placed before CTD Diagnostics in the delivery sequence) and attended no CTD appointment yet. Answers from participantvideoask, any date. One per product.",
             "diagnostics": "Diagnostics — \"ongoing\" products on the selected cycle whose furthest step is an attended CTD Diagnostics appointment this calendar month. One per product. The cards below follow the All / Scheduled / Waiting tab.",
             "implementation 1": "Implementation 1 — \"ongoing\" products on the selected cycle with one attended CTD Implementation (or CTD Implementation Appointment) this calendar month and no Review. One per product. The cards below follow the All / Scheduled / Waiting tab.",
             "implementation 2": "Implementation 2 — \"ongoing\" products on the selected cycle with two or more attended CTD Implementation appointments this calendar month and no Review. One per product. The cards below follow the All / Scheduled / Waiting tab.",
-            "review": "Review — \"ongoing\" products on the selected cycle with an attended CTD Review (or CTD Review/Validation) appointment this calendar month. One per product. The cards below follow the All / Scheduled / Waiting tab.",
+            "review": "Review — \"ongoing\" products on the selected cycle with an attended CTD Review (or CTD Review/Validation) appointment this calendar month and no CTD Post VideoAsk answered yet. One per product. The cards below follow the All / Scheduled / Waiting tab.",
+            "post video ask": "Post Video Ask — \"ongoing\" products on the selected cycle that have answered at least one of the CTD Post VideoAsks (the VideoAsks placed after CTD Review in the delivery sequence). Answers from participantvideoask, any date. One per product.",
             "completion": "Completion — CTD D&I (Appointment) products on the selected cycle with status \"completed\", completed within the selected period. One per product.",
         },
     };
@@ -7563,6 +7653,7 @@ export class DeliveryDashboardCloneComponent {
     private readonly stagePoolRule: Record<string, Record<string, string>> = {
         ctdAppointment: {
             impactValuation: 'Impact Valuation Activity (furthest step: CTD – Impact Valuation Activity form submitted)',
+            readyForDiagnostics: 'Impact Valuation Activity or Pre Video Ask (furthest step: CTD – Impact Valuation Activity submitted, or a CTD Pre VideoAsk answered)',
             diagnostics: 'Diagnostics (furthest step: CTD Diagnostics attended)',
             implementation1: 'Implementation 1 (one CTD Implementation attended)',
             implementation2: 'Implementation 2 (two CTD Implementations attended)',
