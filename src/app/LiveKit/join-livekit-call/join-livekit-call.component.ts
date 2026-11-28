@@ -262,11 +262,16 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   // 2026-11-24 (operator): default = browser's in-built noise suppression; Deep Filter Noise is opt-in
   // from the mic menu. Revert = `(navigator.hardwareConcurrency || 4) >= 4` (DFN on for 4+ cores).
   dfnEnabled = false;
-  dfnAtten = 80;        // attenuation / noiseReductionLevel (0–100)
+  // Defaults 2026-11-28 (operator, after offline tests A–D): 80 dB carved the voice in noisy rooms
+  // ("robotic") with no extra noise removed → 20 dB; gate off; voice leveller on (replaces the ×1.2 boost).
+  dfnAtten = 20;        // attenuation / noiseReductionLevel (0–100) — was 80
   dfnNorm = 1.2;        // makeup gain (1.0–2.5)
   dfnNormOn = true;     // normalize toggle
-  dfnGateOn = true;     // gate toggle
+  dfnGateOn = false;    // gate toggle — was true
   dfnGateDb = -45;      // gate threshold dBFS (-70…-25)
+  // Voice leveller (2026-11-28): automatic gain after DFN toward a steady speech level, like
+  // Zoom / Meet AGC. When on, the fixed makeup gain is 1.0.
+  dfnLevelOn = true;
   dfnPanelOpen = false; // tuning popover visibility
   get dfnEffNorm(): number { return this.dfnNormOn ? this.dfnNorm : 1.0; }
   // Cache active blur processor — avoids recreating the canvas pipeline on every camera re-enable
@@ -1721,9 +1726,10 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
             sampleRate: 48000,
             noiseReductionLevel: this.dfnAtten,
             enabled: true,
-            makeupGain: this.dfnEffNorm,
+            makeupGain: this.dfnLevelOn ? 1.0 : this.dfnEffNorm,
             gateEnabled: this.dfnGateOn,
             gateThresholdDb: this.dfnGateDb,
+            levelerEnabled: this.dfnLevelOn,
             assetConfig: { cdnUrl: '/assets/df3' },
           });
           this.dfnProc = proc;
@@ -1770,7 +1776,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     const room = this.room();
     if (!room) return;
     const id = room.localParticipant?.identity;
-    const info = { dfn: this.dfnEnabled, atten: this.dfnAtten, norm: this.dfnEffNorm };
+    const info = { dfn: this.dfnEnabled, atten: this.dfnAtten, norm: this.dfnLevelOn ? 1.0 : this.dfnEffNorm };
     if (id) this.dfnState.update(id, info);
     if (!id) return;
     try {
@@ -1835,13 +1841,23 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
 
   onDfnNormOnChange(on: boolean): void {
     this.dfnNormOn = on;
-    try { this.dfnProc?.setMakeupGain(this.dfnEffNorm); } catch (_) {}
+    // The voice leveller replaces the fixed boost — keep it at 1.0 while the leveller is on.
+    try { this.dfnProc?.setMakeupGain(this.dfnLevelOn ? 1.0 : this.dfnEffNorm); } catch (_) {}
     this.broadcastDfn();
   }
 
   onDfnNormChange(v: number): void {
     this.dfnNorm = v;
-    try { this.dfnProc?.setMakeupGain(this.dfnEffNorm); } catch (_) {}
+    // The voice leveller replaces the fixed boost — keep it at 1.0 while the leveller is on.
+    try { this.dfnProc?.setMakeupGain(this.dfnLevelOn ? 1.0 : this.dfnEffNorm); } catch (_) {}
+    this.broadcastDfn();
+  }
+
+  /** Voice leveller on/off (diag NR-Tune panel). It replaces the fixed boost, so boost → 1.0 while on. */
+  onDfnLevelOnChange(on: boolean): void {
+    this.dfnLevelOn = on;
+    try { this.dfnProc?.setLevelerEnabled(on); } catch (_) {}
+    try { this.dfnProc?.setMakeupGain(on ? 1.0 : this.dfnEffNorm); } catch (_) {}
     this.broadcastDfn();
   }
 

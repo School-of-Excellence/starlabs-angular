@@ -27,6 +27,8 @@ interface DeepFilterNoiseFilterOptions {
     gateEnabled?: boolean;
     /** Gate open threshold in dBFS (default -45). Higher gates more aggressively. */
     gateThresholdDb?: number;
+    /** Post-DFN voice leveller: automatic gain toward a steady speech level (~-20 dBFS RMS, -6…+12 dB). */
+    levelerEnabled?: boolean;
 }
 
 declare class DeepFilterNet3Core {
@@ -48,6 +50,7 @@ declare class DeepFilterNet3Core {
     setPostFilterBeta(beta: number): void;
     setGateEnabled(enabled: boolean): void;
     setGateThreshold(db: number): void;
+    setLevelerEnabled(enabled: boolean): void;
     destroy(): void;
     isReady(): boolean;
     setNoiseSuppressionEnabled(enabled: boolean): void;
@@ -91,6 +94,7 @@ declare class DeepFilterNoiseFilterProcessor implements TrackProcessor<Track.Kin
     setGateEnabled(enabled: boolean): void;
     /** Gate open threshold in dBFS (e.g. -45). Higher = more aggressive (gates more). */
     setGateThreshold(db: number): void;
+    setLevelerEnabled(enabled: boolean): void;
     isEnabled(): boolean;
     isNoiseSuppressionEnabled(): boolean;
     suspend: () => Promise<void>;

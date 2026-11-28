@@ -564,6 +564,11 @@
                    (input)="onDfnGateDbChange(+$any($event.target).value)">
             <b>{{ dfnGateOn ? (dfnGateDb + ' dB') : 'off' }}</b>
           </div>
+          <div class="dfn-row" [class.dfn-dim]="!dfnEnabled">
+            <label><input data-testid="lkj-dfn-leveller-toggle" type="checkbox" [checked]="dfnLevelOn" [disabled]="!dfnEnabled"
+                   (change)="onDfnLevelOnChange($any($event.target).checked)"> Voice leveller</label>
+            <b>{{ dfnLevelOn ? 'auto' : 'off' }}</b>
+          </div>
         </div>
       </div>
 

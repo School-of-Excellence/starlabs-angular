@@ -78,3 +78,32 @@ Revert: remove `noteDropped` / `clearDropped` / DataReceived listener / `sendBye
   Deny or clicking the pop-up silences it.
 Hooks: `lkj-wr-alerts-chip`, `lkj-wr-alerts-on-btn`, `lkj-wr-alerts-close-btn`, `lkj-wr-test-alert-btn`.
 Revert: restore `prepareHostAlerts` / `alertWaiting` / `playChime` from 3e085042 and drop the chip.
+
+## 2026-11-28 — Deep Filter: robotic voice in noise + voice leveller (offline tests)
+**Offline harness** (scratchpad, not in repo): the shipped worklet code + `df_bg.wasm` + model, driven
+128 samples at a time in Node; synthetic voice (macOS `say`) + generated babble / fan noise.
+- **Robotic in noise = the 80 dB removal limit.** Loud mixed room: today (80 dB, gate, ×1.2) cut
+  10.9 % of speech frames by > 15 dB; 20 dB / gate off cut 4.9 % with the same noise left (−31/−32
+  dBFS). DFN can't remove other people's voices (~7 dB whatever the setting). The gate barely acts
+  in loud noise. Recommendation: removal 20–30 dB, gate off — **not yet applied** (operator to decide).
+- **DFN lowers the voice ~7 dB** (the fixed ×1.2 boost only gives back 1.6 dB).
+
+**Voice leveller** (vendor worklet, after the gate; `levelerEnabled` / `setLevelerEnabled`; app
+`dfnLevelOn`, **off by default**, diag toggle "Voice leveller" `lkj-dfn-leveller-toggle`; when on, the
+fixed boost is 1.0):
+- 10 ms blocks; speech = above a tracked noise floor (+9 dB), above −50 dBFS and within 10 dB of the
+  speaker's level; speaker level rises fast (0.25 s) / falls slowly (2 s) so it locks onto the
+  person at the mic; gain −6…+12 dB toward −18 dB on that estimate (≈ −20 dBFS RMS out), 3 dB/s up
+  / 6 dB/s down (faster and capped at +6 dB during the first 3 s of speech); held in silence;
+  digital silence ignored; instant peak guard at −1 dBFS.
+- Bugs found while testing and fixed: DFN's start-up zeros set the noise floor to −120 dB (all
+  background then counted as speech); background chatter steered the level; 3 ms limiter let
+  104 samples clip → peak guard.
+- Result: speech level −20…−21 dBFS in every room/speaker except a very soft one (−26, gain cap);
+  today −17…−37. After the first ~3 s the voice-to-noise gap equals Test C (±0.5 dB) — no noise
+  pumping. Side effect: chatter before the first words can be lifted up to +6 dB for ~2 s.
+Revert: `dfnLevelOn` stays false = no change; remove the `lev*` code from the worklet string.
+**Defaults changed (operator 2026-11-28 "make it default"):** `dfnAtten` 80 → 20, `dfnGateOn` true → false,
+`dfnLevelOn` false → true (fixed boost held at 1.0 while the leveller is on). Applies whenever a person
+switches Deep Filter on; the in-built noise cancellation stays the overall default. Sliders in the
+`?diag=1` panel still override. Revert: set the three fields back.
